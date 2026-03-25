@@ -228,7 +228,7 @@ export function registerClaudeIPC(): void {
     return result
   })
 
-  ipcMain.handle('claude:send-message', async (_event, message: string, auth: AuthConfig) => {
+  ipcMain.handle('claude:send-message', async (_event, message: string, auth: AuthConfig, modelOptions?: { model?: string; thinkingBudgetTokens?: number }) => {
     // Abort any previous query
     if (currentAbort) {
       currentAbort.abort()
@@ -256,6 +256,8 @@ export function registerClaudeIPC(): void {
         abortController: currentAbort,
         persistSession: true,
         ...(sessionId ? { resume: sessionId } : {}),
+        ...(modelOptions?.model ? { model: modelOptions.model } : {}),
+        ...(modelOptions?.thinkingBudgetTokens ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens } : {}),
         ...authOptions
       }
 

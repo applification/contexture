@@ -18,7 +18,8 @@ declare global {
       detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>
       sendMessage: (
         message: string,
-        auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string }
+        auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string },
+        modelOptions?: { model?: string; thinkingBudgetTokens?: number }
       ) => Promise<void>
       abortClaude: () => Promise<void>
       resetSession: () => Promise<void>

@@ -28,8 +28,9 @@ const api = {
     ipcRenderer.invoke('claude:detect-cli'),
   sendMessage: (
     message: string,
-    auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string }
-  ): Promise<void> => ipcRenderer.invoke('claude:send-message', message, auth),
+    auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string },
+    modelOptions?: { model?: string; thinkingBudgetTokens?: number }
+  ): Promise<void> => ipcRenderer.invoke('claude:send-message', message, auth, modelOptions),
   abortClaude: (): Promise<void> => ipcRenderer.invoke('claude:abort'),
   resetSession: (): Promise<void> => ipcRenderer.invoke('claude:reset-session'),
 

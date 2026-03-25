@@ -11,6 +11,15 @@ export interface ChatMessage {
 }
 
 export type AuthMode = 'max' | 'api-key'
+export type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6'
+export type ThinkingBudget = 'auto' | 'low' | 'med' | 'high'
+
+const THINKING_TOKENS: Record<ThinkingBudget, number | undefined> = {
+  auto: undefined,
+  low: 2048,
+  med: 8192,
+  high: 16000
+}
 
 interface UseClaudeReturn {
   messages: ChatMessage[]
@@ -19,6 +28,10 @@ interface UseClaudeReturn {
   setAuthMode: (mode: AuthMode) => void
   apiKey: string
   setApiKey: (key: string) => void
+  model: ModelId
+  setModel: (model: ModelId) => void
+  thinkingBudget: ThinkingBudget
+  setThinkingBudget: (budget: ThinkingBudget) => void
   cliDetected: boolean
   isReady: boolean
   sendMessage: (message: string, context?: string) => void
@@ -27,6 +40,8 @@ interface UseClaudeReturn {
 
 const API_KEY_STORAGE = 'ontograph-api-key'
 const AUTH_MODE_STORAGE = 'ontograph-auth-mode'
+const MODEL_STORAGE = 'ontograph-model'
+const THINKING_STORAGE = 'ontograph-thinking-budget'
 
 export function useClaude(): UseClaudeReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -34,6 +49,12 @@ export function useClaude(): UseClaudeReturn {
   const [apiKey, setApiKeyState] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '')
   const [authMode, setAuthModeState] = useState<AuthMode>(
     () => (localStorage.getItem(AUTH_MODE_STORAGE) as AuthMode) || 'max'
+  )
+  const [model, setModelState] = useState<ModelId>(
+    () => (localStorage.getItem(MODEL_STORAGE) as ModelId) || 'claude-sonnet-4-6'
+  )
+  const [thinkingBudget, setThinkingBudgetState] = useState<ThinkingBudget>(
+    () => (localStorage.getItem(THINKING_STORAGE) as ThinkingBudget) || 'auto'
   )
   const [cliDetected, setCliDetected] = useState(false)
 
@@ -66,6 +87,16 @@ export function useClaude(): UseClaudeReturn {
     } else {
       localStorage.removeItem(API_KEY_STORAGE)
     }
+  }, [])
+
+  const setModel = useCallback((m: ModelId) => {
+    setModelState(m)
+    localStorage.setItem(MODEL_STORAGE, m)
+  }, [])
+
+  const setThinkingBudget = useCallback((b: ThinkingBudget) => {
+    setThinkingBudgetState(b)
+    localStorage.setItem(THINKING_STORAGE, b)
   }, [])
 
   // Register tool callback listeners
@@ -176,9 +207,10 @@ export function useClaude(): UseClaudeReturn {
       const auth =
         authMode === 'api-key' ? { mode: 'api-key' as const, key: apiKey } : { mode: 'max' as const }
       const prompt = context ? `${context}\n\n${message}` : message
-      window.api.sendMessage(prompt, auth)
+      const modelOptions = { model, thinkingBudgetTokens: THINKING_TOKENS[thinkingBudget] }
+      window.api.sendMessage(prompt, auth, modelOptions)
     },
-    [apiKey, authMode]
+    [apiKey, authMode, model, thinkingBudget]
   )
 
   const resetSession = useCallback(() => {
@@ -186,5 +218,5 @@ export function useClaude(): UseClaudeReturn {
     window.api.resetSession()
   }, [])
 
-  return { messages, isLoading, authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady, sendMessage, resetSession }
+  return { messages, isLoading, authMode, setAuthMode, apiKey, setApiKey, model, setModel, thinkingBudget, setThinkingBudget, cliDetected, isReady, sendMessage, resetSession }
 }

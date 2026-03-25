@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Streamdown } from 'streamdown'
 import { code } from '@streamdown/code'
-import { useClaude, type ChatMessage } from './useClaude'
+import { useClaude, type ChatMessage, type ModelId, type ThinkingBudget } from './useClaude'
 import { useUIStore } from '@renderer/store/ui'
 import { useOntologyStore } from '@renderer/store/ontology'
 
 export function ChatPanel(): React.JSX.Element {
   const {
     messages, isLoading, authMode, isReady,
+    model, setModel, thinkingBudget, setThinkingBudget,
     sendMessage, resetSession
   } = useClaude()
   const [input, setInput] = useState('')
@@ -109,7 +110,7 @@ export function ChatPanel(): React.JSX.Element {
       )}
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 border-t border-border">
+      <form onSubmit={handleSubmit} className="p-3 border-t border-border space-y-1.5">
         <div className="flex gap-2">
           <input
             type="text"
@@ -128,6 +129,33 @@ export function ChatPanel(): React.JSX.Element {
               Stop
             </button>
           )}
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value as ModelId)}
+            className="text-[11px] bg-secondary text-muted-foreground rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-ring cursor-pointer hover:text-foreground transition-colors"
+          >
+            <option value="claude-haiku-4-5-20251001">Haiku</option>
+            <option value="claude-sonnet-4-6">Sonnet</option>
+            <option value="claude-opus-4-6">Opus</option>
+          </select>
+          <div className="flex gap-0.5">
+            {(['auto', 'low', 'med', 'high'] as ThinkingBudget[]).map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setThinkingBudget(level)}
+                className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                  thinkingBudget === level
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
         </div>
       </form>
     </div>
