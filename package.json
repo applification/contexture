@@ -1,0 +1,43 @@
+{
+  "name": "ontograph",
+  "version": "0.1.0",
+  "description": "A modern ontology editor with Claude integration",
+  "main": "./out/main/index.js",
+  "author": "Applification Ltd",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:win": "npm run build && electron-builder --win --config",
+    "build:mac": "npm run build && electron-builder --mac --config",
+    "build:linux": "npm run build && electron-builder --linux --config"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@tailwindcss/vite": "4",
+    "clsx": "^2.1.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "4"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron": "^35.2.1",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "5",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.1"
+  }
+}
