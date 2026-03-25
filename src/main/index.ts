@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMenu } from './menu'
 import { registerFileIPC } from './ipc/file'
+import { registerClaudeIPC } from './ipc/claude'
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -45,6 +46,7 @@ app.whenReady().then(() => {
   })
 
   registerFileIPC()
+  registerClaudeIPC()
 
   const mainWindow = createWindow()
   Menu.setApplicationMenu(createMenu(mainWindow))

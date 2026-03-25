@@ -19,6 +19,7 @@
     "build:linux": "npm run build && electron-builder --linux --config"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.83",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
     "@tailwindcss/vite": "4",
@@ -31,6 +32,7 @@
     "react-dom": "^19.1.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "4",
+    "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

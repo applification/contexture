@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react'
 import { GraphCanvas } from './components/graph/GraphCanvas'
 import { DetailPanel } from './components/detail/DetailPanel'
 import { ValidationPanel } from './components/validation/ValidationPanel'
+import { ChatPanel } from './components/chat/ChatPanel'
 import { useOntologyStore } from './store/ontology'
 import { useUIStore } from './store/ui'
 import './components/graph/graph-node-styles.css'
@@ -124,26 +125,7 @@ function App(): React.JSX.Element {
         )}
 
         {/* Chat Panel */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="px-3 py-2 border-b border-border">
-            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Claude
-            </h2>
-          </div>
-          <div className="flex-1 flex items-center justify-center p-4">
-            <p className="text-xs text-muted-foreground text-center">
-              Chat with Claude to generate and refine your ontology
-            </p>
-          </div>
-          <div className="p-3 border-t border-border">
-            <input
-              type="text"
-              placeholder="Describe your ontology..."
-              className="w-full bg-secondary text-sm rounded-md px-3 py-1.5 outline-none placeholder:text-muted-foreground"
-              disabled
-            />
-          </div>
-        </div>
+        <ChatPanel />
 
         {/* Validation Panel */}
         {hasContent && (
