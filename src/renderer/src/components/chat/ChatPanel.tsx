@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useClaude, type ChatMessage } from './useClaude'
+import { useUIStore } from '@renderer/store/ui'
+import { useOntologyStore } from '@renderer/store/ontology'
 
 export function ChatPanel(): React.JSX.Element {
   const {
@@ -9,6 +11,33 @@ export function ChatPanel(): React.JSX.Element {
   const [input, setInput] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
+  const selectedEdgeId = useUIStore((s) => s.selectedEdgeId)
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode)
+  const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const ontology = useOntologyStore((s) => s.ontology)
+
+  const selectionContext = useMemo(() => {
+    if (selectedNodeId) {
+      const cls = ontology.classes.get(selectedNodeId)
+      if (!cls) return null
+      const parts = [`Currently selected class "${cls.label || cls.uri}" (${cls.uri})`]
+      if (cls.comment) parts.push(`comment: "${cls.comment}"`)
+      if (cls.subClassOf.length) parts.push(`subClassOf: ${cls.subClassOf.join(', ')}`)
+      return { type: 'class' as const, label: cls.label || cls.uri, contextString: `[Context: ${parts.join(' - ')}]` }
+    }
+    if (selectedEdgeId) {
+      const prop = ontology.objectProperties.get(selectedEdgeId)
+      if (!prop) return null
+      const parts = [`Currently selected property "${prop.label || prop.uri}" (${prop.uri})`]
+      if (prop.comment) parts.push(`comment: "${prop.comment}"`)
+      if (prop.domain.length) parts.push(`domain: ${prop.domain.join(', ')}`)
+      if (prop.range.length) parts.push(`range: ${prop.range.join(', ')}`)
+      return { type: 'property' as const, label: prop.label || prop.uri, contextString: `[Context: ${parts.join(' - ')}]` }
+    }
+    return null
+  }, [selectedNodeId, selectedEdgeId, ontology])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -21,7 +50,7 @@ export function ChatPanel(): React.JSX.Element {
       setShowSettings(true)
       return
     }
-    sendMessage(input.trim())
+    sendMessage(input.trim(), selectionContext?.contextString)
     setInput('')
   }
 
@@ -116,6 +145,22 @@ export function ChatPanel(): React.JSX.Element {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Selection Context Badge */}
+      {selectionContext && (
+        <div className="px-3 pt-2">
+          <div className="inline-flex items-center gap-1.5 bg-secondary text-xs rounded-full px-2.5 py-1 max-w-full">
+            <span className="text-muted-foreground">{selectionContext.type === 'class' ? '◆' : '→'}</span>
+            <span className="truncate text-foreground">{selectionContext.label}</span>
+            <button
+              onClick={() => selectionContext.type === 'class' ? setSelectedNode(null) : setSelectedEdge(null)}
+              className="text-muted-foreground hover:text-foreground ml-0.5 shrink-0"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <form onSubmit={handleSubmit} className="p-3 border-t border-border">

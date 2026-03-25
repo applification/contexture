@@ -170,12 +170,13 @@ export function useClaude(): UseClaudeReturn {
   }, [store])
 
   const sendMessage = useCallback(
-    (message: string) => {
+    (message: string, context?: string) => {
       setMessages((prev) => [...prev, { role: 'user', content: message }])
       setIsLoading(true)
       const auth =
         authMode === 'api-key' ? { mode: 'api-key' as const, key: apiKey } : { mode: 'max' as const }
-      window.api.sendMessage(message, auth)
+      const prompt = context ? `${context}\n\n${message}` : message
+      window.api.sendMessage(prompt, auth)
     },
     [apiKey, authMode]
   )
