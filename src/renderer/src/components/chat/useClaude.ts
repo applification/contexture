@@ -10,23 +10,54 @@ export interface ChatMessage {
   cost?: number
 }
 
+export type AuthMode = 'max' | 'api-key'
+
 interface UseClaudeReturn {
   messages: ChatMessage[]
   isLoading: boolean
+  authMode: AuthMode
+  setAuthMode: (mode: AuthMode) => void
   apiKey: string
   setApiKey: (key: string) => void
+  cliDetected: boolean
+  isReady: boolean
   sendMessage: (message: string) => void
   resetSession: () => void
 }
 
 const API_KEY_STORAGE = 'ontograph-api-key'
+const AUTH_MODE_STORAGE = 'ontograph-auth-mode'
 
 export function useClaude(): UseClaudeReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [apiKey, setApiKeyState] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '')
+  const [authMode, setAuthModeState] = useState<AuthMode>(
+    () => (localStorage.getItem(AUTH_MODE_STORAGE) as AuthMode) || 'max'
+  )
+  const [cliDetected, setCliDetected] = useState(false)
 
   const store = useOntologyStore
+
+  // Detect Claude CLI on mount and auto-select auth mode
+  useEffect(() => {
+    window.api.detectClaudeCli().then((result) => {
+      setCliDetected(result.installed)
+      // Auto-default to Max if CLI found and no stored preference
+      if (result.installed && !localStorage.getItem(AUTH_MODE_STORAGE)) {
+        setAuthModeState('max')
+      } else if (!result.installed && !localStorage.getItem(AUTH_MODE_STORAGE)) {
+        setAuthModeState('api-key')
+      }
+    })
+  }, [])
+
+  const isReady = authMode === 'max' ? cliDetected : !!apiKey
+
+  const setAuthMode = useCallback((mode: AuthMode) => {
+    setAuthModeState(mode)
+    localStorage.setItem(AUTH_MODE_STORAGE, mode)
+  }, [])
 
   const setApiKey = useCallback((key: string) => {
     setApiKeyState(key)
@@ -142,9 +173,11 @@ export function useClaude(): UseClaudeReturn {
     (message: string) => {
       setMessages((prev) => [...prev, { role: 'user', content: message }])
       setIsLoading(true)
-      window.api.sendMessage(message, apiKey)
+      const auth =
+        authMode === 'api-key' ? { mode: 'api-key' as const, key: apiKey } : { mode: 'max' as const }
+      window.api.sendMessage(message, auth)
     },
-    [apiKey]
+    [apiKey, authMode]
   )
 
   const resetSession = useCallback(() => {
@@ -152,5 +185,5 @@ export function useClaude(): UseClaudeReturn {
     window.api.resetSession()
   }, [])
 
-  return { messages, isLoading, apiKey, setApiKey, sendMessage, resetSession }
+  return { messages, isLoading, authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady, sendMessage, resetSession }
 }

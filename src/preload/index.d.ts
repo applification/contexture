@@ -15,7 +15,11 @@ declare global {
       onMenuFileSaveAs: (callback: () => void) => () => void
 
       // Claude operations
-      sendMessage: (message: string, apiKey: string) => Promise<void>
+      detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>
+      sendMessage: (
+        message: string,
+        auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string }
+      ) => Promise<void>
       abortClaude: () => Promise<void>
       resetSession: () => Promise<void>
 

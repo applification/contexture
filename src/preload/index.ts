@@ -24,8 +24,12 @@ const api = {
   onMenuFileSaveAs: (callback: () => void) => onChannel('menu:file-save-as', callback),
 
   // Claude operations
-  sendMessage: (message: string, apiKey: string): Promise<void> =>
-    ipcRenderer.invoke('claude:send-message', message, apiKey),
+  detectClaudeCli: (): Promise<{ installed: boolean; path: string | null }> =>
+    ipcRenderer.invoke('claude:detect-cli'),
+  sendMessage: (
+    message: string,
+    auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string }
+  ): Promise<void> => ipcRenderer.invoke('claude:send-message', message, auth),
   abortClaude: (): Promise<void> => ipcRenderer.invoke('claude:abort'),
   resetSession: (): Promise<void> => ipcRenderer.invoke('claude:reset-session'),
 

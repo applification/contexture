@@ -1,6 +1,30 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod/v4'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+
+const execFileAsync = promisify(execFile)
+
+interface AuthConfig {
+  mode: 'api-key' | 'max'
+  key?: string
+  binaryPath?: string
+}
+
+let detectedClaudePath: string | null = null
+
+async function detectClaudeCli(): Promise<{ installed: boolean; path: string | null }> {
+  try {
+    const { stdout } = await execFileAsync(process.platform === 'win32' ? 'where' : 'which', [
+      'claude'
+    ])
+    const path = stdout.trim().split('\n')[0]
+    return { installed: true, path }
+  } catch {
+    return { installed: false, path: null }
+  }
+}
 
 interface OntologyState {
   turtle: string
@@ -192,7 +216,19 @@ const ALL_TOOLS = [
 export function registerClaudeIPC(): void {
   let sessionId: string | undefined
 
-  ipcMain.handle('claude:send-message', async (_event, message: string, apiKey: string) => {
+  // Detect Claude CLI on startup and expose result to renderer
+  detectClaudeCli().then((result) => {
+    detectedClaudePath = result.path
+  })
+
+  ipcMain.handle('claude:detect-cli', async () => {
+    if (detectedClaudePath) return { installed: true, path: detectedClaudePath }
+    const result = await detectClaudeCli()
+    detectedClaudePath = result.path
+    return result
+  })
+
+  ipcMain.handle('claude:send-message', async (_event, message: string, auth: AuthConfig) => {
     // Abort any previous query
     if (currentAbort) {
       currentAbort.abort()
@@ -200,6 +236,14 @@ export function registerClaudeIPC(): void {
     currentAbort = new AbortController()
 
     try {
+      const authOptions =
+        auth.mode === 'api-key' && auth.key
+          ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
+          : {
+              pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
+              env: process.env
+            }
+
       const options: Record<string, unknown> = {
         mcpServers: { ontograph: ontographServer },
         allowedTools: ALL_TOOLS,
@@ -210,9 +254,9 @@ export function registerClaudeIPC(): void {
         systemPrompt: SYSTEM_PROMPT,
         maxTurns: 20,
         abortController: currentAbort,
-        env: { ...process.env, ANTHROPIC_API_KEY: apiKey },
         persistSession: false,
-        ...(sessionId ? { resume: sessionId } : {})
+        ...(sessionId ? { resume: sessionId } : {}),
+        ...authOptions
       }
 
       for await (const msg of query({ prompt: message, options: options as never })) {
@@ -243,7 +287,7 @@ export function registerClaudeIPC(): void {
           if (msg.subtype === 'success') {
             sendToRenderer('claude:result', msg.result, msg.total_cost_usd)
           } else {
-            sendToRenderer('claude:error', msg.error || 'Unknown error')
+            sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error')
           }
         }
       }

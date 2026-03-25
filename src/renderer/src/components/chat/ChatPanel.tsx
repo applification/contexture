@@ -2,9 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { useClaude, type ChatMessage } from './useClaude'
 
 export function ChatPanel(): React.JSX.Element {
-  const { messages, isLoading, apiKey, setApiKey, sendMessage, resetSession } = useClaude()
+  const {
+    messages, isLoading, authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady,
+    sendMessage, resetSession
+  } = useClaude()
   const [input, setInput] = useState('')
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -14,8 +17,8 @@ export function ChatPanel(): React.JSX.Element {
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
-    if (!apiKey) {
-      setShowApiKeyInput(true)
+    if (!isReady) {
+      setShowSettings(true)
       return
     }
     sendMessage(input.trim())
@@ -30,11 +33,11 @@ export function ChatPanel(): React.JSX.Element {
         </h2>
         <div className="flex gap-1">
           <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+            onClick={() => setShowSettings(!showSettings)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
-            title="API Key settings"
+            title="Auth settings"
           >
-            {apiKey ? '●' : '○'}
+            {isReady ? '●' : '○'}
           </button>
           {messages.length > 0 && (
             <button
@@ -48,20 +51,46 @@ export function ChatPanel(): React.JSX.Element {
         </div>
       </div>
 
-      {/* API Key Input */}
-      {showApiKeyInput && (
-        <div className="px-3 py-2 border-b border-border bg-secondary/50">
-          <label className="text-xs text-muted-foreground block mb-1">Anthropic API Key</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-ant-..."
-            className="w-full bg-secondary text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-ring font-mono"
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Your key is stored locally and used to call the Claude API directly.
-          </p>
+      {/* Auth Settings */}
+      {showSettings && (
+        <div className="px-3 py-2 border-b border-border bg-secondary/50 space-y-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setAuthMode('max')}
+              className={`text-[10px] px-2 py-0.5 rounded ${authMode === 'max' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+            >
+              Claude Max
+            </button>
+            <button
+              onClick={() => setAuthMode('api-key')}
+              className={`text-[10px] px-2 py-0.5 rounded ${authMode === 'api-key' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
+            >
+              API Key
+            </button>
+          </div>
+
+          {authMode === 'max' && (
+            <p className="text-[10px] text-muted-foreground">
+              {cliDetected
+                ? 'Claude CLI detected. Using your Max subscription.'
+                : 'Claude CLI not found. Install Claude Code and log in, or switch to API Key mode.'}
+            </p>
+          )}
+
+          {authMode === 'api-key' && (
+            <>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-ant-..."
+                className="w-full bg-secondary text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-ring font-mono"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Stored locally. Used to call the Claude API directly.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -69,9 +98,11 @@ export function ChatPanel(): React.JSX.Element {
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground text-center mt-4">
-            {apiKey
+            {isReady
               ? 'Describe the ontology you want to create...'
-              : 'Set your API key to start chatting with Claude'}
+              : authMode === 'max'
+                ? 'Claude CLI not detected. Check settings.'
+                : 'Set your API key to start chatting with Claude'}
           </p>
         )}
         {messages.map((msg, i) => (
@@ -93,8 +124,8 @@ export function ChatPanel(): React.JSX.Element {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={apiKey ? 'Describe your ontology...' : 'Set API key first...'}
-            disabled={!apiKey || isLoading}
+            placeholder={isReady ? 'Describe your ontology...' : 'Configure auth first...'}
+            disabled={!isReady || isLoading}
             className="flex-1 bg-secondary text-sm rounded-md px-3 py-1.5 outline-none placeholder:text-muted-foreground disabled:opacity-50 focus:ring-1 focus:ring-ring"
           />
           {isLoading && (
