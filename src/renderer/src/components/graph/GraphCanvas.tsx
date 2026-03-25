@@ -7,7 +7,9 @@ import { useUIStore } from '@renderer/store/ui'
 import { ontologyToCytoscapeElements } from '@renderer/model/cytoscape'
 import { getCytoscapeStylesheet } from './graph-styles'
 import { renderNodeHtml } from './node-renderer'
-import { layoutOptions } from './layout'
+import { getLayoutOptions } from './layout'
+import { setCyInstance } from './cyRef'
+import { useGraphFilters } from '@renderer/hooks/useGraphFilters'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 
 // Register extension once
@@ -30,7 +32,10 @@ export function GraphCanvas(): React.JSX.Element {
   const removeObjectProperty = useOntologyStore((s) => s.removeObjectProperty)
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
+  useGraphFilters()
 
   // Derive a base namespace from prefixes
   const baseNs = Array.from(ontology.prefixes.entries()).find(
@@ -46,7 +51,7 @@ export function GraphCanvas(): React.JSX.Element {
       container: containerRef.current,
       elements: elements as cytoscape.ElementDefinition[],
       style: getCytoscapeStylesheet(),
-      layout: elements.length > 0 ? layoutOptions : { name: 'preset' },
+      layout: elements.length > 0 ? getLayoutOptions(useUIStore.getState().graphLayout) : { name: 'preset' },
       minZoom: 0.2,
       maxZoom: 3,
       wheelSensitivity: 0.3
@@ -55,7 +60,7 @@ export function GraphCanvas(): React.JSX.Element {
     // HTML labels for card-style nodes
     ;(cy as unknown as { nodeHtmlLabel: (opts: unknown[]) => void }).nodeHtmlLabel([
       {
-        query: 'node[type = "class"]',
+        query: 'node[type = "class"]:visible',
         halign: 'center',
         valign: 'center',
         cssClass: 'cytoscape-node-html',
@@ -164,8 +169,10 @@ export function GraphCanvas(): React.JSX.Element {
     })
 
     cyRef.current = cy
+    setCyInstance(cy)
 
     return () => {
+      setCyInstance(null)
       cy.destroy()
     }
   }, [ontology, setSelectedNode, setSelectedEdge, addClass, removeClass, removeObjectProperty, baseNs])
@@ -179,7 +186,7 @@ export function GraphCanvas(): React.JSX.Element {
     <>
       <div
         ref={containerRef}
-        className="w-full h-full"
+        className={`w-full h-full${showDatatypeProperties ? '' : ' hide-dt-props'}`}
         style={{ background: 'var(--graph-bg)' }}
       />
       {contextMenu && (

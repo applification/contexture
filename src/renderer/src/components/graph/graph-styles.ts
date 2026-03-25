@@ -116,6 +116,17 @@ export function getCytoscapeStylesheet(): Stylesheet[] {
         'line-color': 'var(--graph-node-selected)',
         'target-arrow-color': 'var(--graph-node-selected)'
       }
-    }
+    },
+    // Search highlight flash
+    {
+      selector: 'node.search-hit',
+      style: {
+        'border-width': 3,
+        'border-color': 'var(--primary)',
+        'border-opacity': 1,
+        'background-color': 'var(--primary)',
+        'background-opacity': 0.25
+      }
+    },
   ]
 }

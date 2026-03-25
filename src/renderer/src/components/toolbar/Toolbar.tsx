@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  Sun, Moon, Bot, FolderOpen, Save, SaveAll, PanelRight, ChevronDown
+  Sun, Moon, Bot, FolderOpen, Save, SaveAll, PanelRight, ChevronDown, SlidersHorizontal
 } from 'lucide-react'
 import { useUIStore } from '@renderer/store/ui'
 import { useClaude } from '../chat/useClaude'
+import { GraphControlsPanel } from './GraphControlsPanel'
+import { GraphSearchBar } from './GraphSearchBar'
 
 interface ToolbarProps {
   onOpen: () => void
@@ -21,6 +23,8 @@ export function Toolbar({ onOpen, onSave, onSaveAs }: ToolbarProps): React.JSX.E
 
   const [showClaudeMenu, setShowClaudeMenu] = useState(false)
   const claudeMenuRef = useRef<HTMLDivElement>(null)
+  const [showGraphControls, setShowGraphControls] = useState(false)
+  const graphControlsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showClaudeMenu) return
@@ -32,6 +36,17 @@ export function Toolbar({ onOpen, onSave, onSaveAs }: ToolbarProps): React.JSX.E
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showClaudeMenu])
+
+  useEffect(() => {
+    if (!showGraphControls) return
+    function handleClickOutside(e: MouseEvent): void {
+      if (graphControlsRef.current && !graphControlsRef.current.contains(e.target as Node)) {
+        setShowGraphControls(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showGraphControls])
 
   return (
     <div className="h-10 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-1 shrink-0 app-drag-region relative z-50" style={{ paddingLeft: 78, paddingRight: 12 }}>
@@ -99,7 +114,26 @@ export function Toolbar({ onOpen, onSave, onSaveAs }: ToolbarProps): React.JSX.E
         )}
       </div>
 
-      <div className="flex-1" />
+      <div className="w-px h-5 bg-border" />
+
+      {/* Graph controls */}
+      <div className="relative" ref={graphControlsRef}>
+        <button
+          onClick={() => setShowGraphControls(!showGraphControls)}
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          title="Graph controls"
+        >
+          <SlidersHorizontal size={16} />
+          <ChevronDown size={12} />
+        </button>
+        {showGraphControls && (
+          <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
+        )}
+      </div>
+
+      <div className="flex-1 flex justify-center">
+        <GraphSearchBar />
+      </div>
 
       {/* Theme toggle */}
       <ToolbarButton

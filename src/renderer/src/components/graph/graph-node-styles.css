@@ -57,3 +57,7 @@
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 9px;
 }
+
+.hide-dt-props .node-body {
+  display: none;
+}
