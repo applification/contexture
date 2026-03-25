@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import cytoscape, { type Core, type EventObject } from 'cytoscape'
 // @ts-expect-error no types available
 import nodeHtmlLabel from 'cytoscape-node-html-label'
@@ -8,18 +8,34 @@ import { ontologyToCytoscapeElements } from '@renderer/model/cytoscape'
 import { getCytoscapeStylesheet } from './graph-styles'
 import { renderNodeHtml } from './node-renderer'
 import { layoutOptions } from './layout'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 
 // Register extension once
 if (typeof cytoscape('core', 'nodeHtmlLabel') !== 'function') {
   nodeHtmlLabel(cytoscape)
 }
 
+interface ContextMenuState {
+  x: number
+  y: number
+  items: ContextMenuItem[]
+}
+
 export function GraphCanvas(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
   const ontology = useOntologyStore((s) => s.ontology)
+  const addClass = useOntologyStore((s) => s.addClass)
+  const removeClass = useOntologyStore((s) => s.removeClass)
+  const removeObjectProperty = useOntologyStore((s) => s.removeObjectProperty)
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
+  // Derive a base namespace from prefixes
+  const baseNs = Array.from(ontology.prefixes.entries()).find(
+    ([k]) => k !== 'owl' && k !== 'rdf' && k !== 'rdfs' && k !== 'xsd'
+  )?.[1] || 'http://example.org/ontology#'
 
   const initCytoscape = useCallback(() => {
     if (!containerRef.current) return
@@ -47,23 +63,103 @@ export function GraphCanvas(): React.JSX.Element {
       }
     ])
 
-    // Event handlers
+    // Click handlers
     cy.on('tap', 'node', (evt: EventObject) => {
-      const node = evt.target
-      setSelectedNode(node.id())
+      setSelectedNode(evt.target.id())
       setSelectedEdge(null)
+      setContextMenu(null)
     })
 
     cy.on('tap', 'edge', (evt: EventObject) => {
-      const edge = evt.target
-      setSelectedEdge(edge.id())
+      setSelectedEdge(evt.target.id())
       setSelectedNode(null)
+      setContextMenu(null)
     })
 
     cy.on('tap', (evt: EventObject) => {
       if (evt.target === cy) {
         setSelectedNode(null)
         setSelectedEdge(null)
+        setContextMenu(null)
+      }
+    })
+
+    // Right-click on node
+    cy.on('cxttap', 'node', (evt: EventObject) => {
+      const node = evt.target
+      const nodeId = node.id()
+      const pos = evt.renderedPosition || evt.position
+      setSelectedNode(nodeId)
+      setSelectedEdge(null)
+
+      setContextMenu({
+        x: pos.x + containerRef.current!.getBoundingClientRect().left,
+        y: pos.y + containerRef.current!.getBoundingClientRect().top,
+        items: [
+          {
+            label: 'Add subclass...',
+            action: () => {
+              const name = prompt('Subclass name:')
+              if (name) {
+                const uri = `${baseNs}${name.replace(/\s+/g, '')}`
+                addClass(uri, { label: name, subClassOf: [nodeId] })
+              }
+            }
+          },
+          { label: '', action: () => {}, separator: true },
+          {
+            label: 'Delete class',
+            destructive: true,
+            action: () => removeClass(nodeId)
+          }
+        ]
+      })
+    })
+
+    // Right-click on edge
+    cy.on('cxttap', 'edge', (evt: EventObject) => {
+      const edge = evt.target
+      const edgeData = edge.data()
+      const pos = evt.renderedPosition || evt.position
+
+      const items: ContextMenuItem[] = []
+      if (edgeData.type === 'objectProperty' && edgeData.uri) {
+        items.push({
+          label: 'Delete property',
+          destructive: true,
+          action: () => removeObjectProperty(edgeData.uri)
+        })
+      }
+
+      if (items.length > 0) {
+        setContextMenu({
+          x: pos.x + containerRef.current!.getBoundingClientRect().left,
+          y: pos.y + containerRef.current!.getBoundingClientRect().top,
+          items
+        })
+      }
+    })
+
+    // Right-click on canvas
+    cy.on('cxttap', (evt: EventObject) => {
+      if (evt.target === cy) {
+        const pos = evt.renderedPosition || evt.position
+        setContextMenu({
+          x: pos.x + containerRef.current!.getBoundingClientRect().left,
+          y: pos.y + containerRef.current!.getBoundingClientRect().top,
+          items: [
+            {
+              label: 'Add class...',
+              action: () => {
+                const name = prompt('Class name:')
+                if (name) {
+                  const uri = `${baseNs}${name.replace(/\s+/g, '')}`
+                  addClass(uri, { label: name })
+                }
+              }
+            }
+          ]
+        })
       }
     })
 
@@ -72,42 +168,28 @@ export function GraphCanvas(): React.JSX.Element {
     return () => {
       cy.destroy()
     }
-  }, [ontology, setSelectedNode, setSelectedEdge])
+  }, [ontology, setSelectedNode, setSelectedEdge, addClass, removeClass, removeObjectProperty, baseNs])
 
   useEffect(() => {
     const cleanup = initCytoscape()
     return cleanup
   }, [initCytoscape])
 
-  // Update elements when ontology changes without full re-init
-  useEffect(() => {
-    const cy = cyRef.current
-    if (!cy) return
-
-    const elements = ontologyToCytoscapeElements(ontology)
-    const currentIds = new Set(cy.elements().map((ele) => ele.id()))
-    const newIds = new Set(elements.map((e) => e.data.id))
-
-    // Remove elements that no longer exist
-    cy.elements().forEach((ele) => {
-      if (!newIds.has(ele.id())) {
-        cy.remove(ele)
-      }
-    })
-
-    // Add new elements
-    const toAdd = elements.filter((e) => !currentIds.has(e.data.id))
-    if (toAdd.length > 0) {
-      cy.add(toAdd as cytoscape.ElementDefinition[])
-      cy.layout(layoutOptions).run()
-    }
-  }, [ontology])
-
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      style={{ backgroundColor: 'var(--graph-bg)' }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        style={{ backgroundColor: 'var(--graph-bg)' }}
+      />
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </>
   )
 }

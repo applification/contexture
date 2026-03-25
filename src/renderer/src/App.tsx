@@ -1,4 +1,6 @@
 import { GraphCanvas } from './components/graph/GraphCanvas'
+import { DetailPanel } from './components/detail/DetailPanel'
+import { ValidationPanel } from './components/validation/ValidationPanel'
 import { useOntologyStore } from './store/ontology'
 import { useUIStore } from './store/ui'
 import './components/graph/graph-node-styles.css'
@@ -11,10 +13,13 @@ function App(): React.JSX.Element {
   const loadFromTurtle = useOntologyStore((s) => s.loadFromTurtle)
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const theme = useUIStore((s) => s.theme)
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
+  const selectedEdgeId = useUIStore((s) => s.selectedEdgeId)
 
   const classCount = ontology.classes.size
   const propCount = ontology.objectProperties.size + ontology.datatypeProperties.size
   const hasContent = classCount > 0
+  const hasSelection = selectedNodeId !== null || selectedEdgeId !== null
 
   return (
     <div className="flex h-full w-full">
@@ -31,7 +36,7 @@ function App(): React.JSX.Element {
                   Open a .ttl file or start chatting with Claude to create an ontology
                 </p>
                 <button
-                  onClick={() => loadSampleOntology(loadFromTurtle)}
+                  onClick={() => loadFromTurtle(peopleTtl, 'Sample: people.ttl')}
                   className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
                 >
                   Load sample ontology
@@ -59,35 +64,56 @@ function App(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Right Sidebar - Chat + Detail Panel */}
+      {/* Right Sidebar */}
       <div className="w-80 border-l border-border bg-card flex flex-col shrink-0">
-        <div className="p-3 border-b border-border">
-          <h2 className="text-sm font-medium">Claude</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <p className="text-xs text-muted-foreground text-center">
-            Chat with Claude to generate and refine your ontology
-          </p>
-        </div>
-        <div className="p-3 border-t border-border">
-          <div className="flex gap-2">
+        {/* Detail Panel (when something selected) */}
+        {hasSelection && (
+          <div className="border-b border-border overflow-y-auto max-h-[50%]">
+            <div className="px-3 py-2 border-b border-border bg-card sticky top-0">
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Properties
+              </h2>
+            </div>
+            <DetailPanel />
+          </div>
+        )}
+
+        {/* Chat Panel */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="px-3 py-2 border-b border-border">
+            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Claude
+            </h2>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4">
+            <p className="text-xs text-muted-foreground text-center">
+              Chat with Claude to generate and refine your ontology
+            </p>
+          </div>
+          <div className="p-3 border-t border-border">
             <input
               type="text"
               placeholder="Describe your ontology..."
-              className="flex-1 bg-secondary text-sm rounded-md px-3 py-1.5 outline-none placeholder:text-muted-foreground"
+              className="w-full bg-secondary text-sm rounded-md px-3 py-1.5 outline-none placeholder:text-muted-foreground"
               disabled
             />
           </div>
         </div>
+
+        {/* Validation Panel */}
+        {hasContent && (
+          <div className="border-t border-border">
+            <div className="px-3 py-2 border-b border-border">
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Validation
+              </h2>
+            </div>
+            <ValidationPanel />
+          </div>
+        )}
       </div>
     </div>
   )
-}
-
-function loadSampleOntology(
-  loadFromTurtle: (turtle: string, path?: string) => void
-): void {
-  loadFromTurtle(peopleTtl, 'Sample: people.ttl')
 }
 
 export default App
