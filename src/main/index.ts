@@ -1,4 +1,7 @@
+import { syncShellEnvironment } from './syncShellEnvironment'
 import { app, shell, BrowserWindow, Menu, nativeImage } from 'electron'
+
+syncShellEnvironment()
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMenu } from './menu'

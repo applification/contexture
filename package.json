@@ -1,6 +1,6 @@
 {
   "name": "ontograph",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A modern ontology editor with Claude integration",
   "main": "./out/main/index.js",
   "author": "Applification Ltd",
