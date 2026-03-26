@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, shell, BrowserWindow, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createMenu } from './menu'
@@ -42,6 +42,11 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.applification.ontograph')
+
+  if (is.dev && process.platform === 'darwin') {
+    const icon = nativeImage.createFromPath(join(__dirname, '../../build/icon.icns'))
+    if (!icon.isEmpty()) app.dock?.setIcon(icon)
+  }
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
