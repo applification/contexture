@@ -38,6 +38,8 @@
   --warning-foreground: oklch(0.145 0 0);
 
   /* Graph-specific tokens */
+  --primary-display: oklch(0.52 0.105 223.128);
+
   --graph-bg: oklch(0.96 0.002 17.2);
   --graph-node-class: oklch(0.52 0.105 223.128);
   --graph-node-header-bg: oklch(0.52 0.105 223.128 / 0.9);
@@ -81,6 +83,8 @@
   --warning-foreground: oklch(0.145 0 0);
 
   /* Graph-specific tokens (dark) */
+  --primary-display: oklch(0.715 0.143 215.221);
+
   --graph-bg: oklch(0.214 0.009 43.1);
   --graph-node-class: oklch(0.715 0.143 215.221);
   --graph-node-header-bg: oklch(0.45 0.085 224.283 / 0.9);
@@ -119,6 +123,7 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-primary-display: var(--primary-display);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

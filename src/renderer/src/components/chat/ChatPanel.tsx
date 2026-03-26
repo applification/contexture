@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, BotMessageSquare } from 'lucide-react'
 import { Streamdown } from 'streamdown'
 import { code } from '@streamdown/code'
 import { useClaude, type ChatMessage, type ModelId, type ThinkingBudget } from './useClaude'
@@ -8,6 +8,7 @@ import { useOntologyStore } from '@renderer/store/ontology'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
@@ -81,13 +82,25 @@ export function ChatPanel(): React.JSX.Element {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            {isReady
-              ? 'Describe the ontology you want to create...'
-              : authMode === 'max'
-                ? 'Claude CLI not detected. Configure in toolbar.'
-                : 'Set your API key in the toolbar to start chatting'}
-          </p>
+          <Empty className="border-0 p-4">
+            <EmptyHeader>
+              {isReady && (
+                <EmptyMedia variant="icon">
+                  <BotMessageSquare />
+                </EmptyMedia>
+              )}
+              <EmptyTitle className="text-sm font-medium">
+                {isReady ? 'Start a conversation' : 'Not connected'}
+              </EmptyTitle>
+              <EmptyDescription className="text-xs">
+                {isReady
+                  ? 'Describe the ontology you want to create or select a node to get context-aware suggestions.'
+                  : authMode === 'max'
+                    ? 'Claude CLI not detected. Configure in toolbar.'
+                    : 'Set your API key in the toolbar to start chatting.'}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
         {messages.map((msg, i) => (
           <MessageBubble key={i} message={msg} />
@@ -104,9 +117,9 @@ export function ChatPanel(): React.JSX.Element {
       {/* Selection Context Badge */}
       {selectionContext && (
         <div className="px-3 pt-2">
-          <Badge variant="secondary" className="inline-flex gap-1.5 px-2.5 py-1 rounded-full max-w-full text-xs font-normal h-auto">
-            <span className="text-muted-foreground">{selectionContext.type === 'class' ? '◆' : '→'}</span>
-            <span className="truncate text-foreground">{selectionContext.label}</span>
+          <Badge className="inline-flex gap-1.5 px-2.5 py-1 rounded-full max-w-full text-xs font-normal h-auto bg-primary-display/10 text-primary-display border border-primary-display hover:bg-primary-display/10">
+            <span className="opacity-60">{selectionContext.type === 'class' ? '◆' : '→'}</span>
+            <span className="truncate">{selectionContext.label}</span>
             <button
               onClick={() => selectionContext.type === 'class' ? setSelectedNode(null) : setSelectedEdge(null)}
               className="text-muted-foreground hover:text-foreground ml-0.5 shrink-0"

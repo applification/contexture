@@ -374,6 +374,8 @@ function GraphFlow(): React.JSX.Element {
         fitView
         style={{ background: 'var(--graph-bg)' }}
         deleteKeyCode={null}
+        proOptions={{ hideAttribution: false }}
+        attributionPosition="bottom-left"
       >
         <Background color="oklch(0.5 0.05 250 / 0.3)" gap={24} size={1} />
 </ReactFlow>
