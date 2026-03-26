@@ -48,7 +48,9 @@
   --graph-node-border: oklch(0.52 0.105 223.128 / 0.25);
   --graph-node-selected: var(--chart-2);
   --graph-node-selected-bg: oklch(0.769 0.188 70.08 / 0.1);
-  --graph-edge-property: oklch(0.52 0.105 223.128);
+  --graph-node-adjacent: oklch(0.769 0.188 70.08 / 0.45);
+  --graph-edge-property: oklch(0.52 0.045 223.128);
+  --graph-edge-disjoint: oklch(0.50 0.055 27.325);
   --graph-edge-subclass: oklch(0.45 0.05 49.3);
 }
 
@@ -93,7 +95,9 @@
   --graph-node-border: oklch(1 0 0 / 0.08);
   --graph-node-selected: var(--chart-2);
   --graph-node-selected-bg: oklch(0.769 0.188 70.08 / 0.1);
-  --graph-edge-property: oklch(0.715 0.143 215.221);
+  --graph-node-adjacent: oklch(0.769 0.188 70.08 / 0.45);
+  --graph-edge-property: oklch(0.65 0.04 215.221);
+  --graph-edge-disjoint: oklch(0.65 0.055 22.216);
   --graph-edge-subclass: oklch(0.714 0.014 41.2);
 }
 

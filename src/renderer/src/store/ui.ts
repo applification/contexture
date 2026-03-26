@@ -31,6 +31,8 @@ export type SidebarTab = 'properties' | 'chat' | 'eval'
 interface UIState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
+  adjacentNodeIds: string[]
+  adjacentEdgeIds: string[]
   theme: Theme
   chatOpen: boolean
   sidebarVisible: boolean
@@ -42,6 +44,7 @@ interface UIState {
 
   setSelectedNode: (id: string | null) => void
   setSelectedEdge: (id: string | null) => void
+  setAdjacency: (nodeIds: string[], edgeIds: string[]) => void
   toggleTheme: () => void
   setChatOpen: (open: boolean) => void
   toggleSidebar: () => void
@@ -59,6 +62,8 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
+  adjacentNodeIds: [],
+  adjacentEdgeIds: [],
   theme: 'dark',
   chatOpen: true,
   sidebarVisible: true,
@@ -71,6 +76,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id }),
+  setAdjacency: (nodeIds, edgeIds) => set({ adjacentNodeIds: nodeIds, adjacentEdgeIds: edgeIds }),
   toggleTheme: () =>
     set((state) => {
       const newTheme = state.theme === 'dark' ? 'light' : 'dark'

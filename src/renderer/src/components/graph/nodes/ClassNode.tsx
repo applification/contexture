@@ -8,7 +8,10 @@ import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow'
 export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNodeType>) {
   const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties)
   const selectedNodeId = useUIStore((s) => s.selectedNodeId)
+  const adjacentNodeIds = useUIStore((s) => s.adjacentNodeIds)
   const isSelected = selectedNodeId === id
+  const isAdjacent = !isSelected && adjacentNodeIds.includes(id)
+  const isDimmed = selectedNodeId !== null && !isSelected && !isAdjacent
 
   return (
     <div
@@ -21,9 +24,13 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
         backdropFilter: 'blur(8px)',
         border: isSelected
           ? '2px solid var(--graph-node-selected)'
-          : '1px solid var(--graph-node-border)',
+          : isAdjacent
+            ? '2px solid var(--graph-node-adjacent)'
+            : '1px solid var(--graph-node-border)',
         boxShadow: '0 2px 8px oklch(0 0 0 / 0.15), 0 0 1px oklch(0 0 0 / 0.1)',
-        background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent'
+        background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent',
+        opacity: isDimmed ? 0.2 : 1,
+        transition: 'opacity 0.15s ease'
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0, top: '50%', left: '50%' }} />

@@ -57,6 +57,8 @@ function GraphFlow(): React.JSX.Element {
   const graphLayout = useUIStore((s) => s.graphLayout)
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const setAdjacency = useUIStore((s) => s.setAdjacency)
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
   const setSidebarTab = useUIStore((s) => s.setSidebarTab)
   const setSidebarVisible = useUIStore((s) => s.setSidebarVisible)
   const focusNodeId = useUIStore((s) => s.focusNodeId)
@@ -169,6 +171,23 @@ function GraphFlow(): React.JSX.Element {
       setEdges(newEdges)
     }
   }, [ontology])
+
+  // Compute adjacency when selection changes
+  useEffect(() => {
+    if (!selectedNodeId) {
+      setAdjacency([], [])
+      return
+    }
+    const adjEdgeIds: string[] = []
+    const adjNodeIds: string[] = []
+    edges.forEach((e) => {
+      if (e.source === selectedNodeId || e.target === selectedNodeId) {
+        adjEdgeIds.push(e.id)
+        adjNodeIds.push(e.source === selectedNodeId ? e.target : e.source)
+      }
+    })
+    setAdjacency(adjNodeIds, adjEdgeIds)
+  }, [selectedNodeId, edges, setAdjacency])
 
   // Focus node from search
   useEffect(() => {

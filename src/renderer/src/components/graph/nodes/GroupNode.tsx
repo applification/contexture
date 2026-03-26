@@ -1,8 +1,12 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps, NodeResizer } from '@xyflow/react'
 import type { GroupNode as GroupNodeType } from '@renderer/model/reactflow'
+import { useUIStore } from '@renderer/store/ui'
 
-export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
+export const GroupNode = memo(function GroupNode({ data, id, selected }: NodeProps<GroupNodeType>) {
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
+  const isDimmed = selectedNodeId !== null && selectedNodeId !== id
+
   return (
     <div
       style={{
@@ -14,7 +18,9 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
           : '1.5px dashed oklch(0.5 0.1 250 / 0.5)',
         background: 'oklch(0.35 0.05 250 / 0.08)',
         backdropFilter: 'blur(4px)',
-        position: 'relative'
+        position: 'relative',
+        opacity: isDimmed ? 0.2 : 1,
+        transition: 'opacity 0.15s ease'
       }}
     >
       <NodeResizer

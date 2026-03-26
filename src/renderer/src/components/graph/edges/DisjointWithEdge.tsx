@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useInternalNode, type EdgeProps } from '@xyflow/react'
 import { getFloatingEdgeParams } from './floating-edge-utils'
+import { useUIStore } from '@renderer/store/ui'
 
 function autoRotation(sx: number, sy: number, tx: number, ty: number): number {
   let angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI)
@@ -16,6 +17,8 @@ export const DisjointWithEdge = memo(function DisjointWithEdge({
 }: EdgeProps) {
   const sourceNode = useInternalNode(source)
   const targetNode = useInternalNode(target)
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
+  const adjacentEdgeIds = useUIStore((s) => s.adjacentEdgeIds)
 
   if (!sourceNode || !targetNode) return null
 
@@ -30,20 +33,24 @@ export const DisjointWithEdge = memo(function DisjointWithEdge({
     targetPosition
   })
 
-  const color = 'var(--destructive)'
+  const isAdjacent = adjacentEdgeIds.includes(id)
+  const isDimmed = selectedNodeId !== null && !isAdjacent
+  const color = 'var(--graph-edge-disjoint)'
   const rotation = autoRotation(sx, sy, tx, ty)
 
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={{
-          stroke: color,
-          strokeWidth: selected ? 3 : 1.5,
-          strokeDasharray: '3,4'
-        }}
-      />
+      <g style={{ opacity: isDimmed ? 0.15 : 1, transition: 'opacity 0.15s ease' }}>
+        <BaseEdge
+          id={id}
+          path={edgePath}
+          style={{
+            stroke: color,
+            strokeWidth: selected ? 3 : isAdjacent ? 2.5 : 1.5,
+            strokeDasharray: '3,4'
+          }}
+        />
+      </g>
       <EdgeLabelRenderer>
         <div
           style={{
@@ -56,7 +63,9 @@ export const DisjointWithEdge = memo(function DisjointWithEdge({
             padding: '2px 5px',
             borderRadius: 4,
             pointerEvents: 'none',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            opacity: isDimmed ? 0.15 : 1,
+            transition: 'opacity 0.15s ease'
           }}
           className="nodrag nopan"
         >
