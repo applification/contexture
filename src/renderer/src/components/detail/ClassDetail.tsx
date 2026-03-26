@@ -1,5 +1,6 @@
 import type { OntologyClass, DatatypeProperty } from '@renderer/model/types'
 import { useOntologyStore } from '@renderer/store/ontology'
+import { useUIStore } from '@renderer/store/ui'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -26,6 +27,7 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
   const updateClass = useOntologyStore((s) => s.updateClass)
   const updateDatatypeProperty = useOntologyStore((s) => s.updateDatatypeProperty)
   const ontology = useOntologyStore((s) => s.ontology)
+  const setFocusNode = useUIStore((s) => s.setFocusNode)
 
   const dtProps = Array.from(ontology.datatypeProperties.values()).filter((p) =>
     p.domain.includes(cls.uri)
@@ -68,8 +70,14 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           <div className="text-xs text-muted-foreground mb-1">Inherits from</div>
           <div className="space-y-0.5">
             {cls.subClassOf.map((uri) => (
-              <div key={uri} className="text-xs bg-secondary rounded px-2 py-1">
-                {ontology.classes.get(uri)?.label || localName(uri)}
+              <div
+                key={uri}
+                className="text-xs bg-secondary rounded px-2 py-1 cursor-pointer hover:bg-accent transition-colors flex items-center gap-1.5 group"
+                onClick={() => setFocusNode(uri)}
+              >
+                <span className="text-primary underline underline-offset-2 decoration-primary/40 group-hover:decoration-primary transition-colors">
+                  {ontology.classes.get(uri)?.label || localName(uri)}
+                </span>
               </div>
             ))}
           </div>
@@ -95,19 +103,35 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           <div className="text-xs text-muted-foreground mb-1">Relationships</div>
           <div className="space-y-0.5">
             {objProps.map((p) => (
-              <div key={p.uri} className="text-xs bg-secondary rounded px-2 py-1">
+              <div key={p.uri} className="text-xs bg-secondary rounded px-2 py-1 flex items-center gap-1 flex-wrap">
                 <span className="font-medium">{p.label || localName(p.uri)}</span>
                 {p.domain.includes(cls.uri) && p.range.length > 0 && (
-                  <span className="text-muted-foreground">
-                    {' → '}
-                    {p.range.map((r) => ontology.classes.get(r)?.label || localName(r)).join(', ')}
-                  </span>
+                  <>
+                    <span className="text-muted-foreground">→</span>
+                    {p.range.map((r) => (
+                      <span
+                        key={r}
+                        className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary cursor-pointer transition-colors"
+                        onClick={() => setFocusNode(r)}
+                      >
+                        {ontology.classes.get(r)?.label || localName(r)}
+                      </span>
+                    ))}
+                  </>
                 )}
                 {p.range.includes(cls.uri) && p.domain.length > 0 && (
-                  <span className="text-muted-foreground">
-                    {' ← '}
-                    {p.domain.map((d) => ontology.classes.get(d)?.label || localName(d)).join(', ')}
-                  </span>
+                  <>
+                    <span className="text-muted-foreground">←</span>
+                    {p.domain.map((d) => (
+                      <span
+                        key={d}
+                        className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary cursor-pointer transition-colors"
+                        onClick={() => setFocusNode(d)}
+                      >
+                        {ontology.classes.get(d)?.label || localName(d)}
+                      </span>
+                    ))}
+                  </>
                 )}
               </div>
             ))}
