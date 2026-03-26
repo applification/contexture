@@ -44,3 +44,4 @@ publish:
   provider: github
   owner: DaveHudson
   repo: Ontograph
+  releaseType: release
