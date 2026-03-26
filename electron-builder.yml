@@ -24,7 +24,8 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: Ontograph needs access to open and save ontology files.
-  notarize: false
+  notarize:
+    teamId: ${APPLE_TEAM_ID}
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
