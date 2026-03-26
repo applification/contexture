@@ -45,6 +45,7 @@ interface UIState {
   toggleTheme: () => void
   setChatOpen: (open: boolean) => void
   toggleSidebar: () => void
+  setSidebarVisible: (visible: boolean) => void
   setGraphFilter: (patch: Partial<GraphFilters>) => void
   setGraphLayout: (patch: Partial<GraphLayout>) => void
   resetGraphControls: () => void
@@ -78,6 +79,7 @@ export const useUIStore = create<UIState>((set) => ({
     }),
   setChatOpen: (open) => set({ chatOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
+  setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
   setGraphFilter: (patch) => set((s) => ({ graphFilters: { ...s.graphFilters, ...patch } })),
   setGraphLayout: (patch) => set((s) => ({ graphLayout: { ...s.graphLayout, ...patch } })),
   resetGraphControls: () => set({ graphFilters: { ...DEFAULT_FILTERS }, graphLayout: { ...DEFAULT_LAYOUT } }),

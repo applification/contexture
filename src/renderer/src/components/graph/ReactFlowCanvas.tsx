@@ -57,6 +57,8 @@ function GraphFlow(): React.JSX.Element {
   const graphLayout = useUIStore((s) => s.graphLayout)
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const setSidebarTab = useUIStore((s) => s.setSidebarTab)
+  const setSidebarVisible = useUIStore((s) => s.setSidebarVisible)
   const focusNodeId = useUIStore((s) => s.focusNodeId)
   const setFocusNode = useUIStore((s) => s.setFocusNode)
 
@@ -225,6 +227,15 @@ function GraphFlow(): React.JSX.Element {
     [onEdgesChange]
   )
 
+  const handleNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setSelectedNode(node.id)
+      setSidebarVisible(true)
+      setSidebarTab('properties')
+    },
+    [setSelectedNode, setSidebarVisible, setSidebarTab]
+  )
+
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       setSelectedNode(node.id)
@@ -363,6 +374,7 @@ function GraphFlow(): React.JSX.Element {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onNodeContextMenu={handleNodeContextMenu}
