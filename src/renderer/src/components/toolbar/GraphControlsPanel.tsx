@@ -1,7 +1,5 @@
 import { X, Maximize2, RefreshCw } from 'lucide-react'
 import { useUIStore } from '@renderer/store/ui'
-import { getCyInstance } from '@renderer/components/graph/cyRef'
-import { getLayoutOptions } from '@renderer/components/graph/layout'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -19,16 +17,16 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
   const resetGraphControls = useUIStore((s) => s.resetGraphControls)
 
   function handleRelayout(): void {
-    getCyInstance()?.layout(getLayoutOptions(graphLayout)).run()
+    document.dispatchEvent(new CustomEvent('graph:relayout'))
   }
 
   function handleFit(): void {
-    getCyInstance()?.fit(undefined, 50)
+    document.dispatchEvent(new CustomEvent('graph:fitview'))
   }
 
   function handleReset(): void {
     resetGraphControls()
-    setTimeout(() => getCyInstance()?.layout(getLayoutOptions()).run(), 0)
+    setTimeout(() => document.dispatchEvent(new CustomEvent('graph:relayout')), 0)
   }
 
   return (
@@ -88,31 +86,8 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
           max={400}
           value={graphLayout.nodeSpacing}
           onChange={(v) => setGraphLayout({ nodeSpacing: v })}
+          onCommit={() => handleRelayout()}
         />
-        <LayoutSlider
-          label="Repulsion"
-          min={1000}
-          max={20000}
-          step={500}
-          value={graphLayout.repulsion}
-          onChange={(v) => setGraphLayout({ repulsion: v })}
-        />
-        <LayoutSlider
-          label="Gravity"
-          min={0.05}
-          max={1.0}
-          step={0.05}
-          value={graphLayout.gravity}
-          onChange={(v) => setGraphLayout({ gravity: v })}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          className="w-full h-7 text-xs mt-1"
-          onClick={handleRelayout}
-        >
-          Re-layout
-        </Button>
       </div>
 
       <div className="flex gap-2 px-3 py-2">
@@ -152,7 +127,8 @@ function LayoutSlider({
   max,
   step = 1,
   value,
-  onChange
+  onChange,
+  onCommit
 }: {
   label: string
   min: number
@@ -160,6 +136,7 @@ function LayoutSlider({
   step?: number
   value: number
   onChange: (v: number) => void
+  onCommit?: () => void
 }): React.JSX.Element {
   return (
     <div className="flex items-center gap-2">
@@ -170,6 +147,7 @@ function LayoutSlider({
         step={step}
         value={[value]}
         onValueChange={([v]) => onChange(v)}
+        onValueCommit={onCommit}
         className="flex-1"
       />
     </div>

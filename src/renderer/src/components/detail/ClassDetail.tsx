@@ -139,7 +139,7 @@ function DatatypePropertyRow({
         <select
           value={property.range}
           onChange={(e) => onRangeChange(e.target.value)}
-          className="shrink-0 bg-background text-muted-foreground font-mono text-xs rounded-md border border-input px-2 py-1.5 outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          className="shrink-0 bg-card text-muted-foreground font-mono text-xs rounded-md border border-input px-2 py-1.5 outline-none focus:ring-1 focus:ring-ring cursor-pointer"
         >
           {XSD_TYPES.map((t) => (
             <option key={t} value={`${XSD}${t}`}>{t}</option>

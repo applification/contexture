@@ -12,8 +12,6 @@ export interface GraphFilters {
 
 export interface GraphLayout {
   nodeSpacing: number
-  repulsion: number
-  gravity: number
 }
 
 const DEFAULT_FILTERS: GraphFilters = {
@@ -25,9 +23,7 @@ const DEFAULT_FILTERS: GraphFilters = {
 }
 
 const DEFAULT_LAYOUT: GraphLayout = {
-  nodeSpacing: 180,
-  repulsion: 8000,
-  gravity: 0.25
+  nodeSpacing: 180
 }
 
 interface UIState {
@@ -38,6 +34,7 @@ interface UIState {
   sidebarVisible: boolean
   graphFilters: GraphFilters
   graphLayout: GraphLayout
+  focusNodeId: string | null
 
   setSelectedNode: (id: string | null) => void
   setSelectedEdge: (id: string | null) => void
@@ -47,6 +44,7 @@ interface UIState {
   setGraphFilter: (patch: Partial<GraphFilters>) => void
   setGraphLayout: (patch: Partial<GraphLayout>) => void
   resetGraphControls: () => void
+  setFocusNode: (id: string | null) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -57,6 +55,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarVisible: true,
   graphFilters: { ...DEFAULT_FILTERS },
   graphLayout: { ...DEFAULT_LAYOUT },
+  focusNodeId: null,
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id }),
@@ -70,5 +69,6 @@ export const useUIStore = create<UIState>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
   setGraphFilter: (patch) => set((s) => ({ graphFilters: { ...s.graphFilters, ...patch } })),
   setGraphLayout: (patch) => set((s) => ({ graphLayout: { ...s.graphLayout, ...patch } })),
-  resetGraphControls: () => set({ graphFilters: { ...DEFAULT_FILTERS }, graphLayout: { ...DEFAULT_LAYOUT } })
+  resetGraphControls: () => set({ graphFilters: { ...DEFAULT_FILTERS }, graphLayout: { ...DEFAULT_LAYOUT } }),
+  setFocusNode: (id) => set({ focusNodeId: id })
 }))

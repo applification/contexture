@@ -10,7 +10,7 @@ import { Button } from './components/ui/button'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 import { useOntologyStore } from './store/ontology'
 import { useUIStore } from './store/ui'
-import './components/graph/graph-node-styles.css'
+import { useHistoryStore } from './store/history'
 import peopleTtl from './samples/people.ttl?raw'
 
 function App(): React.JSX.Element {
@@ -24,6 +24,8 @@ function App(): React.JSX.Element {
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
   const removeClass = useOntologyStore((s) => s.removeClass)
+  const undo = useHistoryStore((s) => s.undo)
+  const canUndo = useHistoryStore((s) => s.canUndo)
 
   const handleOpen = useCallback(async () => {
     const result = await window.api.openFile()
@@ -69,25 +71,31 @@ function App(): React.JSX.Element {
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
+      const target = e.target as HTMLElement
+      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+
       // Escape — deselect
       if (e.key === 'Escape') {
         setSelectedNode(null)
         setSelectedEdge(null)
       }
 
+      // Cmd+Z — undo ontology edit
+      if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !inInput && canUndo) {
+        e.preventDefault()
+        undo()
+      }
+
       // Delete/Backspace — delete selected node (when not in an input)
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId) {
-        const target = e.target as HTMLElement
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          e.preventDefault()
-          removeClass(selectedNodeId)
-          setSelectedNode(null)
-        }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && !inInput) {
+        e.preventDefault()
+        removeClass(selectedNodeId)
+        setSelectedNode(null)
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedNodeId, setSelectedNode, setSelectedEdge, removeClass])
+  }, [selectedNodeId, setSelectedNode, setSelectedEdge, removeClass, undo, canUndo])
 
   const sidebarVisible = useUIStore((s) => s.sidebarVisible)
   const sidebarRef = useRef<PanelImperativeHandle>(null)
@@ -148,7 +156,7 @@ function App(): React.JSX.Element {
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as 'properties' | 'chat')}
-            className="h-full bg-card flex flex-col"
+            className="h-full bg-background flex flex-col"
           >
             <div className="px-3 py-2 border-b border-border shrink-0 flex justify-center">
               <TabsList>

@@ -30,6 +30,9 @@ interface OntologyState {
   addDatatypeProperty: (uri: string, prop?: Partial<DatatypeProperty>) => void
   updateDatatypeProperty: (uri: string, changes: Partial<DatatypeProperty>) => void
   removeDatatypeProperty: (uri: string) => void
+
+  // Undo/redo support
+  restoreOntology: (ontology: Ontology) => void
 }
 
 export const useOntologyStore = create<OntologyState>((set, get) => ({
@@ -174,7 +177,9 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
       ontology.datatypeProperties.delete(uri)
       return { ontology, isDirty: true }
     })
-  }
+  },
+
+  restoreOntology: (ontology) => set({ ontology: cloneOntology(ontology), isDirty: true })
 }))
 
 function cloneOntology(ontology: Ontology): Ontology {

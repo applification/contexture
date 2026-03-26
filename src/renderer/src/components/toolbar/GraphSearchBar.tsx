@@ -1,11 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import { Search, X } from 'lucide-react'
-import { getCyInstance } from '@renderer/components/graph/cyRef'
+import { useOntologyStore } from '@renderer/store/ontology'
 import { useUIStore } from '@renderer/store/ui'
 
 interface Result {
   id: string
   label: string
+}
+
+function localName(uri: string): string {
+  const hash = uri.lastIndexOf('#')
+  const slash = uri.lastIndexOf('/')
+  const idx = Math.max(hash, slash)
+  return idx >= 0 ? uri.substring(idx + 1) : uri
 }
 
 export function GraphSearchBar(): React.JSX.Element {
@@ -15,7 +22,8 @@ export function GraphSearchBar(): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode)
+  const setFocusNode = useUIStore((s) => s.setFocusNode)
+  const classes = useOntologyStore((s) => s.ontology.classes)
 
   // Cmd+F / Ctrl+F to focus
   useEffect(() => {
@@ -30,7 +38,7 @@ export function GraphSearchBar(): React.JSX.Element {
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  // Search on query change
+  // Search against ontology store
   useEffect(() => {
     const q = query.trim().toLowerCase()
     if (!q) {
@@ -38,20 +46,18 @@ export function GraphSearchBar(): React.JSX.Element {
       setOpen(false)
       return
     }
-    const cy = getCyInstance()
-    if (!cy) return
 
     const matches: Result[] = []
-    cy.nodes('[type = "class"]').forEach((node) => {
-      const label = node.data('label') as string
-      if (label?.toLowerCase().includes(q)) {
-        matches.push({ id: node.id(), label })
+    for (const cls of classes.values()) {
+      const label = cls.label || localName(cls.uri)
+      if (label.toLowerCase().includes(q)) {
+        matches.push({ id: cls.uri, label })
       }
-    })
+    }
     setResults(matches.slice(0, 8))
     setActiveIndex(0)
     setOpen(matches.length > 0)
-  }, [query])
+  }, [query, classes])
 
   // Click outside to close
   useEffect(() => {
@@ -66,21 +72,7 @@ export function GraphSearchBar(): React.JSX.Element {
   }, [open])
 
   function selectNode(id: string): void {
-    const cy = getCyInstance()
-    if (!cy) return
-    const node = cy.getElementById(id)
-    if (!node.length) return
-
-    setSelectedNode(id)
-    cy.animate(
-      { center: { eles: node }, zoom: Math.max(cy.zoom(), 1.5) },
-      { duration: 350 }
-    )
-
-    // Flash highlight
-    node.addClass('search-hit')
-    setTimeout(() => node.removeClass('search-hit'), 1500)
-
+    setFocusNode(id)
     setQuery('')
     setOpen(false)
   }

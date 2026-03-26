@@ -26,6 +26,14 @@ export function registerFileIPC(): void {
     return true
   })
 
+  ipcMain.handle('file:read-silent', async (_event, filePath: string) => {
+    try {
+      return await readFile(filePath, 'utf-8')
+    } catch {
+      return null
+    }
+  })
+
   ipcMain.handle('file:save-as', async (_event, content: string) => {
     const win = BrowserWindow.getFocusedWindow()
     if (!win) return null
