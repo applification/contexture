@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOntologyStore } from '@renderer/store/ontology'
+import type { OntologyClass } from '@renderer/model/types'
 import { serializeToTurtle } from '@renderer/model/serialize'
 import { validateOntology } from '@renderer/services/validation'
 
@@ -144,7 +145,7 @@ export function useClaude(): UseClaudeReturn {
 
       // Modify class
       window.api.onClaudeModifyClass((uri: string, changes: Record<string, unknown>) => {
-        store.getState().updateClass(uri, changes as Parameters<typeof store.getState['updateClass']>[1])
+        store.getState().updateClass(uri, changes as Partial<OntologyClass>)
       }),
 
       // Remove element

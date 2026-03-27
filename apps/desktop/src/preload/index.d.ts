@@ -50,6 +50,20 @@ declare global {
       onClaudeRemoveElement: (callback: (uri: string, type: string) => void) => () => void
       onClaudeValidate: (callback: () => void) => () => void
 
+      // Eval operations
+      runEval: (payload: {
+        turtle: string
+        domain: string
+        intendedUse: string
+        auth: { mode: 'api-key'; key: string } | { mode: 'max' }
+        model: string
+        effort: string
+      }) => Promise<void>
+      abortEval: () => Promise<void>
+      onEvalText: (callback: (text: string) => void) => () => void
+      onEvalResult: (callback: (reportJson: string) => void) => () => void
+      onEvalError: (callback: (error: string) => void) => () => void
+
       // Respond to main process
       respondOntology: (turtle: string) => void
       respondValidation: (errors: string) => void

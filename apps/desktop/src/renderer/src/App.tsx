@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { GraphCanvas } from './components/graph/GraphCanvas'
 import { DetailPanel } from './components/detail/DetailPanel'
 import { ChatPanel } from './components/chat/ChatPanel'
@@ -191,7 +191,7 @@ function App(): React.JSX.Element {
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden" id="main-layout">
         {/* Graph Canvas */}
-        <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%" order={1}>
+        <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%">
           <div className="relative w-full h-full">
             {/* Graph controls overlay — top left */}
             <div className="absolute top-2 left-2 z-10">
@@ -264,7 +264,6 @@ function App(): React.JSX.Element {
           collapsible
           collapsedSize={0}
           panelRef={sidebarRef}
-          order={2}
         >
           <div className="flex h-full bg-background">
             {/* Panel content */}
