@@ -239,70 +239,106 @@ export function registerClaudeIPC(): void {
     }
     currentAbort = new AbortController()
 
-    try {
-      const authOptions =
-        auth.mode === 'api-key' && auth.key
-          ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
-          : {
-              pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
-              env: process.env
+    const MAX_RETRIES = 3
+    let attempt = 0
+
+    while (attempt < MAX_RETRIES) {
+      attempt++
+      try {
+        const authOptions =
+          auth.mode === 'api-key' && auth.key
+            ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
+            : {
+                pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
+                env: process.env
+              }
+
+        const options: Record<string, unknown> = {
+          mcpServers: { ontograph: ontographServer },
+          allowedTools: ALL_TOOLS,
+          disallowedTools: [
+            'Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep',
+            'Agent', 'NotebookEdit', 'WebFetch', 'WebSearch'
+          ],
+          systemPrompt: SYSTEM_PROMPT,
+          maxTurns: 20,
+          abortController: currentAbort,
+          persistSession: true,
+          ...(sessionId ? { resume: sessionId } : {}),
+          ...(modelOptions?.model ? { model: modelOptions.model } : {}),
+          ...(modelOptions?.thinkingBudgetTokens ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens } : {}),
+          ...authOptions
+        }
+
+        for await (const msg of query({ prompt: message, options: options as never })) {
+          if (msg.type === 'system' && msg.subtype === 'init') {
+            sessionId = msg.session_id
+          }
+
+          if (msg.type === 'assistant') {
+            const textBlocks = msg.message.content.filter(
+              (b: { type: string }) => b.type === 'text'
+            )
+            const text = textBlocks.map((b: { text: string }) => b.text).join('')
+            if (text) {
+              sendToRenderer('claude:assistant-text', text)
             }
 
-      const options: Record<string, unknown> = {
-        mcpServers: { ontograph: ontographServer },
-        allowedTools: ALL_TOOLS,
-        disallowedTools: [
-          'Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep',
-          'Agent', 'NotebookEdit', 'WebFetch', 'WebSearch'
-        ],
-        systemPrompt: SYSTEM_PROMPT,
-        maxTurns: 20,
-        abortController: currentAbort,
-        persistSession: true,
-        ...(sessionId ? { resume: sessionId } : {}),
-        ...(modelOptions?.model ? { model: modelOptions.model } : {}),
-        ...(modelOptions?.thinkingBudgetTokens ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens } : {}),
-        ...authOptions
-      }
-
-      for await (const msg of query({ prompt: message, options: options as never })) {
-        if (msg.type === 'system' && msg.subtype === 'init') {
-          sessionId = msg.session_id
-        }
-
-        if (msg.type === 'assistant') {
-          // Extract text content
-          const textBlocks = msg.message.content.filter(
-            (b: { type: string }) => b.type === 'text'
-          )
-          const text = textBlocks.map((b: { text: string }) => b.text).join('')
-          if (text) {
-            sendToRenderer('claude:assistant-text', text)
+            const toolBlocks = msg.message.content.filter(
+              (b: { type: string }) => b.type === 'tool_use'
+            )
+            for (const tb of toolBlocks) {
+              sendToRenderer('claude:tool-use', (tb as { name: string }).name, (tb as { input: unknown }).input)
+            }
           }
 
-          // Extract tool use
-          const toolBlocks = msg.message.content.filter(
-            (b: { type: string }) => b.type === 'tool_use'
-          )
-          for (const tb of toolBlocks) {
-            sendToRenderer('claude:tool-use', (tb as { name: string }).name, (tb as { input: unknown }).input)
+          if (msg.type === 'result') {
+            if (msg.subtype === 'success') {
+              sendToRenderer('claude:result', msg.result, msg.total_cost_usd)
+            } else {
+              sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error')
+            }
           }
+        }
+        break // Success — exit retry loop
+      } catch (err: unknown) {
+        if ((err as Error).name === 'AbortError') {
+          break // User cancelled — don't retry
         }
 
-        if (msg.type === 'result') {
-          if (msg.subtype === 'success') {
-            sendToRenderer('claude:result', msg.result, msg.total_cost_usd)
-          } else {
-            sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error')
-          }
+        const errMsg = (err as Error).message || ''
+        const isRetryable = /rate.limit|429|overloaded|timeout|ETIMEDOUT|ECONNRESET|503|529/i.test(errMsg)
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delaySec = Math.pow(2, attempt)
+          sendToRenderer('claude:assistant-text', `\n\n*Rate limited — retrying in ${delaySec}s (attempt ${attempt}/${MAX_RETRIES})...*`)
+          await new Promise((r) => setTimeout(r, delaySec * 1000))
+          continue
+        }
+
+        // Format user-friendly error
+        let userMessage: string
+        if (/rate.limit|429/i.test(errMsg)) {
+          userMessage = 'Rate limited by the API. Please wait a moment and try again.'
+        } else if (/overloaded|503|529/i.test(errMsg)) {
+          userMessage = 'Claude is currently overloaded. Please try again in a few minutes.'
+        } else if (/timeout|ETIMEDOUT/i.test(errMsg)) {
+          userMessage = 'Request timed out. Check your network connection and try again.'
+        } else if (/ECONNRESET|ECONNREFUSED|fetch failed/i.test(errMsg)) {
+          userMessage = 'Network error. Check your internet connection.'
+        } else if (/401|unauthorized|invalid.*key/i.test(errMsg)) {
+          userMessage = 'Authentication failed. Please check your API key.'
+        } else {
+          userMessage = errMsg || 'Failed to communicate with Claude'
+        }
+
+        sendToRenderer('claude:error', userMessage)
+        break
+      } finally {
+        if (attempt >= MAX_RETRIES || !currentAbort) {
+          currentAbort = null
         }
       }
-    } catch (err: unknown) {
-      if ((err as Error).name !== 'AbortError') {
-        sendToRenderer('claude:error', (err as Error).message || 'Failed to communicate with Claude')
-      }
-    } finally {
-      currentAbort = null
     }
   })
 

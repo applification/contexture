@@ -1,16 +1,18 @@
 import { create } from 'zustand'
 import type { Ontology, OntologyClass, ObjectProperty, DatatypeProperty } from '../model/types'
 import { createEmptyOntology } from '../model/types'
-import { parseTurtle } from '../model/parse'
+import { parseTurtleWithWarnings, type ParseWarning } from '../model/parse'
 import { serializeToTurtle } from '../model/serialize'
 
 interface OntologyState {
   ontology: Ontology
   filePath: string | null
   isDirty: boolean
+  importWarnings: ParseWarning[]
 
   // Actions
   loadFromTurtle: (turtle: string, filePath?: string) => void
+  clearImportWarnings: () => void
   exportToTurtle: () => string
   reset: () => void
   setFilePath: (path: string | null) => void
@@ -39,11 +41,14 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
   ontology: createEmptyOntology(),
   filePath: null,
   isDirty: false,
+  importWarnings: [],
 
   loadFromTurtle: (turtle, filePath) => {
-    const ontology = parseTurtle(turtle)
-    set({ ontology, filePath: filePath ?? null, isDirty: false })
+    const { ontology, warnings } = parseTurtleWithWarnings(turtle)
+    set({ ontology, filePath: filePath ?? null, isDirty: false, importWarnings: warnings })
   },
+
+  clearImportWarnings: () => set({ importWarnings: [] }),
 
   exportToTurtle: () => {
     return serializeToTurtle(get().ontology)

@@ -12,6 +12,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
   const isSelected = selectedNodeId === id
   const isAdjacent = !isSelected && adjacentNodeIds.includes(id)
   const isDimmed = selectedNodeId !== null && !isSelected && !isAdjacent
+  const hasErrors = data.errorCount > 0
 
   return (
     <div
@@ -26,7 +27,9 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
           ? '2px solid var(--graph-node-selected)'
           : isAdjacent
             ? '2px solid var(--graph-node-adjacent)'
-            : '1px solid var(--graph-node-border)',
+            : hasErrors
+              ? '1px solid var(--destructive)'
+              : '1px solid var(--graph-node-border)',
         boxShadow: '0 2px 8px oklch(0 0 0 / 0.15), 0 0 1px oklch(0 0 0 / 0.1)',
         background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent',
         opacity: isDimmed ? 0.2 : 1,
@@ -46,10 +49,59 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
           letterSpacing: '0.01em',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          textOverflow: 'ellipsis',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
         }}
       >
-        {data.label}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.label}</span>
+        {(data.errorCount > 0 || data.warningCount > 0) && (
+          <span style={{ display: 'flex', gap: 3, flexShrink: 0, marginLeft: 'auto' }}>
+            {data.errorCount > 0 && (
+              <span
+                title={`${data.errorCount} error${data.errorCount > 1 ? 's' : ''}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  background: 'var(--destructive)',
+                  color: 'var(--destructive-foreground)',
+                  padding: '0 4px',
+                  lineHeight: 1
+                }}
+              >
+                {data.errorCount}
+              </span>
+            )}
+            {data.warningCount > 0 && (
+              <span
+                title={`${data.warningCount} warning${data.warningCount > 1 ? 's' : ''}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  background: 'oklch(0.75 0.18 85)',
+                  color: 'oklch(0.25 0.05 85)',
+                  padding: '0 4px',
+                  lineHeight: 1
+                }}
+              >
+                {data.warningCount}
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       {showDatatypeProperties && data.datatypeProperties.length > 0 && (

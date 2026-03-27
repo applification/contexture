@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool'
   content: string
   toolName?: string
+  toolInput?: Record<string, unknown>
   cost?: number
 }
 
@@ -172,9 +173,14 @@ export function useClaude(): UseClaudeReturn {
       }),
 
       // Tool use indicator
-      window.api.onClaudeToolUse((toolName: string) => {
+      window.api.onClaudeToolUse((toolName: string, toolInput: unknown) => {
         const shortName = toolName.replace('mcp__ontograph__', '')
-        setMessages((prev) => [...prev, { role: 'tool', content: shortName, toolName: shortName }])
+        setMessages((prev) => [...prev, {
+          role: 'tool',
+          content: shortName,
+          toolName: shortName,
+          toolInput: toolInput as Record<string, unknown>
+        }])
       }),
 
       // Final result

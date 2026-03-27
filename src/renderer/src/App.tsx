@@ -12,7 +12,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './componen
 import { Button } from './components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './components/ui/popover'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { SlidersHorizontal, ChevronDown, CircleAlert, TriangleAlert } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useOntologyStore } from './store/ontology'
 import { useUIStore } from './store/ui'
@@ -21,6 +21,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from './
 import { UpdateBanner } from './components/UpdateBanner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './components/ui/dialog'
 import { MousePointer2 } from 'lucide-react'
+import { validateOntology } from './services/validation'
 import peopleTtl from './samples/people.ttl?raw'
 
 function App(): React.JSX.Element {
@@ -30,6 +31,8 @@ function App(): React.JSX.Element {
   const setFilePath = useOntologyStore((s) => s.setFilePath)
   const markClean = useOntologyStore((s) => s.markClean)
   const isDirty = useOntologyStore((s) => s.isDirty)
+  const importWarnings = useOntologyStore((s) => s.importWarnings)
+  const clearImportWarnings = useOntologyStore((s) => s.clearImportWarnings)
   const resetOntology = useOntologyStore((s) => s.reset)
   const selectedNodeId = useUIStore((s) => s.selectedNodeId)
   const selectedEdgeId = useUIStore((s) => s.selectedEdgeId)
@@ -46,7 +49,7 @@ function App(): React.JSX.Element {
     }
   }, [loadFromTurtle])
 
-  const handleSave = useCallback(async () => {
+  const doSave = useCallback(async () => {
     const turtle = exportToTurtle()
     const currentPath = useOntologyStore.getState().filePath
     if (currentPath && !currentPath.startsWith('sample://') && !currentPath.startsWith('Sample:')) {
@@ -61,7 +64,7 @@ function App(): React.JSX.Element {
     }
   }, [exportToTurtle, setFilePath, markClean])
 
-  const handleSaveAs = useCallback(async () => {
+  const doSaveAs = useCallback(async () => {
     const turtle = exportToTurtle()
     const newPath = await window.api.saveFileAs(turtle)
     if (newPath) {
@@ -69,6 +72,38 @@ function App(): React.JSX.Element {
       markClean()
     }
   }, [exportToTurtle, setFilePath, markClean])
+
+  const handleSave = useCallback(async () => {
+    const errors = validateOntology(useOntologyStore.getState().ontology)
+    const errorCount = errors.filter((e) => e.severity === 'error').length
+    if (errorCount > 0) {
+      pendingSaveRef.current = 'save'
+      setShowSaveWarning(true)
+      return
+    }
+    await doSave()
+  }, [doSave])
+
+  const handleSaveAs = useCallback(async () => {
+    const errors = validateOntology(useOntologyStore.getState().ontology)
+    const errorCount = errors.filter((e) => e.severity === 'error').length
+    if (errorCount > 0) {
+      pendingSaveRef.current = 'saveAs'
+      setShowSaveWarning(true)
+      return
+    }
+    await doSaveAs()
+  }, [doSaveAs])
+
+  const handleForceSave = useCallback(async () => {
+    setShowSaveWarning(false)
+    if (pendingSaveRef.current === 'saveAs') {
+      await doSaveAs()
+    } else {
+      await doSave()
+    }
+    pendingSaveRef.current = null
+  }, [doSave, doSaveAs])
 
   // Menu events
   useEffect(() => {
@@ -121,6 +156,8 @@ function App(): React.JSX.Element {
   const setActiveTab = useUIStore((s) => s.setSidebarTab)
 
   const [showNewDialog, setShowNewDialog] = useState(false)
+  const [showSaveWarning, setShowSaveWarning] = useState(false)
+  const pendingSaveRef = useRef<'save' | 'saveAs' | null>(null)
   const [showGraphControls, setShowGraphControls] = useState(false)
 
   const handleNew = useCallback(() => {
@@ -229,6 +266,51 @@ function App(): React.JSX.Element {
       </ResizablePanelGroup>
 
       <StatusBar />
+
+      <Dialog open={importWarnings.length > 0} onOpenChange={(open) => { if (!open) clearImportWarnings() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import warnings</DialogTitle>
+            <DialogDescription>
+              The file was loaded but some issues were detected.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
+            {importWarnings.map((w, i) => (
+              <div key={i} className="flex items-start gap-2">
+                {w.severity === 'error' ? (
+                  <CircleAlert className="size-4 shrink-0 mt-0.5 text-destructive" />
+                ) : (
+                  <TriangleAlert className="size-4 shrink-0 mt-0.5 text-warning" />
+                )}
+                <span>{w.message}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={clearImportWarnings}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSaveWarning} onOpenChange={setShowSaveWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save with errors?</DialogTitle>
+            <DialogDescription>
+              This ontology has validation errors. Saving may produce an invalid file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowSaveWarning(false); pendingSaveRef.current = null }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleForceSave}>
+              Save anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent>

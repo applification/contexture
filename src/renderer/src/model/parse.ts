@@ -57,13 +57,40 @@ function getOrCreateDatatypeProperty(ontology: Ontology, uri: string): DatatypeP
   return prop
 }
 
+export interface ParseWarning {
+  message: string
+  severity: 'error' | 'warning'
+}
+
+export interface ParseResult {
+  ontology: Ontology
+  warnings: ParseWarning[]
+}
+
 export function parseTurtle(turtle: string): Ontology {
-  const parser = new Parser()
-  const quads: Quad[] = parser.parse(turtle)
+  return parseTurtleWithWarnings(turtle).ontology
+}
+
+export function parseTurtleWithWarnings(turtle: string): ParseResult {
+  const warnings: ParseWarning[] = []
+  let quads: Quad[]
+
+  try {
+    const parser = new Parser()
+    quads = parser.parse(turtle)
+
+    // Merge prefixes from parser
+    var prefixes = (parser as unknown as { _prefixes: Record<string, string> })._prefixes
+  } catch (err: unknown) {
+    warnings.push({
+      severity: 'error',
+      message: `Turtle parse error: ${(err as Error).message}`
+    })
+    return { ontology: createEmptyOntology(), warnings }
+  }
+
   const ontology = createEmptyOntology()
 
-  // Merge prefixes from parser
-  const prefixes = (parser as unknown as { _prefixes: Record<string, string> })._prefixes
   if (prefixes) {
     for (const [prefix, iri] of Object.entries(prefixes)) {
       if (prefix) ontology.prefixes.set(prefix, iri)
@@ -176,5 +203,31 @@ export function parseTurtle(turtle: string): Ontology {
     }
   }
 
-  return ontology
+  // Detect unsupported OWL constructs
+  const unsupported = new Set<string>()
+  const UNSUPPORTED_TYPES = [
+    `${OWL}Restriction`, `${OWL}AllDifferent`, `${OWL}AnnotationProperty`,
+    `${OWL}NamedIndividual`, `${OWL}Ontology`
+  ]
+  for (const quad of quads) {
+    if (quad.predicate.value === `${RDF}type` && UNSUPPORTED_TYPES.includes(quad.object.value)) {
+      const name = quad.object.value.split('#').pop() || quad.object.value
+      unsupported.add(name)
+    }
+  }
+  if (unsupported.size > 0) {
+    warnings.push({
+      severity: 'warning',
+      message: `Unsupported OWL constructs ignored: ${[...unsupported].join(', ')}`
+    })
+  }
+
+  if (ontology.classes.size === 0 && ontology.objectProperties.size === 0 && ontology.datatypeProperties.size === 0) {
+    warnings.push({
+      severity: 'warning',
+      message: 'No OWL classes or properties found in this file'
+    })
+  }
+
+  return { ontology, warnings }
 }

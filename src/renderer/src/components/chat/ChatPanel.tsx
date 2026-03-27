@@ -244,6 +244,34 @@ export function ChatPanel(): React.JSX.Element {
   )
 }
 
+function localName(uri?: string): string {
+  if (!uri) return ''
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
+  return idx >= 0 ? uri.substring(idx + 1) : uri
+}
+
+function toolFeedbackSummary(toolName?: string, input?: Record<string, unknown>): string | null {
+  if (!toolName || !input) return null
+  switch (toolName) {
+    case 'add_class':
+      return `+ class "${input.label || localName(input.uri as string)}"`
+    case 'add_object_property':
+      return `+ property "${input.label || localName(input.uri as string)}" (${(input.domain as string[])?.map(localName).join(', ')} → ${(input.range as string[])?.map(localName).join(', ')})`
+    case 'add_datatype_property':
+      return `+ attribute "${input.label || localName(input.uri as string)}" : ${localName(input.range as string)}`
+    case 'modify_class':
+      return `~ modified "${localName(input.uri as string)}"`
+    case 'remove_element':
+      return `- removed ${input.type} "${localName(input.uri as string)}"`
+    case 'generate_ontology':
+      return '↻ replaced entire ontology'
+    case 'validate_ontology':
+      return '✓ ran validation'
+    default:
+      return null
+  }
+}
+
 function MessageBubble({ message }: { message: ChatMessage }): React.JSX.Element {
   if (message.role === 'user') {
     return (
@@ -256,9 +284,11 @@ function MessageBubble({ message }: { message: ChatMessage }): React.JSX.Element
   }
 
   if (message.role === 'tool') {
+    const summary = toolFeedbackSummary(message.toolName, message.toolInput)
     return (
-      <div className="text-[10px] text-muted-foreground bg-secondary/50 rounded px-2 py-1 font-mono">
-        ⚡ {message.toolName}
+      <div className="text-[10px] text-muted-foreground bg-secondary/50 rounded px-2 py-1 font-mono space-y-0.5">
+        <div>⚡ {message.toolName}</div>
+        {summary && <div className="text-[10px] opacity-75 pl-3">{summary}</div>}
       </div>
     )
   }

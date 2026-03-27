@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -21,6 +21,7 @@ import { AnimatePresence } from 'motion/react'
 import { useOntologyStore } from '@renderer/store/ontology'
 import { useUIStore } from '@renderer/store/ui'
 import { ontologyToReactFlowElements, type ClassNode, type GroupNode } from '@renderer/model/reactflow'
+import { validateOntology } from '@renderer/services/validation'
 import { useELKLayout } from '@renderer/hooks/useELKLayout'
 import { useLayoutSidecar } from '@renderer/hooks/useLayoutSidecar'
 import { ClassNode as ClassNodeComponent } from './nodes/ClassNode'
@@ -135,9 +136,11 @@ function GraphFlow(): React.JSX.Element {
     runLayoutNow(true)
   }, [nodesInitialized, runLayoutNow])
 
+  const validationErrors = useMemo(() => validateOntology(ontology), [ontology])
+
   // Sync ontology changes → React Flow nodes/edges
   useEffect(() => {
-    const { nodes: newNodes, edges: newEdges } = ontologyToReactFlowElements(ontology)
+    const { nodes: newNodes, edges: newEdges } = ontologyToReactFlowElements(ontology, validationErrors)
 
     const newIds = new Set(newNodes.map((n) => n.id))
     const prevIds = prevNodeIdsRef.current
@@ -170,7 +173,7 @@ function GraphFlow(): React.JSX.Element {
       )
       setEdges(newEdges)
     }
-  }, [ontology])
+  }, [ontology, validationErrors])
 
   // Compute adjacency when selection changes
   useEffect(() => {

@@ -1,11 +1,14 @@
 import type { Node, Edge } from '@xyflow/react'
 import type { Ontology } from './types'
+import type { ValidationError } from '../services/validation'
 
 export interface ClassNodeData extends Record<string, unknown> {
   label: string
   uri: string
   comment?: string
   datatypeProperties: { uri: string; label: string; range: string }[]
+  errorCount: number
+  warningCount: number
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
@@ -41,7 +44,19 @@ export interface ReactFlowElements {
   edges: Edge[]
 }
 
-export function ontologyToReactFlowElements(ontology: Ontology): ReactFlowElements {
+export function ontologyToReactFlowElements(ontology: Ontology, validationErrors?: ValidationError[]): ReactFlowElements {
+  // Build per-URI error/warning counts
+  const errorCounts = new Map<string, number>()
+  const warningCounts = new Map<string, number>()
+  if (validationErrors) {
+    for (const err of validationErrors) {
+      if (err.severity === 'error') {
+        errorCounts.set(err.elementUri, (errorCounts.get(err.elementUri) ?? 0) + 1)
+      } else {
+        warningCounts.set(err.elementUri, (warningCounts.get(err.elementUri) ?? 0) + 1)
+      }
+    }
+  }
   const nodes: ClassNode[] = []
   const edges: Edge[] = []
 
@@ -71,7 +86,9 @@ export function ontologyToReactFlowElements(ontology: Ontology): ReactFlowElemen
         label: cls.label || localName(cls.uri),
         uri: cls.uri,
         comment: cls.comment,
-        datatypeProperties: dtPropsByDomain.get(cls.uri) || []
+        datatypeProperties: dtPropsByDomain.get(cls.uri) || [],
+        errorCount: errorCounts.get(cls.uri) ?? 0,
+        warningCount: warningCounts.get(cls.uri) ?? 0
       }
     })
     idx++
