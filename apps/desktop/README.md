@@ -148,6 +148,28 @@ Ontograph works with [OWL](https://www.w3.org/OWL/) ontologies serialized in [Tu
 - **Object Properties** — Relations between classes with domain, range, optional `inverseOf`, and cardinality constraints
 - **Datatype Properties** — Relations from classes to XSD data types (string, integer, etc.) with domain, range, and cardinality
 
+## Releases
+
+Releases are automated via GitHub Actions. Pushing a semver git tag triggers the [release workflow](../../.github/workflows/release.yml):
+
+```bash
+# Tag the release
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+This will:
+
+1. **Create a GitHub Release** with auto-generated release notes
+2. **Build platform binaries** in parallel (macOS, Windows, Linux)
+3. **Publish artifacts** to the GitHub Release — `.dmg`/`.zip` (macOS), NSIS installer (Windows), AppImage/`.deb` (Linux)
+
+macOS builds are code-signed and notarized. The app's built-in auto-updater checks GitHub Releases for new versions.
+
+### Tag format
+
+Tags must match `v*.*.*` (e.g. `v0.1.0`, `v1.0.0-beta.1`). Conventional commits are required.
+
 ## License
 
 MIT
