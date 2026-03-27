@@ -26,6 +26,10 @@ const api = {
     ipcRenderer.invoke('file:save-as', content),
   readFileSilent: (filePath: string): Promise<string | null> =>
     ipcRenderer.invoke('file:read-silent', filePath),
+  getRecentFiles: (): Promise<string[]> =>
+    ipcRenderer.invoke('file:recent-files'),
+  openRecentFile: (filePath: string): Promise<{ filePath: string; content: string } | null> =>
+    ipcRenderer.invoke('file:open-recent', filePath),
 
   // Menu events
   onMenuFileOpen: (callback: () => void) => onChannel('menu:file-open', callback),

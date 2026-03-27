@@ -6,6 +6,7 @@ import { useUIStore } from '@renderer/store/ui'
 interface Result {
   id: string
   label: string
+  matchType?: string
 }
 
 function localName(uri: string): string {
@@ -23,7 +24,8 @@ export function GraphSearchBar(): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const setFocusNode = useUIStore((s) => s.setFocusNode)
-  const classes = useOntologyStore((s) => s.ontology.classes)
+  const ontology = useOntologyStore((s) => s.ontology)
+  const classes = ontology.classes
 
   // Cmd+F / Ctrl+F to focus
   useEffect(() => {
@@ -51,10 +53,25 @@ export function GraphSearchBar(): React.JSX.Element {
     for (const cls of classes.values()) {
       const label = cls.label || localName(cls.uri)
       if (label.toLowerCase().includes(q)) {
-        matches.push({ id: cls.uri, label })
+        matches.push({ id: cls.uri, label, matchType: 'label' })
+      } else if (cls.uri.toLowerCase().includes(q)) {
+        matches.push({ id: cls.uri, label: `${label} (URI)`, matchType: 'uri' })
+      } else if (cls.comment?.toLowerCase().includes(q)) {
+        matches.push({ id: cls.uri, label: `${label} (comment)`, matchType: 'comment' })
       }
     }
-    setResults(matches.slice(0, 8))
+    // Also search object properties (match shows domain class)
+    for (const prop of ontology.objectProperties.values()) {
+      const propLabel = prop.label || localName(prop.uri)
+      if (propLabel.toLowerCase().includes(q) || prop.uri.toLowerCase().includes(q)) {
+        const domainUri = prop.domain[0]
+        if (domainUri && !matches.some((m) => m.id === domainUri)) {
+          const domainLabel = classes.get(domainUri)?.label || localName(domainUri)
+          matches.push({ id: domainUri, label: `${domainLabel} (via ${propLabel})`, matchType: 'property' })
+        }
+      }
+    }
+    setResults(matches.slice(0, 10))
     setActiveIndex(0)
     setOpen(matches.length > 0)
   }, [query, classes])
@@ -108,7 +125,7 @@ export function GraphSearchBar(): React.JSX.Element {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Find node…"
+          placeholder="Search label, URI, comment…"
           className="flex-1 min-w-0 bg-transparent text-xs outline-none text-foreground placeholder:text-muted-foreground/50"
         />
         {query && (

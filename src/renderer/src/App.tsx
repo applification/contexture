@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { GraphCanvas } from './components/graph/GraphCanvas'
 import { DetailPanel } from './components/detail/DetailPanel'
 import { ChatPanel } from './components/chat/ChatPanel'
@@ -12,7 +12,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './componen
 import { Button } from './components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './components/ui/popover'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, ChevronDown, CircleAlert, TriangleAlert } from 'lucide-react'
+import { SlidersHorizontal, ChevronDown, CircleAlert, TriangleAlert, Clock } from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useOntologyStore } from './store/ontology'
 import { useUIStore } from './store/ui'
@@ -159,6 +159,19 @@ function App(): React.JSX.Element {
   const [showSaveWarning, setShowSaveWarning] = useState(false)
   const pendingSaveRef = useRef<'save' | 'saveAs' | null>(null)
   const [showGraphControls, setShowGraphControls] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<string[]>([])
+
+  // Load recent files on mount and after opens
+  useEffect(() => {
+    window.api.getRecentFiles().then(setRecentFiles).catch(() => {})
+  }, [ontology])
+
+  const handleOpenRecent = useCallback(async (filePath: string) => {
+    const result = await window.api.openRecentFile(filePath)
+    if (result) {
+      loadFromTurtle(result.content, result.filePath)
+    }
+  }, [loadFromTurtle])
 
   const handleNew = useCallback(() => {
     if (isDirty) {
@@ -203,7 +216,7 @@ function App(): React.JSX.Element {
               <GraphCanvas />
             ) : (
               <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--graph-bg)' }}>
-                <div className="text-center text-muted-foreground">
+                <div className="text-center text-muted-foreground max-w-sm">
                   <h1 className="text-2xl font-semibold mb-2">Ontograph</h1>
                   <p className="text-sm mb-4">
                     Open a .ttl file or start chatting with Claude to create an ontology
@@ -211,6 +224,28 @@ function App(): React.JSX.Element {
                   <Button onClick={() => loadFromTurtle(peopleTtl, 'Sample: people.ttl')}>
                     Load sample ontology
                   </Button>
+
+                  {recentFiles.length > 0 && (
+                    <div className="mt-6 text-left">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
+                        <Clock className="size-3" />
+                        <span>Recent files</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {recentFiles.slice(0, 5).map((fp) => (
+                          <button
+                            key={fp}
+                            onClick={() => handleOpenRecent(fp)}
+                            className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
+                            title={fp}
+                          >
+                            {fp.split('/').pop()}
+                            <span className="text-muted-foreground/50 ml-1.5">{fp.split('/').slice(0, -1).join('/')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

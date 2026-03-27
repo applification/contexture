@@ -15,13 +15,13 @@ describe('GraphSearchBar', () => {
 
   it('renders search input', () => {
     render(<GraphSearchBar />)
-    expect(screen.getByPlaceholderText('Find node…')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search label, URI, comment…')).toBeInTheDocument()
   })
 
   it('shows no results for empty query', () => {
     useOntologyStore.getState().addClass('http://ex/Person', { label: 'Person' })
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: '' } })
     expect(screen.queryByText('Person')).not.toBeInTheDocument()
   })
@@ -30,7 +30,7 @@ describe('GraphSearchBar', () => {
     useOntologyStore.getState().addClass('http://ex/Person', { label: 'Person' })
     useOntologyStore.getState().addClass('http://ex/Animal', { label: 'Animal' })
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'Per' } })
     expect(screen.getByText('Person')).toBeInTheDocument()
     expect(screen.queryByText('Animal')).not.toBeInTheDocument()
@@ -38,7 +38,7 @@ describe('GraphSearchBar', () => {
 
   it('shows clear button when query present', () => {
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'test' } })
     // X button should appear (the clear button)
     expect(input).toHaveValue('test')
@@ -47,7 +47,7 @@ describe('GraphSearchBar', () => {
   it('clears results on Escape', () => {
     useOntologyStore.getState().addClass('http://ex/A', { label: 'Alpha' })
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'Alpha' } })
     expect(screen.getByText('Alpha')).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'Escape' })
@@ -57,7 +57,7 @@ describe('GraphSearchBar', () => {
   it('selects node on click', () => {
     useOntologyStore.getState().addClass('http://ex/Person', { label: 'Person' })
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'Person' } })
     fireEvent.click(screen.getByText('Person'))
     expect(useUIStore.getState().focusNodeId).toBe('http://ex/Person')
@@ -67,7 +67,7 @@ describe('GraphSearchBar', () => {
     useOntologyStore.getState().addClass('http://ex/A', { label: 'Alpha' })
     useOntologyStore.getState().addClass('http://ex/B', { label: 'Alpha-Beta' })
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'Alpha' } })
     fireEvent.keyDown(input, { key: 'ArrowDown' })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -78,7 +78,7 @@ describe('GraphSearchBar', () => {
   it('uses localName fallback for classes without label', () => {
     useOntologyStore.getState().addClass('http://ex/MyClass')
     render(<GraphSearchBar />)
-    const input = screen.getByPlaceholderText('Find node…')
+    const input = screen.getByPlaceholderText('Search label, URI, comment…')
     fireEvent.change(input, { target: { value: 'MyClass' } })
     expect(screen.getByText('MyClass')).toBeInTheDocument()
   })

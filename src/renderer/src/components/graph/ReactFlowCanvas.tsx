@@ -53,10 +53,15 @@ function GraphFlow(): React.JSX.Element {
   const filePath = useOntologyStore((s) => s.filePath)
   const addClass = useOntologyStore((s) => s.addClass)
   const removeClass = useOntologyStore((s) => s.removeClass)
+  const addObjectProperty = useOntologyStore((s) => s.addObjectProperty)
+  const addDatatypeProperty = useOntologyStore((s) => s.addDatatypeProperty)
   const removeObjectProperty = useOntologyStore((s) => s.removeObjectProperty)
   const graphFilters = useUIStore((s) => s.graphFilters)
   const graphLayout = useUIStore((s) => s.graphLayout)
   const setSelectedNode = useUIStore((s) => s.setSelectedNode)
+  const toggleSelectedNode = useUIStore((s) => s.toggleSelectedNode)
+  const clearMultiSelect = useUIStore((s) => s.clearMultiSelect)
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds)
   const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
   const setAdjacency = useUIStore((s) => s.setAdjacency)
   const selectedNodeId = useUIStore((s) => s.selectedNodeId)
@@ -259,12 +264,16 @@ function GraphFlow(): React.JSX.Element {
   )
 
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      setSelectedNode(node.id)
+    (evt: React.MouseEvent, node: Node) => {
+      if (evt.shiftKey || evt.metaKey) {
+        toggleSelectedNode(node.id)
+      } else {
+        setSelectedNode(node.id)
+      }
       setSelectedEdge(null)
       setContextMenu(null)
     },
-    [setSelectedNode, setSelectedEdge]
+    [setSelectedNode, toggleSelectedNode, setSelectedEdge]
   )
 
   const handleEdgeClick = useCallback(
@@ -277,16 +286,60 @@ function GraphFlow(): React.JSX.Element {
   )
 
   const handlePaneClick = useCallback(() => {
-    setSelectedNode(null)
+    clearMultiSelect()
     setSelectedEdge(null)
     setContextMenu(null)
-  }, [setSelectedNode, setSelectedEdge])
+  }, [clearMultiSelect, setSelectedEdge])
 
   const handleNodeContextMenu = useCallback(
     (evt: React.MouseEvent, node: Node) => {
       evt.preventDefault()
-      setSelectedNode(node.id)
+      // If the right-clicked node isn't in current multi-select, reset to just this node
+      if (!selectedNodeIds.includes(node.id)) {
+        setSelectedNode(node.id)
+      }
       setSelectedEdge(null)
+
+      // Multi-select context menu
+      const currentSelection = selectedNodeIds.includes(node.id) ? selectedNodeIds : [node.id]
+      if (currentSelection.length > 1) {
+        setContextMenu({
+          x: evt.clientX,
+          y: evt.clientY,
+          items: [
+            {
+              label: `Reparent ${currentSelection.length} classes...`,
+              action: () => {
+                const parentLabel = prompt('New parent class name or URI:')
+                if (!parentLabel) return
+                const parent = Array.from(ontology.classes.values()).find(
+                  (c) => c.label?.toLowerCase() === parentLabel.toLowerCase() || c.uri === parentLabel
+                )
+                if (!parent) { alert(`Class "${parentLabel}" not found`); return }
+                const updateClass = useOntologyStore.getState().updateClass
+                currentSelection.forEach((id) => {
+                  const cls = ontology.classes.get(id)
+                  if (cls && !cls.subClassOf.includes(parent.uri)) {
+                    updateClass(id, { subClassOf: [...cls.subClassOf, parent.uri] })
+                  }
+                })
+              }
+            },
+            { label: '', action: () => {}, separator: true },
+            {
+              label: `Delete ${currentSelection.length} classes`,
+              destructive: true,
+              action: () => {
+                currentSelection.forEach((id) => removeClass(id))
+                clearMultiSelect()
+              }
+            }
+          ]
+        })
+        return
+      }
+
+      const classLabel = ontology.classes.get(node.id)?.label || ''
       setContextMenu({
         x: evt.clientX,
         y: evt.clientY,
@@ -301,6 +354,43 @@ function GraphFlow(): React.JSX.Element {
               }
             }
           },
+          {
+            label: 'Add datatype property...',
+            action: () => {
+              const name = prompt('Property name:')
+              if (name) {
+                const uri = `${baseNsRef.current}${name.replace(/\s+/g, '')}`
+                addDatatypeProperty(uri, { label: name, domain: [node.id] })
+              }
+            }
+          },
+          {
+            label: 'Connect to...',
+            action: () => {
+              const targetLabel = prompt('Target class name or URI:')
+              if (!targetLabel) return
+              const target = Array.from(ontology.classes.values()).find(
+                (c) => c.label?.toLowerCase() === targetLabel.toLowerCase() || c.uri === targetLabel
+              )
+              if (!target) { alert(`Class "${targetLabel}" not found`); return }
+              const propName = prompt('Property name for connection:')
+              if (!propName) return
+              const uri = `${baseNsRef.current}${propName.replace(/\s+/g, '')}`
+              addObjectProperty(uri, { label: propName, domain: [node.id], range: [target.uri] })
+            }
+          },
+          {
+            label: 'Duplicate class',
+            action: () => {
+              const suffix = prompt('Suffix for duplicate:', 'Copy')
+              if (suffix === null) return
+              const cls = ontology.classes.get(node.id)
+              if (!cls) return
+              const newName = `${classLabel || 'Class'}${suffix}`
+              const uri = `${baseNsRef.current}${newName.replace(/\s+/g, '')}`
+              addClass(uri, { label: newName, subClassOf: [...cls.subClassOf], comment: cls.comment })
+            }
+          },
           { label: '', action: () => {}, separator: true },
           {
             label: 'Delete class',
@@ -310,7 +400,7 @@ function GraphFlow(): React.JSX.Element {
         ]
       })
     },
-    [setSelectedNode, setSelectedEdge, addClass, removeClass]
+    [setSelectedNode, setSelectedEdge, addClass, removeClass, addObjectProperty, addDatatypeProperty, ontology, selectedNodeIds, clearMultiSelect]
   )
 
   const handleEdgeContextMenu = useCallback(
@@ -349,6 +439,26 @@ function GraphFlow(): React.JSX.Element {
             }
           },
           {
+            label: 'Add object property...',
+            action: () => {
+              const name = prompt('Property name:')
+              if (!name) return
+              const domainLabel = prompt('Domain class name or URI:')
+              if (!domainLabel) return
+              const rangeLabel = prompt('Range class name or URI:')
+              if (!rangeLabel) return
+              const findClass = (q: string) => Array.from(ontology.classes.values()).find(
+                (c) => c.label?.toLowerCase() === q.toLowerCase() || c.uri === q
+              )
+              const domainCls = findClass(domainLabel)
+              const rangeCls = findClass(rangeLabel)
+              if (!domainCls) { alert(`Domain class "${domainLabel}" not found`); return }
+              if (!rangeCls) { alert(`Range class "${rangeLabel}" not found`); return }
+              const uri = `${baseNsRef.current}${name.replace(/\s+/g, '')}`
+              addObjectProperty(uri, { label: name, domain: [domainCls.uri], range: [rangeCls.uri] })
+            }
+          },
+          {
             label: 'Add group...',
             action: () => {
               const name = prompt('Group name:')
@@ -367,8 +477,26 @@ function GraphFlow(): React.JSX.Element {
         ]
       })
     },
-    [addClass, setNodes]
+    [addClass, addObjectProperty, ontology, setNodes]
   )
+
+  // Delete key handler for selected nodes
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Don't intercept if user is typing in an input
+        const tag = (e.target as HTMLElement).tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        const ids = useUIStore.getState().selectedNodeIds
+        if (ids.length === 0) return
+        e.preventDefault()
+        ids.forEach((id) => removeClass(id))
+        clearMultiSelect()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [removeClass, clearMultiSelect])
 
   // Relayout and fitview triggers via custom events
   useEffect(() => {

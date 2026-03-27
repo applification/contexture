@@ -93,6 +93,7 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
               property={p}
               onLabelBlur={(label) => updateDatatypeProperty(p.uri, { label: label || undefined })}
               onRangeChange={(range) => updateDatatypeProperty(p.uri, { range })}
+              onCardinalityChange={(changes) => updateDatatypeProperty(p.uri, changes)}
             />
           ))}
         </div>
@@ -146,10 +147,12 @@ function DatatypePropertyRow({
   property,
   onLabelBlur,
   onRangeChange,
+  onCardinalityChange,
 }: {
   property: DatatypeProperty
   onLabelBlur: (label: string) => void
   onRangeChange: (range: string) => void
+  onCardinalityChange: (changes: { minCardinality?: number; maxCardinality?: number }) => void
 }): React.JSX.Element {
   return (
     <div className="space-y-1">
@@ -172,6 +175,34 @@ function DatatypePropertyRow({
             <option value={property.range}>{localName(property.range)}</option>
           )}
         </select>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>Cardinality:</span>
+        <Input
+          type="number"
+          min={0}
+          placeholder="min"
+          defaultValue={property.minCardinality ?? ''}
+          onBlur={(e) => {
+            const val = e.target.value.trim()
+            onCardinalityChange({ minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)) })
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          className="h-6 text-xs w-14 px-1.5"
+        />
+        <span>..</span>
+        <Input
+          type="number"
+          min={0}
+          placeholder="∞"
+          defaultValue={property.maxCardinality ?? ''}
+          onBlur={(e) => {
+            const val = e.target.value.trim()
+            onCardinalityChange({ maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)) })
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          className="h-6 text-xs w-14 px-1.5"
+        />
       </div>
     </div>
   )

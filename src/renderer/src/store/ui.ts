@@ -30,6 +30,7 @@ export type SidebarTab = 'properties' | 'chat' | 'eval'
 
 interface UIState {
   selectedNodeId: string | null
+  selectedNodeIds: string[]
   selectedEdgeId: string | null
   adjacentNodeIds: string[]
   adjacentEdgeIds: string[]
@@ -43,6 +44,8 @@ interface UIState {
   chatDraft: string
 
   setSelectedNode: (id: string | null) => void
+  toggleSelectedNode: (id: string) => void
+  clearMultiSelect: () => void
   setSelectedEdge: (id: string | null) => void
   setAdjacency: (nodeIds: string[], edgeIds: string[]) => void
   toggleTheme: () => void
@@ -61,6 +64,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   selectedNodeId: null,
+  selectedNodeIds: [],
   selectedEdgeId: null,
   adjacentNodeIds: [],
   adjacentEdgeIds: [],
@@ -74,7 +78,14 @@ export const useUIStore = create<UIState>((set) => ({
   chatDraft: '',
   pendingChatMessage: null,
 
-  setSelectedNode: (id) => set({ selectedNodeId: id }),
+  setSelectedNode: (id) => set({ selectedNodeId: id, selectedNodeIds: id ? [id] : [] }),
+  toggleSelectedNode: (id) => set((s) => {
+    const ids = s.selectedNodeIds.includes(id)
+      ? s.selectedNodeIds.filter((x) => x !== id)
+      : [...s.selectedNodeIds, id]
+    return { selectedNodeIds: ids, selectedNodeId: ids.length > 0 ? ids[ids.length - 1] : null }
+  }),
+  clearMultiSelect: () => set({ selectedNodeIds: [], selectedNodeId: null }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id }),
   setAdjacency: (nodeIds, edgeIds) => set({ adjacentNodeIds: nodeIds, adjacentEdgeIds: edgeIds }),
   toggleTheme: () =>

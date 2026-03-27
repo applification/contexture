@@ -62,6 +62,48 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
         </div>
       )}
 
+      <div className="space-y-1.5">
+        <div className="text-xs text-muted-foreground">Cardinality</div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 space-y-1">
+            <Label htmlFor="prop-min-card" className="text-xs">Min</Label>
+            <Input
+              id="prop-min-card"
+              type="number"
+              min={0}
+              placeholder="—"
+              defaultValue={property.minCardinality ?? ''}
+              onBlur={(e) => {
+                const val = e.target.value.trim()
+                updateObjectProperty(property.uri, {
+                  minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10))
+                })
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="flex-1 space-y-1">
+            <Label htmlFor="prop-max-card" className="text-xs">Max</Label>
+            <Input
+              id="prop-max-card"
+              type="number"
+              min={0}
+              placeholder="∞"
+              defaultValue={property.maxCardinality ?? ''}
+              onBlur={(e) => {
+                const val = e.target.value.trim()
+                updateObjectProperty(property.uri, {
+                  maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10))
+                })
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+      </div>
+
       {property.inverseOf && (
         <div>
           <div className="text-xs text-muted-foreground mb-0.5">Inverse of</div>

@@ -37,6 +37,6 @@ describe('Toolbar', () => {
 
   it('renders search bar', () => {
     render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
-    expect(screen.getByPlaceholderText('Find node…')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search label, URI, comment…')).toBeInTheDocument()
   })
 })
