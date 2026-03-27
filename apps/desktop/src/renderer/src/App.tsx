@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { GraphCanvas } from './components/graph/GraphCanvas'
+import { GraphBackground } from './components/graph/GraphBackground'
 import { DetailPanel } from './components/detail/DetailPanel'
 import { ChatPanel } from './components/chat/ChatPanel'
 import { EvalPanel } from './components/eval/EvalPanel'
@@ -215,9 +216,11 @@ function App(): React.JSX.Element {
             {hasContent ? (
               <GraphCanvas />
             ) : (
-              <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--graph-bg)' }}>
-                <div className="text-center text-muted-foreground max-w-sm">
-                  <h1 className="text-2xl font-semibold mb-2">Ontograph</h1>
+              <div className="relative w-full h-full flex items-center justify-center" style={{ background: 'var(--graph-bg)' }}>
+                <GraphBackground />
+                <div className="relative z-10 text-center text-muted-foreground max-w-sm">
+                  <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Ontograph</h1>
+                  <p className="text-xs text-muted-foreground/70 mb-3">Where knowledge takes shape</p>
                   <p className="text-sm mb-4">
                     Open a .ttl file or start chatting with Claude to create an ontology
                   </p>
