@@ -11,6 +11,43 @@ export interface ELKLayoutResult {
   y: number
 }
 
+/**
+ * Build ELK layout options that scale with graph size.
+ * Small graphs (≤100 nodes) use stress minimization for organic results.
+ * Medium graphs (101-300) use stress with reduced iterations.
+ * Large graphs (>300) switch to the much faster layered algorithm.
+ */
+function buildLayoutOptions(
+  nodeCount: number,
+  nodeGap: number
+): Record<string, string> {
+  if (nodeCount > 300) {
+    // Layered (Sugiyama) — O(n log n), handles 1000+ nodes comfortably
+    return {
+      'elk.algorithm': 'org.eclipse.elk.layered',
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(nodeGap * 1.5),
+      'elk.spacing.nodeNode': String(nodeGap),
+      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'elk.padding': '[top=50, left=50, bottom=50, right=50]',
+      'elk.edgeRouting': 'SPLINES'
+    }
+  }
+
+  // Stress minimization — organic look, but scales O(n²)
+  const iterationLimit = nodeCount > 100 ? 150 : 300
+  const epsilon = nodeCount > 100 ? '5e-3' : '1e-3'
+
+  return {
+    'elk.algorithm': 'org.eclipse.elk.stress',
+    'elk.stress.desiredEdgeLength': String(nodeGap * 2),
+    'elk.stress.epsilon': epsilon,
+    'elk.stress.iterationLimit': String(iterationLimit),
+    'elk.spacing.nodeNode': String(nodeGap),
+    'elk.padding': '[top=50, left=50, bottom=50, right=50]'
+  }
+}
+
 export function useELKLayout() {
   const runningRef = useRef(false)
 
@@ -23,26 +60,19 @@ export function useELKLayout() {
       if (runningRef.current) return []
       runningRef.current = true
 
-      // nodeSpacing (80–400) maps directly to nodeNode gap — slider right = more spacing
       const nodeGap = layout?.nodeSpacing ?? 180
+      const layoutChildren = nodes
+        .filter((n) => n.type !== 'group')
+        .map((n) => ({
+          id: n.id,
+          width: n.measured?.width ?? 200,
+          height: n.measured?.height ?? 48
+        }))
 
       const elkGraph = {
         id: 'root',
-        layoutOptions: {
-          'elk.algorithm': 'org.eclipse.elk.stress',
-          'elk.stress.desiredEdgeLength': String(nodeGap * 2),
-          'elk.stress.epsilon': '1e-3',
-          'elk.stress.iterationLimit': '300',
-          'elk.spacing.nodeNode': String(nodeGap),
-          'elk.padding': '[top=50, left=50, bottom=50, right=50]'
-        },
-        children: nodes
-          .filter((n) => n.type !== 'group')
-          .map((n) => ({
-            id: n.id,
-            width: n.measured?.width ?? 200,
-            height: n.measured?.height ?? 48
-          })),
+        layoutOptions: buildLayoutOptions(layoutChildren.length, nodeGap),
+        children: layoutChildren,
         edges: edges.map((e) => ({
           id: e.id,
           sources: [e.source],

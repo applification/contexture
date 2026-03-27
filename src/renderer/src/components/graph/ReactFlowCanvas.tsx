@@ -30,6 +30,7 @@ import { SubClassOfEdge } from './edges/SubClassOfEdge'
 import { ObjectPropertyEdge } from './edges/ObjectPropertyEdge'
 import { DisjointWithEdge } from './edges/DisjointWithEdge'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { GraphLegend } from './GraphLegend'
 
 const NODE_TYPES: NodeTypes = {
   class: ClassNodeComponent as unknown as NodeTypes['class'],
@@ -103,35 +104,73 @@ function GraphFlow(): React.JSX.Element {
     firstLoadRef.current = true
   }, [filePath])
 
-  // Direct layout runner — always uses current nodes, edges, and layout params
+  // Direct layout runner — always uses current nodes, edges, and layout params.
+  // On first load, tries to restore positions from sidecar; if the sidecar covers
+  // every node, skips ELK entirely for instant rendering.
   const runLayoutNow = useCallback(
     async (checkSidecar = false) => {
       const currentNodes = nodesRef.current.filter((n) => n.type !== 'group')
       const currentEdges = edgesRef.current
       if (currentNodes.length === 0) return
 
-      const positions = await runLayout(currentNodes, currentEdges, graphLayoutRef.current)
-      if (positions.length === 0) return
-
-      const posMap = new Map(positions.map((p) => [p.id, { x: p.x, y: p.y }]))
-
+      // Try sidecar first — if all positions cached, skip the expensive ELK pass
       if (checkSidecar && firstLoadRef.current) {
         firstLoadRef.current = false
         const sidecar = await loadPositions()
         if (sidecar) {
+          const nodeIds = new Set(currentNodes.map((n) => n.id))
+          const allCovered = [...nodeIds].every((id) => id in sidecar.positions)
+          if (allCovered) {
+            setNodes((prev) =>
+              prev.map((n) => {
+                const pos = sidecar.positions[n.id]
+                return pos ? { ...n, position: pos } : n
+              })
+            )
+            setTimeout(() => fitView({ padding: 0.1, duration: 400 }), 100)
+            return
+          }
+          // Partial coverage — run ELK but merge sidecar positions on top
+          const positions = await runLayout(currentNodes, currentEdges, graphLayoutRef.current)
+          if (positions.length === 0) return
+          const posMap = new Map(positions.map((p) => [p.id, { x: p.x, y: p.y }]))
           Object.entries(sidecar.positions).forEach(([id, pos]) => posMap.set(id, pos))
+          setNodes((prev) =>
+            prev.map((n) => {
+              const pos = posMap.get(n.id)
+              return pos ? { ...n, position: pos } : n
+            })
+          )
+          // Persist merged layout so next load is instant
+          const merged: Record<string, { x: number; y: number }> = {}
+          posMap.forEach((pos, id) => { merged[id] = pos })
+          savePositions({ positions: merged })
+          setTimeout(() => fitView({ padding: 0.1, duration: 400 }), 100)
+          return
         }
+      } else if (checkSidecar) {
+        // Not first load — skip sidecar
       }
 
+      const positions = await runLayout(currentNodes, currentEdges, graphLayoutRef.current)
+      if (positions.length === 0) return
+
+      const posMap = new Map(positions.map((p) => [p.id, { x: p.x, y: p.y }]))
       setNodes((prev) =>
         prev.map((n) => {
           const pos = posMap.get(n.id)
           return pos ? { ...n, position: pos } : n
         })
       )
+
+      // Auto-save ELK-computed positions so next load skips layout
+      const posData: Record<string, { x: number; y: number }> = {}
+      posMap.forEach((pos, id) => { posData[id] = pos })
+      savePositions({ positions: posData })
+
       setTimeout(() => fitView({ padding: 0.1, duration: 400 }), 100)
     },
-    [runLayout, loadPositions, setNodes, fitView]
+    [runLayout, loadPositions, savePositions, setNodes, fitView]
   )
 
   // Run layout when nodes first become measured after a structural change
@@ -541,6 +580,8 @@ function GraphFlow(): React.JSX.Element {
       >
         <Background color="oklch(0.5 0.05 250 / 0.3)" gap={24} size={1} />
 </ReactFlow>
+
+      <GraphLegend />
 
       <AnimatePresence>
         {contextMenu && (
