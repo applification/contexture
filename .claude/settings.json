@@ -1,5 +1,5 @@
 {
   "permissions": {
-    "allow": ["Bash(curl http://127.0.0.1:3100/*)", "Bash(curl http://100.118.140.48:3100/*)"]
+    "allow": ["Bash(curl *)"]
   }
 }
