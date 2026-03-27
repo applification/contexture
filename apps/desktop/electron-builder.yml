@@ -15,7 +15,7 @@ win:
   executableName: Ontograph
   icon: build/icon.ico
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: ${productName}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -29,7 +29,7 @@ mac:
     - dmg
     - zip
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}.${ext}
 linux:
   icon: build/icon.png
   target:
@@ -38,7 +38,7 @@ linux:
   maintainer: applification.co.uk
   category: Development
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}.${ext}
 npmRebuild: false
 publish:
   provider: github
