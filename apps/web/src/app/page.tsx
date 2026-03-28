@@ -392,7 +392,7 @@ export default function Home() {
           <TrackedLink
             event="download_click"
             properties={{ os: 'unknown', location: 'footer_cta' }}
-            href="https://github.com/DaveHudson/Ontograph/releases/latest"
+            href="/download"
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             <Download className="size-4" />
