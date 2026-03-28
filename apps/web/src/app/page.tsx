@@ -46,7 +46,7 @@ export default function Home() {
             </a>
             <a
               href="#download"
-              className="bg-primary text-background px-4 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Download
             </a>
@@ -55,7 +55,7 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-32 pb-24 px-6">
+      <section className="relative pt-40 pb-24 px-6">
         {/* Dot grid background */}
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -83,7 +83,7 @@ export default function Home() {
           <div className="flex items-center justify-center gap-4">
             <a
               href="#download"
-              className="inline-flex items-center gap-2 bg-primary text-background px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               <Download className="size-4" />
               Download for free
