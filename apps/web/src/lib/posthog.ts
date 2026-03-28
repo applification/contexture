@@ -13,8 +13,9 @@ export function initPostHog() {
     api_host: host,
     person_profiles: "identified_only",
     persistence: "memory",
-    capture_pageview: true,
-    capture_pageleave: true,
+    capture_pageview: false,
+    capture_pageleave: false,
+    opt_out_capturing_by_default: true,
     session_recording: {
       maskAllInputs: true,
       maskTextSelector: "*",

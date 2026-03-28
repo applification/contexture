@@ -5,7 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
+    define: {
+      'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? '')
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin()]

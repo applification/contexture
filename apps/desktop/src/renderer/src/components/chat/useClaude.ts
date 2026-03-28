@@ -60,7 +60,9 @@ export function useClaude(): UseClaudeReturn {
     () => (localStorage.getItem(THINKING_STORAGE) as ThinkingBudget) || 'auto'
   )
   const [cliDetected, setCliDetected] = useState(false)
-  const hasTrackedFirstMessage = useRef(false)
+  const hasTrackedFirstMessage = useRef(
+    localStorage.getItem('ontograph-tracked-first-message') === 'true'
+  )
 
   const store = useOntologyStore
 
@@ -214,6 +216,7 @@ export function useClaude(): UseClaudeReturn {
       if (!hasTrackedFirstMessage.current) {
         track('first_claude_interaction')
         hasTrackedFirstMessage.current = true
+        localStorage.setItem('ontograph-tracked-first-message', 'true')
       }
       track('claude_message_sent', { model, authMode })
       setMessages((prev) => [...prev, { role: 'user', content: message }])

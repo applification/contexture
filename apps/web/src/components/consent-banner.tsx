@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { posthog } from '@/lib/posthog'
+import { usePostHog } from 'posthog-js/react'
 
 const CONSENT_KEY = 'ontograph-analytics-consent'
 
@@ -13,6 +13,7 @@ function getStoredConsent(): ConsentState {
 }
 
 export function ConsentBanner() {
+  const ph = usePostHog()
   const [consent, setConsent] = useState<ConsentState>(null)
   const [visible, setVisible] = useState(false)
 
@@ -23,12 +24,13 @@ export function ConsentBanner() {
   }, [])
 
   useEffect(() => {
+    if (!ph) return
     if (consent === 'denied') {
-      posthog.opt_out_capturing()
+      ph.opt_out_capturing()
     } else if (consent === 'granted') {
-      posthog.opt_in_capturing()
+      ph.opt_in_capturing()
     }
-  }, [consent])
+  }, [consent, ph])
 
   function accept() {
     localStorage.setItem(CONSENT_KEY, 'granted')

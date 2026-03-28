@@ -11,7 +11,6 @@ function isOptedOut(): boolean {
 
 export function initAnalytics(): void {
   if (!POSTHOG_KEY) return
-  if (isOptedOut()) return
 
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
@@ -19,10 +18,13 @@ export function initAnalytics(): void {
     autocapture: false,
     capture_pageview: false,
     capture_pageleave: false,
-    disable_session_recording: true
+    disable_session_recording: true,
+    opt_out_capturing_by_default: isOptedOut()
   })
 
-  track('app_launched')
+  if (!isOptedOut()) {
+    track('app_launched')
+  }
 }
 
 export function getAnalyticsOptOut(): boolean {
@@ -33,24 +35,14 @@ export function setAnalyticsOptOut(optOut: boolean): void {
   localStorage.setItem(OPT_OUT_KEY, String(optOut))
   if (optOut) {
     posthog.opt_out_capturing()
-  } else if (POSTHOG_KEY) {
+  } else {
     posthog.opt_in_capturing()
   }
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
-  if (!POSTHOG_KEY || isOptedOut()) return
+  if (!POSTHOG_KEY || posthog.has_opted_out_capturing()) return
   posthog.capture(event, properties)
-}
-
-export function identifyFromUrl(): void {
-  if (!POSTHOG_KEY || isOptedOut()) return
-
-  const params = new URLSearchParams(window.location.search)
-  const anonId = params.get('ph_id')
-  if (anonId) {
-    posthog.identify(anonId)
-  }
 }
 
 export function getAnonymousId(): string | undefined {

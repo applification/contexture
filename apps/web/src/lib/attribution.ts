@@ -13,20 +13,26 @@ export function captureAttribution() {
     if (value) utms[key] = value
   }
 
-  const referrer = document.referrer || undefined
+  const referrer = document.referrer || null
   const landingPage = window.location.pathname
+  const hasUtms = Object.keys(utms).length > 0
 
-  if (Object.keys(utms).length > 0 || referrer) {
-    posthog.register({
+  if (hasUtms || referrer) {
+    const properties: Record<string, string> = {
       ...utms,
-      referrer,
       landing_page: landingPage,
-    })
+    }
+    if (referrer) properties.referrer = referrer
 
-    posthog.setPersonPropertiesForFlags({
-      first_touch_source: utms.utm_source,
-      first_touch_medium: utms.utm_medium,
-      first_touch_campaign: utms.utm_campaign,
-    })
+    posthog.register(properties)
+
+    const personProps: Record<string, string> = {}
+    if (utms.utm_source) personProps.first_touch_source = utms.utm_source
+    if (utms.utm_medium) personProps.first_touch_medium = utms.utm_medium
+    if (utms.utm_campaign) personProps.first_touch_campaign = utms.utm_campaign
+
+    if (Object.keys(personProps).length > 0) {
+      posthog.setPersonPropertiesForFlags(personProps)
+    }
   }
 }
