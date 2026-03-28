@@ -1,6 +1,19 @@
 import Image from 'next/image'
 import { Brain, GitGraph, Shield, Zap, Download, ArrowRight } from 'lucide-react'
 
+function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none">
+      <line x1="8" y1="24" x2="24" y2="24" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="8" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="24" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="16" cy="8" r="3.5" fill="#818cf8"/>
+      <circle cx="8" cy="24" r="3.5" fill="#818cf8"/>
+      <circle cx="24" cy="24" r="3.5" fill="#22d3ee"/>
+    </svg>
+  )
+}
+
 function GithubIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -13,22 +26,22 @@ const features = [
   {
     icon: GitGraph,
     title: 'Visual Graph Editor',
-    description: 'See your ontology as a living graph. Drag, connect, explore.',
+    description: 'See your ontology as a living graph. Drag nodes, draw connections, and explore complex hierarchies with an intuitive canvas.',
   },
   {
     icon: Brain,
     title: 'AI-Powered',
-    description: 'Chat with Claude to build and refine ontologies in natural language.',
+    description: 'Chat with Claude to build and refine ontologies in natural language. The AI understands OWL semantics.',
   },
   {
     icon: Shield,
     title: 'Standards-First',
-    description: 'Native OWL/RDF/Turtle support. No vendor lock-in.',
+    description: 'Native OWL/RDF/Turtle support. Import existing ontologies, export to any format. No vendor lock-in.',
   },
   {
     icon: Zap,
     title: 'Real-Time Validation',
-    description: 'Catch reasoning errors before they propagate.',
+    description: 'AI-powered validation scores your ontology and suggests improvements as you build.',
   },
 ]
 
@@ -38,7 +51,10 @@ export default function Home() {
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
-          <span className="text-lg font-semibold tracking-tight">Ontograph</span>
+          <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <LogoMark className="size-6" />
+            Ontograph
+          </span>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors flex items-center gap-1.5">
@@ -103,26 +119,30 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero screenshot */}
+        {/* Hero screenshot — perspective tilt for depth */}
         <div className="relative max-w-5xl mx-auto pb-32">
-          <div className="animate-fade-in-up-delay-3 relative rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-            <Image
-              src="/images/hero-graph.png"
-              alt="Ontograph visual graph editor showing an ontology with interconnected classes and properties"
-              width={1920}
-              height={1080}
-              className="w-full h-auto"
-              priority
-            />
-            {/* Bottom fade to background */}
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
+          <div
+            className="animate-fade-in-up-delay-3 relative rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500"
+            style={{ perspective: '1200px' }}
+          >
+            <div style={{ transform: 'rotateX(2deg)', transformOrigin: 'bottom center' }}>
+              <Image
+                src="/images/hero-graph.png"
+                alt="Ontograph visual graph editor showing Plant ontology with interconnected classes like Fruit, Pest, Disease, and Variety"
+                width={1600}
+                height={1200}
+                className="w-full h-auto"
+                priority
+              />
+            </div>
+            {/* Bottom fade */}
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
           </div>
         </div>
       </section>
 
       {/* Features */}
       <section id="features" className="relative py-32 px-8 border-t border-border/30">
-        {/* Subtle gradient orb */}
         <div className="absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto">
@@ -134,7 +154,8 @@ export default function Home() {
               Built for ontology engineers, knowledge architects, and AI researchers.
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 gap-8">
+
+          <div className="grid sm:grid-cols-2 gap-8 mb-20">
             {features.map((feature) => (
               <div
                 key={feature.title}
@@ -149,33 +170,21 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Feature screenshots: graph detail + node properties side by side */}
-          <div className="mt-20 grid sm:grid-cols-2 gap-6">
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <Image
-                src="/images/graph-detail.png"
-                alt="Ontograph graph editor showing zoomed-in class hierarchy with properties and relationships"
-                width={1920}
-                height={1080}
-                className="w-full h-auto"
-              />
-            </div>
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <Image
-                src="/images/node-properties.png"
-                alt="Ontograph node properties panel showing class details, labels, and relationships"
-                width={1920}
-                height={1080}
-                className="w-full h-auto"
-              />
-            </div>
+          {/* Full-width app screenshot showing graph + properties panel */}
+          <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+            <Image
+              src="/images/graph-detail.png"
+              alt="Ontograph showing the graph editor with a selected Variety node and its properties panel displaying class details and relationships"
+              width={2880}
+              height={1335}
+              className="w-full h-auto"
+            />
           </div>
         </div>
       </section>
 
-      {/* AI Section */}
+      {/* AI Section — two-column layout with panel screenshot */}
       <section className="relative py-32 px-8 border-t border-border/30">
-        {/* Gradient orbs */}
         <div className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-accent/[0.04] blur-[100px] animate-float-slow pointer-events-none" />
         <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/[0.05] blur-[80px] animate-float-slower pointer-events-none" />
 
@@ -195,25 +204,46 @@ export default function Home() {
             </p>
           </div>
 
-          {/* AI screenshots: Claude integration + validation side by side */}
-          <div className="grid sm:grid-cols-2 gap-6 mb-16">
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+          {/* Two-column: AI validation panel + description */}
+          <div className="grid sm:grid-cols-5 gap-12 items-center mb-16">
+            <div className="sm:col-span-2 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
               <Image
-                src="/images/claude-integration.png"
-                alt="Ontograph Claude integration showing AI-powered ontology building with Claude Max"
-                width={1920}
-                height={1080}
+                src="/images/ai-validation.png"
+                alt="AI validation panel scoring an ontology at 72 out of 100 with coverage analysis and improvement suggestions"
+                width={930}
+                height={1640}
                 className="w-full h-auto"
               />
             </div>
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <Image
-                src="/images/ai-validation.png"
-                alt="Ontograph AI validation scoring an ontology at 72 out of 100 with coverage analysis"
-                width={1920}
-                height={1080}
-                className="w-full h-auto"
-              />
+            <div className="sm:col-span-3 space-y-6">
+              <h3 className="text-2xl font-bold tracking-tight">
+                AI-powered quality scoring
+              </h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Get instant feedback on your ontology&apos;s quality. The validation engine
+                scores coverage, consistency, and completeness — then suggests specific
+                improvements you can queue for automated refinement.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                    <Zap className="size-4 text-accent" />
+                  </div>
+                  <span className="text-muted-foreground">Coverage analysis across all domain areas</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                    <Shield className="size-4 text-accent" />
+                  </div>
+                  <span className="text-muted-foreground">Consistency checks for vocabulary and class links</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                    <Brain className="size-4 text-accent" />
+                  </div>
+                  <span className="text-muted-foreground">Actionable suggestions to improve your model</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -235,7 +265,6 @@ export default function Home() {
 
       {/* Download */}
       <section id="download" className="relative py-32 px-8 border-t border-border/30">
-        {/* Gradient orb */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto text-center">
@@ -262,7 +291,10 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-border/30 py-10 px-8">
         <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-muted-foreground">
-          <span>Ontograph</span>
+          <span className="flex items-center gap-2">
+            <LogoMark className="size-4" />
+            Ontograph
+          </span>
           <div className="flex items-center gap-6">
             <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors">
               GitHub
