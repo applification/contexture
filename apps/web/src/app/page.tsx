@@ -182,7 +182,7 @@ export default function Home() {
             <div style={{ transform: 'rotateX(2deg)', transformOrigin: 'bottom center' }}>
               <Image
                 src="/images/hero-graph.png"
-                alt="Ontograph visual graph editor showing Plant ontology with interconnected classes like Fruit, Pest, Disease, and Variety"
+                alt="Ontograph visual graph editor showing a People ontology with Person, Employee, Manager and Organisation classes connected by subClassOf and object property edges"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -229,9 +229,9 @@ export default function Home() {
           <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
             <Image
               src="/images/graph-detail.png"
-              alt="Ontograph showing the graph editor with a selected Variety node and its properties panel displaying class details and relationships"
-              width={2880}
-              height={1335}
+              alt="Ontograph showing the graph editor with a selected Person node and its properties panel displaying class details, datatype properties, and relationships"
+              width={1600}
+              height={1200}
               className="w-full h-auto"
             />
           </div>
@@ -267,9 +267,9 @@ export default function Home() {
             <div className="sm:col-span-2 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
               <Image
                 src="/images/ai-validation.png"
-                alt="AI validation panel scoring an ontology at 72 out of 100 with coverage analysis and improvement suggestions"
-                width={930}
-                height={1640}
+                alt="AI validation panel scoring an ontology at 78 out of 100 with coverage analysis and improvement suggestions"
+                width={478}
+                height={1145}
                 className="w-full h-auto"
               />
             </div>
