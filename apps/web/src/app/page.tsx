@@ -4,12 +4,12 @@ import { Brain, GitGraph, Shield, Zap, Download, ArrowRight } from 'lucide-react
 function LogoMark({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <line x1="8" y1="24" x2="24" y2="24" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
-      <line x1="8" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
-      <line x1="24" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
-      <circle cx="16" cy="8" r="3.5" fill="#818cf8"/>
-      <circle cx="8" cy="24" r="3.5" fill="#818cf8"/>
-      <circle cx="24" cy="24" r="3.5" fill="#22d3ee"/>
+      <line x1="8" y1="24" x2="24" y2="24" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="8" y1="24" x2="16" y2="8" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="24" y1="24" x2="16" y2="8" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="16" cy="8" r="3.5" fill="var(--primary)"/>
+      <circle cx="8" cy="24" r="3.5" fill="var(--primary)"/>
+      <circle cx="24" cy="24" r="3.5" fill="var(--accent)"/>
     </svg>
   )
 }
@@ -63,7 +63,7 @@ export default function Home() {
             </a>
             <a
               href="#download"
-              className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Download
             </a>
@@ -104,7 +104,7 @@ export default function Home() {
           <div className="animate-fade-in-up-delay-3 flex items-center justify-center gap-4">
             <a
               href="#download"
-              className="inline-flex items-center gap-2 bg-primary text-white px-7 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-7 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               <Download className="size-4" />
               Download for free
@@ -276,7 +276,7 @@ export default function Home() {
           </p>
           <a
             href="https://github.com/DaveHudson/Ontograph/releases/latest"
-            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             <Download className="size-4" />
             Download latest release
