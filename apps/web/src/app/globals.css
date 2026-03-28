@@ -190,17 +190,43 @@ body {
 
 /* Screenshot showcase treatment */
 .screenshot-glow {
-  box-shadow:
-    0 0 60px color-mix(in oklch, var(--primary) 15%, transparent),
-    0 0 120px color-mix(in oklch, var(--accent) 8%, transparent),
-    0 25px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
 }
 
-.screenshot-glow:hover {
-  box-shadow:
-    0 0 80px color-mix(in oklch, var(--primary) 20%, transparent),
-    0 0 160px color-mix(in oklch, var(--accent) 12%, transparent),
-    0 25px 50px rgba(0, 0, 0, 0.5);
+@media (min-width: 640px) {
+  .screenshot-glow {
+    box-shadow:
+      0 0 60px color-mix(in oklch, var(--primary) 15%, transparent),
+      0 0 120px color-mix(in oklch, var(--accent) 8%, transparent),
+      0 25px 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .screenshot-glow:hover {
+    box-shadow:
+      0 0 80px color-mix(in oklch, var(--primary) 20%, transparent),
+      0 0 160px color-mix(in oklch, var(--accent) 12%, transparent),
+      0 25px 50px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-slower,
+  .animate-node-float,
+  .animate-node-float-delay,
+  .animate-node-float-slow,
+  .animate-edge-pulse,
+  .animate-edge-pulse-delay {
+    animation: none;
+  }
+
+  .animate-fade-in-up,
+  .animate-fade-in-up-delay-1,
+  .animate-fade-in-up-delay-2,
+  .animate-fade-in-up-delay-3 {
+    animation: none;
+  }
 }
 
 @layer base {

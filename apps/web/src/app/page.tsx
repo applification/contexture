@@ -134,12 +134,14 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative px-4 sm:px-8">
-        {/* Animated node graph background */}
-        <AnimatedNodes />
+        {/* Animated node graph background — hidden on mobile to reduce GPU work */}
+        <div className="hidden sm:block">
+          <AnimatedNodes />
+        </div>
 
         {/* Gradient orbs */}
-        <div className="absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-[100px] animate-float-slow pointer-events-none" />
-        <div className="absolute top-40 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/[0.05] blur-[100px] animate-float-slower pointer-events-none" />
+        <div className="hidden sm:block absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-[100px] animate-float-slow pointer-events-none" />
+        <div className="hidden sm:block absolute top-40 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/[0.05] blur-[100px] animate-float-slower pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-accent font-medium mb-6 tracking-widest uppercase">
@@ -201,7 +203,7 @@ export default function Home() {
 
       {/* Features */}
       <section id="features" className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
+        <div className="hidden sm:block absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-12 sm:mb-20">
@@ -245,8 +247,8 @@ export default function Home() {
 
       {/* AI Section — two-column layout with panel screenshot */}
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-accent/[0.04] blur-[100px] animate-float-slow pointer-events-none" />
-        <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/[0.05] blur-[80px] animate-float-slower pointer-events-none" />
+        <div className="hidden sm:block absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-accent/[0.04] blur-[100px] animate-float-slow pointer-events-none" />
+        <div className="hidden sm:block absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/[0.05] blur-[80px] animate-float-slower pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
@@ -329,7 +331,7 @@ export default function Home() {
 
       {/* Use Cases */}
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="absolute top-1/2 right-1/4 w-[350px] h-[350px] rounded-full bg-accent/[0.04] blur-[80px] animate-float-slow pointer-events-none" />
+        <div className="hidden sm:block absolute top-1/2 right-1/4 w-[350px] h-[350px] rounded-full bg-accent/[0.04] blur-[80px] animate-float-slow pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
@@ -369,7 +371,7 @@ export default function Home() {
 
       {/* Download */}
       <section id="download" className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
+        <div className="hidden sm:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto text-center">
           <p className="text-sm text-accent font-medium mb-4 tracking-widest uppercase">
