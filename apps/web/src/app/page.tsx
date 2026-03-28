@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { Brain, GitGraph, Shield, Zap, Download, ArrowRight } from 'lucide-react'
 
 function GithubIcon({ className }: { className?: string }) {
@@ -33,7 +34,7 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-hidden">
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
@@ -56,6 +57,10 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative px-8">
+        {/* Gradient orbs */}
+        <div className="absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-[100px] animate-float-slow pointer-events-none" />
+        <div className="absolute top-40 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/[0.05] blur-[100px] animate-float-slower pointer-events-none" />
+
         {/* Dot grid background */}
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -65,22 +70,22 @@ export default function Home() {
           }}
         />
 
-        <div className="relative max-w-3xl mx-auto text-center pt-44 pb-32">
-          <p className="text-sm text-muted-foreground mb-6 tracking-widest uppercase font-medium">
+        <div className="relative max-w-3xl mx-auto text-center pt-44 pb-16">
+          <p className="animate-fade-in-up text-sm text-muted-foreground mb-6 tracking-widest uppercase font-medium">
             Open source ontology editor
           </p>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-8">
+          <h1 className="animate-fade-in-up-delay-1 text-4xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-8">
             Building ontologies shouldn&apos;t feel like writing XML in a{' '}
             <span className="text-muted-foreground">2005 Java app.</span>
           </h1>
-          <p className="text-lg text-accent font-medium mb-3">
+          <p className="animate-fade-in-up-delay-2 text-lg text-accent font-medium mb-3">
             Where knowledge takes shape.
           </p>
-          <p className="text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
+          <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
             A modern, AI-powered ontology editor with visual graph editing,
             real-time validation, and Claude integration.
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="animate-fade-in-up-delay-3 flex items-center justify-center gap-4">
             <a
               href="#download"
               className="inline-flex items-center gap-2 bg-primary text-white px-7 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
@@ -97,11 +102,30 @@ export default function Home() {
             </a>
           </div>
         </div>
+
+        {/* Hero screenshot */}
+        <div className="relative max-w-5xl mx-auto pb-32">
+          <div className="animate-fade-in-up-delay-3 relative rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+            <Image
+              src="/images/hero-graph.png"
+              alt="Ontograph visual graph editor showing an ontology with interconnected classes and properties"
+              width={1920}
+              height={1080}
+              className="w-full h-auto"
+              priority
+            />
+            {/* Bottom fade to background */}
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
+          </div>
+        </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-32 px-8 border-t border-border/30">
-        <div className="max-w-5xl mx-auto">
+      <section id="features" className="relative py-32 px-8 border-t border-border/30">
+        {/* Subtle gradient orb */}
+        <div className="absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-3xl font-bold tracking-tight mb-4">
               Everything you need to model knowledge
@@ -124,25 +148,77 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {/* Feature screenshots: graph detail + node properties side by side */}
+          <div className="mt-20 grid sm:grid-cols-2 gap-6">
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <Image
+                src="/images/graph-detail.png"
+                alt="Ontograph graph editor showing zoomed-in class hierarchy with properties and relationships"
+                width={1920}
+                height={1080}
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <Image
+                src="/images/node-properties.png"
+                alt="Ontograph node properties panel showing class details, labels, and relationships"
+                width={1920}
+                height={1080}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* AI Section */}
-      <section className="py-32 px-8 border-t border-border/30">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
-            <Brain className="size-4" />
-            Powered by Claude
+      <section className="relative py-32 px-8 border-t border-border/30">
+        {/* Gradient orbs */}
+        <div className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-accent/[0.04] blur-[100px] animate-float-slow pointer-events-none" />
+        <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/[0.05] blur-[80px] animate-float-slower pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 text-sm text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+              <Brain className="size-4" />
+              Powered by Claude
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight mb-5">
+              Describe what you need. Watch it build.
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Chat with Claude to create classes, properties, and relationships in natural language.
+              The AI understands OWL semantics and can suggest refinements, find inconsistencies,
+              and help you think through your domain model.
+            </p>
           </div>
-          <h2 className="text-3xl font-bold tracking-tight mb-5">
-            Describe what you need. Watch it build.
-          </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
-            Chat with Claude to create classes, properties, and relationships in natural language.
-            The AI understands OWL semantics and can suggest refinements, find inconsistencies,
-            and help you think through your domain model.
-          </p>
-          <div className="rounded-xl border border-border/60 bg-card/30 p-8 text-left font-mono text-sm leading-relaxed">
+
+          {/* AI screenshots: Claude integration + validation side by side */}
+          <div className="grid sm:grid-cols-2 gap-6 mb-16">
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <Image
+                src="/images/claude-integration.png"
+                alt="Ontograph Claude integration showing AI-powered ontology building with Claude Max"
+                width={1920}
+                height={1080}
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <Image
+                src="/images/ai-validation.png"
+                alt="Ontograph AI validation scoring an ontology at 72 out of 100 with coverage analysis"
+                width={1920}
+                height={1080}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Chat example */}
+          <div className="max-w-3xl mx-auto rounded-xl border border-border/60 bg-card/30 p-8 text-left font-mono text-sm leading-relaxed">
             <div className="text-muted-foreground/70 text-xs uppercase tracking-wide mb-2">You:</div>
             <div className="text-foreground mb-6">
               Create an ontology for a university with students, courses, and professors.
@@ -158,8 +234,11 @@ export default function Home() {
       </section>
 
       {/* Download */}
-      <section id="download" className="py-32 px-8 border-t border-border/30">
-        <div className="max-w-3xl mx-auto text-center">
+      <section id="download" className="relative py-32 px-8 border-t border-border/30">
+        {/* Gradient orb */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
+
+        <div className="relative max-w-3xl mx-auto text-center">
           <h2 className="text-3xl font-bold tracking-tight mb-4">
             Get Ontograph
           </h2>
