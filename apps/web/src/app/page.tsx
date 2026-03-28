@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { Brain, GitGraph, Shield, Zap, Download, ArrowRight } from 'lucide-react'
+import { Brain, GitGraph, Shield, Zap, Download, ArrowRight, Layers, Network } from 'lucide-react'
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 
 function LogoMark({ className }: { className?: string }) {
@@ -23,26 +23,81 @@ function GithubIcon({ className }: { className?: string }) {
   )
 }
 
+function AnimatedNodes() {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox="0 0 1200 800"
+      fill="none"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      {/* Animated connection lines */}
+      <line x1="200" y1="150" x2="450" y2="280" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.15" />
+      <line x1="450" y1="280" x2="700" y2="180" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.12" />
+      <line x1="700" y1="180" x2="950" y2="320" className="animate-edge-pulse" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.12" />
+      <line x1="450" y1="280" x2="350" y2="500" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.1" />
+      <line x1="700" y1="180" x2="850" y2="520" className="animate-edge-pulse" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.1" />
+      <line x1="200" y1="150" x2="100" y2="400" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
+      <line x1="950" y1="320" x2="1100" y2="500" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
+      <line x1="350" y1="500" x2="600" y2="600" className="animate-edge-pulse-delay" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.08" />
+      <line x1="850" y1="520" x2="600" y2="600" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
+
+      {/* Animated nodes — floating gently */}
+      <circle cx="200" cy="150" r="6" fill="var(--primary)" fillOpacity="0.2" className="animate-node-float" />
+      <circle cx="200" cy="150" r="3" fill="var(--primary)" fillOpacity="0.4" className="animate-node-float" />
+
+      <circle cx="450" cy="280" r="8" fill="var(--accent)" fillOpacity="0.15" className="animate-node-float-delay" />
+      <circle cx="450" cy="280" r="4" fill="var(--accent)" fillOpacity="0.35" className="animate-node-float-delay" />
+
+      <circle cx="700" cy="180" r="7" fill="var(--primary)" fillOpacity="0.18" className="animate-node-float-slow" />
+      <circle cx="700" cy="180" r="3.5" fill="var(--primary)" fillOpacity="0.35" className="animate-node-float-slow" />
+
+      <circle cx="950" cy="320" r="5" fill="var(--accent)" fillOpacity="0.2" className="animate-node-float" />
+      <circle cx="950" cy="320" r="2.5" fill="var(--accent)" fillOpacity="0.4" className="animate-node-float" />
+
+      <circle cx="350" cy="500" r="5" fill="var(--primary)" fillOpacity="0.12" className="animate-node-float-delay" />
+      <circle cx="350" cy="500" r="2.5" fill="var(--primary)" fillOpacity="0.25" className="animate-node-float-delay" />
+
+      <circle cx="850" cy="520" r="6" fill="var(--accent)" fillOpacity="0.1" className="animate-node-float-slow" />
+      <circle cx="850" cy="520" r="3" fill="var(--accent)" fillOpacity="0.2" className="animate-node-float-slow" />
+
+      <circle cx="100" cy="400" r="4" fill="var(--primary)" fillOpacity="0.08" className="animate-node-float" />
+      <circle cx="1100" cy="500" r="4" fill="var(--primary)" fillOpacity="0.08" className="animate-node-float-delay" />
+      <circle cx="600" cy="600" r="5" fill="var(--accent)" fillOpacity="0.1" className="animate-node-float-slow" />
+    </svg>
+  )
+}
+
 const features = [
   {
     icon: GitGraph,
     title: 'Visual Graph Editor',
-    description: 'See your ontology as a living graph. Drag nodes, draw connections, and explore complex hierarchies with an intuitive canvas.',
+    description: 'See your ontology as a living, interactive graph. Drag nodes, draw connections, and explore complex hierarchies on an intuitive canvas.',
   },
   {
     icon: Brain,
-    title: 'AI-Powered',
-    description: 'Chat with Claude to build and refine ontologies in natural language. The AI understands OWL semantics.',
+    title: 'AI-First Creation',
+    description: 'Build ontologies through conversation with an AI that understands OWL semantics. From natural language to formal ontology in minutes.',
+  },
+  {
+    icon: Network,
+    title: 'Built for the AI Stack',
+    description: 'Create ontologies that plug into RAG pipelines, context graphs, and agent architectures. The missing tool between your data and your AI agents.',
+  },
+  {
+    icon: Zap,
+    title: 'AI-Powered Validation',
+    description: 'AI-powered quality scoring catches gaps and inconsistencies as you build. Coverage, consistency, and completeness analysis in real time.',
   },
   {
     icon: Shield,
     title: 'Standards-First',
-    description: 'Native OWL/RDF/Turtle support. Import existing ontologies, export to any format. No vendor lock-in.',
+    description: 'Full OWL/RDF/Turtle support with zero vendor lock-in. Import existing ontologies, export to any format.',
   },
   {
-    icon: Zap,
-    title: 'Real-Time Validation',
-    description: 'AI-powered validation scores your ontology and suggests improvements as you build.',
+    icon: Layers,
+    title: 'Open Source & Free',
+    description: 'MIT licensed and free forever. Built in the open by engineers who believe knowledge infrastructure should be accessible to everyone.',
   },
 ]
 
@@ -76,33 +131,29 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative px-8">
+        {/* Animated node graph background */}
+        <AnimatedNodes />
+
         {/* Gradient orbs */}
         <div className="absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-[100px] animate-float-slow pointer-events-none" />
         <div className="absolute top-40 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/[0.05] blur-[100px] animate-float-slower pointer-events-none" />
 
-        {/* Dot grid background */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-
         <div className="relative max-w-3xl mx-auto text-center pt-44 pb-16">
-          <p className="animate-fade-in-up text-sm text-muted-foreground mb-6 tracking-widest uppercase font-medium">
-            Open source ontology editor
+          <p className="animate-fade-in-up text-sm text-accent font-medium mb-6 tracking-widest uppercase">
+            The AI-native ontology editor
           </p>
-          <h1 className="animate-fade-in-up-delay-1 text-4xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-8">
-            Building ontologies shouldn&apos;t feel like writing XML in a{' '}
-            <span className="text-muted-foreground">2005 Java app.</span>
+          <h1 className="animate-fade-in-up-delay-1 text-4xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
+            Build the knowledge layer{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
+              your AI agents need.
+            </span>
           </h1>
           <p className="animate-fade-in-up-delay-2 text-lg text-accent font-medium mb-3">
             Where knowledge takes shape.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            A modern, AI-powered ontology editor with visual graph editing,
-            real-time validation, and Claude integration.
+            Ontograph pairs a visual graph editor with AI that understands OWL — so you can create
+            production-ready ontologies through natural language.
           </p>
           <div className="animate-fade-in-up-delay-3 flex items-center justify-center gap-4">
             <a
@@ -151,20 +202,21 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-3xl font-bold tracking-tight mb-4">
-              Everything you need to model knowledge
+              The ontology editor built for the AI era
             </h2>
-            <p className="text-muted-foreground text-base">
-              Built for ontology engineers, knowledge architects, and AI researchers.
+            <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+              Create ontologies that ground your AI — not guesswork.
+              Built for AI Product Engineers, knowledge architects, and anyone building the next generation of intelligent applications.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-8 mb-20">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-xl border border-border/60 bg-card/50 p-8 hover:border-primary/30 transition-colors"
+                className="group rounded-xl border border-border/60 bg-card/50 p-8 hover:border-primary/30 hover:bg-card/80 transition-all duration-200"
               >
-                <div className="size-11 rounded-lg bg-primary/10 flex items-center justify-center mb-5">
+                <div className="size-11 rounded-lg bg-primary/10 group-hover:bg-primary/15 flex items-center justify-center mb-5 transition-colors">
                   <feature.icon className="size-5 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
@@ -198,10 +250,13 @@ export default function Home() {
               Powered by Claude
             </div>
             <h2 className="text-3xl font-bold tracking-tight mb-5">
-              Describe what you need. Watch it build.
+              Describe your domain.{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
+                Watch your ontology emerge.
+              </span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Chat with Claude to create classes, properties, and relationships in natural language.
+              Create the structured knowledge that powers reliable AI — through conversation, not configuration.
               The AI understands OWL semantics and can suggest refinements, find inconsistencies,
               and help you think through your domain model.
             </p>
@@ -266,13 +321,56 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Use Cases */}
+      <section className="relative py-32 px-8 border-t border-border/30">
+        <div className="absolute top-1/2 right-1/4 w-[350px] h-[350px] rounded-full bg-accent/[0.04] blur-[80px] animate-float-slow pointer-events-none" />
+
+        <div className="relative max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold tracking-tight mb-4">
+              Your AI agents are only as smart as the knowledge behind them
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Ontograph lets you build, visualize, and validate the structured knowledge layer that makes AI reliable.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-8">
+            <div className="rounded-xl border border-border/60 bg-card/50 p-8 hover:border-accent/30 transition-colors">
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">RAG Pipelines</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Ontology-powered RAG delivers more precise retrieval than unstructured vector search.
+                Build the knowledge graph that gives your AI the context it needs.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/50 p-8 hover:border-accent/30 transition-colors">
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">AI Agents</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Ground your AI agents in verified, typed knowledge. Eliminate hallucination and enable
+                explainability with formal ontology structures.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/50 p-8 hover:border-accent/30 transition-colors">
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">Context Graphs</div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Create the structured context layer that powers intelligent applications.
+                Export to OWL/RDF and plug directly into your AI stack.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Download */}
       <section id="download" className="relative py-32 px-8 border-t border-border/30">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto text-center">
+          <p className="text-sm text-accent font-medium mb-4 tracking-widest uppercase">
+            Open source & free
+          </p>
           <h2 className="text-3xl font-bold tracking-tight mb-4">
-            Get Ontograph
+            Start building your knowledge layer
           </h2>
           <p className="text-muted-foreground mb-10">
             Free and open source. Available for macOS, Windows, and Linux.
@@ -299,6 +397,9 @@ export default function Home() {
             Ontograph
           </span>
           <div className="flex items-center gap-6">
+            <a href="/brand" className="hover:text-foreground transition-colors">
+              Brand
+            </a>
             <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors">
               GitHub
             </a>
