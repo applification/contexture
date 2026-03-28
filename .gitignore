@@ -7,3 +7,6 @@ package-lock.json
 
 coverage/
 .turbo
+
+# Sensitive docs migrated to Paperclip issue documents (ONT-49)
+Marketing/
