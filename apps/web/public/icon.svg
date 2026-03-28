@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background gradient: deep indigo with subtle variation -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2d1b69"/>
+      <stop offset="100%" stop-color="#1a1145"/>
+    </linearGradient>
+    <!-- Node glow -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Accent node glow -->
+    <filter id="accentGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background squircle -->
+  <rect width="1024" height="1024" rx="228" ry="228" fill="url(#bg)"/>
+
+  <!-- Subtle radial overlay for depth -->
+  <radialGradient id="overlay" cx="0.5" cy="0.42" r="0.55">
+    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.06"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0.2"/>
+  </radialGradient>
+  <rect width="1024" height="1024" rx="228" ry="228" fill="url(#overlay)"/>
+
+  <!-- Connection lines — thicker for visibility at small sizes -->
+  <!-- Triangle: top (512, 280), bottom-left (300, 680), bottom-right (724, 680) -->
+  <line x1="512" y1="280" x2="300" y2="680" stroke="#818cf8" stroke-width="5" stroke-opacity="0.45" stroke-linecap="round"/>
+  <line x1="512" y1="280" x2="724" y2="680" stroke="#818cf8" stroke-width="5" stroke-opacity="0.45" stroke-linecap="round"/>
+  <line x1="300" y1="680" x2="724" y2="680" stroke="#818cf8" stroke-width="5" stroke-opacity="0.45" stroke-linecap="round"/>
+
+  <!-- Top node (white/indigo) -->
+  <circle cx="512" cy="280" r="58" fill="#ffffff" opacity="0.95" filter="url(#glow)"/>
+  <circle cx="512" cy="280" r="34" fill="#818cf8" opacity="0.25"/>
+
+  <!-- Bottom-left node (cyan accent) -->
+  <circle cx="300" cy="680" r="58" fill="#22d3ee" opacity="0.9" filter="url(#accentGlow)"/>
+  <circle cx="300" cy="680" r="34" fill="#ffffff" opacity="0.15"/>
+
+  <!-- Bottom-right node (cyan accent) -->
+  <circle cx="724" cy="680" r="58" fill="#22d3ee" opacity="0.9" filter="url(#accentGlow)"/>
+  <circle cx="724" cy="680" r="34" fill="#ffffff" opacity="0.15"/>
+</svg>
