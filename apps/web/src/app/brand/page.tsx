@@ -277,13 +277,16 @@ export default function BrandPage() {
 
           <div className="rounded-xl border border-border/60 bg-card/30 p-8">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Key phrases</h3>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+            <div className="grid sm:grid-cols-3 gap-x-8 gap-y-2 text-sm">
               <p className="text-foreground">&ldquo;Where knowledge takes shape.&rdquo;</p>
               <p className="text-foreground">&ldquo;Build the knowledge layer your AI agents need.&rdquo;</p>
               <p className="text-foreground">&ldquo;From natural language to formal ontology in minutes.&rdquo;</p>
               <p className="text-foreground">&ldquo;See your ontology as a living graph.&rdquo;</p>
               <p className="text-foreground">&ldquo;The ontology editor built for the AI era.&rdquo;</p>
               <p className="text-foreground">&ldquo;Full OWL/RDF/Turtle support — no vendor lock-in.&rdquo;</p>
+              <p className="text-foreground">&ldquo;Create ontologies that ground your AI — not guesswork.&rdquo;</p>
+              <p className="text-foreground">&ldquo;AI-powered validation scores your ontology as you build.&rdquo;</p>
+              <p className="text-foreground">&ldquo;The missing tool between your data and your AI agents.&rdquo;</p>
             </div>
           </div>
         </Section>
