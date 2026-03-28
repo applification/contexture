@@ -12,10 +12,15 @@ export default function DownloadPage() {
   useEffect(() => {
     const visitorId = getVisitorId()
 
-    ph?.capture('download_initiated', {
-      visitor_id: visitorId,
-      referrer: document.referrer || undefined,
-    })
+    ph?.capture(
+      'download_initiated',
+      {
+        visitor_id: visitorId,
+        platform: 'web',
+        referrer: document.referrer || undefined,
+      },
+      { send_instantly: true }
+    )
 
     // Set visitor_id as a person property so it can be used
     // to link this web visitor to their desktop app session

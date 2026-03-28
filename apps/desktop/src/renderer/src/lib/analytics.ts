@@ -57,7 +57,7 @@ export function getAnonymousId(): string | undefined {
  * the marketing website download flow).
  */
 export function linkWebVisitor(webVisitorId: string): void {
-  if (!POSTHOG_KEY || !webVisitorId) return
+  if (!POSTHOG_KEY || !webVisitorId || posthog.has_opted_out_capturing()) return
 
   const alreadyLinked = localStorage.getItem(LINKED_VISITOR_KEY)
   if (alreadyLinked === webVisitorId) return
@@ -73,6 +73,6 @@ export function linkWebVisitor(webVisitorId: string): void {
  * that used the same identifier.
  */
 export function identifyUser(userId: string, properties?: Record<string, string>): void {
-  if (!POSTHOG_KEY || !userId) return
+  if (!POSTHOG_KEY || !userId || posthog.has_opted_out_capturing()) return
   posthog.identify(userId, properties)
 }
