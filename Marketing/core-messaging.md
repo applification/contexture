@@ -1,60 +1,66 @@
 # Core Messaging
 
+## Strategic Context
+
+Ontologies are becoming critical infrastructure for AI-first applications. Platforms like TrustGraph demonstrate that ontologies ground AI agents in verified, typed knowledge — eliminating hallucination and enabling explainability. But the bottleneck is ontology creation itself: it requires domain expertise, iterative refinement, and complex tooling.
+
+**Ontograph removes this bottleneck.** We make ontology creation accessible to AI Product Engineers — the people building the next generation of AI-first apps.
+
 ## Messaging Direction
 
-**Positive-first.** We lead with what Ontograph uniquely enables, not what competitors lack. The two differentiators that define our positioning:
+**Positive-first, outcome-oriented.** We lead with what Ontograph uniquely enables for AI builders, not what competitors lack. Three core differentiators:
 
-1. **Deep AI/LLM integration** - Claude understands OWL semantics and helps you build, refine, and validate ontologies through natural language conversation
-2. **Modern visual editor** - A graph-first interface where you see your knowledge structure take shape as you build it
+1. **Deep AI/LLM integration** — Describe your domain in natural language; Claude builds the formal OWL structure
+2. **Modern visual editor** — See your ontology as a living, interactive graph as you build it
+3. **Built for the AI stack** — Create ontologies that power RAG pipelines, AI agents, and context graphs
 
 ## Tagline
 
 **"Where knowledge takes shape."**
 
-This remains strong — it's positive, evocative, and captures both the visual (shape) and conceptual (knowledge) aspects of the product.
+Strong brand anchor — captures both the visual (shape) and semantic (knowledge) aspects.
 
 ## Hero Headlines — Revised Options
 
-The previous hero headline ("Building ontologies shouldn't feel like writing XML in a 2005 Java app") is effective as a pain point but frames us negatively against competitors. Here are positive alternatives:
-
 ### Option A (Recommended)
-> **Describe your domain. Watch your ontology emerge.**
+> **Build the knowledge layer your AI agents need.**
 >
-> Ontograph pairs a visual graph editor with AI that understands OWL — so you can build formal ontologies through natural language conversation.
+> Ontograph pairs a visual graph editor with AI that understands OWL — so you can create production-ready ontologies through natural language.
 
-Why: Leads with the magical moment (describe -> emerge). Positions AI as the primary differentiator. Action-oriented.
+Why: Speaks directly to AI Product Engineers. Frames ontologies as infrastructure their AI apps need. Positions Ontograph as the fastest path to get there.
 
 ### Option B
-> **The AI-native ontology editor.**
+> **Describe your domain. Watch your ontology emerge.**
 >
-> Build, visualize, and validate ontologies with Claude — an AI that speaks OWL, RDF, and plain English.
+> Create the structured knowledge that powers reliable AI — through conversation, not configuration.
 
-Why: "AI-native" is a strong category claim. Compact and memorable. Positions Claude as a first-class feature.
+Why: Leads with the magical moment. The sub-headline connects ontology creation to AI reliability.
 
 ### Option C
-> **Think in structures. Build with language.**
+> **The AI-native ontology editor.**
 >
-> Ontograph combines a visual graph editor with Claude AI to turn natural language into formal, standards-compliant ontologies.
+> Build the ontologies that ground your AI agents — with an editor that speaks OWL, RDF, and plain English.
 
-Why: Captures the dual nature (visual + conversational). Appeals to knowledge engineers who think structurally.
+Why: "AI-native" is a strong category claim. Explicitly connects to the AI agent ecosystem.
 
 ### Option D
-> **Your ontology, shaped by conversation.**
+> **Your AI agents are only as smart as the knowledge behind them.**
 >
-> Tell Claude what you need. See it as a graph. Validate it in real time. Export to OWL, RDF, or Turtle.
+> Ontograph lets you build, visualize, and validate formal ontologies — the structured knowledge layer that makes AI reliable.
 
-Why: Most concrete — walks through the workflow. Good for audiences who need to understand what the product actually does.
+Why: Problem-aware without being negative. Positions ontologies as essential AI infrastructure.
 
 ## Sub-headline / Supporting Copy
 
-**"Where knowledge takes shape."** — keep as the brand tagline, appearing below or above the hero headline.
+**"Where knowledge takes shape."** — brand tagline, appearing below or above the hero headline.
 
 ## Value Proposition Framework
 
 | Pillar | Message | Evidence |
 |--------|---------|----------|
-| AI-First | Build ontologies through conversation with an AI that understands OWL semantics | Claude integration, natural language to formal ontology |
+| AI-First Creation | Build ontologies through conversation with an AI that understands OWL semantics | Claude integration, natural language to formal ontology |
 | Visual | See your knowledge structure as a living, interactive graph | Drag-and-drop canvas, real-time graph rendering |
+| AI-Stack Ready | Create ontologies that plug into RAG pipelines, context graphs, and agent architectures | OWL/RDF export, compatible with TrustGraph, LangChain, etc. |
 | Validated | AI-powered quality scoring catches gaps and inconsistencies as you build | Coverage, consistency, and completeness analysis |
 | Standards | Full OWL/RDF/Turtle support with zero vendor lock-in | Import/export to all standard formats, open source |
 
@@ -64,19 +70,36 @@ Why: Most concrete — walks through the workflow. Good for audiences who need t
 - **Confident** — We're building a genuinely new category of tool. State what we do, don't hedge.
 - **Approachable** — Ontology engineering sounds intimidating. Our copy should make it feel accessible.
 - **Never dismissive** — Don't mock existing tools or their users. Focus on what we enable.
+- **Builder-oriented** — Speak to engineers who ship products, not academics writing papers.
 
 ## Key Phrases / Copy Blocks
 
-- "Chat with Claude to build ontologies in natural language"
+- "Build the knowledge layer your AI agents need"
+- "From natural language to formal ontology in minutes"
+- "The ontology editor built for the AI era"
 - "See your ontology as a living graph"
+- "Create ontologies that ground your AI — not guesswork"
 - "AI-powered validation scores your ontology as you build"
 - "Full OWL/RDF/Turtle support — no vendor lock-in"
 - "Open source and free"
-- "From conversation to formal ontology"
+- "The missing tool between your data and your AI agents"
+
+## Use-Case Messaging
+
+### For RAG / Retrieval Pipelines
+> Ontology RAG delivers 10x more precise retrieval than unstructured vector search. Ontograph makes building those ontologies effortless.
+
+### For AI Agent Architectures
+> Your agents need structured, typed knowledge to make reliable decisions. Ontograph lets you build that knowledge layer through conversation.
+
+### For Knowledge Graph Construction
+> Stop hand-coding RDF triples. Describe your domain, let AI build the ontology, then export to your graph database.
 
 ## Previous Messaging (Archived)
 
 The original hero headline:
 > "Building ontologies shouldn't feel like writing XML in a 2005 Java app."
 
-**Decision (2026-03-28):** CEO directed shift to positive messaging. The pain-point framing is valid but defines us by what we're against rather than what we enable. Retained as possible secondary/social copy but removed from hero position.
+**Decision (2026-03-28):** CEO directed shift to positive messaging. Retained as possible secondary/social copy.
+
+**Previous Option A (2026-03-28):** "Describe your domain. Watch your ontology emerge." — Refined to better target AI Product Engineers per CEO feedback.
