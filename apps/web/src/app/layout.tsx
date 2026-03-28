@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { GeistSans } from 'geist/font/sans'
+import { PostHogProvider } from '@/components/providers/posthog-provider'
+import { ConsentBanner } from '@/components/consent-banner'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -39,7 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`dark ${GeistSans.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground antialiased">
-        {children}
+        <Suspense fallback={null}>
+          <PostHogProvider>
+            {children}
+            <ConsentBanner />
+          </PostHogProvider>
+        </Suspense>
       </body>
     </html>
   )

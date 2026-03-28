@@ -3,6 +3,7 @@ import { Brain, GitGraph, Shield, Zap, Download, ArrowRight, Layers, Network } f
 import { ThemeImage } from '@/components/ui/theme-image'
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
 import { MobileNav } from '@/components/ui/mobile-nav'
+import { TrackedLink } from '@/components/tracked-link'
 
 function LogoMark({ className }: { className?: string }) {
   return (
@@ -116,17 +117,19 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="/brand" className="hover:text-foreground transition-colors">Brand</a>
-            <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+            <TrackedLink event="github_click" properties={{ location: 'nav' }} href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors flex items-center gap-1.5">
               <GithubIcon className="size-4" />
               GitHub
-            </a>
+            </TrackedLink>
             <AnimatedThemeToggler className="size-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors [&_svg]:size-4" />
-            <a
+            <TrackedLink
+              event="hero_cta_click"
+              properties={{ location: 'nav' }}
               href="#download"
               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Download
-            </a>
+            </TrackedLink>
           </div>
           <MobileNav />
         </div>
@@ -161,20 +164,23 @@ export default function Home() {
             production-ready ontologies through natural language.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <a
+            <TrackedLink
+              event="hero_cta_click"
               href="#download"
               className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               <Download className="size-4" />
               Download for free
-            </a>
-            <a
+            </TrackedLink>
+            <TrackedLink
+              event="github_click"
+              properties={{ location: 'hero' }}
               href="https://github.com/DaveHudson/Ontograph"
               className="inline-flex items-center justify-center gap-2 border border-border w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
             >
               <GithubIcon className="size-4" />
               View on GitHub
-            </a>
+            </TrackedLink>
           </div>
         </div>
 
@@ -383,14 +389,16 @@ export default function Home() {
           <p className="text-muted-foreground mb-10">
             Free and open source. Available for macOS, Windows, and Linux.
           </p>
-          <a
+          <TrackedLink
+            event="download_click"
+            properties={{ os: 'unknown', location: 'footer_cta' }}
             href="https://github.com/DaveHudson/Ontograph/releases/latest"
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             <Download className="size-4" />
             Download latest release
             <ArrowRight className="size-4" />
-          </a>
+          </TrackedLink>
           <p className="text-xs text-muted-foreground mt-6">
             MIT License. Requires macOS 12+, Windows 10+, or Ubuntu 20.04+.
           </p>
