@@ -1,6 +1,19 @@
 import Image from 'next/image'
 import { Brain, GitGraph, Shield, Zap, Download, ArrowRight } from 'lucide-react'
 
+function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none">
+      <line x1="8" y1="24" x2="24" y2="24" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="8" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="24" y1="24" x2="16" y2="8" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="16" cy="8" r="3.5" fill="#818cf8"/>
+      <circle cx="8" cy="24" r="3.5" fill="#818cf8"/>
+      <circle cx="24" cy="24" r="3.5" fill="#22d3ee"/>
+    </svg>
+  )
+}
+
 function GithubIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -38,7 +51,10 @@ export default function Home() {
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
-          <span className="text-lg font-semibold tracking-tight">Ontograph</span>
+          <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <LogoMark className="size-6" />
+              Ontograph
+            </span>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors flex items-center gap-1.5">
