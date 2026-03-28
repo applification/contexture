@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
+import { TokenBlock } from './token-block'
 
 export const metadata: Metadata = {
   title: 'Brand — Ontograph',
@@ -82,7 +84,10 @@ export default function BrandPage() {
             <LogoMark className="size-6" />
             Ontograph
           </a>
-          <span className="text-sm text-muted-foreground">Brand Identity</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">Brand Identity</span>
+            <AnimatedThemeToggler className="size-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors [&_svg]:size-4" />
+          </div>
         </div>
       </nav>
 
@@ -407,33 +412,7 @@ export default function BrandPage() {
         {/* -------------------------------------------------------- */}
         <section id="reference" className="scroll-mt-24 py-20">
           <h2 className="text-2xl font-bold tracking-tight mb-10">Quick Reference</h2>
-          <div className="rounded-xl border border-border/60 bg-card/30 p-8 font-mono text-sm overflow-x-auto">
-            <pre className="text-muted-foreground leading-relaxed">{`/* Ontograph Design Tokens — CSS Custom Properties */
-
-/* Primary */
---primary:            oklch(0.45 0.15 270);   /* light */
---primary:            oklch(0.65 0.12 280);   /* dark  */
---primary-foreground: oklch(1 0 0);
-
-/* Accent */
---accent:             oklch(0.75 0.15 195);   /* both  */
-
-/* Backgrounds */
---background:         oklch(0.98 0.005 270);  /* light */
---background:         oklch(0.14 0.02 270);   /* dark  */
-
-/* Typography */
---font-sans: Geist Sans (variable, 100-900)
---font-mono: Geist Mono (variable, 100-900)
-
-/* Spacing */
---radius: 0.5rem (8px)
-Base unit: 4px (0.25rem)
-
-/* Border radius */
-rounded-lg  → 0.5rem
-rounded-xl  → 0.75rem`}</pre>
-          </div>
+          <TokenBlock />
         </section>
       </div>
 
