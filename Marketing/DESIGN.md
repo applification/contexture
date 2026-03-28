@@ -2,9 +2,9 @@
 
 All design assets live in the [Figma Ontograph project folder](https://www.figma.com/files/project/579034582).
 
-## What's in Figma
+## Figma Files
 
-- **Brand Identity** — logos, colors, typography, iconography
+- **[Brand Identity](https://www.figma.com/design/TSZ8DVQRZyZ9Gh8qqL6hvk)** — logos, colors, typography, voice & tone, components, motion
 - **Design System** — component library, tokens, patterns
 - **Marketing Website** — page layouts and responsive designs
 - **App Design** — product UI screens and flows
