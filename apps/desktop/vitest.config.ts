@@ -16,6 +16,12 @@ export default defineConfig({
         'src/renderer/src/env.d.ts',
         'src/renderer/src/components/ui/**',
       ],
+      thresholds: {
+        statements: 50,
+        branches: 70,
+        functions: 50,
+        lines: 50,
+      },
     },
   },
   resolve: {
