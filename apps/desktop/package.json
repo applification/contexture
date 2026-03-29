@@ -1,6 +1,6 @@
 {
   "name": "@ontograph/desktop",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "A modern ontology editor with Claude integration",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/DaveHudson/Ontograph",
