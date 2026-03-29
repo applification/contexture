@@ -77,12 +77,17 @@ export function ChatPanel(): React.JSX.Element {
 
   const handleDeleteThread = useCallback((id: string) => {
     const wasActive = id === history.activeThreadId
-    history.deleteThread(id)
     if (wasActive) {
-      setMessages([])
-      resetSession()
+      const remaining = history.threads.filter((t) => t.id !== id)
+      window.api.resetSession()
+      if (remaining.length > 0) {
+        setMessages(remaining[0].messages)
+      } else {
+        setMessages([])
+      }
     }
-  }, [history, setMessages, resetSession])
+    history.deleteThread(id)
+  }, [history, setMessages])
 
   useEffect(() => {
     if (chatDraft) {

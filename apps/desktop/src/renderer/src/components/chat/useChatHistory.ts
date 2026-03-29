@@ -28,7 +28,17 @@ function loadThreads(): ChatThread[] {
 }
 
 function saveThreads(threads: ChatThread[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(threads))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(threads))
+  } catch {
+    // Quota exceeded — prune oldest half and retry once
+    try {
+      const pruned = threads.slice(0, Math.ceil(threads.length / 2))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned))
+    } catch {
+      // Storage completely full — silently skip
+    }
+  }
 }
 
 function titleFromMessage(message: string): string {
