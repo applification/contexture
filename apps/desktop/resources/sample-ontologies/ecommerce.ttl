@@ -1,0 +1,191 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ecom: <http://example.org/ecommerce#> .
+
+# --- Agents ---
+
+ecom:Agent a owl:Class ;
+    rdfs:label "Agent" ;
+    rdfs:comment "An actor in the e-commerce system" .
+
+ecom:Customer a owl:Class ;
+    rdfs:label "Customer" ;
+    rdfs:comment "A person who purchases products" ;
+    rdfs:subClassOf ecom:Agent .
+
+ecom:Vendor a owl:Class ;
+    rdfs:label "Vendor" ;
+    rdfs:comment "A seller of products" ;
+    rdfs:subClassOf ecom:Agent ;
+    owl:disjointWith ecom:Customer .
+
+# --- Product hierarchy ---
+
+ecom:Product a owl:Class ;
+    rdfs:label "Product" ;
+    rdfs:comment "A purchasable item" .
+
+ecom:PhysicalProduct a owl:Class ;
+    rdfs:label "Physical Product" ;
+    rdfs:subClassOf ecom:Product .
+
+ecom:DigitalProduct a owl:Class ;
+    rdfs:label "Digital Product" ;
+    rdfs:subClassOf ecom:Product ;
+    owl:disjointWith ecom:PhysicalProduct .
+
+ecom:Subscription a owl:Class ;
+    rdfs:label "Subscription" ;
+    rdfs:comment "A recurring digital product" ;
+    rdfs:subClassOf ecom:DigitalProduct .
+
+ecom:Category a owl:Class ;
+    rdfs:label "Category" ;
+    rdfs:comment "A product classification" .
+
+# --- Order model ---
+
+ecom:Order a owl:Class ;
+    rdfs:label "Order" ;
+    rdfs:comment "A purchase transaction" .
+
+ecom:OrderItem a owl:Class ;
+    rdfs:label "Order Item" ;
+    rdfs:comment "A line item within an order" .
+
+ecom:Payment a owl:Class ;
+    rdfs:label "Payment" ;
+    rdfs:comment "A financial transaction" .
+
+ecom:Shipment a owl:Class ;
+    rdfs:label "Shipment" ;
+    rdfs:comment "A delivery of physical goods" .
+
+ecom:Review a owl:Class ;
+    rdfs:label "Review" ;
+    rdfs:comment "A customer review of a product" .
+
+ecom:Address a owl:Class ;
+    rdfs:label "Address" ;
+    rdfs:comment "A postal address" .
+
+# --- Object Properties ---
+
+ecom:placedBy a owl:ObjectProperty ;
+    rdfs:label "placed by" ;
+    rdfs:domain ecom:Order ;
+    rdfs:range ecom:Customer .
+
+ecom:containsItem a owl:ObjectProperty ;
+    rdfs:label "contains item" ;
+    rdfs:domain ecom:Order ;
+    rdfs:range ecom:OrderItem .
+
+ecom:forProduct a owl:ObjectProperty ;
+    rdfs:label "for product" ;
+    rdfs:domain ecom:OrderItem ;
+    rdfs:range ecom:Product .
+
+ecom:soldBy a owl:ObjectProperty ;
+    rdfs:label "sold by" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range ecom:Vendor .
+
+ecom:belongsToCategory a owl:ObjectProperty ;
+    rdfs:label "belongs to category" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range ecom:Category .
+
+ecom:hasSubCategory a owl:ObjectProperty ;
+    rdfs:label "has sub-category" ;
+    rdfs:domain ecom:Category ;
+    rdfs:range ecom:Category .
+
+ecom:paidWith a owl:ObjectProperty ;
+    rdfs:label "paid with" ;
+    rdfs:domain ecom:Order ;
+    rdfs:range ecom:Payment .
+
+ecom:shippedVia a owl:ObjectProperty ;
+    rdfs:label "shipped via" ;
+    rdfs:domain ecom:Order ;
+    rdfs:range ecom:Shipment .
+
+ecom:shipsTo a owl:ObjectProperty ;
+    rdfs:label "ships to" ;
+    rdfs:domain ecom:Shipment ;
+    rdfs:range ecom:Address .
+
+ecom:reviewOf a owl:ObjectProperty ;
+    rdfs:label "review of" ;
+    rdfs:domain ecom:Review ;
+    rdfs:range ecom:Product .
+
+ecom:writtenBy a owl:ObjectProperty ;
+    rdfs:label "written by" ;
+    rdfs:domain ecom:Review ;
+    rdfs:range ecom:Customer .
+
+# --- Datatype Properties (varied XSD types) ---
+
+ecom:productName a owl:DatatypeProperty ;
+    rdfs:label "product name" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range xsd:string .
+
+ecom:price a owl:DatatypeProperty ;
+    rdfs:label "price" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range xsd:decimal .
+
+ecom:weight a owl:DatatypeProperty ;
+    rdfs:label "weight (kg)" ;
+    rdfs:domain ecom:PhysicalProduct ;
+    rdfs:range xsd:double .
+
+ecom:sku a owl:DatatypeProperty ;
+    rdfs:label "SKU" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range xsd:string .
+
+ecom:quantity a owl:DatatypeProperty ;
+    rdfs:label "quantity" ;
+    rdfs:domain ecom:OrderItem ;
+    rdfs:range xsd:positiveInteger .
+
+ecom:orderDate a owl:DatatypeProperty ;
+    rdfs:label "order date" ;
+    rdfs:domain ecom:Order ;
+    rdfs:range xsd:dateTime .
+
+ecom:rating a owl:DatatypeProperty ;
+    rdfs:label "rating" ;
+    rdfs:domain ecom:Review ;
+    rdfs:range xsd:integer .
+
+ecom:downloadUrl a owl:DatatypeProperty ;
+    rdfs:label "download URL" ;
+    rdfs:domain ecom:DigitalProduct ;
+    rdfs:range xsd:anyURI .
+
+ecom:isInStock a owl:DatatypeProperty ;
+    rdfs:label "is in stock" ;
+    rdfs:domain ecom:Product ;
+    rdfs:range xsd:boolean .
+
+ecom:renewalDate a owl:DatatypeProperty ;
+    rdfs:label "renewal date" ;
+    rdfs:domain ecom:Subscription ;
+    rdfs:range xsd:date .
+
+ecom:streetAddress a owl:DatatypeProperty ;
+    rdfs:label "street address" ;
+    rdfs:domain ecom:Address ;
+    rdfs:range xsd:string .
+
+ecom:postalCode a owl:DatatypeProperty ;
+    rdfs:label "postal code" ;
+    rdfs:domain ecom:Address ;
+    rdfs:range xsd:string .

@@ -1,0 +1,407 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix uni: <http://example.org/university#> .
+
+# ============================================================
+# University ontology — large fixture for performance testing
+# 50+ classes, 30+ properties, deep hierarchy, cross-cutting
+# ============================================================
+
+# --- Top-level ---
+
+uni:Thing a owl:Class ;
+    rdfs:label "Thing" .
+
+uni:Agent a owl:Class ;
+    rdfs:label "Agent" ;
+    rdfs:subClassOf uni:Thing .
+
+uni:Organization a owl:Class ;
+    rdfs:label "Organization" ;
+    rdfs:subClassOf uni:Agent .
+
+uni:Person a owl:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human individual" ;
+    rdfs:subClassOf uni:Agent ;
+    owl:disjointWith uni:Organization .
+
+# --- People hierarchy ---
+
+uni:Student a owl:Class ;
+    rdfs:label "Student" ;
+    rdfs:subClassOf uni:Person .
+
+uni:UndergraduateStudent a owl:Class ;
+    rdfs:label "Undergraduate Student" ;
+    rdfs:subClassOf uni:Student .
+
+uni:GraduateStudent a owl:Class ;
+    rdfs:label "Graduate Student" ;
+    rdfs:subClassOf uni:Student .
+
+uni:MastersStudent a owl:Class ;
+    rdfs:label "Masters Student" ;
+    rdfs:subClassOf uni:GraduateStudent .
+
+uni:DoctoralStudent a owl:Class ;
+    rdfs:label "Doctoral Student" ;
+    rdfs:subClassOf uni:GraduateStudent ;
+    owl:disjointWith uni:MastersStudent .
+
+uni:PostDoc a owl:Class ;
+    rdfs:label "Post-Doctoral Researcher" ;
+    rdfs:subClassOf uni:Person .
+
+uni:Staff a owl:Class ;
+    rdfs:label "Staff" ;
+    rdfs:subClassOf uni:Person .
+
+uni:AcademicStaff a owl:Class ;
+    rdfs:label "Academic Staff" ;
+    rdfs:subClassOf uni:Staff .
+
+uni:Professor a owl:Class ;
+    rdfs:label "Professor" ;
+    rdfs:subClassOf uni:AcademicStaff .
+
+uni:AssistantProfessor a owl:Class ;
+    rdfs:label "Assistant Professor" ;
+    rdfs:subClassOf uni:AcademicStaff .
+
+uni:AssociateProfessor a owl:Class ;
+    rdfs:label "Associate Professor" ;
+    rdfs:subClassOf uni:AcademicStaff .
+
+uni:Lecturer a owl:Class ;
+    rdfs:label "Lecturer" ;
+    rdfs:subClassOf uni:AcademicStaff .
+
+uni:Researcher a owl:Class ;
+    rdfs:label "Researcher" ;
+    rdfs:subClassOf uni:AcademicStaff .
+
+uni:AdministrativeStaff a owl:Class ;
+    rdfs:label "Administrative Staff" ;
+    rdfs:subClassOf uni:Staff ;
+    owl:disjointWith uni:AcademicStaff .
+
+uni:TechnicalStaff a owl:Class ;
+    rdfs:label "Technical Staff" ;
+    rdfs:subClassOf uni:Staff .
+
+uni:Librarian a owl:Class ;
+    rdfs:label "Librarian" ;
+    rdfs:subClassOf uni:AdministrativeStaff .
+
+uni:Registrar a owl:Class ;
+    rdfs:label "Registrar" ;
+    rdfs:subClassOf uni:AdministrativeStaff .
+
+# --- Organization hierarchy ---
+
+uni:University a owl:Class ;
+    rdfs:label "University" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:Faculty a owl:Class ;
+    rdfs:label "Faculty" ;
+    rdfs:comment "An academic division of a university" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:Department a owl:Class ;
+    rdfs:label "Department" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:ResearchGroup a owl:Class ;
+    rdfs:label "Research Group" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:ResearchCenter a owl:Class ;
+    rdfs:label "Research Center" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:Institute a owl:Class ;
+    rdfs:label "Institute" ;
+    rdfs:subClassOf uni:Organization .
+
+uni:Library a owl:Class ;
+    rdfs:label "Library" ;
+    rdfs:subClassOf uni:Organization .
+
+# --- Academic entities ---
+
+uni:AcademicEntity a owl:Class ;
+    rdfs:label "Academic Entity" ;
+    rdfs:subClassOf uni:Thing .
+
+uni:Course a owl:Class ;
+    rdfs:label "Course" ;
+    rdfs:subClassOf uni:AcademicEntity .
+
+uni:GraduateCourse a owl:Class ;
+    rdfs:label "Graduate Course" ;
+    rdfs:subClassOf uni:Course .
+
+uni:UndergraduateCourse a owl:Class ;
+    rdfs:label "Undergraduate Course" ;
+    rdfs:subClassOf uni:Course ;
+    owl:disjointWith uni:GraduateCourse .
+
+uni:Seminar a owl:Class ;
+    rdfs:label "Seminar" ;
+    rdfs:subClassOf uni:Course .
+
+uni:Program a owl:Class ;
+    rdfs:label "Program" ;
+    rdfs:comment "A degree program" ;
+    rdfs:subClassOf uni:AcademicEntity .
+
+uni:BachelorsProgram a owl:Class ;
+    rdfs:label "Bachelors Program" ;
+    rdfs:subClassOf uni:Program .
+
+uni:MastersProgram a owl:Class ;
+    rdfs:label "Masters Program" ;
+    rdfs:subClassOf uni:Program .
+
+uni:DoctoralProgram a owl:Class ;
+    rdfs:label "Doctoral Program" ;
+    rdfs:subClassOf uni:Program .
+
+uni:Curriculum a owl:Class ;
+    rdfs:label "Curriculum" ;
+    rdfs:subClassOf uni:AcademicEntity .
+
+# --- Research entities ---
+
+uni:ResearchEntity a owl:Class ;
+    rdfs:label "Research Entity" ;
+    rdfs:subClassOf uni:Thing .
+
+uni:Publication a owl:Class ;
+    rdfs:label "Publication" ;
+    rdfs:subClassOf uni:ResearchEntity .
+
+uni:JournalArticle a owl:Class ;
+    rdfs:label "Journal Article" ;
+    rdfs:subClassOf uni:Publication .
+
+uni:ConferencePaper a owl:Class ;
+    rdfs:label "Conference Paper" ;
+    rdfs:subClassOf uni:Publication .
+
+uni:TechnicalReport a owl:Class ;
+    rdfs:label "Technical Report" ;
+    rdfs:subClassOf uni:Publication .
+
+uni:Thesis a owl:Class ;
+    rdfs:label "Thesis" ;
+    rdfs:subClassOf uni:Publication .
+
+uni:ResearchProject a owl:Class ;
+    rdfs:label "Research Project" ;
+    rdfs:subClassOf uni:ResearchEntity .
+
+uni:Grant a owl:Class ;
+    rdfs:label "Grant" ;
+    rdfs:subClassOf uni:ResearchEntity .
+
+uni:Patent a owl:Class ;
+    rdfs:label "Patent" ;
+    rdfs:subClassOf uni:ResearchEntity .
+
+# --- Infrastructure ---
+
+uni:PhysicalEntity a owl:Class ;
+    rdfs:label "Physical Entity" ;
+    rdfs:subClassOf uni:Thing .
+
+uni:Building a owl:Class ;
+    rdfs:label "Building" ;
+    rdfs:subClassOf uni:PhysicalEntity .
+
+uni:Room a owl:Class ;
+    rdfs:label "Room" ;
+    rdfs:subClassOf uni:PhysicalEntity .
+
+uni:Classroom a owl:Class ;
+    rdfs:label "Classroom" ;
+    rdfs:subClassOf uni:Room .
+
+uni:Laboratory a owl:Class ;
+    rdfs:label "Laboratory" ;
+    rdfs:subClassOf uni:Room .
+
+uni:Office a owl:Class ;
+    rdfs:label "Office" ;
+    rdfs:subClassOf uni:Room .
+
+# --- Object Properties ---
+
+uni:memberOf a owl:ObjectProperty ;
+    rdfs:label "member of" ;
+    rdfs:domain uni:Person ;
+    rdfs:range uni:Organization .
+
+uni:headOf a owl:ObjectProperty ;
+    rdfs:label "head of" ;
+    rdfs:domain uni:AcademicStaff ;
+    rdfs:range uni:Department .
+
+uni:teaches a owl:ObjectProperty ;
+    rdfs:label "teaches" ;
+    rdfs:domain uni:AcademicStaff ;
+    rdfs:range uni:Course .
+
+uni:enrolledIn a owl:ObjectProperty ;
+    rdfs:label "enrolled in" ;
+    rdfs:domain uni:Student ;
+    rdfs:range uni:Course .
+
+uni:advisedBy a owl:ObjectProperty ;
+    rdfs:label "advised by" ;
+    rdfs:domain uni:GraduateStudent ;
+    rdfs:range uni:Professor ;
+    owl:inverseOf uni:advises .
+
+uni:advises a owl:ObjectProperty ;
+    rdfs:label "advises" ;
+    rdfs:domain uni:Professor ;
+    rdfs:range uni:GraduateStudent ;
+    owl:inverseOf uni:advisedBy .
+
+uni:offeredBy a owl:ObjectProperty ;
+    rdfs:label "offered by" ;
+    rdfs:domain uni:Course ;
+    rdfs:range uni:Department .
+
+uni:partOfProgram a owl:ObjectProperty ;
+    rdfs:label "part of program" ;
+    rdfs:domain uni:Course ;
+    rdfs:range uni:Program .
+
+uni:authorOf a owl:ObjectProperty ;
+    rdfs:label "author of" ;
+    rdfs:domain uni:Person ;
+    rdfs:range uni:Publication .
+
+uni:fundedBy a owl:ObjectProperty ;
+    rdfs:label "funded by" ;
+    rdfs:domain uni:ResearchProject ;
+    rdfs:range uni:Grant .
+
+uni:locatedIn a owl:ObjectProperty ;
+    rdfs:label "located in" ;
+    rdfs:domain uni:Room ;
+    rdfs:range uni:Building .
+
+uni:hasRoom a owl:ObjectProperty ;
+    rdfs:label "has room" ;
+    rdfs:domain uni:Building ;
+    rdfs:range uni:Room ;
+    owl:inverseOf uni:locatedIn .
+
+uni:worksIn a owl:ObjectProperty ;
+    rdfs:label "works in" ;
+    rdfs:domain uni:Staff ;
+    rdfs:range uni:Office .
+
+uni:subOrganizationOf a owl:ObjectProperty ;
+    rdfs:label "sub-organization of" ;
+    rdfs:domain uni:Organization ;
+    rdfs:range uni:Organization .
+
+uni:publishedIn a owl:ObjectProperty ;
+    rdfs:label "published in" ;
+    rdfs:domain uni:Publication ;
+    rdfs:range uni:ResearchEntity .
+
+uni:collaboratesWith a owl:ObjectProperty ;
+    rdfs:label "collaborates with" ;
+    rdfs:domain uni:Researcher ;
+    rdfs:range uni:Researcher .
+
+# --- Datatype Properties ---
+
+uni:name a owl:DatatypeProperty ;
+    rdfs:label "name" ;
+    rdfs:domain uni:Thing ;
+    rdfs:range xsd:string .
+
+uni:email a owl:DatatypeProperty ;
+    rdfs:label "email" ;
+    rdfs:domain uni:Person ;
+    rdfs:range xsd:string .
+
+uni:studentId a owl:DatatypeProperty ;
+    rdfs:label "student ID" ;
+    rdfs:domain uni:Student ;
+    rdfs:range xsd:string .
+
+uni:gpa a owl:DatatypeProperty ;
+    rdfs:label "GPA" ;
+    rdfs:domain uni:Student ;
+    rdfs:range xsd:float .
+
+uni:enrollmentDate a owl:DatatypeProperty ;
+    rdfs:label "enrollment date" ;
+    rdfs:domain uni:Student ;
+    rdfs:range xsd:date .
+
+uni:creditHours a owl:DatatypeProperty ;
+    rdfs:label "credit hours" ;
+    rdfs:domain uni:Course ;
+    rdfs:range xsd:integer .
+
+uni:courseCode a owl:DatatypeProperty ;
+    rdfs:label "course code" ;
+    rdfs:domain uni:Course ;
+    rdfs:range xsd:string .
+
+uni:maxEnrollment a owl:DatatypeProperty ;
+    rdfs:label "max enrollment" ;
+    rdfs:domain uni:Course ;
+    rdfs:range xsd:positiveInteger .
+
+uni:publicationYear a owl:DatatypeProperty ;
+    rdfs:label "publication year" ;
+    rdfs:domain uni:Publication ;
+    rdfs:range xsd:integer .
+
+uni:doi a owl:DatatypeProperty ;
+    rdfs:label "DOI" ;
+    rdfs:domain uni:Publication ;
+    rdfs:range xsd:anyURI .
+
+uni:grantAmount a owl:DatatypeProperty ;
+    rdfs:label "grant amount" ;
+    rdfs:domain uni:Grant ;
+    rdfs:range xsd:decimal .
+
+uni:startDate a owl:DatatypeProperty ;
+    rdfs:label "start date" ;
+    rdfs:domain uni:ResearchProject ;
+    rdfs:range xsd:date .
+
+uni:endDate a owl:DatatypeProperty ;
+    rdfs:label "end date" ;
+    rdfs:domain uni:ResearchProject ;
+    rdfs:range xsd:date .
+
+uni:capacity a owl:DatatypeProperty ;
+    rdfs:label "capacity" ;
+    rdfs:domain uni:Room ;
+    rdfs:range xsd:nonNegativeInteger .
+
+uni:floorNumber a owl:DatatypeProperty ;
+    rdfs:label "floor number" ;
+    rdfs:domain uni:Room ;
+    rdfs:range xsd:integer .
+
+uni:isActive a owl:DatatypeProperty ;
+    rdfs:label "is active" ;
+    rdfs:domain uni:Organization ;
+    rdfs:range xsd:boolean .

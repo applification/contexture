@@ -1,0 +1,7 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <http://example.org/minimal#> .
+
+ex:Thing a owl:Class ;
+    rdfs:label "Thing" ;
+    rdfs:comment "The only class in this minimal ontology" .
