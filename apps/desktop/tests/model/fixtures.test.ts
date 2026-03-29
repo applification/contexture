@@ -59,14 +59,15 @@ describe('all fixtures: parse and round-trip', () => {
 describe('healthcare.ttl', () => {
   const turtle = loadFixture('healthcare.ttl')
 
-  it('parses 16 classes', () => {
+  it('parses 16 named classes (plus blank nodes from restrictions)', () => {
     const o = parseTurtle(turtle)
-    expect(o.classes.size).toBe(16)
+    const namedClasses = [...o.classes.keys()].filter((k) => k.startsWith('http'))
+    expect(namedClasses.length).toBe(16)
   })
 
   it('has deep hierarchy: Surgeon -> Physician -> HealthcareProvider -> Person -> LivingEntity', () => {
     const o = parseTurtle(turtle)
-    expect(o.classes.get(`${HEALTH}Surgeon`)!.subClassOf).toEqual([`${HEALTH}Physician`])
+    expect(o.classes.get(`${HEALTH}Surgeon`)!.subClassOf).toContain(`${HEALTH}Physician`)
     expect(o.classes.get(`${HEALTH}Physician`)!.subClassOf).toEqual([`${HEALTH}HealthcareProvider`])
     expect(o.classes.get(`${HEALTH}HealthcareProvider`)!.subClassOf).toEqual([`${HEALTH}Person`])
     expect(o.classes.get(`${HEALTH}Person`)!.subClassOf).toEqual([`${HEALTH}LivingEntity`])

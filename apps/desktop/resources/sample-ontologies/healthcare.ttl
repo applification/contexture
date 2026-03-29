@@ -4,6 +4,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix health: <http://example.org/healthcare#> .
 
+<http://example.org/healthcare> a owl:Ontology ;
+    rdfs:label "Healthcare Ontology" ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:comment "Test fixture modelling healthcare providers, patients, and clinical entities" .
+
 # --- Top-level classes ---
 
 health:LivingEntity a owl:Class ;
@@ -36,20 +41,26 @@ health:Physician a owl:Class ;
 health:Surgeon a owl:Class ;
     rdfs:label "Surgeon" ;
     rdfs:comment "A physician specializing in surgery" ;
-    rdfs:subClassOf health:Physician .
+    rdfs:subClassOf health:Physician ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty health:performs ;
+        owl:someValuesFrom health:SurgicalProcedure
+    ] .
 
 health:Nurse a owl:Class ;
     rdfs:label "Nurse" ;
     rdfs:comment "A registered nurse" ;
-    rdfs:subClassOf health:HealthcareProvider ;
-    owl:disjointWith health:Physician .
+    rdfs:subClassOf health:HealthcareProvider .
 
 health:Pharmacist a owl:Class ;
     rdfs:label "Pharmacist" ;
     rdfs:comment "A licensed pharmacist" ;
-    rdfs:subClassOf health:HealthcareProvider ;
-    owl:disjointWith health:Physician ;
-    owl:disjointWith health:Nurse .
+    rdfs:subClassOf health:HealthcareProvider .
+
+# OWL 2 AllDisjointClasses — cleaner than pairwise disjointWith
+[] a owl:AllDisjointClasses ;
+    owl:members ( health:Physician health:Nurse health:Pharmacist ) .
 
 # --- Patient ---
 
@@ -173,3 +184,19 @@ health:bedCount a owl:DatatypeProperty ;
     rdfs:label "bed count" ;
     rdfs:domain health:Hospital ;
     rdfs:range xsd:nonNegativeInteger .
+
+health:performs a owl:ObjectProperty ;
+    rdfs:label "performs" ;
+    rdfs:domain health:Physician ;
+    rdfs:range health:Treatment .
+
+# --- Named Individuals (ABox) ---
+
+health:drSmith a health:Surgeon ;
+    health:fullName "Dr. Alice Smith" ;
+    health:licenseNumber "MED-2024-0042" .
+
+health:generalHospital a health:Hospital ;
+    rdfs:label "General Hospital" ;
+    health:isActive true ;
+    health:bedCount "250"^^xsd:nonNegativeInteger .

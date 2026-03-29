@@ -4,6 +4,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix ecom: <http://example.org/ecommerce#> .
 
+<http://example.org/ecommerce> a owl:Ontology ;
+    rdfs:label "E-Commerce Ontology" ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:comment "Test fixture modelling products, orders, and customers" .
+
 # --- Agents ---
 
 ecom:Agent a owl:Class ;
@@ -98,7 +103,7 @@ ecom:belongsToCategory a owl:ObjectProperty ;
     rdfs:domain ecom:Product ;
     rdfs:range ecom:Category .
 
-ecom:hasSubCategory a owl:ObjectProperty ;
+ecom:hasSubCategory a owl:ObjectProperty, owl:TransitiveProperty ;
     rdfs:label "has sub-category" ;
     rdfs:domain ecom:Category ;
     rdfs:range ecom:Category .
@@ -145,7 +150,7 @@ ecom:weight a owl:DatatypeProperty ;
     rdfs:domain ecom:PhysicalProduct ;
     rdfs:range xsd:double .
 
-ecom:sku a owl:DatatypeProperty ;
+ecom:sku a owl:DatatypeProperty, owl:FunctionalProperty ;
     rdfs:label "SKU" ;
     rdfs:domain ecom:Product ;
     rdfs:range xsd:string .

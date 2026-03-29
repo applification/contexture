@@ -4,6 +4,10 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix edge: <http://example.org/edge-cases#> .
 
+<http://example.org/edge-cases> a owl:Ontology ;
+    rdfs:label "Edge Cases Ontology" ;
+    rdfs:comment "Test fixture exercising unusual OWL patterns" .
+
 # --- Class with no label (should trigger validation warning) ---
 
 edge:UnlabeledClass a owl:Class .
@@ -11,7 +15,7 @@ edge:UnlabeledClass a owl:Class .
 # --- Class with unicode label ---
 
 edge:UnicodeClass a owl:Class ;
-    rdfs:label "Classe avec des accents: eaeio uuee" ;
+    rdfs:label "Classe avec des accents: éàèîö üùêë" ;
     rdfs:comment "Tests parsing of non-ASCII characters in labels" .
 
 # --- Class with very long label ---
@@ -24,7 +28,7 @@ edge:VerboseClass a owl:Class ;
 
 edge:SpecialCharsClass a owl:Class ;
     rdfs:label "Special Characters" ;
-    rdfs:comment "Contains <angle brackets>, \"quotes\", & ampersands, and newlines\\nlike this" .
+    rdfs:comment "Contains <angle brackets>, \"quotes\", & ampersands, and newlines\nlike this" .
 
 # --- Deep hierarchy (5 levels) ---
 
@@ -86,6 +90,8 @@ edge:orphanProp a owl:ObjectProperty ;
     rdfs:range edge:SelfRefClass .
 
 # --- Property with multiple domains ---
+# NOTE: In OWL, multiple rdfs:domain assertions are INTERSECTED, not unioned.
+# So multiDomainProp requires its subject to be both DomainA AND DomainB.
 
 edge:DomainA a owl:Class ;
     rdfs:label "Domain A" .

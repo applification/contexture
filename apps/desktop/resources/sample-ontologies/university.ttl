@@ -4,6 +4,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix uni: <http://example.org/university#> .
 
+<http://example.org/university> a owl:Ontology ;
+    rdfs:label "University Ontology" ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:comment "Large test fixture modelling university domains — people, orgs, academics, research, infrastructure" .
+
 # ============================================================
 # University ontology — large fixture for performance testing
 # 50+ classes, 30+ properties, deep hierarchy, cross-cutting
@@ -11,12 +16,12 @@
 
 # --- Top-level ---
 
-uni:Thing a owl:Class ;
-    rdfs:label "Thing" .
+uni:Entity a owl:Class ;
+    rdfs:label "Entity" .
 
 uni:Agent a owl:Class ;
     rdfs:label "Agent" ;
-    rdfs:subClassOf uni:Thing .
+    rdfs:subClassOf uni:Entity .
 
 uni:Organization a owl:Class ;
     rdfs:label "Organization" ;
@@ -135,7 +140,7 @@ uni:Library a owl:Class ;
 
 uni:AcademicEntity a owl:Class ;
     rdfs:label "Academic Entity" ;
-    rdfs:subClassOf uni:Thing .
+    rdfs:subClassOf uni:Entity .
 
 uni:Course a owl:Class ;
     rdfs:label "Course" ;
@@ -179,7 +184,7 @@ uni:Curriculum a owl:Class ;
 
 uni:ResearchEntity a owl:Class ;
     rdfs:label "Research Entity" ;
-    rdfs:subClassOf uni:Thing .
+    rdfs:subClassOf uni:Entity .
 
 uni:Publication a owl:Class ;
     rdfs:label "Publication" ;
@@ -213,11 +218,16 @@ uni:Patent a owl:Class ;
     rdfs:label "Patent" ;
     rdfs:subClassOf uni:ResearchEntity .
 
+uni:Venue a owl:Class ;
+    rdfs:label "Venue" ;
+    rdfs:comment "A publication venue (journal, conference proceedings, etc.)" ;
+    rdfs:subClassOf uni:ResearchEntity .
+
 # --- Infrastructure ---
 
 uni:PhysicalEntity a owl:Class ;
     rdfs:label "Physical Entity" ;
-    rdfs:subClassOf uni:Thing .
+    rdfs:subClassOf uni:Entity .
 
 uni:Building a owl:Class ;
     rdfs:label "Building" ;
@@ -309,7 +319,7 @@ uni:worksIn a owl:ObjectProperty ;
     rdfs:domain uni:Staff ;
     rdfs:range uni:Office .
 
-uni:subOrganizationOf a owl:ObjectProperty ;
+uni:subOrganizationOf a owl:ObjectProperty, owl:TransitiveProperty ;
     rdfs:label "sub-organization of" ;
     rdfs:domain uni:Organization ;
     rdfs:range uni:Organization .
@@ -317,9 +327,9 @@ uni:subOrganizationOf a owl:ObjectProperty ;
 uni:publishedIn a owl:ObjectProperty ;
     rdfs:label "published in" ;
     rdfs:domain uni:Publication ;
-    rdfs:range uni:ResearchEntity .
+    rdfs:range uni:Venue .
 
-uni:collaboratesWith a owl:ObjectProperty ;
+uni:collaboratesWith a owl:ObjectProperty, owl:SymmetricProperty ;
     rdfs:label "collaborates with" ;
     rdfs:domain uni:Researcher ;
     rdfs:range uni:Researcher .
@@ -328,7 +338,7 @@ uni:collaboratesWith a owl:ObjectProperty ;
 
 uni:name a owl:DatatypeProperty ;
     rdfs:label "name" ;
-    rdfs:domain uni:Thing ;
+    rdfs:domain uni:Entity ;
     rdfs:range xsd:string .
 
 uni:email a owl:DatatypeProperty ;
