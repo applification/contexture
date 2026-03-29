@@ -26,6 +26,7 @@ const THINKING_TOKENS: Record<ThinkingBudget, number | undefined> = {
 
 interface UseClaudeReturn {
   messages: ChatMessage[]
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>
   isLoading: boolean
   authMode: AuthMode
   setAuthMode: (mode: AuthMode) => void
@@ -235,5 +236,5 @@ export function useClaude(): UseClaudeReturn {
     window.api.resetSession()
   }, [])
 
-  return { messages, isLoading, authMode, setAuthMode, apiKey, setApiKey, model, setModel, thinkingBudget, setThinkingBudget, cliDetected, isReady, sendMessage, resetSession }
+  return { messages, setMessages, isLoading, authMode, setAuthMode, apiKey, setApiKey, model, setModel, thinkingBudget, setThinkingBudget, cliDetected, isReady, sendMessage, resetSession }
 }
