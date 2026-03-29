@@ -13,6 +13,7 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { EvalPanel } from './components/eval/EvalPanel';
+import { MetricsPanel } from './components/metrics/MetricsPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { GraphCanvas } from './components/graph/GraphCanvas';
 import { ImprovementHUD } from './components/hud/ImprovementHUD';
@@ -339,6 +340,9 @@ function App(): React.JSX.Element {
               </div>
               <div className={activeTab !== 'eval' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <EvalPanel />
+              </div>
+              <div className={activeTab !== 'metrics' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <MetricsPanel />
               </div>
             </div>
 

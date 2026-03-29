@@ -1,5 +1,5 @@
 import type { SidebarTab } from '@renderer/store/ui';
-import { ClipboardList, MessageSquare, MousePointer2 } from 'lucide-react';
+import { BarChart3, ClipboardList, MessageSquare, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityBarProps {
@@ -11,6 +11,7 @@ const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
   { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },
   { id: 'eval', icon: <ClipboardList className="size-4" />, label: 'Eval' },
+  { id: 'metrics', icon: <BarChart3 className="size-4" />, label: 'Metrics' },
 ];
 
 export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React.JSX.Element {
