@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/posthog', () => ({
   posthog: {
@@ -6,8 +6,8 @@ vi.mock('@/lib/posthog', () => ({
   },
 }));
 
-import { getVisitorId } from '@/lib/visitor-id';
 import { posthog } from '@/lib/posthog';
+import { getVisitorId } from '@/lib/visitor-id';
 
 describe('getVisitorId', () => {
   beforeEach(() => {
