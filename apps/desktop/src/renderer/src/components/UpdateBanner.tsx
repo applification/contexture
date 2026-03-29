@@ -13,7 +13,7 @@ export function UpdateBanner(): React.JSX.Element | null {
 
   if (update.status === 'available') {
     return (
-      <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-blue-600 text-white text-xs">
+      <div className="flex items-center justify-between pl-20 pr-3 py-2.5 bg-blue-600 text-white text-xs">
         <span>Update available: v{update.version}</span>
         <button
           type="button"
@@ -28,7 +28,7 @@ export function UpdateBanner(): React.JSX.Element | null {
 
   if (update.status === 'downloading') {
     return (
-      <div className="flex items-center gap-3 pl-20 pr-3 py-1.5 bg-blue-600 text-white text-xs">
+      <div className="flex items-center gap-3 pl-20 pr-3 py-2.5 bg-blue-600 text-white text-xs">
         <span>Downloading update…</span>
         <div className="flex-1 bg-blue-400 rounded-full h-1.5 max-w-32">
           <div
@@ -43,7 +43,7 @@ export function UpdateBanner(): React.JSX.Element | null {
 
   if (update.status === 'ready') {
     return (
-      <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-green-600 text-white text-xs">
+      <div className="flex items-center justify-between pl-20 pr-3 py-2.5 bg-green-600 text-white text-xs">
         <span>v{update.version} ready to install</span>
         <button
           type="button"
@@ -58,7 +58,7 @@ export function UpdateBanner(): React.JSX.Element | null {
 
   if (update.status === 'error') {
     return (
-      <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-yellow-600 text-white text-xs">
+      <div className="flex items-center justify-between pl-20 pr-3 py-2.5 bg-yellow-600 text-white text-xs">
         <span>
           Update check failed —{' '}
           <button
