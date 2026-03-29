@@ -12,31 +12,23 @@ const { Toolbar } = await import('@renderer/components/toolbar/Toolbar')
 describe('Toolbar', () => {
   afterEach(cleanup)
 
-  it('renders file operation buttons', () => {
-    render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
-    expect(screen.getByTitle('New ontology')).toBeInTheDocument()
-    expect(screen.getByTitle('Open (⌘O)')).toBeInTheDocument()
-    expect(screen.getByTitle('Save (⌘S)')).toBeInTheDocument()
-    expect(screen.getByTitle('Save As (⇧⌘S)')).toBeInTheDocument()
+  it('renders search bar', () => {
+    render(<Toolbar />)
+    expect(screen.getByPlaceholderText('Search label, URI, comment…')).toBeInTheDocument()
   })
 
   it('renders theme toggle', () => {
-    render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
+    render(<Toolbar />)
     expect(screen.getByTitle('Toggle theme')).toBeInTheDocument()
   })
 
   it('renders Claude settings button', () => {
-    render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
+    render(<Toolbar />)
     expect(screen.getByTitle('Claude settings')).toBeInTheDocument()
   })
 
   it('renders sidebar toggle', () => {
-    render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
+    render(<Toolbar />)
     expect(screen.getByTitle('Toggle sidebar')).toBeInTheDocument()
-  })
-
-  it('renders search bar', () => {
-    render(<Toolbar onNew={() => {}} onOpen={() => {}} onSave={() => {}} onSaveAs={() => {}} />)
-    expect(screen.getByPlaceholderText('Search label, URI, comment…')).toBeInTheDocument()
   })
 })

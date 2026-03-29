@@ -11,9 +11,9 @@ describe('StatusBar', () => {
   beforeEach(resetStores)
   afterEach(cleanup)
 
-  it('shows "No file open" when no file loaded', () => {
+  it('shows "Saved" when no unsaved changes', () => {
     render(<StatusBar />)
-    expect(screen.getByText('No file open')).toBeInTheDocument()
+    expect(screen.getByText('Saved')).toBeInTheDocument()
   })
 
   it('shows file path when file loaded', () => {
@@ -22,11 +22,11 @@ describe('StatusBar', () => {
     expect(screen.getByText('/path/to/ontology.ttl')).toBeInTheDocument()
   })
 
-  it('shows dirty indicator', () => {
+  it('shows unsaved changes indicator when dirty', () => {
     useOntologyStore.getState().loadFromTurtle('', '/test.ttl')
     useOntologyStore.getState().addClass('http://ex/A')
     render(<StatusBar />)
-    expect(screen.getByText('/test.ttl *')).toBeInTheDocument()
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
   })
 
   it('shows class and property counts', () => {
