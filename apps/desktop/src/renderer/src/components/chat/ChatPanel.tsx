@@ -69,11 +69,11 @@ export function ChatPanel(): React.JSX.Element {
   const handleSwitchThread = useCallback((id: string) => {
     const thread = history.threads.find((t) => t.id === id)
     if (thread) {
+      window.api.resetSession()
       setMessages(thread.messages)
-      resetSession()
     }
     history.switchThread(id)
-  }, [history, setMessages, resetSession])
+  }, [history, setMessages])
 
   const handleDeleteThread = useCallback((id: string) => {
     const wasActive = id === history.activeThreadId
