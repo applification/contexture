@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { RotateCcw, BotMessageSquare, ArrowUp, Square } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { List, SquarePen, BotMessageSquare, ArrowUp, Square } from 'lucide-react'
 import { Streamdown } from 'streamdown'
 import { code } from '@streamdown/code'
 import { useClaude, type ChatMessage, type ModelId, type ThinkingBudget } from './useClaude'
+import { useChatHistory } from './useChatHistory'
+import { ChatThreadList } from './ChatThreadList'
 import { useUIStore } from '@renderer/store/ui'
 import { useOntologyStore } from '@renderer/store/ontology'
 import { Button } from '@/components/ui/button'
@@ -13,18 +15,73 @@ import { cn } from '@/lib/utils'
 
 export function ChatPanel(): React.JSX.Element {
   const {
-    messages, isLoading, authMode, isReady,
+    messages, setMessages, isLoading, authMode, isReady,
     model, setModel, thinkingBudget, setThinkingBudget,
     sendMessage, resetSession
   } = useClaude()
+  const history = useChatHistory()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const prevMessagesRef = useRef<ChatMessage[]>([])
 
   const chatDraft = useUIStore((s) => s.chatDraft)
   const setChatDraft = useUIStore((s) => s.setChatDraft)
   const pendingChatMessage = useUIStore((s) => s.pendingChatMessage)
   const setPendingChatMessage = useUIStore((s) => s.setPendingChatMessage)
+
+  // Restore active thread on mount
+  useEffect(() => {
+    const thread = history.getActiveThread()
+    if (thread && thread.messages.length > 0) {
+      setMessages(thread.messages)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-save messages to active thread when messages change
+  useEffect(() => {
+    if (history.activeThreadId && messages.length > 0 && messages !== prevMessagesRef.current) {
+      history.updateThreadMessages(history.activeThreadId, messages)
+    }
+    prevMessagesRef.current = messages
+  }, [messages, history.activeThreadId, history.updateThreadMessages])
+
+  // Auto-create thread on first message if none active
+  useEffect(() => {
+    if (!history.activeThreadId && messages.length > 0) {
+      history.createThread(model)
+    }
+  }, [messages.length, history.activeThreadId, history.createThread, model])
+
+  const handleNewChat = useCallback(() => {
+    // Don't save empty threads
+    if (history.activeThreadId && messages.length === 0) {
+      history.deleteThread(history.activeThreadId)
+    }
+    const id = history.createThread(model)
+    setMessages([])
+    resetSession()
+    history.setShowThreadList(false)
+    return id
+  }, [history, messages.length, model, setMessages, resetSession])
+
+  const handleSwitchThread = useCallback((id: string) => {
+    const thread = history.switchThread(id)
+    if (thread) {
+      setMessages(thread.messages)
+      resetSession()
+    }
+  }, [history, setMessages, resetSession])
+
+  const handleDeleteThread = useCallback((id: string) => {
+    const wasActive = id === history.activeThreadId
+    history.deleteThread(id)
+    if (wasActive) {
+      setMessages([])
+      resetSession()
+    }
+  }, [history, setMessages, resetSession])
 
   useEffect(() => {
     if (chatDraft) {
@@ -94,152 +151,175 @@ export function ChatPanel(): React.JSX.Element {
     }
   }
 
+  const activeThread = history.getActiveThread()
+  const headerTitle = activeThread?.title && activeThread.title !== 'New chat'
+    ? activeThread.title
+    : 'Claude'
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Claude
+      <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 shrink-0"
+          onClick={() => history.setShowThreadList(!history.showThreadList)}
+          title={history.showThreadList ? 'Hide chat history' : 'Show chat history'}
+        >
+          <List className="size-3.5" />
+        </Button>
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate flex-1">
+          {history.showThreadList ? 'Chat History' : headerTitle}
         </h2>
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6"
-            onClick={resetSession}
-            title="New conversation"
-          >
-            <RotateCcw className="size-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 shrink-0"
+          onClick={handleNewChat}
+          title="New chat"
+        >
+          <SquarePen className="size-3.5" />
+        </Button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.length === 0 && (
-          <Empty className="border-0 p-4">
-            <EmptyHeader>
-              {isReady && (
-                <EmptyMedia variant="icon">
-                  <BotMessageSquare />
-                </EmptyMedia>
-              )}
-              <EmptyTitle className="text-sm font-medium">
-                {isReady ? 'Start a conversation' : 'Not connected'}
-              </EmptyTitle>
-              <EmptyDescription className="text-xs">
-                {isReady
-                  ? 'Describe the ontology you want to create or select a node to get context-aware suggestions.'
-                  : authMode === 'max'
-                    ? 'Claude CLI not detected. Configure in toolbar.'
-                    : 'Set your API key in the toolbar to start chatting.'}
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
-        {messages.map((msg, i) => (
-          <MessageBubble key={i} message={msg} />
-        ))}
-        {isLoading && (
-          <div className="flex gap-1 items-center text-xs text-muted-foreground">
-            <span className="animate-pulse">●</span>
-            <span>Claude is thinking...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Selection Context Badge */}
-      {selectionContext && (
-        <div className="px-3 pt-2">
-          <Badge className="inline-flex gap-1.5 px-2.5 py-1 rounded-full max-w-full text-xs font-normal h-auto bg-primary-display/10 text-primary-display border border-primary-display hover:bg-primary-display/10">
-            <span className="opacity-60">{selectionContext.type === 'class' ? '◆' : '→'}</span>
-            <span className="truncate">{selectionContext.label}</span>
-            <button
-              onClick={() => selectionContext.type === 'class' ? setSelectedNode(null) : setSelectedEdge(null)}
-              className="text-muted-foreground hover:text-foreground ml-0.5 shrink-0"
-            >
-              ×
-            </button>
-          </Badge>
-        </div>
-      )}
-
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 border-t border-border">
-        <div className={cn(
-          'rounded-xl border border-input bg-card transition-shadow',
-          'focus-within:ring-1 focus-within:ring-ring',
-          (!isReady || isLoading) && 'opacity-60'
-        )}>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isReady ? 'Ask anything...' : 'Configure auth first...'}
-            disabled={!isReady || isLoading}
-            rows={1}
-            className={cn(
-              'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm',
-              'placeholder:text-muted-foreground focus:outline-none',
-              'disabled:cursor-not-allowed max-h-32 overflow-y-auto'
-            )}
-          />
-          <div className="flex items-center gap-1.5 px-2 pb-2">
-            <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
-              <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Model</SelectLabel>
-                  <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
-                  <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
-                  <SelectItem value="claude-opus-4-6">Opus</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Select value={thinkingBudget} onValueChange={(v) => setThinkingBudget(v as ThinkingBudget)}>
-              <SelectTrigger className="w-20 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Effort</SelectLabel>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="med">Med</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <div className="ml-auto">
-              {isLoading ? (
-                <button
-                  type="button"
-                  onClick={() => window.api.abortClaude()}
-                  className="size-7 rounded-lg flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                >
-                  <Square className="size-3.5 fill-current" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={!isReady || !input.trim()}
-                  className={cn(
-                    'size-7 rounded-lg flex items-center justify-center transition-colors',
-                    isReady && input.trim()
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+      {history.showThreadList ? (
+        <ChatThreadList
+          threads={history.threads}
+          activeThreadId={history.activeThreadId}
+          onSelect={handleSwitchThread}
+          onDelete={handleDeleteThread}
+        />
+      ) : (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {messages.length === 0 && (
+              <Empty className="border-0 p-4">
+                <EmptyHeader>
+                  {isReady && (
+                    <EmptyMedia variant="icon">
+                      <BotMessageSquare />
+                    </EmptyMedia>
                   )}
-                >
-                  <ArrowUp className="size-3.5" />
-                </button>
-              )}
-            </div>
+                  <EmptyTitle className="text-sm font-medium">
+                    {isReady ? 'Start a conversation' : 'Not connected'}
+                  </EmptyTitle>
+                  <EmptyDescription className="text-xs">
+                    {isReady
+                      ? 'Describe the ontology you want to create or select a node to get context-aware suggestions.'
+                      : authMode === 'max'
+                        ? 'Claude CLI not detected. Configure in toolbar.'
+                        : 'Set your API key in the toolbar to start chatting.'}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+            {messages.map((msg, i) => (
+              <MessageBubble key={i} message={msg} />
+            ))}
+            {isLoading && (
+              <div className="flex gap-1 items-center text-xs text-muted-foreground">
+                <span className="animate-pulse">●</span>
+                <span>Claude is thinking...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        </div>
-      </form>
+
+          {/* Selection Context Badge */}
+          {selectionContext && (
+            <div className="px-3 pt-2">
+              <Badge className="inline-flex gap-1.5 px-2.5 py-1 rounded-full max-w-full text-xs font-normal h-auto bg-primary-display/10 text-primary-display border border-primary-display hover:bg-primary-display/10">
+                <span className="opacity-60">{selectionContext.type === 'class' ? '◆' : '→'}</span>
+                <span className="truncate">{selectionContext.label}</span>
+                <button
+                  onClick={() => selectionContext.type === 'class' ? setSelectedNode(null) : setSelectedEdge(null)}
+                  className="text-muted-foreground hover:text-foreground ml-0.5 shrink-0"
+                >
+                  ×
+                </button>
+              </Badge>
+            </div>
+          )}
+
+          {/* Input */}
+          <form onSubmit={handleSubmit} className="p-3 border-t border-border">
+            <div className={cn(
+              'rounded-xl border border-input bg-card transition-shadow',
+              'focus-within:ring-1 focus-within:ring-ring',
+              (!isReady || isLoading) && 'opacity-60'
+            )}>
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isReady ? 'Ask anything...' : 'Configure auth first...'}
+                disabled={!isReady || isLoading}
+                rows={1}
+                className={cn(
+                  'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm',
+                  'placeholder:text-muted-foreground focus:outline-none',
+                  'disabled:cursor-not-allowed max-h-32 overflow-y-auto'
+                )}
+              />
+              <div className="flex items-center gap-1.5 px-2 pb-2">
+                <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
+                  <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Model</SelectLabel>
+                      <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
+                      <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
+                      <SelectItem value="claude-opus-4-6">Opus</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Select value={thinkingBudget} onValueChange={(v) => setThinkingBudget(v as ThinkingBudget)}>
+                  <SelectTrigger className="w-20 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Effort</SelectLabel>
+                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="med">Med</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <div className="ml-auto">
+                  {isLoading ? (
+                    <button
+                      type="button"
+                      onClick={() => window.api.abortClaude()}
+                      className="size-7 rounded-lg flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    >
+                      <Square className="size-3.5 fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!isReady || !input.trim()}
+                      className={cn(
+                        'size-7 rounded-lg flex items-center justify-center transition-colors',
+                        isReady && input.trim()
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      )}
+                    >
+                      <ArrowUp className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   )
 }
