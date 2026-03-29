@@ -1,50 +1,50 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { usePostHog } from 'posthog-js/react'
+import { useState, useEffect } from 'react';
+import { usePostHog } from 'posthog-js/react';
 
-const CONSENT_KEY = 'ontograph-analytics-consent'
+const CONSENT_KEY = 'ontograph-analytics-consent';
 
-type ConsentState = 'granted' | 'denied' | null
+type ConsentState = 'granted' | 'denied' | null;
 
 function getStoredConsent(): ConsentState {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(CONSENT_KEY) as ConsentState
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(CONSENT_KEY) as ConsentState;
 }
 
 export function ConsentBanner() {
-  const ph = usePostHog()
-  const [consent, setConsent] = useState<ConsentState>(null)
-  const [visible, setVisible] = useState(false)
+  const ph = usePostHog();
+  const [consent, setConsent] = useState<ConsentState>(null);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const stored = getStoredConsent()
-    setConsent(stored)
-    if (!stored) setVisible(true)
-  }, [])
+    const stored = getStoredConsent();
+    setConsent(stored);
+    if (!stored) setVisible(true);
+  }, []);
 
   useEffect(() => {
-    if (!ph) return
+    if (!ph) return;
     if (consent === 'denied') {
-      ph.opt_out_capturing()
+      ph.opt_out_capturing();
     } else if (consent === 'granted') {
-      ph.opt_in_capturing()
+      ph.opt_in_capturing();
     }
-  }, [consent, ph])
+  }, [consent, ph]);
 
   function accept() {
-    localStorage.setItem(CONSENT_KEY, 'granted')
-    setConsent('granted')
-    setVisible(false)
+    localStorage.setItem(CONSENT_KEY, 'granted');
+    setConsent('granted');
+    setVisible(false);
   }
 
   function decline() {
-    localStorage.setItem(CONSENT_KEY, 'denied')
-    setConsent('denied')
-    setVisible(false)
+    localStorage.setItem(CONSENT_KEY, 'denied');
+    setConsent('denied');
+    setVisible(false);
   }
 
-  if (!visible) return null
+  if (!visible) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50 rounded-xl border border-border bg-card p-4 shadow-lg">
@@ -66,5 +66,5 @@ export function ConsentBanner() {
         </button>
       </div>
     </div>
-  )
+  );
 }

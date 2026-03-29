@@ -1,10 +1,10 @@
-import type { NextConfig } from 'next'
-import bundleAnalyzer from '@next/bundle-analyzer'
-import { withSentryConfig } from '@sentry/nextjs'
+import type { NextConfig } from 'next';
+import bundleAnalyzer from '@next/bundle-analyzer';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
-})
+});
 
 const nextConfig: NextConfig = {
   images: {
@@ -21,11 +21,11 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
 export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   silent: true,
   disableLogger: true,
-})
+});

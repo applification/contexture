@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
-import { useUIStore } from '@renderer/store/ui'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { useUIStore } from '@renderer/store/ui';
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <div data-testid="handle" />,
   Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
-  NodeResizer: () => null
-}))
+  NodeResizer: () => null,
+}));
 
-const { ClassNode } = await import('@renderer/components/graph/nodes/ClassNode')
+const { ClassNode } = await import('@renderer/components/graph/nodes/ClassNode');
 
 function resetStore() {
   useUIStore.setState({
@@ -19,14 +19,14 @@ function resetStore() {
       showDisjointWith: true,
       showObjectProperties: true,
       showDatatypeProperties: true,
-      minDegree: 0
-    }
-  })
+      minDegree: 0,
+    },
+  });
 }
 
 describe('ClassNode', () => {
-  beforeEach(resetStore)
-  afterEach(cleanup)
+  beforeEach(resetStore);
+  afterEach(cleanup);
 
   it('renders class label', () => {
     render(
@@ -44,10 +44,10 @@ describe('ClassNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    expect(screen.getByText('Person')).toBeInTheDocument()
-  })
+      />,
+    );
+    expect(screen.getByText('Person')).toBeInTheDocument();
+  });
 
   it('renders datatype properties when filter enabled', () => {
     render(
@@ -56,9 +56,7 @@ describe('ClassNode', () => {
         data={{
           label: 'Person',
           uri: 'http://ex/Person',
-          datatypeProperties: [
-            { uri: 'http://ex/name', label: 'name', range: 'string' }
-          ]
+          datatypeProperties: [{ uri: 'http://ex/name', label: 'name', range: 'string' }],
         }}
         type="class"
         dragging={false}
@@ -71,11 +69,11 @@ describe('ClassNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    expect(screen.getByText('name')).toBeInTheDocument()
-    expect(screen.getByText('string')).toBeInTheDocument()
-  })
+      />,
+    );
+    expect(screen.getByText('name')).toBeInTheDocument();
+    expect(screen.getByText('string')).toBeInTheDocument();
+  });
 
   it('hides datatype properties when filter disabled', () => {
     useUIStore.setState({
@@ -84,18 +82,16 @@ describe('ClassNode', () => {
         showDisjointWith: true,
         showObjectProperties: true,
         showDatatypeProperties: false,
-        minDegree: 0
-      }
-    })
+        minDegree: 0,
+      },
+    });
     render(
       <ClassNode
         id="http://ex/Person"
         data={{
           label: 'Person',
           uri: 'http://ex/Person',
-          datatypeProperties: [
-            { uri: 'http://ex/name', label: 'name', range: 'string' }
-          ]
+          datatypeProperties: [{ uri: 'http://ex/name', label: 'name', range: 'string' }],
         }}
         type="class"
         dragging={false}
@@ -108,13 +104,13 @@ describe('ClassNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    expect(screen.queryByText('name')).not.toBeInTheDocument()
-  })
+      />,
+    );
+    expect(screen.queryByText('name')).not.toBeInTheDocument();
+  });
 
   it('applies selected styling', () => {
-    useUIStore.setState({ selectedNodeId: 'http://ex/Person' })
+    useUIStore.setState({ selectedNodeId: 'http://ex/Person' });
     const { container } = render(
       <ClassNode
         id="http://ex/Person"
@@ -130,14 +126,14 @@ describe('ClassNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    const node = container.querySelector('.ontograph-class-node')!
-    expect(node.getAttribute('style')).toContain('selected')
-  })
+      />,
+    );
+    const node = container.querySelector('.ontograph-class-node')!;
+    expect(node.getAttribute('style')).toContain('selected');
+  });
 
   it('dims non-selected non-adjacent nodes when something is selected', () => {
-    useUIStore.setState({ selectedNodeId: 'http://ex/Other', adjacentNodeIds: [] })
+    useUIStore.setState({ selectedNodeId: 'http://ex/Other', adjacentNodeIds: [] });
     const { container } = render(
       <ClassNode
         id="http://ex/Person"
@@ -153,9 +149,9 @@ describe('ClassNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    const node = container.querySelector('.ontograph-class-node')!
-    expect(node.getAttribute('style')).toContain('opacity: 0.2')
-  })
-})
+      />,
+    );
+    const node = container.querySelector('.ontograph-class-node')!;
+    expect(node.getAttribute('style')).toContain('opacity: 0.2');
+  });
+});

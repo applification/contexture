@@ -1,18 +1,18 @@
-import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { memo } from 'react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 // Floating edges use useInternalNode to compute real intersection points,
 // so handles are invisible and centered — they exist only for RF's connection model.
-import { useUIStore } from '@renderer/store/ui'
-import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow'
+import { useUIStore } from '@renderer/store/ui';
+import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow';
 
 export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNodeType>) {
-  const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties)
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
-  const adjacentNodeIds = useUIStore((s) => s.adjacentNodeIds)
-  const isSelected = selectedNodeId === id
-  const isAdjacent = !isSelected && adjacentNodeIds.includes(id)
-  const isDimmed = selectedNodeId !== null && !isSelected && !isAdjacent
-  const hasErrors = data.errorCount > 0
+  const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties);
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
+  const adjacentNodeIds = useUIStore((s) => s.adjacentNodeIds);
+  const isSelected = selectedNodeId === id;
+  const isAdjacent = !isSelected && adjacentNodeIds.includes(id);
+  const isDimmed = selectedNodeId !== null && !isSelected && !isAdjacent;
+  const hasErrors = data.errorCount > 0;
 
   return (
     <div
@@ -33,11 +33,19 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
         boxShadow: '0 2px 8px oklch(0 0 0 / 0.15), 0 0 1px oklch(0 0 0 / 0.1)',
         background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent',
         opacity: isDimmed ? 0.2 : 1,
-        transition: 'opacity 0.15s ease'
+        transition: 'opacity 0.15s ease',
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0, top: '50%', left: '50%' }} />
-      <Handle type="source" position={Position.Left} style={{ opacity: 0, top: '50%', left: '50%' }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ opacity: 0, top: '50%', left: '50%' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        style={{ opacity: 0, top: '50%', left: '50%' }}
+      />
 
       <div
         style={{
@@ -52,7 +60,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
           textOverflow: 'ellipsis',
           display: 'flex',
           alignItems: 'center',
-          gap: 6
+          gap: 6,
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.label}</span>
@@ -73,7 +81,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
                   background: 'var(--destructive)',
                   color: 'var(--destructive-foreground)',
                   padding: '0 4px',
-                  lineHeight: 1
+                  lineHeight: 1,
                 }}
               >
                 {data.errorCount}
@@ -94,7 +102,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
                   background: 'oklch(0.75 0.18 85)',
                   color: 'oklch(0.25 0.05 85)',
                   padding: '0 4px',
-                  lineHeight: 1
+                  lineHeight: 1,
                 }}
               >
                 {data.warningCount}
@@ -108,7 +116,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
         <div
           style={{
             padding: '4px 0',
-            background: 'var(--graph-node-body-bg)'
+            background: 'var(--graph-node-body-bg)',
           }}
         >
           {data.datatypeProperties.map((prop) => (
@@ -120,15 +128,17 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
                 alignItems: 'center',
                 padding: '2px 10px',
                 fontSize: 10,
-                gap: 8
+                gap: 8,
               }}
             >
-              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>{prop.label}</span>
+              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
+                {prop.label}
+              </span>
               <span
                 style={{
                   color: 'var(--graph-edge-property)',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 9
+                  fontSize: 9,
                 }}
               >
                 {prop.range}
@@ -138,5 +148,5 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
         </div>
       )}
     </div>
-  )
-})
+  );
+});

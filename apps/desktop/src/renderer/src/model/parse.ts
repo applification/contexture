@@ -1,11 +1,11 @@
-import { Parser, type Quad } from 'n3'
-import type { Ontology, OntologyClass, ObjectProperty, DatatypeProperty } from './types'
-import { createEmptyOntology } from './types'
+import { Parser, type Quad } from 'n3';
+import type { Ontology, OntologyClass, ObjectProperty, DatatypeProperty } from './types';
+import { createEmptyOntology } from './types';
 
-const OWL = 'http://www.w3.org/2002/07/owl#'
-const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-const RDFS = 'http://www.w3.org/2000/01/rdf-schema#'
-const XSD = 'http://www.w3.org/2001/XMLSchema#'
+const OWL = 'http://www.w3.org/2002/07/owl#';
+const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
+const XSD = 'http://www.w3.org/2001/XMLSchema#';
 
 const XSD_DATATYPES = new Set([
   `${XSD}string`,
@@ -23,211 +23,218 @@ const XSD_DATATYPES = new Set([
   `${XSD}time`,
   `${XSD}anyURI`,
   `${XSD}nonNegativeInteger`,
-  `${XSD}positiveInteger`
-])
+  `${XSD}positiveInteger`,
+]);
 
 function isDatatypeURI(uri: string): boolean {
-  return XSD_DATATYPES.has(uri) || uri.startsWith(XSD)
+  return XSD_DATATYPES.has(uri) || uri.startsWith(XSD);
 }
 
 function getOrCreateClass(ontology: Ontology, uri: string): OntologyClass {
-  let cls = ontology.classes.get(uri)
+  let cls = ontology.classes.get(uri);
   if (!cls) {
-    cls = { uri, subClassOf: [], disjointWith: [] }
-    ontology.classes.set(uri, cls)
+    cls = { uri, subClassOf: [], disjointWith: [] };
+    ontology.classes.set(uri, cls);
   }
-  return cls
+  return cls;
 }
 
 function getOrCreateObjectProperty(ontology: Ontology, uri: string): ObjectProperty {
-  let prop = ontology.objectProperties.get(uri)
+  let prop = ontology.objectProperties.get(uri);
   if (!prop) {
-    prop = { uri, domain: [], range: [] }
-    ontology.objectProperties.set(uri, prop)
+    prop = { uri, domain: [], range: [] };
+    ontology.objectProperties.set(uri, prop);
   }
-  return prop
+  return prop;
 }
 
 function getOrCreateDatatypeProperty(ontology: Ontology, uri: string): DatatypeProperty {
-  let prop = ontology.datatypeProperties.get(uri)
+  let prop = ontology.datatypeProperties.get(uri);
   if (!prop) {
-    prop = { uri, domain: [], range: `${XSD}string` }
-    ontology.datatypeProperties.set(uri, prop)
+    prop = { uri, domain: [], range: `${XSD}string` };
+    ontology.datatypeProperties.set(uri, prop);
   }
-  return prop
+  return prop;
 }
 
 export interface ParseWarning {
-  message: string
-  severity: 'error' | 'warning'
+  message: string;
+  severity: 'error' | 'warning';
 }
 
 export interface ParseResult {
-  ontology: Ontology
-  warnings: ParseWarning[]
+  ontology: Ontology;
+  warnings: ParseWarning[];
 }
 
 export function parseTurtle(turtle: string): Ontology {
-  return parseTurtleWithWarnings(turtle).ontology
+  return parseTurtleWithWarnings(turtle).ontology;
 }
 
 export function parseTurtleWithWarnings(turtle: string): ParseResult {
-  const warnings: ParseWarning[] = []
-  let quads: Quad[]
+  const warnings: ParseWarning[] = [];
+  let quads: Quad[];
 
   try {
-    const parser = new Parser()
-    quads = parser.parse(turtle)
+    const parser = new Parser();
+    quads = parser.parse(turtle);
 
     // Merge prefixes from parser
-    var prefixes = (parser as unknown as { _prefixes: Record<string, string> })._prefixes
+    var prefixes = (parser as unknown as { _prefixes: Record<string, string> })._prefixes;
   } catch (err: unknown) {
     warnings.push({
       severity: 'error',
-      message: `Turtle parse error: ${(err as Error).message}`
-    })
-    return { ontology: createEmptyOntology(), warnings }
+      message: `Turtle parse error: ${(err as Error).message}`,
+    });
+    return { ontology: createEmptyOntology(), warnings };
   }
 
-  const ontology = createEmptyOntology()
+  const ontology = createEmptyOntology();
 
   if (prefixes) {
     for (const [prefix, iri] of Object.entries(prefixes)) {
-      if (prefix) ontology.prefixes.set(prefix, iri)
+      if (prefix) ontology.prefixes.set(prefix, iri);
     }
   }
 
   // Track declared types to distinguish ObjectProperty from DatatypeProperty
-  const declaredTypes = new Map<string, string>()
+  const declaredTypes = new Map<string, string>();
 
   // First pass: collect type declarations
   for (const quad of quads) {
-    const s = quad.subject.value
-    const p = quad.predicate.value
-    const o = quad.object.value
+    const s = quad.subject.value;
+    const p = quad.predicate.value;
+    const o = quad.object.value;
 
     if (p === `${RDF}type`) {
-      declaredTypes.set(s, o)
+      declaredTypes.set(s, o);
 
       if (o === `${OWL}Class`) {
-        getOrCreateClass(ontology, s)
+        getOrCreateClass(ontology, s);
       } else if (o === `${OWL}ObjectProperty`) {
-        getOrCreateObjectProperty(ontology, s)
+        getOrCreateObjectProperty(ontology, s);
       } else if (o === `${OWL}DatatypeProperty`) {
-        getOrCreateDatatypeProperty(ontology, s)
+        getOrCreateDatatypeProperty(ontology, s);
       }
     }
   }
 
   // Second pass: process properties and relationships
   for (const quad of quads) {
-    const s = quad.subject.value
-    const p = quad.predicate.value
-    const o = quad.object.value
+    const s = quad.subject.value;
+    const p = quad.predicate.value;
+    const o = quad.object.value;
 
-    if (p === `${RDF}type`) continue
+    if (p === `${RDF}type`) continue;
 
     if (p === `${RDFS}label`) {
-      const literal = quad.object.termType === 'Literal' ? quad.object.value : o
+      const literal = quad.object.termType === 'Literal' ? quad.object.value : o;
       if (ontology.classes.has(s)) {
-        ontology.classes.get(s)!.label = literal
+        ontology.classes.get(s)!.label = literal;
       } else if (ontology.objectProperties.has(s)) {
-        ontology.objectProperties.get(s)!.label = literal
+        ontology.objectProperties.get(s)!.label = literal;
       } else if (ontology.datatypeProperties.has(s)) {
-        ontology.datatypeProperties.get(s)!.label = literal
+        ontology.datatypeProperties.get(s)!.label = literal;
       }
-      continue
+      continue;
     }
 
     if (p === `${RDFS}comment`) {
-      const literal = quad.object.termType === 'Literal' ? quad.object.value : o
+      const literal = quad.object.termType === 'Literal' ? quad.object.value : o;
       if (ontology.classes.has(s)) {
-        ontology.classes.get(s)!.comment = literal
+        ontology.classes.get(s)!.comment = literal;
       } else if (ontology.objectProperties.has(s)) {
-        ontology.objectProperties.get(s)!.comment = literal
+        ontology.objectProperties.get(s)!.comment = literal;
       } else if (ontology.datatypeProperties.has(s)) {
-        ontology.datatypeProperties.get(s)!.comment = literal
+        ontology.datatypeProperties.get(s)!.comment = literal;
       }
-      continue
+      continue;
     }
 
     if (p === `${RDFS}subClassOf`) {
-      const cls = getOrCreateClass(ontology, s)
-      getOrCreateClass(ontology, o)
+      const cls = getOrCreateClass(ontology, s);
+      getOrCreateClass(ontology, o);
       if (!cls.subClassOf.includes(o)) {
-        cls.subClassOf.push(o)
+        cls.subClassOf.push(o);
       }
-      continue
+      continue;
     }
 
     if (p === `${OWL}disjointWith`) {
-      const cls = getOrCreateClass(ontology, s)
+      const cls = getOrCreateClass(ontology, s);
       if (!cls.disjointWith.includes(o)) {
-        cls.disjointWith.push(o)
+        cls.disjointWith.push(o);
       }
-      continue
+      continue;
     }
 
     if (p === `${RDFS}domain`) {
-      getOrCreateClass(ontology, o)
+      getOrCreateClass(ontology, o);
       if (ontology.objectProperties.has(s)) {
-        const prop = ontology.objectProperties.get(s)!
-        if (!prop.domain.includes(o)) prop.domain.push(o)
+        const prop = ontology.objectProperties.get(s)!;
+        if (!prop.domain.includes(o)) prop.domain.push(o);
       } else if (ontology.datatypeProperties.has(s)) {
-        const prop = ontology.datatypeProperties.get(s)!
-        if (!prop.domain.includes(o)) prop.domain.push(o)
+        const prop = ontology.datatypeProperties.get(s)!;
+        if (!prop.domain.includes(o)) prop.domain.push(o);
       }
-      continue
+      continue;
     }
 
     if (p === `${RDFS}range`) {
       if (ontology.objectProperties.has(s)) {
-        const prop = ontology.objectProperties.get(s)!
-        getOrCreateClass(ontology, o)
-        if (!prop.range.includes(o)) prop.range.push(o)
+        const prop = ontology.objectProperties.get(s)!;
+        getOrCreateClass(ontology, o);
+        if (!prop.range.includes(o)) prop.range.push(o);
       } else if (ontology.datatypeProperties.has(s)) {
-        ontology.datatypeProperties.get(s)!.range = o
+        ontology.datatypeProperties.get(s)!.range = o;
       } else if (isDatatypeURI(o)) {
         // Undeclared property with datatype range — treat as DatatypeProperty
-        const prop = getOrCreateDatatypeProperty(ontology, s)
-        prop.range = o
+        const prop = getOrCreateDatatypeProperty(ontology, s);
+        prop.range = o;
       }
-      continue
+      continue;
     }
 
     if (p === `${OWL}inverseOf`) {
       if (ontology.objectProperties.has(s)) {
-        ontology.objectProperties.get(s)!.inverseOf = o
+        ontology.objectProperties.get(s)!.inverseOf = o;
       }
-      continue
+      continue;
     }
   }
 
   // Detect unsupported OWL constructs
-  const unsupported = new Set<string>()
+  const unsupported = new Set<string>();
   const UNSUPPORTED_TYPES = [
-    `${OWL}Restriction`, `${OWL}AllDifferent`, `${OWL}AnnotationProperty`,
-    `${OWL}NamedIndividual`, `${OWL}Ontology`
-  ]
+    `${OWL}Restriction`,
+    `${OWL}AllDifferent`,
+    `${OWL}AnnotationProperty`,
+    `${OWL}NamedIndividual`,
+    `${OWL}Ontology`,
+  ];
   for (const quad of quads) {
     if (quad.predicate.value === `${RDF}type` && UNSUPPORTED_TYPES.includes(quad.object.value)) {
-      const name = quad.object.value.split('#').pop() || quad.object.value
-      unsupported.add(name)
+      const name = quad.object.value.split('#').pop() || quad.object.value;
+      unsupported.add(name);
     }
   }
   if (unsupported.size > 0) {
     warnings.push({
       severity: 'warning',
-      message: `Unsupported OWL constructs ignored: ${[...unsupported].join(', ')}`
-    })
+      message: `Unsupported OWL constructs ignored: ${[...unsupported].join(', ')}`,
+    });
   }
 
-  if (ontology.classes.size === 0 && ontology.objectProperties.size === 0 && ontology.datatypeProperties.size === 0) {
+  if (
+    ontology.classes.size === 0 &&
+    ontology.objectProperties.size === 0 &&
+    ontology.datatypeProperties.size === 0
+  ) {
     warnings.push({
       severity: 'warning',
-      message: 'No OWL classes or properties found in this file'
-    })
+      message: 'No OWL classes or properties found in this file',
+    });
   }
 
-  return { ontology, warnings }
+  return { ontology, warnings };
 }

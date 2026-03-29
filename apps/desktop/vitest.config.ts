@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config'
-import { resolve } from 'path'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
@@ -14,14 +14,14 @@ export default defineConfig({
       exclude: [
         'src/renderer/src/main.tsx',
         'src/renderer/src/env.d.ts',
-        'src/renderer/src/components/ui/**'
-      ]
-    }
+        'src/renderer/src/components/ui/**',
+      ],
+    },
   },
   resolve: {
     alias: {
       '@renderer': resolve('src/renderer/src'),
-      '@': resolve('src/renderer/src')
-    }
-  }
-})
+      '@': resolve('src/renderer/src'),
+    },
+  },
+});

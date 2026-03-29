@@ -1,31 +1,32 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
-import { initPostHog, posthog } from '@/lib/posthog'
-import { captureAttribution } from '@/lib/attribution'
+import { useEffect } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
+import { initPostHog, posthog } from '@/lib/posthog';
+import { captureAttribution } from '@/lib/attribution';
 
 function PostHogPageView() {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const ph = usePostHog()
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const ph = usePostHog();
 
   useEffect(() => {
-    if (!pathname || !ph) return
-    const url = window.origin + pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
-    ph.capture('$pageview', { $current_url: url })
-  }, [pathname, searchParams, ph])
+    if (!pathname || !ph) return;
+    const url =
+      window.origin + pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '');
+    ph.capture('$pageview', { $current_url: url });
+  }, [pathname, searchParams, ph]);
 
-  return null
+  return null;
 }
 
 function PostHogInit() {
   useEffect(() => {
-    initPostHog()
-    captureAttribution()
-  }, [])
-  return null
+    initPostHog();
+    captureAttribution();
+  }, []);
+  return null;
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
@@ -35,5 +36,5 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       <PostHogPageView />
       {children}
     </PHProvider>
-  )
+  );
 }

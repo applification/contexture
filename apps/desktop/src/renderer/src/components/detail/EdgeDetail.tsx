@@ -1,22 +1,22 @@
-import type { ObjectProperty } from '@renderer/model/types'
-import { useOntologyStore } from '@renderer/store/ontology'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import type { ObjectProperty } from '@renderer/model/types';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 interface Props {
-  property: ObjectProperty
-  type: 'objectProperty'
+  property: ObjectProperty;
+  type: 'objectProperty';
 }
 
 function localName(uri: string): string {
-  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
-  return idx >= 0 ? uri.substring(idx + 1) : uri
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
 }
 
 export function EdgeDetail({ property }: Props): React.JSX.Element {
-  const updateObjectProperty = useOntologyStore((s) => s.updateObjectProperty)
-  const ontology = useOntologyStore((s) => s.ontology)
+  const updateObjectProperty = useOntologyStore((s) => s.updateObjectProperty);
+  const ontology = useOntologyStore((s) => s.ontology);
 
   return (
     <div className="p-3 space-y-4 text-sm">
@@ -32,7 +32,9 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
           id="prop-label"
           defaultValue={property.label || ''}
           onBlur={(e) => updateObjectProperty(property.uri, { label: e.target.value || undefined })}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
         />
       </div>
 
@@ -66,7 +68,9 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
         <div className="text-xs text-muted-foreground">Cardinality</div>
         <div className="flex items-center gap-2">
           <div className="flex-1 space-y-1">
-            <Label htmlFor="prop-min-card" className="text-xs">Min</Label>
+            <Label htmlFor="prop-min-card" className="text-xs">
+              Min
+            </Label>
             <Input
               id="prop-min-card"
               type="number"
@@ -74,17 +78,21 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
               placeholder="—"
               defaultValue={property.minCardinality ?? ''}
               onBlur={(e) => {
-                const val = e.target.value.trim()
+                const val = e.target.value.trim();
                 updateObjectProperty(property.uri, {
-                  minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10))
-                })
+                  minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)),
+                });
               }}
-              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
               className="h-8 text-xs"
             />
           </div>
           <div className="flex-1 space-y-1">
-            <Label htmlFor="prop-max-card" className="text-xs">Max</Label>
+            <Label htmlFor="prop-max-card" className="text-xs">
+              Max
+            </Label>
             <Input
               id="prop-max-card"
               type="number"
@@ -92,12 +100,14 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
               placeholder="∞"
               defaultValue={property.maxCardinality ?? ''}
               onBlur={(e) => {
-                const val = e.target.value.trim()
+                const val = e.target.value.trim();
                 updateObjectProperty(property.uri, {
-                  maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10))
-                })
+                  maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)),
+                });
               }}
-              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
               className="h-8 text-xs"
             />
           </div>
@@ -108,10 +118,11 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
         <div>
           <div className="text-xs text-muted-foreground mb-0.5">Inverse of</div>
           <Badge variant="secondary" className="text-xs font-normal">
-            {ontology.objectProperties.get(property.inverseOf)?.label || localName(property.inverseOf)}
+            {ontology.objectProperties.get(property.inverseOf)?.label ||
+              localName(property.inverseOf)}
           </Badge>
         </div>
       )}
     </div>
-  )
+  );
 }

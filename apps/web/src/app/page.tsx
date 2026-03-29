@@ -1,21 +1,45 @@
-import Image from 'next/image'
-import { Brain, GitGraph, Shield, Zap, Download, ArrowRight, Layers, Network } from 'lucide-react'
-import { ThemeImage } from '@/components/ui/theme-image'
-import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler'
-import { MobileNav } from '@/components/ui/mobile-nav'
-import { TrackedLink } from '@/components/tracked-link'
+import Image from 'next/image';
+import { Brain, GitGraph, Shield, Zap, Download, ArrowRight, Layers, Network } from 'lucide-react';
+import { ThemeImage } from '@/components/ui/theme-image';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { MobileNav } from '@/components/ui/mobile-nav';
+import { TrackedLink } from '@/components/tracked-link';
 
 function LogoMark({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none">
-      <line x1="8" y1="24" x2="24" y2="24" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
-      <line x1="8" y1="24" x2="16" y2="8" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
-      <line x1="24" y1="24" x2="16" y2="8" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round"/>
-      <circle cx="16" cy="8" r="3.5" fill="var(--primary)"/>
-      <circle cx="8" cy="24" r="3.5" fill="var(--primary)"/>
-      <circle cx="24" cy="24" r="3.5" fill="var(--accent)"/>
+      <line
+        x1="8"
+        y1="24"
+        x2="24"
+        y2="24"
+        stroke="var(--primary)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <line
+        x1="8"
+        y1="24"
+        x2="16"
+        y2="8"
+        stroke="var(--primary)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <line
+        x1="24"
+        y1="24"
+        x2="16"
+        y2="8"
+        stroke="var(--primary)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="16" cy="8" r="3.5" fill="var(--primary)" />
+      <circle cx="8" cy="24" r="3.5" fill="var(--primary)" />
+      <circle cx="24" cy="24" r="3.5" fill="var(--accent)" />
     </svg>
-  )
+  );
 }
 
 function GithubIcon({ className }: { className?: string }) {
@@ -23,7 +47,7 @@ function GithubIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
     </svg>
-  )
+  );
 }
 
 function AnimatedNodes() {
@@ -35,74 +59,266 @@ function AnimatedNodes() {
       preserveAspectRatio="xMidYMid slice"
     >
       {/* Animated connection lines */}
-      <line x1="200" y1="150" x2="450" y2="280" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.15" />
-      <line x1="450" y1="280" x2="700" y2="180" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.12" />
-      <line x1="700" y1="180" x2="950" y2="320" className="animate-edge-pulse" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.12" />
-      <line x1="450" y1="280" x2="350" y2="500" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.1" />
-      <line x1="700" y1="180" x2="850" y2="520" className="animate-edge-pulse" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.1" />
-      <line x1="200" y1="150" x2="100" y2="400" className="animate-edge-pulse-delay" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
-      <line x1="950" y1="320" x2="1100" y2="500" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
-      <line x1="350" y1="500" x2="600" y2="600" className="animate-edge-pulse-delay" stroke="var(--accent)" strokeWidth="1" strokeOpacity="0.08" />
-      <line x1="850" y1="520" x2="600" y2="600" className="animate-edge-pulse" stroke="var(--primary)" strokeWidth="1" strokeOpacity="0.08" />
+      <line
+        x1="200"
+        y1="150"
+        x2="450"
+        y2="280"
+        className="animate-edge-pulse"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.15"
+      />
+      <line
+        x1="450"
+        y1="280"
+        x2="700"
+        y2="180"
+        className="animate-edge-pulse-delay"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.12"
+      />
+      <line
+        x1="700"
+        y1="180"
+        x2="950"
+        y2="320"
+        className="animate-edge-pulse"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        strokeOpacity="0.12"
+      />
+      <line
+        x1="450"
+        y1="280"
+        x2="350"
+        y2="500"
+        className="animate-edge-pulse-delay"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.1"
+      />
+      <line
+        x1="700"
+        y1="180"
+        x2="850"
+        y2="520"
+        className="animate-edge-pulse"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        strokeOpacity="0.1"
+      />
+      <line
+        x1="200"
+        y1="150"
+        x2="100"
+        y2="400"
+        className="animate-edge-pulse-delay"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.08"
+      />
+      <line
+        x1="950"
+        y1="320"
+        x2="1100"
+        y2="500"
+        className="animate-edge-pulse"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.08"
+      />
+      <line
+        x1="350"
+        y1="500"
+        x2="600"
+        y2="600"
+        className="animate-edge-pulse-delay"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        strokeOpacity="0.08"
+      />
+      <line
+        x1="850"
+        y1="520"
+        x2="600"
+        y2="600"
+        className="animate-edge-pulse"
+        stroke="var(--primary)"
+        strokeWidth="1"
+        strokeOpacity="0.08"
+      />
 
       {/* Animated nodes — floating gently */}
-      <circle cx="200" cy="150" r="6" fill="var(--primary)" fillOpacity="0.2" className="animate-node-float" />
-      <circle cx="200" cy="150" r="3" fill="var(--primary)" fillOpacity="0.4" className="animate-node-float" />
+      <circle
+        cx="200"
+        cy="150"
+        r="6"
+        fill="var(--primary)"
+        fillOpacity="0.2"
+        className="animate-node-float"
+      />
+      <circle
+        cx="200"
+        cy="150"
+        r="3"
+        fill="var(--primary)"
+        fillOpacity="0.4"
+        className="animate-node-float"
+      />
 
-      <circle cx="450" cy="280" r="8" fill="var(--accent)" fillOpacity="0.15" className="animate-node-float-delay" />
-      <circle cx="450" cy="280" r="4" fill="var(--accent)" fillOpacity="0.35" className="animate-node-float-delay" />
+      <circle
+        cx="450"
+        cy="280"
+        r="8"
+        fill="var(--accent)"
+        fillOpacity="0.15"
+        className="animate-node-float-delay"
+      />
+      <circle
+        cx="450"
+        cy="280"
+        r="4"
+        fill="var(--accent)"
+        fillOpacity="0.35"
+        className="animate-node-float-delay"
+      />
 
-      <circle cx="700" cy="180" r="7" fill="var(--primary)" fillOpacity="0.18" className="animate-node-float-slow" />
-      <circle cx="700" cy="180" r="3.5" fill="var(--primary)" fillOpacity="0.35" className="animate-node-float-slow" />
+      <circle
+        cx="700"
+        cy="180"
+        r="7"
+        fill="var(--primary)"
+        fillOpacity="0.18"
+        className="animate-node-float-slow"
+      />
+      <circle
+        cx="700"
+        cy="180"
+        r="3.5"
+        fill="var(--primary)"
+        fillOpacity="0.35"
+        className="animate-node-float-slow"
+      />
 
-      <circle cx="950" cy="320" r="5" fill="var(--accent)" fillOpacity="0.2" className="animate-node-float" />
-      <circle cx="950" cy="320" r="2.5" fill="var(--accent)" fillOpacity="0.4" className="animate-node-float" />
+      <circle
+        cx="950"
+        cy="320"
+        r="5"
+        fill="var(--accent)"
+        fillOpacity="0.2"
+        className="animate-node-float"
+      />
+      <circle
+        cx="950"
+        cy="320"
+        r="2.5"
+        fill="var(--accent)"
+        fillOpacity="0.4"
+        className="animate-node-float"
+      />
 
-      <circle cx="350" cy="500" r="5" fill="var(--primary)" fillOpacity="0.12" className="animate-node-float-delay" />
-      <circle cx="350" cy="500" r="2.5" fill="var(--primary)" fillOpacity="0.25" className="animate-node-float-delay" />
+      <circle
+        cx="350"
+        cy="500"
+        r="5"
+        fill="var(--primary)"
+        fillOpacity="0.12"
+        className="animate-node-float-delay"
+      />
+      <circle
+        cx="350"
+        cy="500"
+        r="2.5"
+        fill="var(--primary)"
+        fillOpacity="0.25"
+        className="animate-node-float-delay"
+      />
 
-      <circle cx="850" cy="520" r="6" fill="var(--accent)" fillOpacity="0.1" className="animate-node-float-slow" />
-      <circle cx="850" cy="520" r="3" fill="var(--accent)" fillOpacity="0.2" className="animate-node-float-slow" />
+      <circle
+        cx="850"
+        cy="520"
+        r="6"
+        fill="var(--accent)"
+        fillOpacity="0.1"
+        className="animate-node-float-slow"
+      />
+      <circle
+        cx="850"
+        cy="520"
+        r="3"
+        fill="var(--accent)"
+        fillOpacity="0.2"
+        className="animate-node-float-slow"
+      />
 
-      <circle cx="100" cy="400" r="4" fill="var(--primary)" fillOpacity="0.08" className="animate-node-float" />
-      <circle cx="1100" cy="500" r="4" fill="var(--primary)" fillOpacity="0.08" className="animate-node-float-delay" />
-      <circle cx="600" cy="600" r="5" fill="var(--accent)" fillOpacity="0.1" className="animate-node-float-slow" />
+      <circle
+        cx="100"
+        cy="400"
+        r="4"
+        fill="var(--primary)"
+        fillOpacity="0.08"
+        className="animate-node-float"
+      />
+      <circle
+        cx="1100"
+        cy="500"
+        r="4"
+        fill="var(--primary)"
+        fillOpacity="0.08"
+        className="animate-node-float-delay"
+      />
+      <circle
+        cx="600"
+        cy="600"
+        r="5"
+        fill="var(--accent)"
+        fillOpacity="0.1"
+        className="animate-node-float-slow"
+      />
     </svg>
-  )
+  );
 }
 
 const features = [
   {
     icon: GitGraph,
     title: 'Visual Graph Editor',
-    description: 'See your ontology as a living, interactive graph. Drag nodes, draw connections, and explore complex hierarchies on an intuitive canvas.',
+    description:
+      'See your ontology as a living, interactive graph. Drag nodes, draw connections, and explore complex hierarchies on an intuitive canvas.',
   },
   {
     icon: Brain,
     title: 'AI-First Creation',
-    description: 'Build ontologies through conversation with an AI that understands OWL semantics. From natural language to formal ontology in minutes.',
+    description:
+      'Build ontologies through conversation with an AI that understands OWL semantics. From natural language to formal ontology in minutes.',
   },
   {
     icon: Network,
     title: 'Built for the AI Stack',
-    description: 'Create ontologies that plug into RAG pipelines, context graphs, and agent architectures. The missing tool between your data and your AI agents.',
+    description:
+      'Create ontologies that plug into RAG pipelines, context graphs, and agent architectures. The missing tool between your data and your AI agents.',
   },
   {
     icon: Zap,
     title: 'AI-Powered Validation',
-    description: 'AI-powered quality scoring catches gaps and inconsistencies as you build. Coverage, consistency, and completeness analysis in real time.',
+    description:
+      'AI-powered quality scoring catches gaps and inconsistencies as you build. Coverage, consistency, and completeness analysis in real time.',
   },
   {
     icon: Shield,
     title: 'Standards-First',
-    description: 'Full OWL/RDF/Turtle support with zero vendor lock-in. Import existing ontologies, export to any format.',
+    description:
+      'Full OWL/RDF/Turtle support with zero vendor lock-in. Import existing ontologies, export to any format.',
   },
   {
     icon: Layers,
     title: 'Open Source & Free',
-    description: 'MIT licensed and free forever. Built in the open by engineers who believe knowledge infrastructure should be accessible to everyone.',
+    description:
+      'MIT licensed and free forever. Built in the open by engineers who believe knowledge infrastructure should be accessible to everyone.',
   },
-]
+];
 
 export default function Home() {
   return (
@@ -115,9 +331,18 @@ export default function Home() {
             Ontograph
           </span>
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="/brand" className="hover:text-foreground transition-colors">Brand</a>
-            <TrackedLink event="github_click" properties={{ location: 'nav' }} href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+            <a href="#features" className="hover:text-foreground transition-colors">
+              Features
+            </a>
+            <a href="/brand" className="hover:text-foreground transition-colors">
+              Brand
+            </a>
+            <TrackedLink
+              event="github_click"
+              properties={{ location: 'nav' }}
+              href="https://github.com/DaveHudson/Ontograph"
+              className="hover:text-foreground transition-colors flex items-center gap-1.5"
+            >
               <GithubIcon className="size-4" />
               GitHub
             </TrackedLink>
@@ -208,7 +433,10 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
+      <section
+        id="features"
+        className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
+      >
         <div className="hidden sm:block absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto">
@@ -217,8 +445,9 @@ export default function Home() {
               The ontology editor built for the AI era
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Create ontologies that ground your AI — not guesswork.
-              Built for AI Product Engineers, knowledge architects, and anyone building the next generation of intelligent applications.
+              Create ontologies that ground your AI — not guesswork. Built for AI Product Engineers,
+              knowledge architects, and anyone building the next generation of intelligent
+              applications.
             </p>
           </div>
 
@@ -232,7 +461,9 @@ export default function Home() {
                   <feature.icon className="size-5 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -269,9 +500,9 @@ export default function Home() {
               </span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Create the structured knowledge that powers reliable AI — through conversation, not configuration.
-              The AI understands OWL semantics and can suggest refinements, find inconsistencies,
-              and help you think through your domain model.
+              Create the structured knowledge that powers reliable AI — through conversation, not
+              configuration. The AI understands OWL semantics and can suggest refinements, find
+              inconsistencies, and help you think through your domain model.
             </p>
           </div>
 
@@ -288,32 +519,36 @@ export default function Home() {
               />
             </div>
             <div className="sm:col-span-3 space-y-6">
-              <h3 className="text-2xl font-bold tracking-tight">
-                AI-powered quality scoring
-              </h3>
+              <h3 className="text-2xl font-bold tracking-tight">AI-powered quality scoring</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Get instant feedback on your ontology&apos;s quality. The validation engine
-                scores coverage, consistency, and completeness — then suggests specific
-                improvements you can queue for automated refinement.
+                Get instant feedback on your ontology&apos;s quality. The validation engine scores
+                coverage, consistency, and completeness — then suggests specific improvements you
+                can queue for automated refinement.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Zap className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">Coverage analysis across all domain areas</span>
+                  <span className="text-muted-foreground">
+                    Coverage analysis across all domain areas
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Shield className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">Consistency checks for vocabulary and class links</span>
+                  <span className="text-muted-foreground">
+                    Consistency checks for vocabulary and class links
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Brain className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">Actionable suggestions to improve your model</span>
+                  <span className="text-muted-foreground">
+                    Actionable suggestions to improve your model
+                  </span>
                 </div>
               </div>
             </div>
@@ -321,10 +556,12 @@ export default function Home() {
 
           {/* Chat example */}
           <div className="max-w-3xl mx-auto rounded-xl border border-border/60 bg-card/30 p-5 sm:p-8 text-left font-mono text-sm leading-relaxed">
-            <div className="text-muted-foreground/70 text-xs uppercase tracking-wide mb-2">You:</div>
+            <div className="text-muted-foreground/70 text-xs uppercase tracking-wide mb-2">
+              You:
+            </div>
             <div className="text-foreground mb-6">
-              Create an ontology for a university with students, courses, and professors.
-              Students enroll in courses, professors teach courses.
+              Create an ontology for a university with students, courses, and professors. Students
+              enroll in courses, professors teach courses.
             </div>
             <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">Claude:</div>
             <div className="text-muted-foreground">
@@ -345,30 +582,37 @@ export default function Home() {
               Your AI agents are only as smart as the knowledge behind them
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Ontograph lets you build, visualize, and validate the structured knowledge layer that makes AI reliable.
+              Ontograph lets you build, visualize, and validate the structured knowledge layer that
+              makes AI reliable.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-8">
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">RAG Pipelines</div>
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+                RAG Pipelines
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ontology-powered RAG delivers more precise retrieval than unstructured vector search.
-                Build the knowledge graph that gives your AI the context it needs.
+                Ontology-powered RAG delivers more precise retrieval than unstructured vector
+                search. Build the knowledge graph that gives your AI the context it needs.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">AI Agents</div>
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+                AI Agents
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ground your AI agents in verified, typed knowledge. Eliminate hallucination and enable
-                explainability with formal ontology structures.
+                Ground your AI agents in verified, typed knowledge. Eliminate hallucination and
+                enable explainability with formal ontology structures.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">Context Graphs</div>
+              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+                Context Graphs
+              </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Create the structured context layer that powers intelligent applications.
-                Export to OWL/RDF and plug directly into your AI stack.
+                Create the structured context layer that powers intelligent applications. Export to
+                OWL/RDF and plug directly into your AI stack.
               </p>
             </div>
           </div>
@@ -376,7 +620,10 @@ export default function Home() {
       </section>
 
       {/* Download */}
-      <section id="download" className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
+      <section
+        id="download"
+        className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
+      >
         <div className="hidden sm:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto text-center">
@@ -416,15 +663,21 @@ export default function Home() {
             <a href="/brand" className="hover:text-foreground transition-colors">
               Brand
             </a>
-            <a href="https://github.com/DaveHudson/Ontograph" className="hover:text-foreground transition-colors">
+            <a
+              href="https://github.com/DaveHudson/Ontograph"
+              className="hover:text-foreground transition-colors"
+            >
               GitHub
             </a>
-            <a href="https://github.com/DaveHudson/Ontograph/releases" className="hover:text-foreground transition-colors">
+            <a
+              href="https://github.com/DaveHudson/Ontograph/releases"
+              className="hover:text-foreground transition-colors"
+            >
               Changelog
             </a>
           </div>
         </div>
       </footer>
     </div>
-  )
+  );
 }

@@ -1,38 +1,41 @@
-import { useEffect, useCallback } from 'react'
-import { X, Check, Loader } from 'lucide-react'
-import { useEvalStore } from '@renderer/store/eval'
-import { cn } from '@/lib/utils'
+import { useEffect, useCallback } from 'react';
+import { X, Check, Loader } from 'lucide-react';
+import { useEvalStore } from '@renderer/store/eval';
+import { cn } from '@/lib/utils';
 
 export function ImprovementHUD(): React.JSX.Element | null {
-  const improvementItems = useEvalStore((s) => s.improvementItems)
-  const improvementStatus = useEvalStore((s) => s.improvementStatus)
-  const markItemDone = useEvalStore((s) => s.markItemDone)
-  const finishImprovements = useEvalStore((s) => s.finishImprovements)
-  const dismissImprovements = useEvalStore((s) => s.dismissImprovements)
+  const improvementItems = useEvalStore((s) => s.improvementItems);
+  const improvementStatus = useEvalStore((s) => s.improvementStatus);
+  const markItemDone = useEvalStore((s) => s.markItemDone);
+  const finishImprovements = useEvalStore((s) => s.finishImprovements);
+  const dismissImprovements = useEvalStore((s) => s.dismissImprovements);
 
-  const doneCount = improvementItems.filter((i) => i.status === 'done').length
-  const total = improvementItems.length
+  const doneCount = improvementItems.filter((i) => i.status === 'done').length;
+  const total = improvementItems.length;
 
-  const handleText = useCallback((text: string) => {
-    const matches = [...text.matchAll(/✅\s*DONE:\s*(\d+)/g)]
-    for (const match of matches) {
-      const n = parseInt(match[1], 10) - 1  // convert 1-indexed to 0-indexed
-      markItemDone(n)
-    }
-  }, [markItemDone])
+  const handleText = useCallback(
+    (text: string) => {
+      const matches = [...text.matchAll(/✅\s*DONE:\s*(\d+)/g)];
+      for (const match of matches) {
+        const n = parseInt(match[1], 10) - 1; // convert 1-indexed to 0-indexed
+        markItemDone(n);
+      }
+    },
+    [markItemDone],
+  );
 
   useEffect(() => {
-    if (improvementStatus !== 'running') return
+    if (improvementStatus !== 'running') return;
 
     const cleanups = [
       window.api.onClaudeAssistantText(handleText),
       window.api.onClaudeResult(() => finishImprovements()),
-      window.api.onClaudeError(() => finishImprovements())
-    ]
-    return () => cleanups.forEach((fn) => fn())
-  }, [improvementStatus, handleText, finishImprovements])
+      window.api.onClaudeError(() => finishImprovements()),
+    ];
+    return () => cleanups.forEach((fn) => fn());
+  }, [improvementStatus, handleText, finishImprovements]);
 
-  if (improvementStatus === 'idle') return null
+  if (improvementStatus === 'idle') return null;
 
   return (
     <div className="absolute top-3 right-3 z-50 w-56 rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-lg overflow-hidden">
@@ -40,7 +43,9 @@ export function ImprovementHUD(): React.JSX.Element | null {
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-foreground">Improvements</span>
-          <span className="text-xs text-muted-foreground font-mono">{doneCount}/{total}</span>
+          <span className="text-xs text-muted-foreground font-mono">
+            {doneCount}/{total}
+          </span>
         </div>
         {improvementStatus === 'complete' && (
           <button
@@ -72,7 +77,7 @@ export function ImprovementHUD(): React.JSX.Element | null {
                 'text-xs leading-relaxed',
                 item.status === 'done' && 'text-muted-foreground line-through',
                 item.status === 'active' && 'text-foreground',
-                item.status === 'pending' && 'text-muted-foreground'
+                item.status === 'pending' && 'text-muted-foreground',
               )}
             >
               {item.text}
@@ -88,7 +93,7 @@ export function ImprovementHUD(): React.JSX.Element | null {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function StatusIcon({ status }: { status: 'pending' | 'active' | 'done' }): React.JSX.Element {
@@ -97,16 +102,14 @@ function StatusIcon({ status }: { status: 'pending' | 'active' | 'done' }): Reac
       <div className="size-4 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
         <Check className="size-2.5 text-green-500" />
       </div>
-    )
+    );
   }
   if (status === 'active') {
     return (
       <div className="size-4 rounded-full border border-primary/50 flex items-center justify-center">
         <Loader className="size-2.5 text-primary animate-spin" />
       </div>
-    )
+    );
   }
-  return (
-    <div className="size-4 rounded-full border border-border" />
-  )
+  return <div className="size-4 rounded-full border border-border" />;
 }

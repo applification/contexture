@@ -1,17 +1,17 @@
-import '@testing-library/jest-dom/vitest'
-import { vi } from 'vitest'
+import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 // Mock scrollIntoView for jsdom
-Element.prototype.scrollIntoView = vi.fn()
+Element.prototype.scrollIntoView = vi.fn();
 
 // Mock ResizeObserver for jsdom
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
-  disconnect: vi.fn()
-}))
+  disconnect: vi.fn(),
+}));
 
-const noop = () => () => {}
+const noop = () => () => {};
 
 // Mock window.api (Electron preload bridge)
 Object.defineProperty(window, 'api', {
@@ -59,5 +59,5 @@ Object.defineProperty(window, 'api', {
     getUpdateState: vi.fn().mockResolvedValue({ status: 'idle' }),
     onUpdateState: vi.fn(noop),
   },
-  writable: true
-})
+  writable: true,
+});

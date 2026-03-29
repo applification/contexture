@@ -1,32 +1,32 @@
-import { X, Maximize2, RefreshCw } from 'lucide-react'
-import { useUIStore } from '@renderer/store/ui'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { Slider } from '@/components/ui/slider'
+import { X, Maximize2, RefreshCw } from 'lucide-react';
+import { useUIStore } from '@renderer/store/ui';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
 interface Props {
-  onClose: () => void
+  onClose: () => void;
 }
 
 export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
-  const graphFilters = useUIStore((s) => s.graphFilters)
-  const graphLayout = useUIStore((s) => s.graphLayout)
-  const setGraphFilter = useUIStore((s) => s.setGraphFilter)
-  const setGraphLayout = useUIStore((s) => s.setGraphLayout)
-  const resetGraphControls = useUIStore((s) => s.resetGraphControls)
+  const graphFilters = useUIStore((s) => s.graphFilters);
+  const graphLayout = useUIStore((s) => s.graphLayout);
+  const setGraphFilter = useUIStore((s) => s.setGraphFilter);
+  const setGraphLayout = useUIStore((s) => s.setGraphLayout);
+  const resetGraphControls = useUIStore((s) => s.resetGraphControls);
 
   function handleRelayout(): void {
-    document.dispatchEvent(new CustomEvent('graph:relayout'))
+    document.dispatchEvent(new CustomEvent('graph:relayout'));
   }
 
   function handleFit(): void {
-    document.dispatchEvent(new CustomEvent('graph:fitview'))
+    document.dispatchEvent(new CustomEvent('graph:fitview'));
   }
 
   function handleReset(): void {
-    resetGraphControls()
-    setTimeout(() => document.dispatchEvent(new CustomEvent('graph:relayout')), 0)
+    resetGraphControls();
+    setTimeout(() => document.dispatchEvent(new CustomEvent('graph:relayout')), 0);
   }
 
   return (
@@ -39,7 +39,9 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
       </div>
 
       <div className="px-3 py-2 space-y-1.5 border-b border-border">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Visibility</p>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          Visibility
+        </p>
         <FilterCheckbox
           id="filter-object-props"
           label="Object properties"
@@ -74,12 +76,16 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
             onValueChange={([v]) => setGraphFilter({ minDegree: v })}
             className="flex-1"
           />
-          <span className="text-xs text-muted-foreground w-3 text-right">{graphFilters.minDegree}</span>
+          <span className="text-xs text-muted-foreground w-3 text-right">
+            {graphFilters.minDegree}
+          </span>
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-1.5 border-b border-border">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Layout</p>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          Layout
+        </p>
         <LayoutSlider
           label="Spacing"
           min={80}
@@ -91,34 +97,46 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
       </div>
 
       <div className="flex gap-2 px-3 py-2">
-        <Button variant="secondary" size="sm" className="flex-1 h-7 text-xs gap-1" onClick={handleFit}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1 h-7 text-xs gap-1"
+          onClick={handleFit}
+        >
           <Maximize2 className="size-3" /> Fit to screen
         </Button>
-        <Button variant="secondary" size="sm" className="flex-1 h-7 text-xs gap-1" onClick={handleReset}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1 h-7 text-xs gap-1"
+          onClick={handleReset}
+        >
           <RefreshCw className="size-3" /> Reset
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function FilterCheckbox({
   id,
   label,
   checked,
-  onChange
+  onChange,
 }: {
-  id: string
-  label: string
-  checked: boolean
-  onChange: (v: boolean) => void
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
 }): React.JSX.Element {
   return (
     <div className="flex items-center gap-2">
       <Checkbox id={id} checked={checked} onCheckedChange={(v) => onChange(v as boolean)} />
-      <Label htmlFor={id} className="text-xs text-foreground cursor-pointer font-normal">{label}</Label>
+      <Label htmlFor={id} className="text-xs text-foreground cursor-pointer font-normal">
+        {label}
+      </Label>
     </div>
-  )
+  );
 }
 
 function LayoutSlider({
@@ -128,15 +146,15 @@ function LayoutSlider({
   step = 1,
   value,
   onChange,
-  onCommit
+  onCommit,
 }: {
-  label: string
-  min: number
-  max: number
-  step?: number
-  value: number
-  onChange: (v: number) => void
-  onCommit?: () => void
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  onChange: (v: number) => void;
+  onCommit?: () => void;
 }): React.JSX.Element {
   return (
     <div className="flex items-center gap-2">
@@ -151,5 +169,5 @@ function LayoutSlider({
         className="flex-1"
       />
     </div>
-  )
+  );
 }

@@ -1,14 +1,14 @@
-import type { Ontology } from '../model/types'
+import type { Ontology } from '../model/types';
 
 export interface ValidationError {
-  severity: 'error' | 'warning'
-  message: string
-  elementUri: string
-  elementType: 'class' | 'objectProperty' | 'datatypeProperty'
+  severity: 'error' | 'warning';
+  message: string;
+  elementUri: string;
+  elementType: 'class' | 'objectProperty' | 'datatypeProperty';
 }
 
 export function validateOntology(ontology: Ontology): ValidationError[] {
-  const errors: ValidationError[] = []
+  const errors: ValidationError[] = [];
 
   // Check classes
   for (const cls of ontology.classes.values()) {
@@ -19,8 +19,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
           severity: 'error',
           message: `Subclass parent "${localName(parentUri)}" does not exist`,
           elementUri: cls.uri,
-          elementType: 'class'
-        })
+          elementType: 'class',
+        });
       }
     }
 
@@ -30,8 +30,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         severity: 'error',
         message: 'Circular inheritance detected',
         elementUri: cls.uri,
-        elementType: 'class'
-      })
+        elementType: 'class',
+      });
     }
 
     // DisjointWith references must exist
@@ -41,8 +41,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
           severity: 'warning',
           message: `Disjoint class "${localName(djUri)}" does not exist`,
           elementUri: cls.uri,
-          elementType: 'class'
-        })
+          elementType: 'class',
+        });
       }
     }
 
@@ -52,8 +52,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         severity: 'warning',
         message: 'Class has no label',
         elementUri: cls.uri,
-        elementType: 'class'
-      })
+        elementType: 'class',
+      });
     }
   }
 
@@ -66,8 +66,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
           severity: 'error',
           message: `Domain class "${localName(domainUri)}" does not exist`,
           elementUri: prop.uri,
-          elementType: 'objectProperty'
-        })
+          elementType: 'objectProperty',
+        });
       }
     }
 
@@ -78,8 +78,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
           severity: 'error',
           message: `Range class "${localName(rangeUri)}" does not exist`,
           elementUri: prop.uri,
-          elementType: 'objectProperty'
-        })
+          elementType: 'objectProperty',
+        });
       }
     }
 
@@ -89,16 +89,16 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         severity: 'warning',
         message: 'Object property has no domain',
         elementUri: prop.uri,
-        elementType: 'objectProperty'
-      })
+        elementType: 'objectProperty',
+      });
     }
     if (prop.range.length === 0) {
       errors.push({
         severity: 'warning',
         message: 'Object property has no range',
         elementUri: prop.uri,
-        elementType: 'objectProperty'
-      })
+        elementType: 'objectProperty',
+      });
     }
 
     // InverseOf must reference existing property
@@ -107,8 +107,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         severity: 'error',
         message: `Inverse property "${localName(prop.inverseOf)}" does not exist`,
         elementUri: prop.uri,
-        elementType: 'objectProperty'
-      })
+        elementType: 'objectProperty',
+      });
     }
   }
 
@@ -120,8 +120,8 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
           severity: 'error',
           message: `Domain class "${localName(domainUri)}" does not exist`,
           elementUri: prop.uri,
-          elementType: 'datatypeProperty'
-        })
+          elementType: 'datatypeProperty',
+        });
       }
     }
 
@@ -130,38 +130,38 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         severity: 'warning',
         message: 'Datatype property has no domain',
         elementUri: prop.uri,
-        elementType: 'datatypeProperty'
-      })
+        elementType: 'datatypeProperty',
+      });
     }
   }
 
-  return errors
+  return errors;
 }
 
 function hasCircularInheritance(startUri: string, ontology: Ontology): boolean {
-  const visited = new Set<string>()
-  let current = [startUri]
+  const visited = new Set<string>();
+  let current = [startUri];
 
   while (current.length > 0) {
-    const next: string[] = []
+    const next: string[] = [];
     for (const uri of current) {
-      const cls = ontology.classes.get(uri)
-      if (!cls) continue
+      const cls = ontology.classes.get(uri);
+      if (!cls) continue;
       for (const parentUri of cls.subClassOf) {
-        if (parentUri === startUri) return true
+        if (parentUri === startUri) return true;
         if (!visited.has(parentUri)) {
-          visited.add(parentUri)
-          next.push(parentUri)
+          visited.add(parentUri);
+          next.push(parentUri);
         }
       }
     }
-    current = next
+    current = next;
   }
 
-  return false
+  return false;
 }
 
 function localName(uri: string): string {
-  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
-  return idx >= 0 ? uri.substring(idx + 1) : uri
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
 }

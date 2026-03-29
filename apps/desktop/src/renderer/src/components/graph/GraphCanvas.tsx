@@ -1,1 +1,1 @@
-export { GraphCanvas } from './ReactFlowCanvas'
+export { GraphCanvas } from './ReactFlowCanvas';

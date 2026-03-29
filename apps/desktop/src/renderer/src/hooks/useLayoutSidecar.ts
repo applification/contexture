@@ -1,47 +1,47 @@
-import { useCallback } from 'react'
+import { useCallback } from 'react';
 
 interface NodePosition {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
 
 interface SidecarData {
-  positions: Record<string, NodePosition>
+  positions: Record<string, NodePosition>;
   groups?: Array<{
-    id: string
-    label: string
-    x: number
-    y: number
-    width: number
-    height: number
-  }>
+    id: string;
+    label: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
 }
 
 function sidecarPath(filePath: string): string {
-  return filePath + '.layout.json'
+  return filePath + '.layout.json';
 }
 
 export function useLayoutSidecar(filePath: string | null) {
   const loadPositions = useCallback(async (): Promise<SidecarData | null> => {
     if (!filePath || filePath.startsWith('sample://') || filePath.startsWith('Sample:')) {
-      return null
+      return null;
     }
-    const content = await window.api.readFileSilent(sidecarPath(filePath))
-    if (!content) return null
+    const content = await window.api.readFileSilent(sidecarPath(filePath));
+    if (!content) return null;
     try {
-      return JSON.parse(content) as SidecarData
+      return JSON.parse(content) as SidecarData;
     } catch {
-      return null
+      return null;
     }
-  }, [filePath])
+  }, [filePath]);
 
   const savePositions = useCallback(
     async (data: SidecarData): Promise<void> => {
-      if (!filePath || filePath.startsWith('sample://') || filePath.startsWith('Sample:')) return
-      await window.api.saveFile(sidecarPath(filePath), JSON.stringify(data, null, 2))
+      if (!filePath || filePath.startsWith('sample://') || filePath.startsWith('Sample:')) return;
+      await window.api.saveFile(sidecarPath(filePath), JSON.stringify(data, null, 2));
     },
-    [filePath]
-  )
+    [filePath],
+  );
 
-  return { loadPositions, savePositions }
+  return { loadPositions, savePositions };
 }

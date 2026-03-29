@@ -1,32 +1,32 @@
-import { memo, useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { memo, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const EDGE_ITEMS = [
   {
     label: 'Subclass (is-a)',
     color: 'var(--graph-edge-subclass)',
-    dash: '8,4'
+    dash: '8,4',
   },
   {
     label: 'Object property',
     color: 'var(--graph-edge-property)',
-    dash: undefined
+    dash: undefined,
   },
   {
     label: 'Disjoint with',
     color: 'var(--graph-edge-disjoint)',
-    dash: '3,4'
-  }
-] as const
+    dash: '3,4',
+  },
+] as const;
 
 const NODE_ITEMS = [
   { label: 'Class', border: 'var(--graph-node-border)' },
   { label: 'Selected', border: 'var(--graph-node-selected)' },
-  { label: 'Adjacent', border: 'var(--graph-node-adjacent)' }
-] as const
+  { label: 'Adjacent', border: 'var(--graph-node-adjacent)' },
+] as const;
 
 export const GraphLegend = memo(function GraphLegend() {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div
@@ -73,7 +73,7 @@ export const GraphLegend = memo(function GraphLegend() {
                   className="size-3.5 rounded shrink-0"
                   style={{
                     border: `2px solid ${item.border}`,
-                    background: 'var(--graph-node-body-bg)'
+                    background: 'var(--graph-node-body-bg)',
                   }}
                 />
                 <span className="text-foreground">{item.label}</span>
@@ -83,5 +83,5 @@ export const GraphLegend = memo(function GraphLegend() {
         </div>
       )}
     </div>
-  )
-})
+  );
+});

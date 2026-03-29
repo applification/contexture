@@ -1,41 +1,41 @@
-import { useEffect, useRef } from 'react'
-import { motion } from 'motion/react'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 export interface ContextMenuItem {
-  label: string
-  action: () => void
-  destructive?: boolean
-  separator?: boolean
+  label: string;
+  action: () => void;
+  destructive?: boolean;
+  separator?: boolean;
 }
 
 interface Props {
-  x: number
-  y: number
-  items: ContextMenuItem[]
-  onClose: () => void
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+  onClose: () => void;
 }
 
 export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent): void {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
+        onClose();
       }
     }
     function handleEsc(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleEsc)
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleEsc);
     return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleEsc)
-    }
-  }, [onClose])
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [onClose]);
 
   return (
     <motion.div
@@ -56,14 +56,14 @@ export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element 
             variant="ghost"
             className={`w-full justify-start px-3 h-8 rounded-none text-sm font-normal ${item.destructive ? 'text-destructive-foreground hover:text-destructive-foreground' : ''}`}
             onClick={() => {
-              item.action()
-              onClose()
+              item.action();
+              onClose();
             }}
           >
             {item.label}
           </Button>
-        )
+        ),
       )}
     </motion.div>
-  )
+  );
 }

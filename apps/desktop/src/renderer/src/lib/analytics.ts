@@ -1,17 +1,17 @@
-import posthog from 'posthog-js'
+import posthog from 'posthog-js';
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
-const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string) || 'https://eu.i.posthog.com'
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
+const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string) || 'https://eu.i.posthog.com';
 
-const OPT_OUT_KEY = 'ontograph-analytics-opt-out'
-const LINKED_VISITOR_KEY = 'ontograph-linked-visitor-id'
+const OPT_OUT_KEY = 'ontograph-analytics-opt-out';
+const LINKED_VISITOR_KEY = 'ontograph-linked-visitor-id';
 
 function isOptedOut(): boolean {
-  return localStorage.getItem(OPT_OUT_KEY) === 'true'
+  return localStorage.getItem(OPT_OUT_KEY) === 'true';
 }
 
 export function initAnalytics(): void {
-  if (!POSTHOG_KEY) return
+  if (!POSTHOG_KEY) return;
 
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
@@ -20,35 +20,35 @@ export function initAnalytics(): void {
     capture_pageview: false,
     capture_pageleave: false,
     disable_session_recording: true,
-    opt_out_capturing_by_default: isOptedOut()
-  })
+    opt_out_capturing_by_default: isOptedOut(),
+  });
 
   if (!isOptedOut()) {
-    track('app_launched', { platform: 'desktop' })
+    track('app_launched', { platform: 'desktop' });
   }
 }
 
 export function getAnalyticsOptOut(): boolean {
-  return isOptedOut()
+  return isOptedOut();
 }
 
 export function setAnalyticsOptOut(optOut: boolean): void {
-  localStorage.setItem(OPT_OUT_KEY, String(optOut))
+  localStorage.setItem(OPT_OUT_KEY, String(optOut));
   if (optOut) {
-    posthog.opt_out_capturing()
+    posthog.opt_out_capturing();
   } else {
-    posthog.opt_in_capturing()
+    posthog.opt_in_capturing();
   }
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
-  if (!POSTHOG_KEY || posthog.has_opted_out_capturing()) return
-  posthog.capture(event, properties)
+  if (!POSTHOG_KEY || posthog.has_opted_out_capturing()) return;
+  posthog.capture(event, properties);
 }
 
 export function getAnonymousId(): string | undefined {
-  if (!POSTHOG_KEY) return undefined
-  return posthog.get_distinct_id()
+  if (!POSTHOG_KEY) return undefined;
+  return posthog.get_distinct_id();
 }
 
 /**
@@ -57,14 +57,14 @@ export function getAnonymousId(): string | undefined {
  * the marketing website download flow).
  */
 export function linkWebVisitor(webVisitorId: string): void {
-  if (!POSTHOG_KEY || !webVisitorId || posthog.has_opted_out_capturing()) return
+  if (!POSTHOG_KEY || !webVisitorId || posthog.has_opted_out_capturing()) return;
 
-  const alreadyLinked = localStorage.getItem(LINKED_VISITOR_KEY)
-  if (alreadyLinked === webVisitorId) return
+  const alreadyLinked = localStorage.getItem(LINKED_VISITOR_KEY);
+  if (alreadyLinked === webVisitorId) return;
 
-  posthog.alias(webVisitorId)
-  posthog.setPersonProperties({ web_visitor_id: webVisitorId, linked_from: 'desktop' })
-  localStorage.setItem(LINKED_VISITOR_KEY, webVisitorId)
+  posthog.alias(webVisitorId);
+  posthog.setPersonProperties({ web_visitor_id: webVisitorId, linked_from: 'desktop' });
+  localStorage.setItem(LINKED_VISITOR_KEY, webVisitorId);
 }
 
 /**
@@ -73,6 +73,6 @@ export function linkWebVisitor(webVisitorId: string): void {
  * that used the same identifier.
  */
 export function identifyUser(userId: string, properties?: Record<string, string>): void {
-  if (!POSTHOG_KEY || !userId || posthog.has_opted_out_capturing()) return
-  posthog.identify(userId, properties)
+  if (!POSTHOG_KEY || !userId || posthog.has_opted_out_capturing()) return;
+  posthog.identify(userId, properties);
 }

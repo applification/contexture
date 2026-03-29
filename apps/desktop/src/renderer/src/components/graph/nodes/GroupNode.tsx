@@ -1,11 +1,11 @@
-import { memo } from 'react'
-import { Handle, Position, type NodeProps, NodeResizer } from '@xyflow/react'
-import type { GroupNode as GroupNodeType } from '@renderer/model/reactflow'
-import { useUIStore } from '@renderer/store/ui'
+import { memo } from 'react';
+import { Handle, Position, type NodeProps, NodeResizer } from '@xyflow/react';
+import type { GroupNode as GroupNodeType } from '@renderer/model/reactflow';
+import { useUIStore } from '@renderer/store/ui';
 
 export const GroupNode = memo(function GroupNode({ data, id, selected }: NodeProps<GroupNodeType>) {
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
-  const isDimmed = selectedNodeId !== null && selectedNodeId !== id
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
+  const isDimmed = selectedNodeId !== null && selectedNodeId !== id;
 
   return (
     <div
@@ -20,7 +20,7 @@ export const GroupNode = memo(function GroupNode({ data, id, selected }: NodePro
         backdropFilter: 'blur(4px)',
         position: 'relative',
         opacity: isDimmed ? 0.2 : 1,
-        transition: 'opacity 0.15s ease'
+        transition: 'opacity 0.15s ease',
       }}
     >
       <NodeResizer
@@ -44,11 +44,11 @@ export const GroupNode = memo(function GroupNode({ data, id, selected }: NodePro
           color: 'var(--graph-node-class)',
           letterSpacing: '0.02em',
           userSelect: 'none',
-          pointerEvents: 'none'
+          pointerEvents: 'none',
         }}
       >
         {data.label}
       </div>
     </div>
-  )
-})
+  );
+});

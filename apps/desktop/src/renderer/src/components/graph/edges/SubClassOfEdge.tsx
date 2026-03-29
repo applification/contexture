@@ -1,28 +1,37 @@
-import { memo } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useInternalNode, type EdgeProps } from '@xyflow/react'
-import { getFloatingEdgeParams } from './floating-edge-utils'
-import { useUIStore } from '@renderer/store/ui'
+import { memo } from 'react';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  useInternalNode,
+  type EdgeProps,
+} from '@xyflow/react';
+import { getFloatingEdgeParams } from './floating-edge-utils';
+import { useUIStore } from '@renderer/store/ui';
 
 function autoRotation(sx: number, sy: number, tx: number, ty: number): number {
-  let angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI)
-  if (angle > 90 || angle < -90) angle += 180
-  return angle
+  let angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI);
+  if (angle > 90 || angle < -90) angle += 180;
+  return angle;
 }
 
 export const SubClassOfEdge = memo(function SubClassOfEdge({
   id,
   source,
   target,
-  selected
+  selected,
 }: EdgeProps) {
-  const sourceNode = useInternalNode(source)
-  const targetNode = useInternalNode(target)
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId)
-  const adjacentEdgeIds = useUIStore((s) => s.adjacentEdgeIds)
+  const sourceNode = useInternalNode(source);
+  const targetNode = useInternalNode(target);
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
+  const adjacentEdgeIds = useUIStore((s) => s.adjacentEdgeIds);
 
-  if (!sourceNode || !targetNode) return null
+  if (!sourceNode || !targetNode) return null;
 
-  const { sx, sy, tx, ty, sourcePosition, targetPosition } = getFloatingEdgeParams(sourceNode, targetNode)
+  const { sx, sy, tx, ty, sourcePosition, targetPosition } = getFloatingEdgeParams(
+    sourceNode,
+    targetNode,
+  );
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX: sx,
@@ -30,14 +39,14 @@ export const SubClassOfEdge = memo(function SubClassOfEdge({
     sourcePosition,
     targetX: tx,
     targetY: ty,
-    targetPosition
-  })
+    targetPosition,
+  });
 
-  const isAdjacent = adjacentEdgeIds.includes(id)
-  const isDimmed = selectedNodeId !== null && !isAdjacent
-  const color = 'var(--graph-edge-subclass)'
-  const markerId = `subclass-arrow-${id}`
-  const rotation = autoRotation(sx, sy, tx, ty)
+  const isAdjacent = adjacentEdgeIds.includes(id);
+  const isDimmed = selectedNodeId !== null && !isAdjacent;
+  const color = 'var(--graph-edge-subclass)';
+  const markerId = `subclass-arrow-${id}`;
+  const rotation = autoRotation(sx, sy, tx, ty);
 
   return (
     <>
@@ -54,7 +63,7 @@ export const SubClassOfEdge = memo(function SubClassOfEdge({
             stroke: color,
             strokeWidth: selected ? 3 : isAdjacent ? 3 : 2,
             strokeDasharray: '8,4',
-            markerEnd: `url(#${markerId})`
+            markerEnd: `url(#${markerId})`,
           }}
         />
       </g>
@@ -72,7 +81,7 @@ export const SubClassOfEdge = memo(function SubClassOfEdge({
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
             opacity: isDimmed ? 0.15 : 1,
-            transition: 'opacity 0.15s ease'
+            transition: 'opacity 0.15s ease',
           }}
           className="nodrag nopan"
         >
@@ -80,5 +89,5 @@ export const SubClassOfEdge = memo(function SubClassOfEdge({
         </div>
       </EdgeLabelRenderer>
     </>
-  )
-})
+  );
+});

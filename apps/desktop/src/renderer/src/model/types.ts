@@ -1,37 +1,37 @@
 export interface Ontology {
-  prefixes: Map<string, string>
-  classes: Map<string, OntologyClass>
-  objectProperties: Map<string, ObjectProperty>
-  datatypeProperties: Map<string, DatatypeProperty>
+  prefixes: Map<string, string>;
+  classes: Map<string, OntologyClass>;
+  objectProperties: Map<string, ObjectProperty>;
+  datatypeProperties: Map<string, DatatypeProperty>;
 }
 
 export interface OntologyClass {
-  uri: string
-  label?: string
-  comment?: string
-  subClassOf: string[]
-  disjointWith: string[]
+  uri: string;
+  label?: string;
+  comment?: string;
+  subClassOf: string[];
+  disjointWith: string[];
 }
 
 export interface ObjectProperty {
-  uri: string
-  label?: string
-  comment?: string
-  domain: string[]
-  range: string[]
-  minCardinality?: number
-  maxCardinality?: number
-  inverseOf?: string
+  uri: string;
+  label?: string;
+  comment?: string;
+  domain: string[];
+  range: string[];
+  minCardinality?: number;
+  maxCardinality?: number;
+  inverseOf?: string;
 }
 
 export interface DatatypeProperty {
-  uri: string
-  label?: string
-  comment?: string
-  domain: string[]
-  range: string
-  minCardinality?: number
-  maxCardinality?: number
+  uri: string;
+  label?: string;
+  comment?: string;
+  domain: string[];
+  range: string;
+  minCardinality?: number;
+  maxCardinality?: number;
 }
 
 export function createEmptyOntology(): Ontology {
@@ -40,10 +40,10 @@ export function createEmptyOntology(): Ontology {
       ['owl', 'http://www.w3.org/2002/07/owl#'],
       ['rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'],
       ['rdfs', 'http://www.w3.org/2000/01/rdf-schema#'],
-      ['xsd', 'http://www.w3.org/2001/XMLSchema#']
+      ['xsd', 'http://www.w3.org/2001/XMLSchema#'],
     ]),
     classes: new Map(),
     objectProperties: new Map(),
-    datatypeProperties: new Map()
-  }
+    datatypeProperties: new Map(),
+  };
 }

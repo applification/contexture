@@ -1,17 +1,17 @@
-import { MousePointer2, MessageSquare, ClipboardList } from 'lucide-react'
-import type { SidebarTab } from '@renderer/store/ui'
-import { cn } from '@/lib/utils'
+import { MousePointer2, MessageSquare, ClipboardList } from 'lucide-react';
+import type { SidebarTab } from '@renderer/store/ui';
+import { cn } from '@/lib/utils';
 
 interface ActivityBarProps {
-  activeTab: SidebarTab
-  onTabChange: (tab: SidebarTab) => void
+  activeTab: SidebarTab;
+  onTabChange: (tab: SidebarTab) => void;
 }
 
 const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
   { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },
-  { id: 'eval', icon: <ClipboardList className="size-4" />, label: 'Eval' }
-]
+  { id: 'eval', icon: <ClipboardList className="size-4" />, label: 'Eval' },
+];
 
 export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React.JSX.Element {
   return (
@@ -25,7 +25,7 @@ export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React
             'relative w-8 h-8 rounded-md flex items-center justify-center transition-colors',
             activeTab === id
               ? 'text-primary bg-primary/10'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
           )}
         >
           {activeTab === id && (
@@ -35,5 +35,5 @@ export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React
         </button>
       ))}
     </div>
-  )
+  );
 }

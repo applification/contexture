@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import {
   CodeBlock,
@@ -7,8 +7,8 @@ import {
   CodeBlockFilename,
   CodeBlockHeader,
   CodeBlockTitle,
-} from '@/components/ai-elements/code-block'
-import { FileIcon } from 'lucide-react'
+} from '@/components/ai-elements/code-block';
+import { FileIcon } from 'lucide-react';
 
 const tokens = `/* Ontograph Design Tokens — CSS Custom Properties */
 
@@ -34,7 +34,7 @@ Base unit: 4px (0.25rem)
 
 /* Border radius */
 rounded-lg  → 0.5rem
-rounded-xl  → 0.75rem`
+rounded-xl  → 0.75rem`;
 
 export function TokenBlock() {
   return (
@@ -49,5 +49,5 @@ export function TokenBlock() {
         </CodeBlockActions>
       </CodeBlockHeader>
     </CodeBlock>
-  )
+  );
 }

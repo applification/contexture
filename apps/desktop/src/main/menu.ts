@@ -1,7 +1,7 @@
-import { Menu, BrowserWindow, MenuItemConstructorOptions } from 'electron'
+import { Menu, BrowserWindow, MenuItemConstructorOptions } from 'electron';
 
 export function createMenu(mainWindow: BrowserWindow): Menu {
-  const isMac = process.platform === 'darwin'
+  const isMac = process.platform === 'darwin';
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
@@ -17,9 +17,9 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
               { role: 'hideOthers' as const },
               { role: 'unhide' as const },
               { type: 'separator' as const },
-              { role: 'quit' as const }
-            ]
-          }
+              { role: 'quit' as const },
+            ],
+          },
         ]
       : []),
     {
@@ -29,34 +29,34 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
           label: 'New Ontology',
           accelerator: 'CmdOrCtrl+N',
           click: (): void => {
-            mainWindow.webContents.send('menu:file-new')
-          }
+            mainWindow.webContents.send('menu:file-new');
+          },
         },
         {
           label: 'Open...',
           accelerator: 'CmdOrCtrl+O',
           click: (): void => {
-            mainWindow.webContents.send('menu:file-open')
-          }
+            mainWindow.webContents.send('menu:file-open');
+          },
         },
         { type: 'separator' },
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
           click: (): void => {
-            mainWindow.webContents.send('menu:file-save')
-          }
+            mainWindow.webContents.send('menu:file-save');
+          },
         },
         {
           label: 'Save As...',
           accelerator: 'CmdOrCtrl+Shift+S',
           click: (): void => {
-            mainWindow.webContents.send('menu:file-save-as')
-          }
+            mainWindow.webContents.send('menu:file-save-as');
+          },
         },
         { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' }
-      ]
+        isMac ? { role: 'close' } : { role: 'quit' },
+      ],
     },
     {
       label: 'Edit',
@@ -67,8 +67,8 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'selectAll' }
-      ]
+        { role: 'selectAll' },
+      ],
     },
     {
       label: 'View',
@@ -81,8 +81,8 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
+        { role: 'togglefullscreen' },
+      ],
     },
     {
       label: 'Window',
@@ -91,10 +91,10 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
         { role: 'zoom' },
         ...(isMac
           ? [{ type: 'separator' as const }, { role: 'front' as const }]
-          : [{ role: 'close' as const }])
-      ]
-    }
-  ]
+          : [{ role: 'close' as const }]),
+      ],
+    },
+  ];
 
-  return Menu.buildFromTemplate(template)
+  return Menu.buildFromTemplate(template);
 }

@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react'
-import type { UpdateState } from '../../../preload/index.d'
+import { useEffect, useState } from 'react';
+import type { UpdateState } from '../../../preload/index.d';
 
 export function UpdateBanner(): React.JSX.Element | null {
-  const [update, setUpdate] = useState<UpdateState>({ status: 'idle' })
+  const [update, setUpdate] = useState<UpdateState>({ status: 'idle' });
 
   useEffect(() => {
-    window.api.getUpdateState().then(setUpdate)
-    return window.api.onUpdateState(setUpdate)
-  }, [])
+    window.api.getUpdateState().then(setUpdate);
+    return window.api.onUpdateState(setUpdate);
+  }, []);
 
-  if (update.status === 'idle' || update.status === 'checking') return null
+  if (update.status === 'idle' || update.status === 'checking') return null;
 
   if (update.status === 'available') {
     return (
@@ -22,7 +22,7 @@ export function UpdateBanner(): React.JSX.Element | null {
           Download
         </button>
       </div>
-    )
+    );
   }
 
   if (update.status === 'downloading') {
@@ -37,7 +37,7 @@ export function UpdateBanner(): React.JSX.Element | null {
         </div>
         <span>{update.progress ?? 0}%</span>
       </div>
-    )
+    );
   }
 
   if (update.status === 'ready') {
@@ -51,13 +51,21 @@ export function UpdateBanner(): React.JSX.Element | null {
           Restart & update
         </button>
       </div>
-    )
+    );
   }
 
   if (update.status === 'error') {
     return (
       <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-yellow-600 text-white text-xs">
-        <span>Update check failed — <a onClick={() => window.api.openReleasesPage()} className="underline cursor-pointer hover:no-underline">view releases</a></span>
+        <span>
+          Update check failed —{' '}
+          <a
+            onClick={() => window.api.openReleasesPage()}
+            className="underline cursor-pointer hover:no-underline"
+          >
+            view releases
+          </a>
+        </span>
         <button
           onClick={() => window.api.checkForUpdate()}
           className="ml-4 underline hover:no-underline"
@@ -65,8 +73,8 @@ export function UpdateBanner(): React.JSX.Element | null {
           Retry
         </button>
       </div>
-    )
+    );
   }
 
-  return null
+  return null;
 }

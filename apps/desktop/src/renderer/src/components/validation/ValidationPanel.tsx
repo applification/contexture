@@ -1,38 +1,34 @@
-import { useMemo } from 'react'
-import { CircleAlert, TriangleAlert } from 'lucide-react'
-import { useOntologyStore } from '@renderer/store/ontology'
-import { useUIStore } from '@renderer/store/ui'
-import { validateOntology, type ValidationError } from '@renderer/services/validation'
-import { Button } from '@/components/ui/button'
+import { useMemo } from 'react';
+import { CircleAlert, TriangleAlert } from 'lucide-react';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { validateOntology, type ValidationError } from '@renderer/services/validation';
+import { Button } from '@/components/ui/button';
 
 function localName(uri: string): string {
-  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
-  return idx >= 0 ? uri.substring(idx + 1) : uri
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
 }
 
 export function ValidationPanel(): React.JSX.Element {
-  const ontology = useOntologyStore((s) => s.ontology)
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode)
-  const setSelectedEdge = useUIStore((s) => s.setSelectedEdge)
+  const ontology = useOntologyStore((s) => s.ontology);
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
+  const setSelectedEdge = useUIStore((s) => s.setSelectedEdge);
 
-  const errors = useMemo(() => validateOntology(ontology), [ontology])
+  const errors = useMemo(() => validateOntology(ontology), [ontology]);
 
-  const errorCount = errors.filter((e) => e.severity === 'error').length
-  const warnCount = errors.filter((e) => e.severity === 'warning').length
+  const errorCount = errors.filter((e) => e.severity === 'error').length;
+  const warnCount = errors.filter((e) => e.severity === 'warning').length;
 
   function handleClick(error: ValidationError): void {
     if (error.elementType === 'class') {
-      setSelectedNode(error.elementUri)
-      setSelectedEdge(null)
+      setSelectedNode(error.elementUri);
+      setSelectedEdge(null);
     }
   }
 
   if (errors.length === 0) {
-    return (
-      <div className="p-3 text-xs text-muted-foreground">
-        No validation issues
-      </div>
-    )
+    return <div className="p-3 text-xs text-muted-foreground">No validation issues</div>;
   }
 
   return (
@@ -63,5 +59,5 @@ export function ValidationPanel(): React.JSX.Element {
         ))}
       </div>
     </div>
-  )
+  );
 }

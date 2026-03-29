@@ -1,48 +1,48 @@
-import { ipcMain, BrowserWindow } from 'electron'
-import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
-import { z } from 'zod/v4'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
+import { ipcMain, BrowserWindow } from 'electron';
+import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod/v4';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
-const execFileAsync = promisify(execFile)
+const execFileAsync = promisify(execFile);
 
 interface AuthConfig {
-  mode: 'api-key' | 'max'
-  key?: string
-  binaryPath?: string
+  mode: 'api-key' | 'max';
+  key?: string;
+  binaryPath?: string;
 }
 
-let detectedClaudePath: string | null = null
+let detectedClaudePath: string | null = null;
 
 export function getDetectedClaudePath(): string | null {
-  return detectedClaudePath
+  return detectedClaudePath;
 }
 
 async function detectClaudeCli(): Promise<{ installed: boolean; path: string | null }> {
   try {
     const { stdout } = await execFileAsync(process.platform === 'win32' ? 'where' : 'which', [
-      'claude'
-    ])
-    const path = stdout.trim().split('\n')[0]
-    return { installed: true, path }
+      'claude',
+    ]);
+    const path = stdout.trim().split('\n')[0];
+    return { installed: true, path };
   } catch {
-    return { installed: false, path: null }
+    return { installed: false, path: null };
   }
 }
 
 interface OntologyState {
-  turtle: string
+  turtle: string;
 }
 
-let currentAbort: AbortController | null = null
+let currentAbort: AbortController | null = null;
 
 function getMainWindow(): BrowserWindow | null {
-  return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null
+  return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null;
 }
 
 function sendToRenderer(channel: string, ...args: unknown[]): void {
-  const win = getMainWindow()
-  if (win) win.webContents.send(channel, ...args)
+  const win = getMainWindow();
+  if (win) win.webContents.send(channel, ...args);
 }
 
 // Define ontology manipulation tools
@@ -52,28 +52,31 @@ const getCurrentOntology = tool(
   {},
   async () => {
     return new Promise((resolve) => {
-      const win = getMainWindow()
+      const win = getMainWindow();
       if (!win) {
-        resolve({ content: [{ type: 'text' as const, text: 'No window available' }], isError: true })
-        return
+        resolve({
+          content: [{ type: 'text' as const, text: 'No window available' }],
+          isError: true,
+        });
+        return;
       }
       ipcMain.handleOnce('claude:ontology-response', (_event, state: OntologyState) => {
-        resolve({ content: [{ type: 'text' as const, text: state.turtle }] })
-      })
-      win.webContents.send('claude:get-ontology')
-    })
-  }
-)
+        resolve({ content: [{ type: 'text' as const, text: state.turtle }] });
+      });
+      win.webContents.send('claude:get-ontology');
+    });
+  },
+);
 
 const generateOntology = tool(
   'generate_ontology',
   'Replace the entire ontology with new Turtle content. Use this for initial generation or wholesale replacement. The Turtle must be valid and include all necessary prefix declarations.',
   { turtle: z.string().describe('Complete ontology in Turtle (.ttl) format') },
   async (args) => {
-    sendToRenderer('claude:load-ontology', args.turtle)
-    return { content: [{ type: 'text' as const, text: 'Ontology loaded successfully' }] }
-  }
-)
+    sendToRenderer('claude:load-ontology', args.turtle);
+    return { content: [{ type: 'text' as const, text: 'Ontology loaded successfully' }] };
+  },
+);
 
 const addClass = tool(
   'add_class',
@@ -82,13 +85,13 @@ const addClass = tool(
     uri: z.string().describe('Full URI for the class (e.g. http://example.org/ontology#Person)'),
     label: z.string().optional().describe('Human-readable label'),
     comment: z.string().optional().describe('Description of the class'),
-    subClassOf: z.array(z.string()).optional().describe('URIs of parent classes')
+    subClassOf: z.array(z.string()).optional().describe('URIs of parent classes'),
   },
   async (args) => {
-    sendToRenderer('claude:add-class', args)
-    return { content: [{ type: 'text' as const, text: `Class ${args.uri} added` }] }
-  }
-)
+    sendToRenderer('claude:add-class', args);
+    return { content: [{ type: 'text' as const, text: `Class ${args.uri} added` }] };
+  },
+);
 
 const addObjectProperty = tool(
   'add_object_property',
@@ -98,13 +101,13 @@ const addObjectProperty = tool(
     label: z.string().optional().describe('Human-readable label'),
     comment: z.string().optional().describe('Description'),
     domain: z.array(z.string()).describe('URIs of domain classes'),
-    range: z.array(z.string()).describe('URIs of range classes')
+    range: z.array(z.string()).describe('URIs of range classes'),
   },
   async (args) => {
-    sendToRenderer('claude:add-object-property', args)
-    return { content: [{ type: 'text' as const, text: `Object property ${args.uri} added` }] }
-  }
-)
+    sendToRenderer('claude:add-object-property', args);
+    return { content: [{ type: 'text' as const, text: `Object property ${args.uri} added` }] };
+  },
+);
 
 const addDatatypeProperty = tool(
   'add_datatype_property',
@@ -113,13 +116,13 @@ const addDatatypeProperty = tool(
     uri: z.string().describe('Full URI for the property'),
     label: z.string().optional().describe('Human-readable label'),
     domain: z.array(z.string()).describe('URIs of domain classes'),
-    range: z.string().describe('XSD datatype URI (e.g. http://www.w3.org/2001/XMLSchema#string)')
+    range: z.string().describe('XSD datatype URI (e.g. http://www.w3.org/2001/XMLSchema#string)'),
   },
   async (args) => {
-    sendToRenderer('claude:add-datatype-property', args)
-    return { content: [{ type: 'text' as const, text: `Datatype property ${args.uri} added` }] }
-  }
-)
+    sendToRenderer('claude:add-datatype-property', args);
+    return { content: [{ type: 'text' as const, text: `Datatype property ${args.uri} added` }] };
+  },
+);
 
 const modifyClass = tool(
   'modify_class',
@@ -128,27 +131,27 @@ const modifyClass = tool(
     uri: z.string().describe('URI of the class to modify'),
     label: z.string().optional().describe('New label'),
     comment: z.string().optional().describe('New comment'),
-    subClassOf: z.array(z.string()).optional().describe('Replace subClassOf list')
+    subClassOf: z.array(z.string()).optional().describe('Replace subClassOf list'),
   },
   async (args) => {
-    const { uri, ...changes } = args
-    sendToRenderer('claude:modify-class', uri, changes)
-    return { content: [{ type: 'text' as const, text: `Class ${uri} modified` }] }
-  }
-)
+    const { uri, ...changes } = args;
+    sendToRenderer('claude:modify-class', uri, changes);
+    return { content: [{ type: 'text' as const, text: `Class ${uri} modified` }] };
+  },
+);
 
 const removeElement = tool(
   'remove_element',
   'Remove a class or property from the ontology by URI',
   {
     uri: z.string().describe('URI of the element to remove'),
-    type: z.enum(['class', 'objectProperty', 'datatypeProperty']).describe('Type of element')
+    type: z.enum(['class', 'objectProperty', 'datatypeProperty']).describe('Type of element'),
   },
   async (args) => {
-    sendToRenderer('claude:remove-element', args.uri, args.type)
-    return { content: [{ type: 'text' as const, text: `${args.type} ${args.uri} removed` }] }
-  }
-)
+    sendToRenderer('claude:remove-element', args.uri, args.type);
+    return { content: [{ type: 'text' as const, text: `${args.type} ${args.uri} removed` }] };
+  },
+);
 
 const validateOntology = tool(
   'validate_ontology',
@@ -156,18 +159,21 @@ const validateOntology = tool(
   {},
   async () => {
     return new Promise((resolve) => {
-      const win = getMainWindow()
+      const win = getMainWindow();
       if (!win) {
-        resolve({ content: [{ type: 'text' as const, text: 'No window available' }], isError: true })
-        return
+        resolve({
+          content: [{ type: 'text' as const, text: 'No window available' }],
+          isError: true,
+        });
+        return;
       }
       ipcMain.handleOnce('claude:validation-response', (_event, errors: string) => {
-        resolve({ content: [{ type: 'text' as const, text: errors }] })
-      })
-      win.webContents.send('claude:validate')
-    })
-  }
-)
+        resolve({ content: [{ type: 'text' as const, text: errors }] });
+      });
+      win.webContents.send('claude:validate');
+    });
+  },
+);
 
 const ontographServer = createSdkMcpServer({
   name: 'ontograph',
@@ -180,9 +186,9 @@ const ontographServer = createSdkMcpServer({
     addDatatypeProperty,
     modifyClass,
     removeElement,
-    validateOntology
-  ]
-})
+    validateOntology,
+  ],
+});
 
 const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
 
@@ -204,7 +210,7 @@ Always include necessary prefix declarations in generated Turtle:
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`;
 
 const ALL_TOOLS = [
   'mcp__ontograph__get_current_ontology',
@@ -214,142 +220,168 @@ const ALL_TOOLS = [
   'mcp__ontograph__add_datatype_property',
   'mcp__ontograph__modify_class',
   'mcp__ontograph__remove_element',
-  'mcp__ontograph__validate_ontology'
-]
+  'mcp__ontograph__validate_ontology',
+];
 
 export function registerClaudeIPC(): void {
-  let sessionId: string | undefined
+  let sessionId: string | undefined;
 
   // Detect Claude CLI on startup and expose result to renderer
   detectClaudeCli().then((result) => {
-    detectedClaudePath = result.path
-  })
+    detectedClaudePath = result.path;
+  });
 
   ipcMain.handle('claude:detect-cli', async () => {
-    if (detectedClaudePath) return { installed: true, path: detectedClaudePath }
-    const result = await detectClaudeCli()
-    detectedClaudePath = result.path
-    return result
-  })
+    if (detectedClaudePath) return { installed: true, path: detectedClaudePath };
+    const result = await detectClaudeCli();
+    detectedClaudePath = result.path;
+    return result;
+  });
 
-  ipcMain.handle('claude:send-message', async (_event, message: string, auth: AuthConfig, modelOptions?: { model?: string; thinkingBudgetTokens?: number }) => {
-    // Abort any previous query
-    if (currentAbort) {
-      currentAbort.abort()
-    }
-    currentAbort = new AbortController()
+  ipcMain.handle(
+    'claude:send-message',
+    async (
+      _event,
+      message: string,
+      auth: AuthConfig,
+      modelOptions?: { model?: string; thinkingBudgetTokens?: number },
+    ) => {
+      // Abort any previous query
+      if (currentAbort) {
+        currentAbort.abort();
+      }
+      currentAbort = new AbortController();
 
-    const MAX_RETRIES = 3
-    let attempt = 0
+      const MAX_RETRIES = 3;
+      let attempt = 0;
 
-    while (attempt < MAX_RETRIES) {
-      attempt++
-      try {
-        const authOptions =
-          auth.mode === 'api-key' && auth.key
-            ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
-            : {
-                pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
-                env: process.env
+      while (attempt < MAX_RETRIES) {
+        attempt++;
+        try {
+          const authOptions =
+            auth.mode === 'api-key' && auth.key
+              ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
+              : {
+                  pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
+                  env: process.env,
+                };
+
+          const options: Record<string, unknown> = {
+            mcpServers: { ontograph: ontographServer },
+            allowedTools: ALL_TOOLS,
+            disallowedTools: [
+              'Read',
+              'Edit',
+              'Write',
+              'Bash',
+              'Glob',
+              'Grep',
+              'Agent',
+              'NotebookEdit',
+              'WebFetch',
+              'WebSearch',
+            ],
+            systemPrompt: SYSTEM_PROMPT,
+            maxTurns: 20,
+            abortController: currentAbort,
+            persistSession: true,
+            ...(sessionId ? { resume: sessionId } : {}),
+            ...(modelOptions?.model ? { model: modelOptions.model } : {}),
+            ...(modelOptions?.thinkingBudgetTokens
+              ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens }
+              : {}),
+            ...authOptions,
+          };
+
+          for await (const msg of query({ prompt: message, options: options as never })) {
+            if (msg.type === 'system' && msg.subtype === 'init') {
+              sessionId = msg.session_id;
+            }
+
+            if (msg.type === 'assistant') {
+              const textBlocks = msg.message.content.filter(
+                (b: { type: string }) => b.type === 'text',
+              );
+              const text = textBlocks.map((b: { text: string }) => b.text).join('');
+              if (text) {
+                sendToRenderer('claude:assistant-text', text);
               }
 
-        const options: Record<string, unknown> = {
-          mcpServers: { ontograph: ontographServer },
-          allowedTools: ALL_TOOLS,
-          disallowedTools: [
-            'Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep',
-            'Agent', 'NotebookEdit', 'WebFetch', 'WebSearch'
-          ],
-          systemPrompt: SYSTEM_PROMPT,
-          maxTurns: 20,
-          abortController: currentAbort,
-          persistSession: true,
-          ...(sessionId ? { resume: sessionId } : {}),
-          ...(modelOptions?.model ? { model: modelOptions.model } : {}),
-          ...(modelOptions?.thinkingBudgetTokens ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens } : {}),
-          ...authOptions
-        }
-
-        for await (const msg of query({ prompt: message, options: options as never })) {
-          if (msg.type === 'system' && msg.subtype === 'init') {
-            sessionId = msg.session_id
-          }
-
-          if (msg.type === 'assistant') {
-            const textBlocks = msg.message.content.filter(
-              (b: { type: string }) => b.type === 'text'
-            )
-            const text = textBlocks.map((b: { text: string }) => b.text).join('')
-            if (text) {
-              sendToRenderer('claude:assistant-text', text)
+              const toolBlocks = msg.message.content.filter(
+                (b: { type: string }) => b.type === 'tool_use',
+              );
+              for (const tb of toolBlocks) {
+                sendToRenderer(
+                  'claude:tool-use',
+                  (tb as { name: string }).name,
+                  (tb as { input: unknown }).input,
+                );
+              }
             }
 
-            const toolBlocks = msg.message.content.filter(
-              (b: { type: string }) => b.type === 'tool_use'
-            )
-            for (const tb of toolBlocks) {
-              sendToRenderer('claude:tool-use', (tb as { name: string }).name, (tb as { input: unknown }).input)
+            if (msg.type === 'result') {
+              if (msg.subtype === 'success') {
+                sendToRenderer('claude:result', msg.result, msg.total_cost_usd);
+              } else {
+                sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error');
+              }
             }
           }
-
-          if (msg.type === 'result') {
-            if (msg.subtype === 'success') {
-              sendToRenderer('claude:result', msg.result, msg.total_cost_usd)
-            } else {
-              sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error')
-            }
+          break; // Success — exit retry loop
+        } catch (err: unknown) {
+          if ((err as Error).name === 'AbortError') {
+            break; // User cancelled — don't retry
           }
-        }
-        break // Success — exit retry loop
-      } catch (err: unknown) {
-        if ((err as Error).name === 'AbortError') {
-          break // User cancelled — don't retry
-        }
 
-        const errMsg = (err as Error).message || ''
-        const isRetryable = /rate.limit|429|overloaded|timeout|ETIMEDOUT|ECONNRESET|503|529/i.test(errMsg)
+          const errMsg = (err as Error).message || '';
+          const isRetryable =
+            /rate.limit|429|overloaded|timeout|ETIMEDOUT|ECONNRESET|503|529/i.test(errMsg);
 
-        if (isRetryable && attempt < MAX_RETRIES) {
-          const delaySec = Math.pow(2, attempt)
-          sendToRenderer('claude:assistant-text', `\n\n*Rate limited — retrying in ${delaySec}s (attempt ${attempt}/${MAX_RETRIES})...*`)
-          await new Promise((r) => setTimeout(r, delaySec * 1000))
-          continue
-        }
+          if (isRetryable && attempt < MAX_RETRIES) {
+            const delaySec = Math.pow(2, attempt);
+            sendToRenderer(
+              'claude:assistant-text',
+              `\n\n*Rate limited — retrying in ${delaySec}s (attempt ${attempt}/${MAX_RETRIES})...*`,
+            );
+            await new Promise((r) => setTimeout(r, delaySec * 1000));
+            continue;
+          }
 
-        // Format user-friendly error
-        let userMessage: string
-        if (/rate.limit|429/i.test(errMsg)) {
-          userMessage = 'Rate limited by the API. Please wait a moment and try again.'
-        } else if (/overloaded|503|529/i.test(errMsg)) {
-          userMessage = 'Claude is currently overloaded. Please try again in a few minutes.'
-        } else if (/timeout|ETIMEDOUT/i.test(errMsg)) {
-          userMessage = 'Request timed out. Check your network connection and try again.'
-        } else if (/ECONNRESET|ECONNREFUSED|fetch failed/i.test(errMsg)) {
-          userMessage = 'Network error. Check your internet connection.'
-        } else if (/401|unauthorized|invalid.*key/i.test(errMsg)) {
-          userMessage = 'Authentication failed. Please check your API key.'
-        } else {
-          userMessage = errMsg || 'Failed to communicate with Claude'
-        }
+          // Format user-friendly error
+          let userMessage: string;
+          if (/rate.limit|429/i.test(errMsg)) {
+            userMessage = 'Rate limited by the API. Please wait a moment and try again.';
+          } else if (/overloaded|503|529/i.test(errMsg)) {
+            userMessage = 'Claude is currently overloaded. Please try again in a few minutes.';
+          } else if (/timeout|ETIMEDOUT/i.test(errMsg)) {
+            userMessage = 'Request timed out. Check your network connection and try again.';
+          } else if (/ECONNRESET|ECONNREFUSED|fetch failed/i.test(errMsg)) {
+            userMessage = 'Network error. Check your internet connection.';
+          } else if (/401|unauthorized|invalid.*key/i.test(errMsg)) {
+            userMessage = 'Authentication failed. Please check your API key.';
+          } else {
+            userMessage = errMsg || 'Failed to communicate with Claude';
+          }
 
-        sendToRenderer('claude:error', userMessage)
-        break
-      } finally {
-        if (attempt >= MAX_RETRIES || !currentAbort) {
-          currentAbort = null
+          sendToRenderer('claude:error', userMessage);
+          break;
+        } finally {
+          if (attempt >= MAX_RETRIES || !currentAbort) {
+            currentAbort = null;
+          }
         }
       }
-    }
-  })
+    },
+  );
 
   ipcMain.handle('claude:abort', () => {
     if (currentAbort) {
-      currentAbort.abort()
-      currentAbort = null
+      currentAbort.abort();
+      currentAbort = null;
     }
-  })
+  });
 
   ipcMain.handle('claude:reset-session', () => {
-    sessionId = undefined
-  })
+    sessionId = undefined;
+  });
 }

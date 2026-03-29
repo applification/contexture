@@ -1,83 +1,86 @@
-import type { Node, Edge } from '@xyflow/react'
-import type { Ontology } from './types'
-import type { ValidationError } from '../services/validation'
+import type { Node, Edge } from '@xyflow/react';
+import type { Ontology } from './types';
+import type { ValidationError } from '../services/validation';
 
 export interface ClassNodeData extends Record<string, unknown> {
-  label: string
-  uri: string
-  comment?: string
-  datatypeProperties: { uri: string; label: string; range: string }[]
-  errorCount: number
-  warningCount: number
+  label: string;
+  uri: string;
+  comment?: string;
+  datatypeProperties: { uri: string; label: string; range: string }[];
+  errorCount: number;
+  warningCount: number;
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
-  label: string
+  label: string;
 }
 
-export type ClassNode = Node<ClassNodeData, 'class'>
-export type GroupNode = Node<GroupNodeData, 'group'>
-export type OntographNode = ClassNode | GroupNode
+export type ClassNode = Node<ClassNodeData, 'class'>;
+export type GroupNode = Node<GroupNodeData, 'group'>;
+export type OntographNode = ClassNode | GroupNode;
 
 export interface ObjPropEdgeData extends Record<string, unknown> {
-  label: string
-  uri: string
+  label: string;
+  uri: string;
 }
 
 export interface SubClassEdgeData extends Record<string, unknown> {
-  label: string
+  label: string;
 }
 
 export interface DisjointEdgeData extends Record<string, unknown> {
-  label: string
+  label: string;
 }
 
 function localName(uri: string): string {
-  const hash = uri.lastIndexOf('#')
-  const slash = uri.lastIndexOf('/')
-  const idx = Math.max(hash, slash)
-  return idx >= 0 ? uri.substring(idx + 1) : uri
+  const hash = uri.lastIndexOf('#');
+  const slash = uri.lastIndexOf('/');
+  const idx = Math.max(hash, slash);
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
 }
 
 export interface ReactFlowElements {
-  nodes: ClassNode[]
-  edges: Edge[]
+  nodes: ClassNode[];
+  edges: Edge[];
 }
 
-export function ontologyToReactFlowElements(ontology: Ontology, validationErrors?: ValidationError[]): ReactFlowElements {
+export function ontologyToReactFlowElements(
+  ontology: Ontology,
+  validationErrors?: ValidationError[],
+): ReactFlowElements {
   // Build per-URI error/warning counts
-  const errorCounts = new Map<string, number>()
-  const warningCounts = new Map<string, number>()
+  const errorCounts = new Map<string, number>();
+  const warningCounts = new Map<string, number>();
   if (validationErrors) {
     for (const err of validationErrors) {
       if (err.severity === 'error') {
-        errorCounts.set(err.elementUri, (errorCounts.get(err.elementUri) ?? 0) + 1)
+        errorCounts.set(err.elementUri, (errorCounts.get(err.elementUri) ?? 0) + 1);
       } else {
-        warningCounts.set(err.elementUri, (warningCounts.get(err.elementUri) ?? 0) + 1)
+        warningCounts.set(err.elementUri, (warningCounts.get(err.elementUri) ?? 0) + 1);
       }
     }
   }
-  const nodes: ClassNode[] = []
-  const edges: Edge[] = []
+  const nodes: ClassNode[] = [];
+  const edges: Edge[] = [];
 
   // Build map of datatype properties by domain class
-  const dtPropsByDomain = new Map<string, { uri: string; label: string; range: string }[]>()
+  const dtPropsByDomain = new Map<string, { uri: string; label: string; range: string }[]>();
   for (const prop of ontology.datatypeProperties.values()) {
-    const label = prop.label || localName(prop.uri)
-    const range = localName(prop.range)
+    const label = prop.label || localName(prop.uri);
+    const range = localName(prop.range);
     for (const domainUri of prop.domain) {
-      if (!dtPropsByDomain.has(domainUri)) dtPropsByDomain.set(domainUri, [])
-      dtPropsByDomain.get(domainUri)!.push({ uri: prop.uri, label, range })
+      if (!dtPropsByDomain.has(domainUri)) dtPropsByDomain.set(domainUri, []);
+      dtPropsByDomain.get(domainUri)!.push({ uri: prop.uri, label, range });
     }
   }
 
   // Class nodes — positions start at {0, 0}, layout engine will place them
-  let idx = 0
+  let idx = 0;
   for (const cls of ontology.classes.values()) {
-    const total = ontology.classes.size
-    const cols = Math.ceil(Math.sqrt(total))
-    const row = Math.floor(idx / cols)
-    const col = idx % cols
+    const total = ontology.classes.size;
+    const cols = Math.ceil(Math.sqrt(total));
+    const row = Math.floor(idx / cols);
+    const col = idx % cols;
     nodes.push({
       id: cls.uri,
       type: 'class',
@@ -88,10 +91,10 @@ export function ontologyToReactFlowElements(ontology: Ontology, validationErrors
         comment: cls.comment,
         datatypeProperties: dtPropsByDomain.get(cls.uri) || [],
         errorCount: errorCounts.get(cls.uri) ?? 0,
-        warningCount: warningCounts.get(cls.uri) ?? 0
-      }
-    })
-    idx++
+        warningCount: warningCounts.get(cls.uri) ?? 0,
+      },
+    });
+    idx++;
   }
 
   // SubClassOf edges
@@ -102,8 +105,8 @@ export function ontologyToReactFlowElements(ontology: Ontology, validationErrors
         source: cls.uri,
         target: parentUri,
         type: 'subClassOf',
-        data: { label: 'subClassOf' }
-      })
+        data: { label: 'subClassOf' },
+      });
     }
 
     for (const disjointUri of cls.disjointWith) {
@@ -112,14 +115,14 @@ export function ontologyToReactFlowElements(ontology: Ontology, validationErrors
         source: cls.uri,
         target: disjointUri,
         type: 'disjointWith',
-        data: { label: 'disjointWith' }
-      })
+        data: { label: 'disjointWith' },
+      });
     }
   }
 
   // Object property edges
   for (const prop of ontology.objectProperties.values()) {
-    const label = prop.label || localName(prop.uri)
+    const label = prop.label || localName(prop.uri);
     for (const domainUri of prop.domain) {
       for (const rangeUri of prop.range) {
         edges.push({
@@ -127,11 +130,11 @@ export function ontologyToReactFlowElements(ontology: Ontology, validationErrors
           source: domainUri,
           target: rangeUri,
           type: 'objectProperty',
-          data: { label, uri: prop.uri }
-        })
+          data: { label, uri: prop.uri },
+        });
       }
     }
   }
 
-  return { nodes, edges }
+  return { nodes, edges };
 }

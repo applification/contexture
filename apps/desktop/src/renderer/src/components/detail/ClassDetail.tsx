@@ -1,40 +1,56 @@
-import type { OntologyClass, DatatypeProperty } from '@renderer/model/types'
-import { useOntologyStore } from '@renderer/store/ontology'
-import { useUIStore } from '@renderer/store/ui'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import type { OntologyClass, DatatypeProperty } from '@renderer/model/types';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface Props {
-  cls: OntologyClass
+  cls: OntologyClass;
 }
 
 function localName(uri: string): string {
-  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
-  return idx >= 0 ? uri.substring(idx + 1) : uri
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
 }
 
-const XSD = 'http://www.w3.org/2001/XMLSchema#'
+const XSD = 'http://www.w3.org/2001/XMLSchema#';
 const XSD_TYPES = [
-  'string', 'boolean', 'integer', 'decimal', 'float', 'double',
-  'date', 'dateTime', 'time', 'duration',
-  'anyURI', 'base64Binary', 'hexBinary',
-  'positiveInteger', 'negativeInteger', 'nonNegativeInteger', 'nonPositiveInteger',
-  'long', 'int', 'short', 'byte',
-]
+  'string',
+  'boolean',
+  'integer',
+  'decimal',
+  'float',
+  'double',
+  'date',
+  'dateTime',
+  'time',
+  'duration',
+  'anyURI',
+  'base64Binary',
+  'hexBinary',
+  'positiveInteger',
+  'negativeInteger',
+  'nonNegativeInteger',
+  'nonPositiveInteger',
+  'long',
+  'int',
+  'short',
+  'byte',
+];
 
 export function ClassDetail({ cls }: Props): React.JSX.Element {
-  const updateClass = useOntologyStore((s) => s.updateClass)
-  const updateDatatypeProperty = useOntologyStore((s) => s.updateDatatypeProperty)
-  const ontology = useOntologyStore((s) => s.ontology)
-  const setFocusNode = useUIStore((s) => s.setFocusNode)
+  const updateClass = useOntologyStore((s) => s.updateClass);
+  const updateDatatypeProperty = useOntologyStore((s) => s.updateDatatypeProperty);
+  const ontology = useOntologyStore((s) => s.ontology);
+  const setFocusNode = useUIStore((s) => s.setFocusNode);
 
   const dtProps = Array.from(ontology.datatypeProperties.values()).filter((p) =>
-    p.domain.includes(cls.uri)
-  )
+    p.domain.includes(cls.uri),
+  );
   const objProps = Array.from(ontology.objectProperties.values()).filter(
-    (p) => p.domain.includes(cls.uri) || p.range.includes(cls.uri)
-  )
+    (p) => p.domain.includes(cls.uri) || p.range.includes(cls.uri),
+  );
 
   return (
     <div className="p-3 space-y-4 text-sm">
@@ -50,7 +66,9 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           id="cls-label"
           defaultValue={cls.label || ''}
           onBlur={(e) => updateClass(cls.uri, { label: e.target.value || undefined })}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
         />
       </div>
 
@@ -104,7 +122,10 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           <div className="text-xs text-muted-foreground mb-1">Relationships</div>
           <div className="space-y-0.5">
             {objProps.map((p) => (
-              <div key={p.uri} className="text-xs bg-secondary rounded px-2 py-1 flex items-center gap-1 flex-wrap">
+              <div
+                key={p.uri}
+                className="text-xs bg-secondary rounded px-2 py-1 flex items-center gap-1 flex-wrap"
+              >
                 <span className="font-medium">{p.label || localName(p.uri)}</span>
                 {p.domain.includes(cls.uri) && p.range.length > 0 && (
                   <>
@@ -140,7 +161,7 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function DatatypePropertyRow({
@@ -149,10 +170,10 @@ function DatatypePropertyRow({
   onRangeChange,
   onCardinalityChange,
 }: {
-  property: DatatypeProperty
-  onLabelBlur: (label: string) => void
-  onRangeChange: (range: string) => void
-  onCardinalityChange: (changes: { minCardinality?: number; maxCardinality?: number }) => void
+  property: DatatypeProperty;
+  onLabelBlur: (label: string) => void;
+  onRangeChange: (range: string) => void;
+  onCardinalityChange: (changes: { minCardinality?: number; maxCardinality?: number }) => void;
 }): React.JSX.Element {
   return (
     <div className="space-y-1">
@@ -160,7 +181,9 @@ function DatatypePropertyRow({
         <Input
           defaultValue={property.label || localName(property.uri)}
           onBlur={(e) => onLabelBlur(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
           className="h-8 text-xs flex-1"
         />
         <select
@@ -169,7 +192,9 @@ function DatatypePropertyRow({
           className="shrink-0 bg-card text-muted-foreground font-mono text-xs rounded-md border border-input px-2 py-1.5 outline-none focus:ring-1 focus:ring-ring cursor-pointer"
         >
           {XSD_TYPES.map((t) => (
-            <option key={t} value={`${XSD}${t}`}>{t}</option>
+            <option key={t} value={`${XSD}${t}`}>
+              {t}
+            </option>
           ))}
           {!property.range.startsWith(XSD) && (
             <option value={property.range}>{localName(property.range)}</option>
@@ -184,10 +209,14 @@ function DatatypePropertyRow({
           placeholder="min"
           defaultValue={property.minCardinality ?? ''}
           onBlur={(e) => {
-            const val = e.target.value.trim()
-            onCardinalityChange({ minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)) })
+            const val = e.target.value.trim();
+            onCardinalityChange({
+              minCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)),
+            });
           }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
           className="h-6 text-xs w-14 px-1.5"
         />
         <span>..</span>
@@ -197,13 +226,17 @@ function DatatypePropertyRow({
           placeholder="∞"
           defaultValue={property.maxCardinality ?? ''}
           onBlur={(e) => {
-            const val = e.target.value.trim()
-            onCardinalityChange({ maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)) })
+            const val = e.target.value.trim();
+            onCardinalityChange({
+              maxCardinality: val === '' ? undefined : Math.max(0, parseInt(val, 10)),
+            });
           }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
           className="h-6 text-xs w-14 px-1.5"
         />
       </div>
     </div>
-  )
+  );
 }

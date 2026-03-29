@@ -1,17 +1,17 @@
-import { initSentryMain } from './sentry'
-initSentryMain()
+import { initSentryMain } from './sentry';
+initSentryMain();
 
-import { syncShellEnvironment } from './syncShellEnvironment'
-import { app, shell, BrowserWindow, Menu, nativeImage } from 'electron'
+import { syncShellEnvironment } from './syncShellEnvironment';
+import { app, shell, BrowserWindow, Menu, nativeImage } from 'electron';
 
-syncShellEnvironment()
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { createMenu } from './menu'
-import { registerFileIPC } from './ipc/file'
-import { registerClaudeIPC } from './ipc/claude'
-import { registerEvalIPC } from './ipc/eval'
-import { registerUpdateIpc } from './ipc/update'
+syncShellEnvironment();
+import { join } from 'path';
+import { electronApp, optimizer, is } from '@electron-toolkit/utils';
+import { createMenu } from './menu';
+import { registerFileIPC } from './ipc/file';
+import { registerClaudeIPC } from './ipc/claude';
+import { registerEvalIPC } from './ipc/eval';
+import { registerUpdateIpc } from './ipc/update';
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -24,58 +24,58 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
-  })
+      sandbox: false,
+    },
+  });
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
+    mainWindow.show();
+  });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
+    shell.openExternal(details.url);
+    return { action: 'deny' };
+  });
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
-  return mainWindow
+  return mainWindow;
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.applification.ontograph')
+  electronApp.setAppUserModelId('com.applification.ontograph');
 
   if (is.dev && process.platform === 'darwin') {
-    const icon = nativeImage.createFromPath(join(__dirname, '../../build/icon.icns'))
-    if (!icon.isEmpty()) app.dock?.setIcon(icon)
+    const icon = nativeImage.createFromPath(join(__dirname, '../../build/icon.icns'));
+    if (!icon.isEmpty()) app.dock?.setIcon(icon);
   }
 
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+    optimizer.watchWindowShortcuts(window);
+  });
 
-  registerFileIPC()
-  registerClaudeIPC()
-  registerEvalIPC()
+  registerFileIPC();
+  registerClaudeIPC();
+  registerEvalIPC();
 
-  const mainWindow = createWindow()
-  Menu.setApplicationMenu(createMenu(mainWindow))
-  registerUpdateIpc(mainWindow)
+  const mainWindow = createWindow();
+  Menu.setApplicationMenu(createMenu(mainWindow));
+  registerUpdateIpc(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      const newWindow = createWindow()
-      Menu.setApplicationMenu(createMenu(newWindow))
+      const newWindow = createWindow();
+      Menu.setApplicationMenu(createMenu(newWindow));
     }
-  })
-})
+  });
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit()
+    app.quit();
   }
-})
+});

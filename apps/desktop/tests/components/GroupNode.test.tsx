@@ -1,22 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
-import { useUIStore } from '@renderer/store/ui'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import { useUIStore } from '@renderer/store/ui';
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <div data-testid="handle" />,
   Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
-  NodeResizer: () => null
-}))
+  NodeResizer: () => null,
+}));
 
-const { GroupNode } = await import('@renderer/components/graph/nodes/GroupNode')
+const { GroupNode } = await import('@renderer/components/graph/nodes/GroupNode');
 
 function resetStore() {
-  useUIStore.setState({ selectedNodeId: null })
+  useUIStore.setState({ selectedNodeId: null });
 }
 
 describe('GroupNode', () => {
-  beforeEach(resetStore)
-  afterEach(cleanup)
+  beforeEach(resetStore);
+  afterEach(cleanup);
 
   it('renders group label', () => {
     render(
@@ -34,13 +34,13 @@ describe('GroupNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    expect(screen.getByText('Animals')).toBeInTheDocument()
-  })
+      />,
+    );
+    expect(screen.getByText('Animals')).toBeInTheDocument();
+  });
 
   it('dims when another node is selected', () => {
-    useUIStore.setState({ selectedNodeId: 'other-node' })
+    useUIStore.setState({ selectedNodeId: 'other-node' });
     const { container } = render(
       <GroupNode
         id="group-1"
@@ -56,14 +56,14 @@ describe('GroupNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    const style = container.firstElementChild!.getAttribute('style')!
-    expect(style).toContain('opacity: 0.2')
-  })
+      />,
+    );
+    const style = container.firstElementChild!.getAttribute('style')!;
+    expect(style).toContain('opacity: 0.2');
+  });
 
   it('is not dimmed when it is the selected node', () => {
-    useUIStore.setState({ selectedNodeId: 'group-1' })
+    useUIStore.setState({ selectedNodeId: 'group-1' });
     const { container } = render(
       <GroupNode
         id="group-1"
@@ -79,9 +79,9 @@ describe('GroupNode', () => {
         parentId=""
         sourcePosition={undefined}
         targetPosition={undefined}
-      />
-    )
-    const style = container.firstElementChild!.getAttribute('style')!
-    expect(style).not.toContain('opacity: 0.2')
-  })
-})
+      />,
+    );
+    const style = container.firstElementChild!.getAttribute('style')!;
+    expect(style).not.toContain('opacity: 0.2');
+  });
+});
