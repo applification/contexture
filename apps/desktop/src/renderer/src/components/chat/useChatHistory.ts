@@ -6,6 +6,7 @@ export interface ChatThread {
   title: string;
   messages: ChatMessage[];
   model: ModelId;
+  filePath: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -22,8 +23,9 @@ function loadThreads(): ChatThread[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const threads: ChatThread[] = raw ? JSON.parse(raw) : [];
-    // Migrate: ensure all messages have an id (older saved threads may lack them)
+    // Migrate: ensure all messages have an id and filePath (older saved threads may lack them)
     for (const thread of threads) {
+      if (thread.filePath === undefined) thread.filePath = null;
       for (const msg of thread.messages) {
         if (!msg.id) msg.id = msgId();
       }
@@ -57,7 +59,8 @@ export interface UseChatHistoryReturn {
   activeThreadId: string | null;
   showThreadList: boolean;
   setShowThreadList: (show: boolean) => void;
-  createThread: (model: ModelId) => string;
+  createThread: (model: ModelId, filePath?: string | null) => string;
+  threadsForFile: (filePath: string | null) => ChatThread[];
   switchThread: (id: string) => ChatThread | undefined;
   deleteThread: (id: string) => void;
   updateThreadMessages: (id: string, messages: ChatMessage[]) => void;
@@ -89,13 +92,14 @@ export function useChatHistory(): UseChatHistoryReturn {
   }, []);
 
   const createThread = useCallback(
-    (model: ModelId): string => {
+    (model: ModelId, filePath?: string | null): string => {
       const id = generateId();
       const thread: ChatThread = {
         id,
         title: 'New chat',
         messages: [],
         model,
+        filePath: filePath ?? null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -155,6 +159,13 @@ export function useChatHistory(): UseChatHistoryReturn {
     return threads.find((t) => t.id === activeThreadId);
   }, [threads, activeThreadId]);
 
+  const threadsForFile = useCallback(
+    (filePath: string | null): ChatThread[] => {
+      return threads.filter((t) => t.filePath === filePath);
+    },
+    [threads],
+  );
+
   return {
     threads,
     activeThreadId,
@@ -167,5 +178,6 @@ export function useChatHistory(): UseChatHistoryReturn {
     updateThreadTitle,
     getActiveThread,
     setActiveThreadId,
+    threadsForFile,
   };
 }

@@ -47,10 +47,15 @@ export function ChatPanel(): React.JSX.Element {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevMessagesRef = useRef<ChatMessage[]>([]);
 
+  const filePath = useOntologyStore((s) => s.filePath);
+
   const chatDraft = useUIStore((s) => s.chatDraft);
   const setChatDraft = useUIStore((s) => s.setChatDraft);
   const pendingChatMessage = useUIStore((s) => s.pendingChatMessage);
   const setPendingChatMessage = useUIStore((s) => s.setPendingChatMessage);
+
+  // Track previous filePath to detect ontology file changes
+  const prevFilePathRef = useRef<string | null | undefined>(undefined);
 
   // Restore active thread on mount
   useEffect(() => {
@@ -60,6 +65,28 @@ export function ChatPanel(): React.JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history.getActiveThread, setMessages]);
+
+  // When ontology file changes, switch to the most recent thread for that file (or clear)
+  useEffect(() => {
+    if (prevFilePathRef.current === undefined) {
+      // Initial mount — don't switch, the restore-active-thread effect handles it
+      prevFilePathRef.current = filePath;
+      return;
+    }
+    if (prevFilePathRef.current === filePath) return;
+    prevFilePathRef.current = filePath;
+
+    const fileThreads = history.threadsForFile(filePath);
+    if (fileThreads.length > 0) {
+      const latest = fileThreads[0];
+      history.switchThread(latest.id);
+      setMessages(latest.messages);
+    } else {
+      history.setActiveThreadId(null);
+      setMessages([]);
+      resetSession();
+    }
+  }, [filePath, history, setMessages, resetSession]);
 
   // Auto-save messages to active thread when messages change
   useEffect(() => {
@@ -72,21 +99,21 @@ export function ChatPanel(): React.JSX.Element {
   // Auto-create thread on first message if none active
   useEffect(() => {
     if (!history.activeThreadId && messages.length > 0) {
-      history.createThread(model);
+      history.createThread(model, filePath);
     }
-  }, [messages.length, history.activeThreadId, history.createThread, model]);
+  }, [messages.length, history.activeThreadId, history.createThread, model, filePath]);
 
   const handleNewChat = useCallback(() => {
     // Don't save empty threads
     if (history.activeThreadId && messages.length === 0) {
       history.deleteThread(history.activeThreadId);
     }
-    const id = history.createThread(model);
+    const id = history.createThread(model, filePath);
     setMessages([]);
     resetSession();
     history.setShowThreadList(false);
     return id;
-  }, [history, messages.length, model, setMessages, resetSession]);
+  }, [history, messages.length, model, filePath, setMessages, resetSession]);
 
   const handleSwitchThread = useCallback(
     (id: string) => {
@@ -193,6 +220,11 @@ export function ChatPanel(): React.JSX.Element {
     }
   };
 
+  const fileThreads = useMemo(
+    () => history.threadsForFile(filePath),
+    [history.threadsForFile, filePath],
+  );
+
   const activeThread = history.getActiveThread();
   const headerTitle =
     activeThread?.title && activeThread.title !== 'New chat' ? activeThread.title : 'Claude';
@@ -225,7 +257,7 @@ export function ChatPanel(): React.JSX.Element {
 
       {history.showThreadList ? (
         <ChatThreadList
-          threads={history.threads}
+          threads={fileThreads}
           activeThreadId={history.activeThreadId}
           onSelect={handleSwitchThread}
           onDelete={handleDeleteThread}
