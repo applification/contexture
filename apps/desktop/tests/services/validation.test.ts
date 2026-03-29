@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { validateOntology } from '@renderer/services/validation';
-import { createEmptyOntology } from '@renderer/model/types';
 import type { Ontology } from '@renderer/model/types';
+import { createEmptyOntology } from '@renderer/model/types';
+import { validateOntology } from '@renderer/services/validation';
+import { describe, expect, it } from 'vitest';
 
 const EX = 'http://example.org/';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';

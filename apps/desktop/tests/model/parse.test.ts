@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseTurtle } from '@renderer/model/parse';
+import type { DatatypeProperty, ObjectProperty, OntologyClass } from '@renderer/model/types';
+import { describe, expect, it } from 'vitest';
 
 const EX = 'http://example.org/ontology#';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';
@@ -23,17 +24,17 @@ describe('parseTurtle', () => {
 
   it('parses class labels and comments', () => {
     const ontology = parseTurtle(peopleTurtle);
-    const person = ontology.classes.get(`${EX}Person`)!;
+    const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
     expect(person.label).toBe('Person');
     expect(person.comment).toBe('A human being');
   });
 
   it('parses subClassOf relationships', () => {
     const ontology = parseTurtle(peopleTurtle);
-    const employee = ontology.classes.get(`${EX}Employee`)!;
+    const employee = ontology.classes.get(`${EX}Employee`) as OntologyClass;
     expect(employee.subClassOf).toEqual([`${EX}Person`]);
 
-    const manager = ontology.classes.get(`${EX}Manager`)!;
+    const manager = ontology.classes.get(`${EX}Manager`) as OntologyClass;
     expect(manager.subClassOf).toEqual([`${EX}Employee`]);
   });
 
@@ -41,7 +42,7 @@ describe('parseTurtle', () => {
     const ontology = parseTurtle(peopleTurtle);
     expect(ontology.objectProperties.size).toBe(3);
 
-    const worksFor = ontology.objectProperties.get(`${EX}worksFor`)!;
+    const worksFor = ontology.objectProperties.get(`${EX}worksFor`) as ObjectProperty;
     expect(worksFor.label).toBe('works for');
     expect(worksFor.domain).toEqual([`${EX}Employee`]);
     expect(worksFor.range).toEqual([`${EX}Organisation`]);
@@ -49,7 +50,7 @@ describe('parseTurtle', () => {
 
   it('parses inverseOf', () => {
     const ontology = parseTurtle(peopleTurtle);
-    const manages = ontology.objectProperties.get(`${EX}manages`)!;
+    const manages = ontology.objectProperties.get(`${EX}manages`) as ObjectProperty;
     expect(manages.inverseOf).toBe(`${EX}managedBy`);
   });
 
@@ -57,12 +58,12 @@ describe('parseTurtle', () => {
     const ontology = parseTurtle(peopleTurtle);
     expect(ontology.datatypeProperties.size).toBe(4);
 
-    const name = ontology.datatypeProperties.get(`${EX}name`)!;
+    const name = ontology.datatypeProperties.get(`${EX}name`) as DatatypeProperty;
     expect(name.label).toBe('name');
     expect(name.domain).toEqual([`${EX}Person`]);
     expect(name.range).toBe(`${XSD}string`);
 
-    const age = ontology.datatypeProperties.get(`${EX}age`)!;
+    const age = ontology.datatypeProperties.get(`${EX}age`) as DatatypeProperty;
     expect(age.range).toBe(`${XSD}integer`);
   });
 
@@ -87,7 +88,7 @@ describe('parseTurtle', () => {
     `;
     const ontology = parseTurtle(turtle);
     expect(ontology.classes.size).toBe(1);
-    const thing = ontology.classes.get('http://example.org/Thing')!;
+    const thing = ontology.classes.get('http://example.org/Thing') as OntologyClass;
     expect(thing.uri).toBe('http://example.org/Thing');
     expect(thing.label).toBeUndefined();
     expect(thing.subClassOf).toEqual([]);

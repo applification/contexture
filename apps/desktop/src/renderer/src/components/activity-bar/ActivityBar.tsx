@@ -1,5 +1,5 @@
-import { MousePointer2, MessageSquare, ClipboardList } from 'lucide-react';
 import type { SidebarTab } from '@renderer/store/ui';
+import { ClipboardList, MessageSquare, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityBarProps {
@@ -18,6 +18,7 @@ export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React
     <div className="w-10 flex flex-col items-center py-2 gap-1 border-l border-border bg-background shrink-0">
       {TABS.map(({ id, icon, label }) => (
         <button
+          type="button"
           key={id}
           title={label}
           onClick={() => onTabChange(id)}

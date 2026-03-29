@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json", "**/*.jsonc"]
   },
   "formatter": {
     "enabled": true,
@@ -24,36 +25,36 @@
       },
       "a11y": {
         "useValidAriaRole": "error",
-        "useButtonType": "warn",
-        "useValidAnchor": "warn",
-        "noStaticElementInteractions": "warn",
-        "noSvgWithoutTitle": "warn",
-        "useKeyWithClickEvents": "warn",
-        "noLabelWithoutControl": "warn"
+        "useButtonType": "error",
+        "useValidAnchor": "error",
+        "noStaticElementInteractions": "error",
+        "noSvgWithoutTitle": "error",
+        "useKeyWithClickEvents": "error",
+        "noLabelWithoutControl": "error"
       },
       "correctness": {
-        "noUnusedImports": "warn",
-        "noUnusedVariables": "warn",
-        "useExhaustiveDependencies": "warn",
-        "noInnerDeclarations": "warn"
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "error",
+        "noInnerDeclarations": "error"
       },
       "style": {
-        "noNonNullAssertion": "warn",
-        "useNodejsImportProtocol": "warn",
-        "useImportType": "warn",
-        "useTemplate": "warn",
-        "useExponentiationOperator": "warn"
+        "noNonNullAssertion": "error",
+        "useNodejsImportProtocol": "error",
+        "useImportType": "error",
+        "useTemplate": "error",
+        "useExponentiationOperator": "error"
       },
       "suspicious": {
-        "noArrayIndexKey": "warn",
-        "noExplicitAny": "warn",
-        "useIterableCallbackReturn": "warn",
-        "noTsIgnore": "warn"
+        "noArrayIndexKey": "error",
+        "noExplicitAny": "error",
+        "useIterableCallbackReturn": "error",
+        "noTsIgnore": "error"
       },
       "complexity": {
-        "noImportantStyles": "warn",
-        "useLiteralKeys": "warn",
-        "noUselessContinue": "warn"
+        "noImportantStyles": "error",
+        "useLiteralKeys": "error",
+        "noUselessContinue": "error"
       }
     }
   },

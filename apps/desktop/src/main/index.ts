@@ -1,17 +1,19 @@
 import { initSentryMain } from './sentry';
+
 initSentryMain();
 
+import { app, BrowserWindow, Menu, nativeImage, shell } from 'electron';
 import { syncShellEnvironment } from './syncShellEnvironment';
-import { app, shell, BrowserWindow, Menu, nativeImage } from 'electron';
 
 syncShellEnvironment();
-import { join } from 'path';
-import { electronApp, optimizer, is } from '@electron-toolkit/utils';
-import { createMenu } from './menu';
-import { registerFileIPC } from './ipc/file';
+
+import { join } from 'node:path';
+import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { registerClaudeIPC } from './ipc/claude';
 import { registerEvalIPC } from './ipc/eval';
+import { registerFileIPC } from './ipc/file';
 import { registerUpdateIpc } from './ipc/update';
+import { createMenu } from './menu';
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -37,8 +39,8 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+  if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }

@@ -27,7 +27,7 @@ function LogoMark({
   const accent =
     variant === 'mono-light' ? '#000' : variant === 'mono-dark' ? '#fff' : 'var(--accent)';
   return (
-    <svg className={className} viewBox="0 0 32 32" fill="none">
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <line
         x1="8"
         y1="24"
@@ -447,16 +447,28 @@ export default function BrandPage() {
             Buttons
           </h3>
           <div className="flex flex-wrap gap-4 mb-10">
-            <button className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+            <button
+              type="button"
+              className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            >
               Primary
             </button>
-            <button className="bg-secondary text-secondary-foreground px-5 py-2.5 rounded-lg text-sm font-medium border border-border/60 hover:bg-secondary/80 transition-colors">
+            <button
+              type="button"
+              className="bg-secondary text-secondary-foreground px-5 py-2.5 rounded-lg text-sm font-medium border border-border/60 hover:bg-secondary/80 transition-colors"
+            >
               Secondary
             </button>
-            <button className="px-5 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+            <button
+              type="button"
+              className="px-5 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
               Ghost
             </button>
-            <button className="bg-destructive text-destructive-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+            <button
+              type="button"
+              className="bg-destructive text-destructive-foreground px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            >
               Destructive
             </button>
           </div>
@@ -475,6 +487,7 @@ export default function BrandPage() {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 16v-4" />

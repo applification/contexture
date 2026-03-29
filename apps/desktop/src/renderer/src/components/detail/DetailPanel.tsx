@@ -1,5 +1,5 @@
-import { useUIStore } from '@renderer/store/ui';
 import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
 import { ClassDetail } from './ClassDetail';
 import { EdgeDetail } from './EdgeDetail';
 

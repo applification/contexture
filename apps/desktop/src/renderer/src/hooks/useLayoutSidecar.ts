@@ -18,7 +18,7 @@ interface SidecarData {
 }
 
 function sidecarPath(filePath: string): string {
-  return filePath + '.layout.json';
+  return `${filePath}.layout.json`;
 }
 
 export function useLayoutSidecar(filePath: string | null) {

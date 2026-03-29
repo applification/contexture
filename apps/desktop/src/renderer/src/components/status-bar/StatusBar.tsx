@@ -1,14 +1,14 @@
-import { useMemo, useState, useCallback } from 'react';
-import { CircleAlert, TriangleAlert, BarChart3, Circle } from 'lucide-react';
-import { useOntologyStore } from '@renderer/store/ontology';
-import { useUIStore } from '@renderer/store/ui';
+import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
 import { serializeToTurtle } from '@renderer/model/serialize';
 import { estimateTokenCount } from '@renderer/services/tokens';
-import { validateOntology, type ValidationError } from '@renderer/services/validation';
-import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
+import { type ValidationError, validateOntology } from '@renderer/services/validation';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { BarChart3, Circle, CircleAlert, TriangleAlert } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 function localName(uri: string): string {
@@ -104,9 +104,10 @@ export function StatusBar(): React.JSX.Element {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0 w-80" side="top" align="end">
-              {errors.map((error, i) => (
+              {errors.map((error) => (
                 <button
-                  key={i}
+                  type="button"
+                  key={`${error.elementUri}-${error.message}`}
                   onClick={() => handleErrorClick(error)}
                   className="w-full text-left px-3 py-2 hover:bg-accent transition-colors flex gap-2 items-start border-b border-border last:border-0 text-xs"
                 >
@@ -134,6 +135,7 @@ export function StatusBar(): React.JSX.Element {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={toggleAnalytics}
                 className="flex items-center gap-1 hover:text-foreground transition-colors"
               >

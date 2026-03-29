@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
 import { useOntologyStore } from '@renderer/store/ontology';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 const SAMPLE_TURTLE = `
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -91,9 +91,9 @@ describe('useOntologyStore', () => {
       useOntologyStore.getState().addClass('http://example.org/Foo');
       const cls = useOntologyStore.getState().ontology.classes.get('http://example.org/Foo');
       expect(cls).toBeDefined();
-      expect(cls!.uri).toBe('http://example.org/Foo');
-      expect(cls!.subClassOf).toEqual([]);
-      expect(cls!.disjointWith).toEqual([]);
+      expect(cls?.uri).toBe('http://example.org/Foo');
+      expect(cls?.subClassOf).toEqual([]);
+      expect(cls?.disjointWith).toEqual([]);
       expect(useOntologyStore.getState().isDirty).toBe(true);
     });
 
@@ -103,8 +103,8 @@ describe('useOntologyStore', () => {
         comment: 'A foo class',
       });
       const cls = useOntologyStore.getState().ontology.classes.get('http://example.org/Foo');
-      expect(cls!.label).toBe('Foo');
-      expect(cls!.comment).toBe('A foo class');
+      expect(cls?.label).toBe('Foo');
+      expect(cls?.comment).toBe('A foo class');
     });
   });
 
@@ -113,7 +113,7 @@ describe('useOntologyStore', () => {
       useOntologyStore.getState().addClass('http://example.org/Foo', { label: 'Foo' });
       useOntologyStore.getState().updateClass('http://example.org/Foo', { label: 'Bar' });
       expect(
-        useOntologyStore.getState().ontology.classes.get('http://example.org/Foo')!.label,
+        useOntologyStore.getState().ontology.classes.get('http://example.org/Foo')?.label,
       ).toBe('Bar');
     });
 
@@ -161,15 +161,15 @@ describe('useOntologyStore', () => {
       });
       const prop = useOntologyStore.getState().ontology.objectProperties.get('http://ex/rel');
       expect(prop).toBeDefined();
-      expect(prop!.domain).toEqual(['http://ex/A']);
-      expect(prop!.range).toEqual(['http://ex/B']);
+      expect(prop?.domain).toEqual(['http://ex/A']);
+      expect(prop?.range).toEqual(['http://ex/B']);
     });
 
     it('updates an object property', () => {
       useOntologyStore.getState().addObjectProperty('http://ex/rel');
       useOntologyStore.getState().updateObjectProperty('http://ex/rel', { label: 'Relates' });
       expect(
-        useOntologyStore.getState().ontology.objectProperties.get('http://ex/rel')!.label,
+        useOntologyStore.getState().ontology.objectProperties.get('http://ex/rel')?.label,
       ).toBe('Relates');
     });
 
@@ -192,14 +192,14 @@ describe('useOntologyStore', () => {
     it('adds with default range', () => {
       useOntologyStore.getState().addDatatypeProperty('http://ex/dp');
       const prop = useOntologyStore.getState().ontology.datatypeProperties.get('http://ex/dp');
-      expect(prop!.range).toBe('http://www.w3.org/2001/XMLSchema#string');
+      expect(prop?.range).toBe('http://www.w3.org/2001/XMLSchema#string');
     });
 
     it('updates a datatype property', () => {
       useOntologyStore.getState().addDatatypeProperty('http://ex/dp');
       useOntologyStore.getState().updateDatatypeProperty('http://ex/dp', { label: 'Data' });
       expect(
-        useOntologyStore.getState().ontology.datatypeProperties.get('http://ex/dp')!.label,
+        useOntologyStore.getState().ontology.datatypeProperties.get('http://ex/dp')?.label,
       ).toBe('Data');
     });
 

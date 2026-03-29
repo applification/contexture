@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { ChatMessage, ModelId } from './useClaude';
+import { useCallback, useEffect, useState } from 'react';
+import { type ChatMessage, type ModelId, msgId } from './useClaude';
 
 export interface ChatThread {
   id: string;
@@ -21,7 +21,14 @@ function generateId(): string {
 function loadThreads(): ChatThread[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const threads: ChatThread[] = raw ? JSON.parse(raw) : [];
+    // Migrate: ensure all messages have an id (older saved threads may lack them)
+    for (const thread of threads) {
+      for (const msg of thread.messages) {
+        if (!msg.id) msg.id = msgId();
+      }
+    }
+    return threads;
   } catch {
     return [];
   }
@@ -42,7 +49,7 @@ function saveThreads(threads: ChatThread[]): void {
 }
 
 function titleFromMessage(message: string): string {
-  return message.length > 50 ? message.slice(0, 50) + '…' : message;
+  return message.length > 50 ? `${message.slice(0, 50)}…` : message;
 }
 
 export interface UseChatHistoryReturn {

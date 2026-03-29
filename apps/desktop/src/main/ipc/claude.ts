@@ -1,8 +1,8 @@
-import { ipcMain, BrowserWindow } from 'electron';
-import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
+import { BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod/v4';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
@@ -338,7 +338,7 @@ export function registerClaudeIPC(): void {
             /rate.limit|429|overloaded|timeout|ETIMEDOUT|ECONNRESET|503|529/i.test(errMsg);
 
           if (isRetryable && attempt < MAX_RETRIES) {
-            const delaySec = Math.pow(2, attempt);
+            const delaySec = 2 ** attempt;
             sendToRenderer(
               'claude:assistant-text',
               `\n\n*Rate limited — retrying in ${delaySec}s (attempt ${attempt}/${MAX_RETRIES})...*`,

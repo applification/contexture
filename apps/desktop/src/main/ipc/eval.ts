@@ -1,5 +1,5 @@
-import { ipcMain, BrowserWindow } from 'electron';
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import { BrowserWindow, ipcMain } from 'electron';
 import { getDetectedClaudePath } from './claude';
 
 const THINKING_TOKENS: Record<string, number | undefined> = {

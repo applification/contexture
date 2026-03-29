@@ -7,11 +7,12 @@ interface TrackedLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement>
   properties?: Record<string, string>;
 }
 
-export function TrackedLink({ event, properties, children, ...props }: TrackedLinkProps) {
+export function TrackedLink({ event, properties, children, href, ...props }: TrackedLinkProps) {
   const ph = usePostHog();
 
   return (
     <a
+      href={href}
       {...props}
       onClick={(e) => {
         ph?.capture(event, properties);

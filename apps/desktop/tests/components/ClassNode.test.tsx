@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
 import { useUIStore } from '@renderer/store/ui';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <div data-testid="handle" />,
@@ -128,7 +128,7 @@ describe('ClassNode', () => {
         targetPosition={undefined}
       />,
     );
-    const node = container.querySelector('.ontograph-class-node')!;
+    const node = container.querySelector('.ontograph-class-node') as Element;
     expect(node.getAttribute('style')).toContain('selected');
   });
 
@@ -151,7 +151,7 @@ describe('ClassNode', () => {
         targetPosition={undefined}
       />,
     );
-    const node = container.querySelector('.ontograph-class-node')!;
+    const node = container.querySelector('.ontograph-class-node') as Element;
     expect(node.getAttribute('style')).toContain('opacity: 0.2');
   });
 });

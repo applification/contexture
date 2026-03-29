@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
+import { contextBridge, ipcRenderer } from 'electron';
 
 type Callback<T extends unknown[] = []> = (...args: T) => void;
 
@@ -120,8 +120,8 @@ if (process.contextIsolated) {
     console.error(error);
   }
 } else {
-  // @ts-ignore
+  // @ts-expect-error
   window.electron = electronAPI;
-  // @ts-ignore
+  // @ts-expect-error
   window.api = api;
 }

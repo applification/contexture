@@ -1,6 +1,6 @@
-import type { Node, Edge } from '@xyflow/react';
-import type { Ontology } from './types';
+import type { Edge, Node } from '@xyflow/react';
 import type { ValidationError } from '../services/validation';
+import type { Ontology } from './types';
 
 export interface ClassNodeData extends Record<string, unknown> {
   label: string;
@@ -70,7 +70,7 @@ export function ontologyToReactFlowElements(
     const range = localName(prop.range);
     for (const domainUri of prop.domain) {
       if (!dtPropsByDomain.has(domainUri)) dtPropsByDomain.set(domainUri, []);
-      dtPropsByDomain.get(domainUri)!.push({ uri: prop.uri, label, range });
+      dtPropsByDomain.get(domainUri)?.push({ uri: prop.uri, label, range });
     }
   }
 

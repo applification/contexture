@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
 import { getFloatingEdgeParams } from '@renderer/components/graph/edges/floating-edge-utils';
 import { Position } from '@xyflow/react';
+import { describe, expect, it } from 'vitest';
 
 function makeNode(x: number, y: number, w: number, h: number) {
   return {
     measured: { width: w, height: h },
     internals: { positionAbsolute: { x, y } },
-  } as any;
+  } as unknown as Parameters<typeof getFloatingEdgeParams>[0];
 }
 
 describe('getFloatingEdgeParams', () => {

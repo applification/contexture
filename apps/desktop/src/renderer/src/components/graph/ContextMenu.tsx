@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -47,23 +47,27 @@ export function ContextMenu({ x, y, items, onClose }: Props): React.JSX.Element 
       exit={{ opacity: 0, scale: 0.95, y: -4 }}
       transition={{ duration: 0.1, ease: 'easeOut' }}
     >
-      {items.map((item, i) =>
-        item.separator ? (
-          <Separator key={i} className="my-1" />
-        ) : (
-          <Button
-            key={i}
-            variant="ghost"
-            className={`w-full justify-start px-3 h-8 rounded-none text-sm font-normal ${item.destructive ? 'text-destructive-foreground hover:text-destructive-foreground' : ''}`}
-            onClick={() => {
-              item.action();
-              onClose();
-            }}
-          >
-            {item.label}
-          </Button>
-        ),
-      )}
+      {(() => {
+        let sepCount = 0;
+        return items.map((item) => {
+          if (item.separator) {
+            return <Separator key={`sep-${++sepCount}`} className="my-1" />;
+          }
+          return (
+            <Button
+              key={item.label}
+              variant="ghost"
+              className={`w-full justify-start px-3 h-8 rounded-none text-sm font-normal ${item.destructive ? 'text-destructive-foreground hover:text-destructive-foreground' : ''}`}
+              onClick={() => {
+                item.action();
+                onClose();
+              }}
+            >
+              {item.label}
+            </Button>
+          );
+        });
+      })()}
     </motion.div>
   );
 }

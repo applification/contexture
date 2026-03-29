@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { useUIStore } from '@renderer/store/ui';
 import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock streamdown before importing ChatPanel
 vi.mock('streamdown', () => ({

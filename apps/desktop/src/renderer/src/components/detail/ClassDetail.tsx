@@ -1,9 +1,9 @@
-import type { OntologyClass, DatatypeProperty } from '@renderer/model/types';
+import type { DatatypeProperty, OntologyClass } from '@renderer/model/types';
 import { useOntologyStore } from '@renderer/store/ontology';
 import { useUIStore } from '@renderer/store/ui';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Props {
   cls: OntologyClass;
@@ -88,7 +88,8 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           <div className="text-xs text-muted-foreground mb-1">Inherits from</div>
           <div className="space-y-0.5">
             {cls.subClassOf.map((uri) => (
-              <div
+              <button
+                type="button"
                 key={uri}
                 className="text-xs bg-secondary rounded px-2 py-1 cursor-pointer hover:bg-accent transition-colors flex items-center gap-1.5 group"
                 onClick={() => setFocusNode(uri)}
@@ -96,7 +97,7 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
                 <span className="text-primary underline underline-offset-2 decoration-primary/40 group-hover:decoration-primary transition-colors">
                   {ontology.classes.get(uri)?.label || localName(uri)}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -131,13 +132,14 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
                   <>
                     <span className="text-muted-foreground">→</span>
                     {p.range.map((r) => (
-                      <span
+                      <button
+                        type="button"
                         key={r}
                         className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary cursor-pointer transition-colors"
                         onClick={() => setFocusNode(r)}
                       >
                         {ontology.classes.get(r)?.label || localName(r)}
-                      </span>
+                      </button>
                     ))}
                   </>
                 )}
@@ -145,13 +147,14 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
                   <>
                     <span className="text-muted-foreground">←</span>
                     {p.domain.map((d) => (
-                      <span
+                      <button
+                        type="button"
                         key={d}
                         className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary cursor-pointer transition-colors"
                         onClick={() => setFocusNode(d)}
                       >
                         {ontology.classes.get(d)?.label || localName(d)}
-                      </span>
+                      </button>
                     ))}
                   </>
                 )}

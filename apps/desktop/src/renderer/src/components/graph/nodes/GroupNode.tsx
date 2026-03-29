@@ -1,7 +1,7 @@
-import { memo } from 'react';
-import { Handle, Position, type NodeProps, NodeResizer } from '@xyflow/react';
 import type { GroupNode as GroupNodeType } from '@renderer/model/reactflow';
 import { useUIStore } from '@renderer/store/ui';
+import { Handle, type NodeProps, NodeResizer, Position } from '@xyflow/react';
+import { memo } from 'react';
 
 export const GroupNode = memo(function GroupNode({ data, id, selected }: NodeProps<GroupNodeType>) {
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);

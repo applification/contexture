@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { useEvalStore } from '@renderer/store/eval';
 import { ImprovementHUD } from '@renderer/components/hud/ImprovementHUD';
+import { useEvalStore } from '@renderer/store/eval';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function resetStore() {
   useEvalStore.setState({

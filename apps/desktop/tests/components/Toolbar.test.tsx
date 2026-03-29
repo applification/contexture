@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock streamdown before importing Toolbar (it uses useClaude which uses ChatPanel dependencies)
 vi.mock('streamdown', () => ({

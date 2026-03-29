@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { usePostHog } from 'posthog-js/react';
+import { useEffect } from 'react';
 import { getVisitorId } from '@/lib/visitor-id';
 
 const GITHUB_RELEASES_URL = 'https://github.com/DaveHudson/Ontograph/releases/latest';

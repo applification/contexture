@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execFileSync } from 'node:child_process';
 
 const ENV_START = '__ONTOGRAPH_ENV_START__';
 const ENV_END = '__ONTOGRAPH_ENV_END__';

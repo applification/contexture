@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseTurtle } from '@renderer/model/parse';
 import { serializeToTurtle } from '@renderer/model/serialize';
+import type { DatatypeProperty, ObjectProperty, OntologyClass } from '@renderer/model/types';
 import { createEmptyOntology } from '@renderer/model/types';
+import { describe, expect, it } from 'vitest';
 
 const EX = 'http://example.org/ontology#';
-const XSD = 'http://www.w3.org/2001/XMLSchema#';
+const _XSD = 'http://www.w3.org/2001/XMLSchema#';
 
 const peopleTurtle = readFileSync(
   resolve(__dirname, '../../resources/sample-ontologies/people.ttl'),
@@ -21,7 +22,7 @@ describe('serializeToTurtle', () => {
 
     expect(reparsed.classes.size).toBe(original.classes.size);
     for (const [uri, cls] of original.classes) {
-      const reparsedCls = reparsed.classes.get(uri)!;
+      const reparsedCls = reparsed.classes.get(uri) as OntologyClass;
       expect(reparsedCls).toBeDefined();
       expect(reparsedCls.label).toBe(cls.label);
       expect(reparsedCls.comment).toBe(cls.comment);
@@ -36,7 +37,7 @@ describe('serializeToTurtle', () => {
 
     expect(reparsed.objectProperties.size).toBe(original.objectProperties.size);
     for (const [uri, prop] of original.objectProperties) {
-      const reparsedProp = reparsed.objectProperties.get(uri)!;
+      const reparsedProp = reparsed.objectProperties.get(uri) as ObjectProperty;
       expect(reparsedProp).toBeDefined();
       expect(reparsedProp.label).toBe(prop.label);
       expect(reparsedProp.domain.sort()).toEqual(prop.domain.sort());
@@ -52,7 +53,7 @@ describe('serializeToTurtle', () => {
 
     expect(reparsed.datatypeProperties.size).toBe(original.datatypeProperties.size);
     for (const [uri, prop] of original.datatypeProperties) {
-      const reparsedProp = reparsed.datatypeProperties.get(uri)!;
+      const reparsedProp = reparsed.datatypeProperties.get(uri) as DatatypeProperty;
       expect(reparsedProp).toBeDefined();
       expect(reparsedProp.label).toBe(prop.label);
       expect(reparsedProp.domain.sort()).toEqual(prop.domain.sort());

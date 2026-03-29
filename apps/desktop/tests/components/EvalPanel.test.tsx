@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { useUIStore } from '@renderer/store/ui';
-import { useOntologyStore } from '@renderer/store/ontology';
 import { useEvalStore } from '@renderer/store/eval';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock streamdown before importing EvalPanel
 vi.mock('streamdown', () => ({
@@ -60,7 +60,7 @@ describe('EvalPanel', () => {
   it('disables Run Eval when domain is empty', () => {
     render(<EvalPanel />);
     expect(screen.getByText('Run Eval')).toBeInTheDocument();
-    const btn = screen.getByText('Run Eval').closest('button')!;
+    const btn = screen.getByText('Run Eval').closest('button') as HTMLButtonElement;
     expect(btn).toBeDisabled();
   });
 
@@ -68,7 +68,7 @@ describe('EvalPanel', () => {
     useEvalStore.getState().setConfig({ domain: 'Healthcare' });
     useOntologyStore.getState().addClass('http://ex/A');
     render(<EvalPanel />);
-    const btn = screen.getByText('Run Eval').closest('button')!;
+    const btn = screen.getByText('Run Eval').closest('button') as HTMLButtonElement;
     expect(btn).not.toBeDisabled();
   });
 

@@ -1,9 +1,9 @@
-import { memo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow';
 // Floating edges use useInternalNode to compute real intersection points,
 // so handles are invisible and centered — they exist only for RF's connection model.
 import { useUIStore } from '@renderer/store/ui';
-import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow';
+import { Handle, type NodeProps, Position } from '@xyflow/react';
+import { memo } from 'react';
 
 export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNodeType>) {
   const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties);

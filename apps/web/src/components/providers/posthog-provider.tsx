@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
-import { initPostHog, posthog } from '@/lib/posthog';
+import { useEffect } from 'react';
 import { captureAttribution } from '@/lib/attribution';
+import { initPostHog, posthog } from '@/lib/posthog';
 
 function PostHogPageView() {
   const pathname = usePathname();

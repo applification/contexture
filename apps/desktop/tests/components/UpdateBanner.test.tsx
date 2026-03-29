@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
 import { UpdateBanner } from '@renderer/components/UpdateBanner';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('UpdateBanner', () => {
   afterEach(cleanup);

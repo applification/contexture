@@ -17,22 +17,26 @@ export function GraphBackground() {
   const animRef = useRef<number>(0);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const cvs = canvasRef.current;
+    if (!cvs) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const context = cvs.getContext('2d');
+    if (!context) return;
+
+    // Store in consts so closures retain the non-null narrowing
+    const canvas: HTMLCanvasElement = cvs;
+    const ctx: CanvasRenderingContext2D = context;
 
     function resize() {
       const dpr = window.devicePixelRatio || 1;
-      canvas!.width = canvas!.offsetWidth * dpr;
-      canvas!.height = canvas!.offsetHeight * dpr;
-      ctx!.scale(dpr, dpr);
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
     }
     resize();
 
-    const w = () => canvas!.offsetWidth;
-    const h = () => canvas!.offsetHeight;
+    const w = () => canvas.offsetWidth;
+    const h = () => canvas.offsetHeight;
 
     // Initialize nodes
     nodesRef.current = Array.from({ length: NODE_COUNT }, () => ({
@@ -47,7 +51,7 @@ export function GraphBackground() {
     function draw() {
       const width = w();
       const height = h();
-      ctx!.clearRect(0, 0, width, height);
+      ctx.clearRect(0, 0, width, height);
 
       const nodes = nodesRef.current;
       const primaryColor = style.getPropertyValue('--primary').trim() || 'oklch(0.45 0.15 270)';
@@ -71,12 +75,12 @@ export function GraphBackground() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DISTANCE) {
             const opacity = 0.08 * (1 - dist / CONNECTION_DISTANCE);
-            ctx!.beginPath();
-            ctx!.moveTo(nodes[i].x, nodes[i].y);
-            ctx!.lineTo(nodes[j].x, nodes[j].y);
-            ctx!.strokeStyle = `color-mix(in oklch, ${primaryColor} 100%, transparent ${(1 - opacity) * 100}%)`;
-            ctx!.lineWidth = 1;
-            ctx!.stroke();
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.strokeStyle = `color-mix(in oklch, ${primaryColor} 100%, transparent ${(1 - opacity) * 100}%)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
           }
         }
       }
@@ -84,10 +88,10 @@ export function GraphBackground() {
       // Draw nodes
       for (let i = 0; i < nodes.length; i++) {
         const color = i % 3 === 0 ? accentColor : primaryColor;
-        ctx!.beginPath();
-        ctx!.arc(nodes[i].x, nodes[i].y, 2.5, 0, Math.PI * 2);
-        ctx!.fillStyle = `color-mix(in oklch, ${color} 100%, transparent 85%)`;
-        ctx!.fill();
+        ctx.beginPath();
+        ctx.arc(nodes[i].x, nodes[i].y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = `color-mix(in oklch, ${color} 100%, transparent 85%)`;
+        ctx.fill();
       }
 
       animRef.current = requestAnimationFrame(draw);

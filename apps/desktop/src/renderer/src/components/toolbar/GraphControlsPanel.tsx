@@ -1,5 +1,5 @@
-import { X, Maximize2, RefreshCw } from 'lucide-react';
 import { useUIStore } from '@renderer/store/ui';
+import { Maximize2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';

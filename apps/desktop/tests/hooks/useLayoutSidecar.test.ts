@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
 import { useLayoutSidecar } from '@renderer/hooks/useLayoutSidecar';
+import { renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('useLayoutSidecar', () => {
   beforeEach(() => {

@@ -1,8 +1,8 @@
+import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { GeistSans } from 'geist/font/sans';
-import { PostHogProvider } from '@/components/providers/posthog-provider';
 import { ConsentBanner } from '@/components/consent-banner';
+import { PostHogProvider } from '@/components/providers/posthog-provider';
 import './globals.css';
 
 export const metadata: Metadata = {

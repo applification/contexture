@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { estimateTokenCount } from '@renderer/services/tokens';
+import { describe, expect, it } from 'vitest';
 
 describe('estimateTokenCount', () => {
   it('returns 0 for empty string', () => {
@@ -7,7 +7,7 @@ describe('estimateTokenCount', () => {
   });
 
   it('returns 0 for falsy input', () => {
-    expect(estimateTokenCount(undefined as any)).toBe(0);
+    expect(estimateTokenCount(undefined as unknown as string)).toBe(0);
   });
 
   it('estimates tokens for short text', () => {

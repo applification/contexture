@@ -1,8 +1,8 @@
 import type { ObjectProperty } from '@renderer/model/types';
 import { useOntologyStore } from '@renderer/store/ontology';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 
 interface Props {
   property: ObjectProperty;

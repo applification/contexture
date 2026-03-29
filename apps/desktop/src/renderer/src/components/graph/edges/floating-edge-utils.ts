@@ -1,4 +1,4 @@
-import { Position, type InternalNode } from '@xyflow/react';
+import { type InternalNode, Position } from '@xyflow/react';
 
 // Find where the line from this node's center toward the target intersects the node's border
 function getNodeIntersection(node: InternalNode, target: InternalNode) {

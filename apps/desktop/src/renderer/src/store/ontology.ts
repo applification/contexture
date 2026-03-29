@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import type { Ontology, OntologyClass, ObjectProperty, DatatypeProperty } from '../model/types';
-import { createEmptyOntology } from '../model/types';
-import { parseTurtleWithWarnings, type ParseWarning } from '../model/parse';
-import { serializeToTurtle } from '../model/serialize';
 import { track } from '../lib/analytics';
+import { type ParseWarning, parseTurtleWithWarnings } from '../model/parse';
+import { serializeToTurtle } from '../model/serialize';
+import type { DatatypeProperty, ObjectProperty, Ontology, OntologyClass } from '../model/types';
+import { createEmptyOntology } from '../model/types';
 
 interface OntologyState {
   ontology: Ontology;

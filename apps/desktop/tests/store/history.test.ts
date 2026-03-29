@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
 import { useHistoryStore } from '@renderer/store/history';
 import { useOntologyStore } from '@renderer/store/ontology';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 function resetStores() {
   useOntologyStore.getState().reset();

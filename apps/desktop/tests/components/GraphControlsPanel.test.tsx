@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { useUIStore } from '@renderer/store/ui';
 import { GraphControlsPanel } from '@renderer/components/toolbar/GraphControlsPanel';
+import { useUIStore } from '@renderer/store/ui';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function resetStore() {
   useUIStore.getState().resetGraphControls();
@@ -41,7 +41,9 @@ describe('GraphControlsPanel', () => {
     const onClose = vi.fn();
     render(<GraphControlsPanel onClose={onClose} />);
     // Find the close button (it's the first icon button in the header)
-    const closeBtn = screen.getByText('Graph Controls').parentElement!.querySelector('button')!;
+    const closeBtn = screen
+      .getByText('Graph Controls')
+      .parentElement?.querySelector('button') as HTMLButtonElement;
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
   });

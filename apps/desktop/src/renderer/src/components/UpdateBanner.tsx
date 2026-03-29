@@ -16,6 +16,7 @@ export function UpdateBanner(): React.JSX.Element | null {
       <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-blue-600 text-white text-xs">
         <span>Update available: v{update.version}</span>
         <button
+          type="button"
           onClick={() => window.api.downloadUpdate()}
           className="ml-4 underline hover:no-underline"
         >
@@ -45,6 +46,7 @@ export function UpdateBanner(): React.JSX.Element | null {
       <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-green-600 text-white text-xs">
         <span>v{update.version} ready to install</span>
         <button
+          type="button"
           onClick={() => window.api.installUpdate()}
           className="ml-4 underline hover:no-underline"
         >
@@ -59,14 +61,16 @@ export function UpdateBanner(): React.JSX.Element | null {
       <div className="flex items-center justify-between pl-20 pr-3 py-1.5 bg-yellow-600 text-white text-xs">
         <span>
           Update check failed —{' '}
-          <a
+          <button
+            type="button"
             onClick={() => window.api.openReleasesPage()}
             className="underline cursor-pointer hover:no-underline"
           >
             view releases
-          </a>
+          </button>
         </span>
         <button
+          type="button"
           onClick={() => window.api.checkForUpdate()}
           className="ml-4 underline hover:no-underline"
         >

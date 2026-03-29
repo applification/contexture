@@ -1,9 +1,9 @@
 // Patches the dev Electron binary's Info.plist so macOS menu bar shows "Ontograph" instead of "Electron"
 // Also copies the app icon into the bundle so the dock shows the correct icon in dev mode.
 // Note: the dock tooltip will still say "Electron" in dev — this is expected and fine.
-const { execFileSync } = require('child_process');
-const { existsSync, copyFileSync } = require('fs');
-const path = require('path');
+const { execFileSync } = require('node:child_process');
+const { existsSync, copyFileSync } = require('node:fs');
+const path = require('node:path');
 
 if (process.platform !== 'darwin') process.exit(0);
 

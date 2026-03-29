@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useEvalStore } from '@renderer/store/eval';
 import type { EvalReport } from '@renderer/store/eval';
+import { useEvalStore } from '@renderer/store/eval';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 function resetStore() {
   useEvalStore.setState({

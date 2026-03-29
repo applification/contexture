@@ -1,12 +1,12 @@
-import { Sun, Moon, Bot, PanelRight, ChevronDown } from 'lucide-react';
 import { useUIStore } from '@renderer/store/ui';
+import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import { useClaude } from '../chat/useClaude';
 import { GraphSearchBar } from './GraphSearchBar';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 export function Toolbar(): React.JSX.Element {
   const theme = useUIStore((s) => s.theme);

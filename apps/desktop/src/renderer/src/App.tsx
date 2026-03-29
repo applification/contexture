@@ -1,42 +1,48 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { GraphCanvas } from './components/graph/GraphCanvas';
-import { GraphBackground } from './components/graph/GraphBackground';
-import { DetailPanel } from './components/detail/DetailPanel';
-import { ChatPanel } from './components/chat/ChatPanel';
-import { EvalPanel } from './components/eval/EvalPanel';
+import {
+  ChevronDown,
+  CircleAlert,
+  Clock,
+  MousePointer2,
+  SlidersHorizontal,
+  TriangleAlert,
+} from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
+import { ChatPanel } from './components/chat/ChatPanel';
+import { DetailPanel } from './components/detail/DetailPanel';
+import { EvalPanel } from './components/eval/EvalPanel';
+import { GraphBackground } from './components/graph/GraphBackground';
+import { GraphCanvas } from './components/graph/GraphCanvas';
 import { ImprovementHUD } from './components/hud/ImprovementHUD';
 import { StatusBar } from './components/status-bar/StatusBar';
-import { Toolbar } from './components/toolbar/Toolbar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable';
-import { Button } from './components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from './components/ui/popover';
-import type { PanelImperativeHandle } from 'react-resizable-panels';
-import { SlidersHorizontal, ChevronDown, CircleAlert, TriangleAlert, Clock } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
-import { useOntologyStore } from './store/ontology';
-import { useUIStore } from './store/ui';
-import { useHistoryStore } from './store/history';
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  EmptyDescription,
-} from './components/ui/empty';
+import { Toolbar } from './components/toolbar/Toolbar';
 import { UpdateBanner } from './components/UpdateBanner';
+import { Button } from './components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from './components/ui/dialog';
-import { MousePointer2 } from 'lucide-react';
-import { validateOntology } from './services/validation';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from './components/ui/empty';
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import peopleTtl from './samples/people.ttl?raw';
+import { validateOntology } from './services/validation';
+import { useHistoryStore } from './store/history';
+import { useOntologyStore } from './store/ontology';
+import { useUIStore } from './store/ui';
 
 function App(): React.JSX.Element {
   const ontology = useOntologyStore((s) => s.ontology);
@@ -141,7 +147,9 @@ function App(): React.JSX.Element {
       window.api.onMenuFileSave(handleSave),
       window.api.onMenuFileSaveAs(handleSaveAs),
     ];
-    return () => cleanups.forEach((fn) => fn());
+    return () => {
+      for (const fn of cleanups) fn();
+    };
   }, [handleNew, handleOpen, handleSave, handleSaveAs]);
 
   // Keyboard shortcuts
@@ -190,7 +198,7 @@ function App(): React.JSX.Element {
       .getRecentFiles()
       .then(setRecentFiles)
       .catch(() => {});
-  }, [ontology]);
+  }, []);
 
   const handleOpenRecent = useCallback(
     async (filePath: string) => {
@@ -272,6 +280,7 @@ function App(): React.JSX.Element {
                       <div className="space-y-0.5">
                         {recentFiles.slice(0, 5).map((fp) => (
                           <button
+                            type="button"
                             key={fp}
                             onClick={() => handleOpenRecent(fp)}
                             className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
@@ -355,8 +364,8 @@ function App(): React.JSX.Element {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
-            {importWarnings.map((w, i) => (
-              <div key={i} className="flex items-start gap-2">
+            {importWarnings.map((w) => (
+              <div key={w.message} className="flex items-start gap-2">
                 {w.severity === 'error' ? (
                   <CircleAlert className="size-4 shrink-0 mt-0.5 text-destructive" />
                 ) : (

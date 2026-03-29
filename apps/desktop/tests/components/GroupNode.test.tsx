@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
 import { useUIStore } from '@renderer/store/ui';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => <div data-testid="handle" />,
@@ -58,7 +58,7 @@ describe('GroupNode', () => {
         targetPosition={undefined}
       />,
     );
-    const style = container.firstElementChild!.getAttribute('style')!;
+    const style = container.firstElementChild?.getAttribute('style') ?? '';
     expect(style).toContain('opacity: 0.2');
   });
 
@@ -81,7 +81,7 @@ describe('GroupNode', () => {
         targetPosition={undefined}
       />,
     );
-    const style = container.firstElementChild!.getAttribute('style')!;
+    const style = container.firstElementChild?.getAttribute('style') ?? '';
     expect(style).not.toContain('opacity: 0.2');
   });
 });

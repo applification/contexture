@@ -1,7 +1,7 @@
-import { ipcMain, dialog, BrowserWindow, app } from 'electron';
-import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 const RECENT_FILES_PATH = join(app.getPath('userData'), 'recent-files.json');
 const MAX_RECENT = 10;
@@ -9,7 +9,7 @@ const MAX_RECENT = 10;
 function loadRecentFiles(): string[] {
   try {
     if (existsSync(RECENT_FILES_PATH)) {
-      const data = JSON.parse(require('fs').readFileSync(RECENT_FILES_PATH, 'utf-8'));
+      const data = JSON.parse(require('node:fs').readFileSync(RECENT_FILES_PATH, 'utf-8'));
       return Array.isArray(data) ? data.filter((f: unknown) => typeof f === 'string') : [];
     }
   } catch {
@@ -23,7 +23,7 @@ function addRecentFile(filePath: string): void {
   recent.unshift(filePath);
   if (recent.length > MAX_RECENT) recent.length = MAX_RECENT;
   try {
-    require('fs').writeFileSync(RECENT_FILES_PATH, JSON.stringify(recent), 'utf-8');
+    require('node:fs').writeFileSync(RECENT_FILES_PATH, JSON.stringify(recent), 'utf-8');
     app.addRecentDocument(filePath);
   } catch {
     /* ignore */

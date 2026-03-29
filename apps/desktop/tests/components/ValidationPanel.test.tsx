@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { useOntologyStore } from '@renderer/store/ontology';
 import { ValidationPanel } from '@renderer/components/validation/ValidationPanel';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function resetStores() {
   useOntologyStore.getState().reset();

@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { Search, X } from 'lucide-react';
 import { useOntologyStore } from '@renderer/store/ontology';
 import { useUIStore } from '@renderer/store/ui';
+import { Search, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Result {
   id: string;
@@ -78,7 +78,7 @@ export function GraphSearchBar(): React.JSX.Element {
     setResults(matches.slice(0, 10));
     setActiveIndex(0);
     setOpen(matches.length > 0);
-  }, [query, classes]);
+  }, [query, classes, ontology.objectProperties.values]);
 
   // Click outside to close
   useEffect(() => {
@@ -134,6 +134,7 @@ export function GraphSearchBar(): React.JSX.Element {
         />
         {query && (
           <button
+            type="button"
             onClick={() => {
               setQuery('');
               setOpen(false);
@@ -149,6 +150,7 @@ export function GraphSearchBar(): React.JSX.Element {
         <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
           {results.map((r, i) => (
             <button
+              type="button"
               key={r.id}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => selectNode(r.id)}

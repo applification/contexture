@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
 import { useUIStore } from '@renderer/store/ui';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 function resetStore() {
   useUIStore.setState({

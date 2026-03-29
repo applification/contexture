@@ -1,4 +1,4 @@
-import { Writer, DataFactory } from 'n3';
+import { DataFactory, Writer } from 'n3';
 import type { Ontology } from './types';
 
 const { namedNode, literal } = DataFactory;

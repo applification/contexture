@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { GraphSearchBar } from '@renderer/components/toolbar/GraphSearchBar';
 import { useOntologyStore } from '@renderer/store/ontology';
 import { useUIStore } from '@renderer/store/ui';
-import { GraphSearchBar } from '@renderer/components/toolbar/GraphSearchBar';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function resetStores() {
   useOntologyStore.getState().reset();

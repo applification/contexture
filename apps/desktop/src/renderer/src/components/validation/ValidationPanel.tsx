@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
-import { CircleAlert, TriangleAlert } from 'lucide-react';
+import { type ValidationError, validateOntology } from '@renderer/services/validation';
 import { useOntologyStore } from '@renderer/store/ontology';
 import { useUIStore } from '@renderer/store/ui';
-import { validateOntology, type ValidationError } from '@renderer/services/validation';
+import { CircleAlert, TriangleAlert } from 'lucide-react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 
 function localName(uri: string): string {
@@ -39,9 +39,9 @@ export function ValidationPanel(): React.JSX.Element {
         {warnCount > 0 && <span>{warnCount} warnings</span>}
       </div>
       <div className="max-h-40 overflow-y-auto">
-        {errors.map((error, i) => (
+        {errors.map((error) => (
           <Button
-            key={i}
+            key={`${error.elementUri}-${error.message}`}
             variant="ghost"
             className="w-full justify-start px-3 h-auto py-1.5 gap-2 items-start rounded-none text-xs font-normal"
             onClick={() => handleClick(error)}

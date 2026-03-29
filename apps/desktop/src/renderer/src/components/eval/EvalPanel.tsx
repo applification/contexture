@@ -1,38 +1,43 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { serializeToTurtle } from '@renderer/model/serialize';
 import {
-  Play,
-  Square,
+  type EvalEffort,
+  type EvalModelId,
+  type EvalReport as EvalReportType,
+  useEvalStore,
+} from '@renderer/store/eval';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useUIStore } from '@renderer/store/ui';
+import { code } from '@streamdown/code';
+import {
   ChevronDown,
   ChevronRight,
-  MessageSquarePlus,
   ClipboardList,
+  MessageSquarePlus,
+  Play,
+  Square,
   Wand2,
   X,
 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
-import { code } from '@streamdown/code';
-import { useEvalStore, type EvalModelId, type EvalEffort } from '@renderer/store/eval';
-import { useUIStore } from '@renderer/store/ui';
-import { useOntologyStore } from '@renderer/store/ontology';
-import { serializeToTurtle } from '@renderer/model/serialize';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-  SelectGroup,
-  SelectLabel,
-} from '@/components/ui/select';
-import {
   Empty,
+  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  EmptyDescription,
 } from '@/components/ui/empty';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 const AUTH_MODE_STORAGE = 'ontograph-auth-mode';
@@ -124,7 +129,7 @@ export function EvalPanel(): React.JSX.Element {
         // ignore malformed sidecar
       }
     });
-  }, [filePath]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [markSuggestionsComplete, setConfig, setReport, sidecarPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Register eval event listeners
   useEffect(() => {
@@ -147,8 +152,10 @@ export function EvalPanel(): React.JSX.Element {
       }),
       window.api.onEvalError((err: string) => setError(err)),
     ];
-    return () => cleanups.forEach((fn) => fn());
-  }, [saveSidecar]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      for (const fn of cleanups) fn();
+    };
+  }, [saveSidecar, setError, setReport, setStreamText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced config save
   const handleConfigChange = useCallback(
@@ -239,10 +246,14 @@ export function EvalPanel(): React.JSX.Element {
       {/* Config form */}
       <div className="p-3 border-b border-border space-y-2 shrink-0">
         <div className="space-y-1">
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+          <label
+            htmlFor="eval-domain"
+            className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide"
+          >
             Domain
           </label>
           <input
+            id="eval-domain"
             type="text"
             value={config.domain}
             onChange={(e) => handleConfigChange({ domain: e.target.value })}
@@ -251,10 +262,14 @@ export function EvalPanel(): React.JSX.Element {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+          <label
+            htmlFor="eval-intended-use"
+            className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide"
+          >
             Intended use
           </label>
           <textarea
+            id="eval-intended-use"
             value={config.intendedUse}
             onChange={(e) => handleConfigChange({ intendedUse: e.target.value })}
             placeholder="e.g. Reasoning system for drug interactions"
@@ -366,7 +381,7 @@ export function EvalPanel(): React.JSX.Element {
 
         {showReport && (
           <EvalReport
-            report={report!}
+            report={report as EvalReportType}
             selectedSuggestions={selectedSuggestions}
             completedSuggestions={completedSuggestions}
             onToggleSuggestion={toggleSuggestion}
@@ -384,6 +399,7 @@ export function EvalPanel(): React.JSX.Element {
             {selectedSuggestions.length !== 1 ? 's' : ''}
           </Button>
           <button
+            type="button"
             onClick={clearSelections}
             className="text-muted-foreground hover:text-foreground transition-colors"
             title="Clear selection"
@@ -469,6 +485,7 @@ function DimensionCard({
   return (
     <div className="rounded-md border border-border bg-card overflow-hidden">
       <button
+        type="button"
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 transition-colors"
       >
@@ -503,8 +520,8 @@ function DimensionCard({
                 Findings
               </p>
               <ul className="space-y-1">
-                {dimension.findings.map((f, i) => (
-                  <li key={i} className="text-xs text-foreground flex gap-1.5">
+                {dimension.findings.map((f) => (
+                  <li key={f} className="text-xs text-foreground flex gap-1.5">
                     <span className="text-muted-foreground shrink-0 mt-0.5">·</span>
                     <span>{f}</span>
                   </li>
@@ -518,31 +535,34 @@ function DimensionCard({
                 Suggestions
               </p>
               <ul className="space-y-2">
-                {dimension.suggestions.map((s, i) => {
+                {dimension.suggestions.map((s) => {
                   const completed = completedSuggestions.includes(s);
                   const checked = selectedSuggestions.includes(s);
                   return (
-                    <li key={i} className={cn('flex items-start gap-2', completed && 'opacity-50')}>
+                    <li key={s} className={cn('flex items-start gap-2', completed && 'opacity-50')}>
                       <Checkbox
-                        id={`sug-${dimension.name}-${i}`}
+                        id={`sug-${dimension.name}-${s.slice(0, 20)}`}
                         checked={completed || checked}
                         disabled={completed}
                         onCheckedChange={() => !completed && onToggleSuggestion(s)}
                         className="mt-0.5 shrink-0 size-3.5"
                       />
-                      <span
+                      <button
+                        type="button"
                         className={cn(
-                          'text-xs flex-1 leading-relaxed select-none',
+                          'text-xs flex-1 leading-relaxed select-none text-left',
                           completed ? 'line-through text-muted-foreground' : 'cursor-pointer',
                           !completed && checked && 'text-foreground',
                           !completed && !checked && 'text-foreground/80',
                         )}
                         onClick={() => !completed && onToggleSuggestion(s)}
+                        disabled={completed}
                       >
                         {s}
-                      </span>
+                      </button>
                       {!completed && (
                         <button
+                          type="button"
                           onClick={() => onSendToChat(s)}
                           title="Send to Chat"
                           className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"

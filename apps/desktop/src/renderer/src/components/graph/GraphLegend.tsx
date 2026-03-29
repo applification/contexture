@@ -1,5 +1,5 @@
-import { memo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { memo, useState } from 'react';
 
 const EDGE_ITEMS = [
   {
@@ -34,6 +34,7 @@ export const GraphLegend = memo(function GraphLegend() {
       style={{ minWidth: 140 }}
     >
       <button
+        type="button"
         className="flex items-center justify-between w-full px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
@@ -48,7 +49,7 @@ export const GraphLegend = memo(function GraphLegend() {
             <span className="text-[9px] text-muted-foreground font-medium uppercase">Edges</span>
             {EDGE_ITEMS.map((item) => (
               <div key={item.label} className="flex items-center gap-2">
-                <svg width="24" height="8" className="shrink-0">
+                <svg width="24" height="8" className="shrink-0" aria-hidden="true">
                   <line
                     x1="0"
                     y1="4"

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import type { ClassNode } from '@renderer/model/reactflow';
 import { ontologyToReactFlowElements } from '@renderer/model/reactflow';
-import { createEmptyOntology } from '@renderer/model/types';
 import type { Ontology } from '@renderer/model/types';
+import { createEmptyOntology } from '@renderer/model/types';
+import { describe, expect, it } from 'vitest';
 
 function buildOntology(): Ontology {
   const ont = createEmptyOntology();
@@ -52,21 +53,21 @@ describe('ontologyToReactFlowElements', () => {
 
   it('sets node data correctly', () => {
     const result = ontologyToReactFlowElements(buildOntology());
-    const personNode = result.nodes.find((n) => n.id === 'http://ex/Person')!;
+    const personNode = result.nodes.find((n) => n.id === 'http://ex/Person') as ClassNode;
     expect(personNode.data.label).toBe('Person');
     expect(personNode.data.uri).toBe('http://ex/Person');
   });
 
   it('attaches datatype properties to class nodes', () => {
     const result = ontologyToReactFlowElements(buildOntology());
-    const personNode = result.nodes.find((n) => n.id === 'http://ex/Person')!;
+    const personNode = result.nodes.find((n) => n.id === 'http://ex/Person') as ClassNode;
     expect(personNode.data.datatypeProperties).toHaveLength(1);
     expect(personNode.data.datatypeProperties[0].label).toBe('name');
   });
 
   it('uses localName when label missing', () => {
     const result = ontologyToReactFlowElements(buildOntology());
-    const robotNode = result.nodes.find((n) => n.id === 'http://ex/Robot')!;
+    const robotNode = result.nodes.find((n) => n.id === 'http://ex/Robot') as ClassNode;
     expect(robotNode.data.label).toBe('Robot');
   });
 
@@ -90,7 +91,7 @@ describe('ontologyToReactFlowElements', () => {
     expect(objEdges).toHaveLength(1);
     expect(objEdges[0].source).toBe('http://ex/Employee');
     expect(objEdges[0].target).toBe('http://ex/Person');
-    expect((objEdges[0].data as any).label).toBe('works at');
+    expect((objEdges[0].data as Record<string, unknown>).label).toBe('works at');
   });
 
   it('creates multiple edges for multi-domain/range properties', () => {

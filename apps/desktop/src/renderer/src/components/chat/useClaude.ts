@@ -1,16 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useOntologyStore } from '@renderer/store/ontology';
-import type { OntologyClass } from '@renderer/model/types';
-import { serializeToTurtle } from '@renderer/model/serialize';
-import { validateOntology } from '@renderer/services/validation';
 import { track } from '@renderer/lib/analytics';
+import { serializeToTurtle } from '@renderer/model/serialize';
+import type { OntologyClass } from '@renderer/model/types';
+import { validateOntology } from '@renderer/services/validation';
+import { useOntologyStore } from '@renderer/store/ontology';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
   cost?: number;
+}
+
+let _msgSeq = 0;
+export function msgId(): string {
+  return `msg-${Date.now()}-${++_msgSeq}`;
 }
 
 export type AuthMode = 'max' | 'api-key';
@@ -174,7 +180,7 @@ export function useClaude(): UseClaudeReturn {
           if (last && last.role === 'assistant') {
             return [...prev.slice(0, -1), { ...last, content: text }];
           }
-          return [...prev, { role: 'assistant', content: text }];
+          return [...prev, { id: msgId(), role: 'assistant', content: text }];
         });
       }),
 
@@ -184,6 +190,7 @@ export function useClaude(): UseClaudeReturn {
         setMessages((prev) => [
           ...prev,
           {
+            id: msgId(),
             role: 'tool',
             content: shortName,
             toolName: shortName,
@@ -208,12 +215,17 @@ export function useClaude(): UseClaudeReturn {
       // Error
       window.api.onClaudeError((error: string) => {
         setIsLoading(false);
-        setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${error}` }]);
+        setMessages((prev) => [
+          ...prev,
+          { id: msgId(), role: 'assistant', content: `Error: ${error}` },
+        ]);
       }),
     ];
 
-    return () => cleanups.forEach((fn) => fn());
-  }, [store]);
+    return () => {
+      for (const fn of cleanups) fn();
+    };
+  }, []);
 
   const sendMessage = useCallback(
     (message: string, context?: string) => {
@@ -223,7 +235,7 @@ export function useClaude(): UseClaudeReturn {
         localStorage.setItem('ontograph-tracked-first-message', 'true');
       }
       track('claude_message_sent', { model, authMode });
-      setMessages((prev) => [...prev, { role: 'user', content: message }]);
+      setMessages((prev) => [...prev, { id: msgId(), role: 'user', content: message }]);
       setIsLoading(true);
       const auth =
         authMode === 'api-key'

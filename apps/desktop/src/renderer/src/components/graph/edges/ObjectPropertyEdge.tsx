@@ -1,15 +1,15 @@
-import { memo } from 'react';
+import type { ObjPropEdgeData } from '@renderer/model/reactflow';
+import { useUIStore } from '@renderer/store/ui';
 import {
   BaseEdge,
+  type Edge,
   EdgeLabelRenderer,
+  type EdgeProps,
   getBezierPath,
   useInternalNode,
-  type Edge,
-  type EdgeProps,
 } from '@xyflow/react';
-import type { ObjPropEdgeData } from '@renderer/model/reactflow';
+import { memo } from 'react';
 import { getFloatingEdgeParams } from './floating-edge-utils';
-import { useUIStore } from '@renderer/store/ui';
 
 type ObjPropEdge = Edge<ObjPropEdgeData>;
 

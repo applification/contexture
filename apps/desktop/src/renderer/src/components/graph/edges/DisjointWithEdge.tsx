@@ -1,13 +1,13 @@
-import { memo } from 'react';
+import { useUIStore } from '@renderer/store/ui';
 import {
   BaseEdge,
   EdgeLabelRenderer,
+  type EdgeProps,
   getBezierPath,
   useInternalNode,
-  type EdgeProps,
 } from '@xyflow/react';
+import { memo } from 'react';
 import { getFloatingEdgeParams } from './floating-edge-utils';
-import { useUIStore } from '@renderer/store/ui';
 
 function autoRotation(sx: number, sy: number, tx: number, ty: number): number {
   let angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI);

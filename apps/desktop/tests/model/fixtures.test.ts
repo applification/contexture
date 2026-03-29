@@ -1,15 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'fs';
-import { resolve } from 'path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseTurtle, parseTurtleWithWarnings } from '@renderer/model/parse';
 import { serializeToTurtle } from '@renderer/model/serialize';
+import type { ObjectProperty, OntologyClass } from '@renderer/model/types';
+import { describe, expect, it } from 'vitest';
 
 const FIXTURES_DIR = resolve(__dirname, '../../resources/sample-ontologies');
 
 const HEALTH = 'http://example.org/healthcare#';
 const ECOM = 'http://example.org/ecommerce#';
 const EDGE = 'http://example.org/edge-cases#';
-const UNI = 'http://example.org/university#';
+const _UNI = 'http://example.org/university#';
 
 function loadFixture(name: string): string {
   return readFileSync(resolve(FIXTURES_DIR, name), 'utf-8');
@@ -67,33 +68,33 @@ describe('healthcare.ttl', () => {
 
   it('has deep hierarchy: Surgeon -> Physician -> HealthcareProvider -> Person -> LivingEntity', () => {
     const o = parseTurtle(turtle);
-    expect(o.classes.get(`${HEALTH}Surgeon`)!.subClassOf).toContain(`${HEALTH}Physician`);
-    expect(o.classes.get(`${HEALTH}Physician`)!.subClassOf).toEqual([
+    expect(o.classes.get(`${HEALTH}Surgeon`)?.subClassOf).toContain(`${HEALTH}Physician`);
+    expect(o.classes.get(`${HEALTH}Physician`)?.subClassOf).toEqual([
       `${HEALTH}HealthcareProvider`,
     ]);
-    expect(o.classes.get(`${HEALTH}HealthcareProvider`)!.subClassOf).toEqual([`${HEALTH}Person`]);
-    expect(o.classes.get(`${HEALTH}Person`)!.subClassOf).toEqual([`${HEALTH}LivingEntity`]);
+    expect(o.classes.get(`${HEALTH}HealthcareProvider`)?.subClassOf).toEqual([`${HEALTH}Person`]);
+    expect(o.classes.get(`${HEALTH}Person`)?.subClassOf).toEqual([`${HEALTH}LivingEntity`]);
   });
 
   it('parses disjointWith between Person and Animal', () => {
-    const animal = o().classes.get(`${HEALTH}Animal`)!;
+    const animal = o().classes.get(`${HEALTH}Animal`) as OntologyClass;
     expect(animal.disjointWith).toContain(`${HEALTH}Person`);
   });
 
   it('parses inverse properties treats/treatedBy', () => {
-    const treats = o().objectProperties.get(`${HEALTH}treats`)!;
+    const treats = o().objectProperties.get(`${HEALTH}treats`) as ObjectProperty;
     expect(treats.inverseOf).toBe(`${HEALTH}treatedBy`);
   });
 
   it('parses varied XSD datatypes', () => {
     const o2 = parseTurtle(turtle);
-    expect(o2.datatypeProperties.get(`${HEALTH}dosageMg`)!.range).toBe(
+    expect(o2.datatypeProperties.get(`${HEALTH}dosageMg`)?.range).toBe(
       'http://www.w3.org/2001/XMLSchema#float',
     );
-    expect(o2.datatypeProperties.get(`${HEALTH}isActive`)!.range).toBe(
+    expect(o2.datatypeProperties.get(`${HEALTH}isActive`)?.range).toBe(
       'http://www.w3.org/2001/XMLSchema#boolean',
     );
-    expect(o2.datatypeProperties.get(`${HEALTH}bedCount`)!.range).toBe(
+    expect(o2.datatypeProperties.get(`${HEALTH}bedCount`)?.range).toBe(
       'http://www.w3.org/2001/XMLSchema#nonNegativeInteger',
     );
   });
@@ -125,23 +126,23 @@ describe('ecommerce.ttl', () => {
 
   it('has Product hierarchy with disjoint physical/digital', () => {
     const o = parseTurtle(turtle);
-    const digital = o.classes.get(`${ECOM}DigitalProduct`)!;
+    const digital = o.classes.get(`${ECOM}DigitalProduct`) as OntologyClass;
     expect(digital.subClassOf).toContain(`${ECOM}Product`);
     expect(digital.disjointWith).toContain(`${ECOM}PhysicalProduct`);
   });
 
   it('parses Subscription as subclass of DigitalProduct', () => {
     const o = parseTurtle(turtle);
-    expect(o.classes.get(`${ECOM}Subscription`)!.subClassOf).toContain(`${ECOM}DigitalProduct`);
+    expect(o.classes.get(`${ECOM}Subscription`)?.subClassOf).toContain(`${ECOM}DigitalProduct`);
   });
 
   it('parses decimal, double, anyURI, positiveInteger XSD types', () => {
     const o = parseTurtle(turtle);
     const XSD = 'http://www.w3.org/2001/XMLSchema#';
-    expect(o.datatypeProperties.get(`${ECOM}price`)!.range).toBe(`${XSD}decimal`);
-    expect(o.datatypeProperties.get(`${ECOM}weight`)!.range).toBe(`${XSD}double`);
-    expect(o.datatypeProperties.get(`${ECOM}downloadUrl`)!.range).toBe(`${XSD}anyURI`);
-    expect(o.datatypeProperties.get(`${ECOM}quantity`)!.range).toBe(`${XSD}positiveInteger`);
+    expect(o.datatypeProperties.get(`${ECOM}price`)?.range).toBe(`${XSD}decimal`);
+    expect(o.datatypeProperties.get(`${ECOM}weight`)?.range).toBe(`${XSD}double`);
+    expect(o.datatypeProperties.get(`${ECOM}downloadUrl`)?.range).toBe(`${XSD}anyURI`);
+    expect(o.datatypeProperties.get(`${ECOM}quantity`)?.range).toBe(`${XSD}positiveInteger`);
   });
 });
 
@@ -152,33 +153,33 @@ describe('edge-cases.ttl', () => {
 
   it('parses class with no label', () => {
     const o = parseTurtle(turtle);
-    const cls = o.classes.get(`${EDGE}UnlabeledClass`)!;
+    const cls = o.classes.get(`${EDGE}UnlabeledClass`) as OntologyClass;
     expect(cls).toBeDefined();
     expect(cls.label).toBeUndefined();
   });
 
   it('parses unicode label', () => {
     const o = parseTurtle(turtle);
-    const cls = o.classes.get(`${EDGE}UnicodeClass`)!;
+    const cls = o.classes.get(`${EDGE}UnicodeClass`) as OntologyClass;
     expect(cls.label).toContain('accents');
   });
 
   it('parses very long label', () => {
     const o = parseTurtle(turtle);
-    const cls = o.classes.get(`${EDGE}VerboseClass`)!;
-    expect(cls.label!.length).toBeGreaterThan(50);
+    const cls = o.classes.get(`${EDGE}VerboseClass`) as OntologyClass;
+    expect(cls.label?.length).toBeGreaterThan(50);
   });
 
   it('parses 6-level deep hierarchy', () => {
     const o = parseTurtle(turtle);
-    expect(o.classes.get(`${EDGE}Level5`)!.subClassOf).toEqual([`${EDGE}Level4`]);
-    expect(o.classes.get(`${EDGE}Level4`)!.subClassOf).toEqual([`${EDGE}Level3`]);
-    expect(o.classes.get(`${EDGE}Level3`)!.subClassOf).toEqual([`${EDGE}Level2`]);
+    expect(o.classes.get(`${EDGE}Level5`)?.subClassOf).toEqual([`${EDGE}Level4`]);
+    expect(o.classes.get(`${EDGE}Level4`)?.subClassOf).toEqual([`${EDGE}Level3`]);
+    expect(o.classes.get(`${EDGE}Level3`)?.subClassOf).toEqual([`${EDGE}Level2`]);
   });
 
   it('parses diamond multiple inheritance', () => {
     const o = parseTurtle(turtle);
-    const bottom = o.classes.get(`${EDGE}DiamondBottom`)!;
+    const bottom = o.classes.get(`${EDGE}DiamondBottom`) as OntologyClass;
     expect(bottom.subClassOf).toContain(`${EDGE}DiamondLeft`);
     expect(bottom.subClassOf).toContain(`${EDGE}DiamondRight`);
     expect(bottom.subClassOf.length).toBe(2);
@@ -186,14 +187,14 @@ describe('edge-cases.ttl', () => {
 
   it('parses self-referencing property', () => {
     const o = parseTurtle(turtle);
-    const prop = o.objectProperties.get(`${EDGE}relatesTo`)!;
+    const prop = o.objectProperties.get(`${EDGE}relatesTo`) as ObjectProperty;
     expect(prop.domain).toEqual([`${EDGE}SelfRefClass`]);
     expect(prop.range).toEqual([`${EDGE}SelfRefClass`]);
   });
 
   it('parses property with multiple domains', () => {
     const o = parseTurtle(turtle);
-    const prop = o.objectProperties.get(`${EDGE}multiDomainProp`)!;
+    const prop = o.objectProperties.get(`${EDGE}multiDomainProp`) as ObjectProperty;
     expect(prop.domain).toContain(`${EDGE}DomainA`);
     expect(prop.domain).toContain(`${EDGE}DomainB`);
     expect(prop.domain.length).toBe(2);
@@ -201,7 +202,7 @@ describe('edge-cases.ttl', () => {
 
   it('parses mutual disjointness', () => {
     const o = parseTurtle(turtle);
-    const a = o.classes.get(`${EDGE}DisjointA`)!;
+    const a = o.classes.get(`${EDGE}DisjointA`) as OntologyClass;
     expect(a.disjointWith).toContain(`${EDGE}DisjointB`);
     expect(a.disjointWith).toContain(`${EDGE}DisjointC`);
   });
@@ -209,10 +210,10 @@ describe('edge-cases.ttl', () => {
   it('parses less common XSD types (byte, short, long, time)', () => {
     const o = parseTurtle(turtle);
     const XSD = 'http://www.w3.org/2001/XMLSchema#';
-    expect(o.datatypeProperties.get(`${EDGE}byteVal`)!.range).toBe(`${XSD}byte`);
-    expect(o.datatypeProperties.get(`${EDGE}shortVal`)!.range).toBe(`${XSD}short`);
-    expect(o.datatypeProperties.get(`${EDGE}longVal`)!.range).toBe(`${XSD}long`);
-    expect(o.datatypeProperties.get(`${EDGE}durationVal`)!.range).toBe(`${XSD}time`);
+    expect(o.datatypeProperties.get(`${EDGE}byteVal`)?.range).toBe(`${XSD}byte`);
+    expect(o.datatypeProperties.get(`${EDGE}shortVal`)?.range).toBe(`${XSD}short`);
+    expect(o.datatypeProperties.get(`${EDGE}longVal`)?.range).toBe(`${XSD}long`);
+    expect(o.datatypeProperties.get(`${EDGE}durationVal`)?.range).toBe(`${XSD}time`);
   });
 });
 
@@ -228,7 +229,7 @@ describe('minimal.ttl', () => {
 
   it('has correct label and comment', () => {
     const o = parseTurtle(loadFixture('minimal.ttl'));
-    const cls = o.classes.get('http://example.org/minimal#Thing')!;
+    const cls = o.classes.get('http://example.org/minimal#Thing') as OntologyClass;
     expect(cls.label).toBe('Thing');
     expect(cls.comment).toBe('The only class in this minimal ontology');
   });
@@ -260,7 +261,7 @@ describe('university.ttl', () => {
     const reparsed = parseTurtle(serialized);
 
     for (const [uri, cls] of original.classes) {
-      expect(reparsed.classes.get(uri)!.label).toBe(cls.label);
+      expect(reparsed.classes.get(uri)?.label).toBe(cls.label);
     }
   });
 
