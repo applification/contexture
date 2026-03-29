@@ -26,6 +26,13 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
       label: 'File',
       submenu: [
         {
+          label: 'New Ontology',
+          accelerator: 'CmdOrCtrl+N',
+          click: (): void => {
+            mainWindow.webContents.send('menu:file-new')
+          }
+        },
+        {
           label: 'Open...',
           accelerator: 'CmdOrCtrl+O',
           click: (): void => {

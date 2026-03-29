@@ -1,5 +1,5 @@
 import {
-  Sun, Moon, Bot, FilePlus, FolderOpen, Save, SaveAll, PanelRight, ChevronDown
+  Sun, Moon, Bot, PanelRight, ChevronDown
 } from 'lucide-react'
 import { useUIStore } from '@renderer/store/ui'
 import { useClaude } from '../chat/useClaude'
@@ -10,14 +10,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-interface ToolbarProps {
-  onNew: () => void
-  onOpen: () => void
-  onSave: () => void
-  onSaveAs: () => void
-}
-
-export function Toolbar({ onNew, onOpen, onSave, onSaveAs }: ToolbarProps): React.JSX.Element {
+export function Toolbar(): React.JSX.Element {
   const theme = useUIStore((s) => s.theme)
   const toggleTheme = useUIStore((s) => s.toggleTheme)
   const sidebarVisible = useUIStore((s) => s.sidebarVisible)
@@ -28,22 +21,6 @@ export function Toolbar({ onNew, onOpen, onSave, onSaveAs }: ToolbarProps): Reac
   return (
     <div className="h-10 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-1 shrink-0 app-drag-region relative z-50" style={{ paddingLeft: 78, paddingRight: 12 }}>
       {/* macOS traffic lights occupy ~78px */}
-
-      {/* File ops */}
-      <Button variant="ghost" size="icon" className="size-8" title="New ontology" onClick={onNew}>
-        <FilePlus />
-      </Button>
-      <Button variant="ghost" size="icon" className="size-8" title="Open (⌘O)" onClick={onOpen}>
-        <FolderOpen />
-      </Button>
-      <Button variant="ghost" size="icon" className="size-8" title="Save (⌘S)" onClick={onSave}>
-        <Save />
-      </Button>
-      <Button variant="ghost" size="icon" className="size-8" title="Save As (⇧⌘S)" onClick={onSaveAs}>
-        <SaveAll />
-      </Button>
-
-      <Separator orientation="vertical" className="h-5 mx-1" />
 
       <div className="flex-1 flex justify-center">
         <GraphSearchBar />

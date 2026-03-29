@@ -20,6 +20,7 @@ declare global {
       openRecentFile: (filePath: string) => Promise<{ filePath: string; content: string } | null>
 
       // Menu events
+      onMenuFileNew: (callback: () => void) => () => void
       onMenuFileOpen: (callback: () => void) => () => void
       onMenuFileSave: (callback: () => void) => () => void
       onMenuFileSaveAs: (callback: () => void) => () => void
