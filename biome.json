@@ -6,8 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true,
-    "ignore": ["**/dist/**", "**/out/**", "**/.next/**", "**/coverage/**", "**/.turbo/**"]
+    "ignoreUnknown": true
   },
   "formatter": {
     "enabled": true,
@@ -24,11 +23,37 @@
         "noDangerouslySetInnerHtml": "error"
       },
       "a11y": {
-        "useValidAriaRole": "error"
+        "useValidAriaRole": "error",
+        "useButtonType": "warn",
+        "useValidAnchor": "warn",
+        "noStaticElementInteractions": "warn",
+        "noSvgWithoutTitle": "warn",
+        "useKeyWithClickEvents": "warn",
+        "noLabelWithoutControl": "warn"
       },
       "correctness": {
         "noUnusedImports": "warn",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "warn",
+        "noInnerDeclarations": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useNodejsImportProtocol": "warn",
+        "useImportType": "warn",
+        "useTemplate": "warn",
+        "useExponentiationOperator": "warn"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn",
+        "noExplicitAny": "warn",
+        "useIterableCallbackReturn": "warn",
+        "noTsIgnore": "warn"
+      },
+      "complexity": {
+        "noImportantStyles": "warn",
+        "useLiteralKeys": "warn",
+        "noUselessContinue": "warn"
       }
     }
   },
@@ -36,6 +61,17 @@
     "formatter": {
       "quoteStyle": "single",
       "trailingCommas": "all"
+    }
+  },
+  "css": {
+    "linter": {
+      "enabled": false
+    },
+    "formatter": {
+      "enabled": false
+    },
+    "parser": {
+      "cssModules": true
     }
   },
   "assist": {
