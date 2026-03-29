@@ -1,0 +1,146 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix edge: <http://example.org/edge-cases#> .
+
+<http://example.org/edge-cases> a owl:Ontology ;
+    rdfs:label "Edge Cases Ontology" ;
+    rdfs:comment "Test fixture exercising unusual OWL patterns" .
+
+# --- Class with no label (should trigger validation warning) ---
+
+edge:UnlabeledClass a owl:Class .
+
+# --- Class with unicode label ---
+
+edge:UnicodeClass a owl:Class ;
+    rdfs:label "Classe avec des accents: éàèîö üùêë" ;
+    rdfs:comment "Tests parsing of non-ASCII characters in labels" .
+
+# --- Class with very long label ---
+
+edge:VerboseClass a owl:Class ;
+    rdfs:label "A class with a particularly long and descriptive label that might challenge UI rendering assumptions about maximum label length" ;
+    rdfs:comment "Edge case for UI truncation logic" .
+
+# --- Class with special characters in comment ---
+
+edge:SpecialCharsClass a owl:Class ;
+    rdfs:label "Special Characters" ;
+    rdfs:comment "Contains <angle brackets>, \"quotes\", & ampersands, and newlines\nlike this" .
+
+# --- Deep hierarchy (5 levels) ---
+
+edge:Level0 a owl:Class ;
+    rdfs:label "Level 0" .
+
+edge:Level1 a owl:Class ;
+    rdfs:label "Level 1" ;
+    rdfs:subClassOf edge:Level0 .
+
+edge:Level2 a owl:Class ;
+    rdfs:label "Level 2" ;
+    rdfs:subClassOf edge:Level1 .
+
+edge:Level3 a owl:Class ;
+    rdfs:label "Level 3" ;
+    rdfs:subClassOf edge:Level2 .
+
+edge:Level4 a owl:Class ;
+    rdfs:label "Level 4" ;
+    rdfs:subClassOf edge:Level3 .
+
+edge:Level5 a owl:Class ;
+    rdfs:label "Level 5" ;
+    rdfs:subClassOf edge:Level4 .
+
+# --- Multiple inheritance (diamond) ---
+
+edge:DiamondTop a owl:Class ;
+    rdfs:label "Diamond Top" .
+
+edge:DiamondLeft a owl:Class ;
+    rdfs:label "Diamond Left" ;
+    rdfs:subClassOf edge:DiamondTop .
+
+edge:DiamondRight a owl:Class ;
+    rdfs:label "Diamond Right" ;
+    rdfs:subClassOf edge:DiamondTop .
+
+edge:DiamondBottom a owl:Class ;
+    rdfs:label "Diamond Bottom" ;
+    rdfs:subClassOf edge:DiamondLeft ;
+    rdfs:subClassOf edge:DiamondRight .
+
+# --- Self-referencing object property (domain = range) ---
+
+edge:SelfRefClass a owl:Class ;
+    rdfs:label "Self-Referencing" .
+
+edge:relatesTo a owl:ObjectProperty ;
+    rdfs:label "relates to" ;
+    rdfs:domain edge:SelfRefClass ;
+    rdfs:range edge:SelfRefClass .
+
+# --- Property with no domain (should trigger validation warning) ---
+
+edge:orphanProp a owl:ObjectProperty ;
+    rdfs:label "orphan property" ;
+    rdfs:range edge:SelfRefClass .
+
+# --- Property with multiple domains ---
+# NOTE: In OWL, multiple rdfs:domain assertions are INTERSECTED, not unioned.
+# So multiDomainProp requires its subject to be both DomainA AND DomainB.
+
+edge:DomainA a owl:Class ;
+    rdfs:label "Domain A" .
+
+edge:DomainB a owl:Class ;
+    rdfs:label "Domain B" .
+
+edge:Target a owl:Class ;
+    rdfs:label "Target" .
+
+edge:multiDomainProp a owl:ObjectProperty ;
+    rdfs:label "multi-domain property" ;
+    rdfs:domain edge:DomainA ;
+    rdfs:domain edge:DomainB ;
+    rdfs:range edge:Target .
+
+# --- Mutual disjointness ---
+
+edge:DisjointA a owl:Class ;
+    rdfs:label "Disjoint A" ;
+    owl:disjointWith edge:DisjointB ;
+    owl:disjointWith edge:DisjointC .
+
+edge:DisjointB a owl:Class ;
+    rdfs:label "Disjoint B" ;
+    owl:disjointWith edge:DisjointA .
+
+edge:DisjointC a owl:Class ;
+    rdfs:label "Disjoint C" ;
+    owl:disjointWith edge:DisjointA .
+
+# --- Datatype properties with less common XSD types ---
+
+edge:durationVal a owl:DatatypeProperty ;
+    rdfs:label "time value" ;
+    rdfs:domain edge:Level0 ;
+    rdfs:range xsd:time .
+
+edge:byteVal a owl:DatatypeProperty ;
+    rdfs:label "byte value" ;
+    rdfs:domain edge:Level0 ;
+    rdfs:range xsd:byte .
+
+edge:shortVal a owl:DatatypeProperty ;
+    rdfs:label "short value" ;
+    rdfs:domain edge:Level0 ;
+    rdfs:range xsd:short .
+
+edge:longVal a owl:DatatypeProperty ;
+    rdfs:label "long value" ;
+    rdfs:domain edge:Level0 ;
+    rdfs:range xsd:long .

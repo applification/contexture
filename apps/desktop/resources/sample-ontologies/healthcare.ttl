@@ -1,0 +1,202 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix health: <http://example.org/healthcare#> .
+
+<http://example.org/healthcare> a owl:Ontology ;
+    rdfs:label "Healthcare Ontology" ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:comment "Test fixture modelling healthcare providers, patients, and clinical entities" .
+
+# --- Top-level classes ---
+
+health:LivingEntity a owl:Class ;
+    rdfs:label "Living Entity" ;
+    rdfs:comment "Any entity that is alive or was once alive" .
+
+health:Person a owl:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being" ;
+    rdfs:subClassOf health:LivingEntity .
+
+health:Animal a owl:Class ;
+    rdfs:label "Animal" ;
+    rdfs:comment "A non-human animal" ;
+    rdfs:subClassOf health:LivingEntity ;
+    owl:disjointWith health:Person .
+
+# --- Healthcare provider hierarchy (3 levels deep) ---
+
+health:HealthcareProvider a owl:Class ;
+    rdfs:label "Healthcare Provider" ;
+    rdfs:comment "A person who provides healthcare services" ;
+    rdfs:subClassOf health:Person .
+
+health:Physician a owl:Class ;
+    rdfs:label "Physician" ;
+    rdfs:comment "A medical doctor" ;
+    rdfs:subClassOf health:HealthcareProvider .
+
+health:Surgeon a owl:Class ;
+    rdfs:label "Surgeon" ;
+    rdfs:comment "A physician specializing in surgery" ;
+    rdfs:subClassOf health:Physician ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty health:performs ;
+        owl:someValuesFrom health:SurgicalProcedure
+    ] .
+
+health:Nurse a owl:Class ;
+    rdfs:label "Nurse" ;
+    rdfs:comment "A registered nurse" ;
+    rdfs:subClassOf health:HealthcareProvider .
+
+health:Pharmacist a owl:Class ;
+    rdfs:label "Pharmacist" ;
+    rdfs:comment "A licensed pharmacist" ;
+    rdfs:subClassOf health:HealthcareProvider .
+
+# OWL 2 AllDisjointClasses — cleaner than pairwise disjointWith
+[] a owl:AllDisjointClasses ;
+    owl:members ( health:Physician health:Nurse health:Pharmacist ) .
+
+# --- Patient ---
+
+health:Patient a owl:Class ;
+    rdfs:label "Patient" ;
+    rdfs:comment "A person receiving healthcare" ;
+    rdfs:subClassOf health:Person .
+
+# --- Clinical entities ---
+
+health:MedicalCondition a owl:Class ;
+    rdfs:label "Medical Condition" ;
+    rdfs:comment "A disease, disorder, or health condition" .
+
+health:Treatment a owl:Class ;
+    rdfs:label "Treatment" ;
+    rdfs:comment "A therapeutic intervention" .
+
+health:Medication a owl:Class ;
+    rdfs:label "Medication" ;
+    rdfs:comment "A pharmaceutical substance" ;
+    rdfs:subClassOf health:Treatment .
+
+health:SurgicalProcedure a owl:Class ;
+    rdfs:label "Surgical Procedure" ;
+    rdfs:comment "An invasive surgical intervention" ;
+    rdfs:subClassOf health:Treatment ;
+    owl:disjointWith health:Medication .
+
+health:Facility a owl:Class ;
+    rdfs:label "Healthcare Facility" ;
+    rdfs:comment "A place where healthcare is delivered" .
+
+health:Hospital a owl:Class ;
+    rdfs:label "Hospital" ;
+    rdfs:subClassOf health:Facility .
+
+health:Clinic a owl:Class ;
+    rdfs:label "Clinic" ;
+    rdfs:subClassOf health:Facility ;
+    owl:disjointWith health:Hospital .
+
+# --- Object Properties ---
+
+health:treats a owl:ObjectProperty ;
+    rdfs:label "treats" ;
+    rdfs:comment "A provider treats a patient" ;
+    rdfs:domain health:HealthcareProvider ;
+    rdfs:range health:Patient ;
+    owl:inverseOf health:treatedBy .
+
+health:treatedBy a owl:ObjectProperty ;
+    rdfs:label "treated by" ;
+    rdfs:domain health:Patient ;
+    rdfs:range health:HealthcareProvider ;
+    owl:inverseOf health:treats .
+
+health:diagnoses a owl:ObjectProperty ;
+    rdfs:label "diagnoses" ;
+    rdfs:domain health:Physician ;
+    rdfs:range health:MedicalCondition .
+
+health:hasTreatment a owl:ObjectProperty ;
+    rdfs:label "has treatment" ;
+    rdfs:domain health:MedicalCondition ;
+    rdfs:range health:Treatment .
+
+health:prescribes a owl:ObjectProperty ;
+    rdfs:label "prescribes" ;
+    rdfs:domain health:Physician ;
+    rdfs:range health:Medication .
+
+health:performedAt a owl:ObjectProperty ;
+    rdfs:label "performed at" ;
+    rdfs:domain health:Treatment ;
+    rdfs:range health:Facility .
+
+health:worksAt a owl:ObjectProperty ;
+    rdfs:label "works at" ;
+    rdfs:domain health:HealthcareProvider ;
+    rdfs:range health:Facility .
+
+# --- Datatype Properties ---
+
+health:dateOfBirth a owl:DatatypeProperty ;
+    rdfs:label "date of birth" ;
+    rdfs:domain health:Person ;
+    rdfs:range xsd:date .
+
+health:fullName a owl:DatatypeProperty ;
+    rdfs:label "full name" ;
+    rdfs:domain health:Person ;
+    rdfs:range xsd:string .
+
+health:licenseNumber a owl:DatatypeProperty ;
+    rdfs:label "license number" ;
+    rdfs:domain health:HealthcareProvider ;
+    rdfs:range xsd:string .
+
+health:dosageMg a owl:DatatypeProperty ;
+    rdfs:label "dosage (mg)" ;
+    rdfs:domain health:Medication ;
+    rdfs:range xsd:float .
+
+health:icdCode a owl:DatatypeProperty ;
+    rdfs:label "ICD code" ;
+    rdfs:domain health:MedicalCondition ;
+    rdfs:range xsd:string .
+
+health:admissionDate a owl:DatatypeProperty ;
+    rdfs:label "admission date" ;
+    rdfs:domain health:Patient ;
+    rdfs:range xsd:dateTime .
+
+health:isActive a owl:DatatypeProperty ;
+    rdfs:label "is active" ;
+    rdfs:domain health:Facility ;
+    rdfs:range xsd:boolean .
+
+health:bedCount a owl:DatatypeProperty ;
+    rdfs:label "bed count" ;
+    rdfs:domain health:Hospital ;
+    rdfs:range xsd:nonNegativeInteger .
+
+health:performs a owl:ObjectProperty ;
+    rdfs:label "performs" ;
+    rdfs:domain health:Physician ;
+    rdfs:range health:Treatment .
+
+# --- Named Individuals (ABox) ---
+
+health:drSmith a health:Surgeon ;
+    health:fullName "Dr. Alice Smith" ;
+    health:licenseNumber "MED-2024-0042" .
+
+health:generalHospital a health:Hospital ;
+    rdfs:label "General Hospital" ;
+    health:isActive true ;
+    health:bedCount "250"^^xsd:nonNegativeInteger .
