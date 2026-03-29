@@ -97,14 +97,13 @@ export function useChatHistory(): UseChatHistoryReturn {
   }, [threads, setActiveThreadId])
 
   const deleteThread = useCallback((id: string) => {
-    setThreads((prev) => prev.filter((t) => t.id !== id))
-    if (activeThreadId === id) {
-      setThreads((prev) => {
-        const remaining = prev.filter((t) => t.id !== id)
+    setThreads((prev) => {
+      const remaining = prev.filter((t) => t.id !== id)
+      if (activeThreadId === id) {
         setActiveThreadId(remaining.length > 0 ? remaining[0].id : null)
-        return remaining
-      })
-    }
+      }
+      return remaining
+    })
   }, [activeThreadId, setActiveThreadId])
 
   const updateThreadMessages = useCallback((id: string, messages: ChatMessage[]) => {
