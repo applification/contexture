@@ -12,19 +12,12 @@ export default function DownloadPage() {
   useEffect(() => {
     const visitorId = getVisitorId()
 
-    ph?.capture(
-      'download_initiated',
-      {
-        visitor_id: visitorId,
-        platform: 'web',
-        referrer: document.referrer || undefined,
-      },
-      { send_instantly: true }
-    )
-
-    // Set visitor_id as a person property so it can be used
-    // to link this web visitor to their desktop app session
-    ph?.setPersonProperties({ visitor_id: visitorId })
+    ph?.capture('download_initiated', {
+      visitor_id: visitorId,
+      platform: 'web',
+      referrer: document.referrer || undefined,
+      $set: { visitor_id: visitorId },
+    }, { send_instantly: true })
 
     const timeout = setTimeout(() => {
       window.location.href = GITHUB_RELEASES_URL
