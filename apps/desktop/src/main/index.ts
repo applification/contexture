@@ -48,6 +48,8 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
+app.setName('Ontograph');
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.applification.ontograph');
 
