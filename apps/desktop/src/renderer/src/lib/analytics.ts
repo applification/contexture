@@ -4,6 +4,7 @@ const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string) || 'https://eu.i.posthog.com'
 
 const OPT_OUT_KEY = 'ontograph-analytics-opt-out'
+const LINKED_VISITOR_KEY = 'ontograph-linked-visitor-id'
 
 function isOptedOut(): boolean {
   return localStorage.getItem(OPT_OUT_KEY) === 'true'
@@ -23,7 +24,7 @@ export function initAnalytics(): void {
   })
 
   if (!isOptedOut()) {
-    track('app_launched')
+    track('app_launched', { platform: 'desktop' })
   }
 }
 
@@ -48,4 +49,30 @@ export function track(event: string, properties?: Record<string, unknown>): void
 export function getAnonymousId(): string | undefined {
   if (!POSTHOG_KEY) return undefined
   return posthog.get_distinct_id()
+}
+
+/**
+ * Link this desktop session to a website visitor by aliasing PostHog identities.
+ * Call this when a shared identifier becomes available (e.g. the visitor_id from
+ * the marketing website download flow).
+ */
+export function linkWebVisitor(webVisitorId: string): void {
+  if (!POSTHOG_KEY || !webVisitorId || posthog.has_opted_out_capturing()) return
+
+  const alreadyLinked = localStorage.getItem(LINKED_VISITOR_KEY)
+  if (alreadyLinked === webVisitorId) return
+
+  posthog.alias(webVisitorId)
+  posthog.setPersonProperties({ web_visitor_id: webVisitorId, linked_from: 'desktop' })
+  localStorage.setItem(LINKED_VISITOR_KEY, webVisitorId)
+}
+
+/**
+ * Identify the user with a stable identifier (e.g. email).
+ * This merges the anonymous desktop session with any web session
+ * that used the same identifier.
+ */
+export function identifyUser(userId: string, properties?: Record<string, string>): void {
+  if (!POSTHOG_KEY || !userId || posthog.has_opted_out_capturing()) return
+  posthog.identify(userId, properties)
 }
