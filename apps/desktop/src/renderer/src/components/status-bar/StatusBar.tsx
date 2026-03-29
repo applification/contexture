@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { CircleAlert, TriangleAlert, BarChart3 } from 'lucide-react'
+import { CircleAlert, TriangleAlert, BarChart3, Circle } from 'lucide-react'
 import { useOntologyStore } from '@renderer/store/ontology'
 import { useUIStore } from '@renderer/store/ui'
 import { serializeToTurtle } from '@renderer/model/serialize'
@@ -9,6 +9,7 @@ import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 function localName(uri: string): string {
   const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'))
@@ -56,8 +57,29 @@ export function StatusBar(): React.JSX.Element {
   const hasIssues = errors.length > 0
 
   return (
-    <div className="h-7 border-t border-border bg-card px-3 flex items-center text-xs text-muted-foreground gap-4 shrink-0 relative">
-      <span>{filePath ? `${filePath}${isDirty ? ' *' : ''}` : 'No file open'}</span>
+    <div className={cn(
+      "h-7 border-t px-3 flex items-center text-xs gap-4 shrink-0 relative transition-colors duration-200",
+      isDirty
+        ? "bg-warning/10 border-warning/30 text-warning-foreground"
+        : "bg-card border-border text-muted-foreground"
+    )}>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex items-center gap-1.5">
+              <Circle className={cn(
+                "size-2 shrink-0 transition-colors duration-200",
+                isDirty ? "fill-warning text-warning" : "fill-success/60 text-success/60"
+              )} />
+              <span>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="text-xs">{isDirty ? 'You have unsaved changes — press ⌘S to save' : 'All changes saved'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      {filePath && <span className="text-muted-foreground/60">{filePath}</span>}
 
       <span className="ml-auto flex items-center gap-4">
         {!hasIssues && classCount > 0 && (

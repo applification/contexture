@@ -32,6 +32,7 @@ const api = {
     ipcRenderer.invoke('file:open-recent', filePath),
 
   // Menu events
+  onMenuFileNew: (callback: () => void) => onChannel('menu:file-new', callback),
   onMenuFileOpen: (callback: () => void) => onChannel('menu:file-open', callback),
   onMenuFileSave: (callback: () => void) => onChannel('menu:file-save', callback),
   onMenuFileSaveAs: (callback: () => void) => onChannel('menu:file-save-as', callback),

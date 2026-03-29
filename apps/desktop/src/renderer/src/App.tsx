@@ -43,6 +43,12 @@ function App(): React.JSX.Element {
   const undo = useHistoryStore((s) => s.undo)
   const canUndo = useHistoryStore((s) => s.canUndo)
 
+  const [showNewDialog, setShowNewDialog] = useState(false)
+  const [showSaveWarning, setShowSaveWarning] = useState(false)
+  const pendingSaveRef = useRef<'save' | 'saveAs' | null>(null)
+  const [showGraphControls, setShowGraphControls] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<string[]>([])
+
   const handleOpen = useCallback(async () => {
     const result = await window.api.openFile()
     if (result) {
@@ -106,15 +112,24 @@ function App(): React.JSX.Element {
     pendingSaveRef.current = null
   }, [doSave, doSaveAs])
 
+  const handleNew = useCallback(() => {
+    if (isDirty) {
+      setShowNewDialog(true)
+    } else {
+      resetOntology()
+    }
+  }, [isDirty, resetOntology])
+
   // Menu events
   useEffect(() => {
     const cleanups = [
+      window.api.onMenuFileNew(handleNew),
       window.api.onMenuFileOpen(handleOpen),
       window.api.onMenuFileSave(handleSave),
       window.api.onMenuFileSaveAs(handleSaveAs)
     ]
     return () => cleanups.forEach((fn) => fn())
-  }, [handleOpen, handleSave, handleSaveAs])
+  }, [handleNew, handleOpen, handleSave, handleSaveAs])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -156,12 +171,6 @@ function App(): React.JSX.Element {
   const activeTab = useUIStore((s) => s.sidebarTab)
   const setActiveTab = useUIStore((s) => s.setSidebarTab)
 
-  const [showNewDialog, setShowNewDialog] = useState(false)
-  const [showSaveWarning, setShowSaveWarning] = useState(false)
-  const pendingSaveRef = useRef<'save' | 'saveAs' | null>(null)
-  const [showGraphControls, setShowGraphControls] = useState(false)
-  const [recentFiles, setRecentFiles] = useState<string[]>([])
-
   // Load recent files on mount and after opens
   useEffect(() => {
     window.api.getRecentFiles().then(setRecentFiles).catch(() => {})
@@ -174,21 +183,13 @@ function App(): React.JSX.Element {
     }
   }, [loadFromTurtle])
 
-  const handleNew = useCallback(() => {
-    if (isDirty) {
-      setShowNewDialog(true)
-    } else {
-      resetOntology()
-    }
-  }, [isDirty, resetOntology])
-
   const hasContent = ontology.classes.size > 0
   const hasSelection = selectedNodeId !== null || selectedEdgeId !== null
 
   return (
     <div className="flex flex-col h-full w-full">
       <UpdateBanner />
-      <Toolbar onNew={handleNew} onOpen={handleOpen} onSave={handleSave} onSaveAs={handleSaveAs} />
+      <Toolbar />
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden" id="main-layout">
         {/* Graph Canvas */}
