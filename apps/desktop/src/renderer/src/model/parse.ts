@@ -1,5 +1,11 @@
 import { Parser, type Quad } from 'n3';
-import type { DatatypeProperty, ObjectProperty, Ontology, OntologyClass } from './types';
+import type {
+  DatatypeProperty,
+  Individual,
+  ObjectProperty,
+  Ontology,
+  OntologyClass,
+} from './types';
 import { createEmptyOntology } from './types';
 
 const OWL = 'http://www.w3.org/2002/07/owl#';
@@ -57,6 +63,15 @@ function getOrCreateDatatypeProperty(ontology: Ontology, uri: string): DatatypeP
   return prop;
 }
 
+function getOrCreateIndividual(ontology: Ontology, uri: string): Individual {
+  let ind = ontology.individuals.get(uri);
+  if (!ind) {
+    ind = { uri, types: [], objectPropertyAssertions: [], dataPropertyAssertions: [] };
+    ontology.individuals.set(uri, ind);
+  }
+  return ind;
+}
+
 export interface ParseWarning {
   message: string;
   severity: 'error' | 'warning';
@@ -99,7 +114,7 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
   }
 
   // Track declared types to distinguish ObjectProperty from DatatypeProperty
-  const declaredTypes = new Map<string, string>();
+  const declaredTypes = new Map<string, Set<string>>();
 
   // First pass: collect type declarations
   for (const quad of quads) {
@@ -108,7 +123,8 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
     const o = quad.object.value;
 
     if (p === `${RDF}type`) {
-      declaredTypes.set(s, o);
+      if (!declaredTypes.has(s)) declaredTypes.set(s, new Set());
+      declaredTypes.get(s)?.add(o);
 
       if (o === `${OWL}Class`) {
         getOrCreateClass(ontology, s);
@@ -116,6 +132,16 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         getOrCreateObjectProperty(ontology, s);
       } else if (o === `${OWL}DatatypeProperty`) {
         getOrCreateDatatypeProperty(ontology, s);
+      } else if (o === `${OWL}NamedIndividual`) {
+        // Skip blank node individuals
+        if (quad.subject.termType === 'BlankNode') {
+          warnings.push({
+            severity: 'warning',
+            message: `Blank node individual ignored: ${s}`,
+          });
+        } else {
+          getOrCreateIndividual(ontology, s);
+        }
       }
     }
   }
@@ -126,19 +152,29 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
     const p = quad.predicate.value;
     const o = quad.object.value;
 
-    if (p === `${RDF}type`) continue;
+    if (p === `${RDF}type`) {
+      // Record type assertions for individuals (e.g., :john rdf:type :Person)
+      const ind = ontology.individuals.get(s);
+      if (ind && o !== `${OWL}NamedIndividual`) {
+        if (!ind.types.includes(o)) ind.types.push(o);
+      }
+      continue;
+    }
 
     if (p === `${RDFS}label`) {
       const literal = quad.object.termType === 'Literal' ? quad.object.value : o;
       const cls = ontology.classes.get(s);
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
+      const ind = ontology.individuals.get(s);
       if (cls) {
         cls.label = literal;
       } else if (objProp) {
         objProp.label = literal;
       } else if (dtProp) {
         dtProp.label = literal;
+      } else if (ind) {
+        ind.label = literal;
       }
       continue;
     }
@@ -148,12 +184,15 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       const cls = ontology.classes.get(s);
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
+      const ind = ontology.individuals.get(s);
       if (cls) {
         cls.comment = literal;
       } else if (objProp) {
         objProp.comment = literal;
       } else if (dtProp) {
         dtProp.comment = literal;
+      } else if (ind) {
+        ind.comment = literal;
       }
       continue;
     }
@@ -208,6 +247,22 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       if (prop) {
         prop.inverseOf = o;
       }
+      continue;
+    }
+
+    // Individual property assertions
+    const ind = ontology.individuals.get(s);
+    if (ind) {
+      if (quad.object.termType === 'Literal') {
+        const datatype = (quad.object as { datatype?: { value: string } }).datatype?.value;
+        ind.dataPropertyAssertions.push({
+          property: p,
+          value: o,
+          datatype: datatype || undefined,
+        });
+      } else if (quad.object.termType === 'NamedNode') {
+        ind.objectPropertyAssertions.push({ property: p, target: o });
+      }
     }
   }
 
@@ -217,7 +272,6 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
     `${OWL}Restriction`,
     `${OWL}AllDifferent`,
     `${OWL}AnnotationProperty`,
-    `${OWL}NamedIndividual`,
     `${OWL}Ontology`,
   ];
   for (const quad of quads) {
@@ -236,7 +290,8 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
   if (
     ontology.classes.size === 0 &&
     ontology.objectProperties.size === 0 &&
-    ontology.datatypeProperties.size === 0
+    ontology.datatypeProperties.size === 0 &&
+    ontology.individuals.size === 0
   ) {
     warnings.push({
       severity: 'warning',

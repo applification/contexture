@@ -66,6 +66,18 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
           checked={graphFilters.showDatatypeProperties}
           onChange={(v) => setGraphFilter({ showDatatypeProperties: v })}
         />
+        <FilterCheckbox
+          id="filter-individuals"
+          label="Individuals"
+          checked={graphFilters.showIndividuals}
+          onChange={(v) => setGraphFilter({ showIndividuals: v })}
+        />
+        <FilterCheckbox
+          id="filter-typeof"
+          label="Type-of edges"
+          checked={graphFilters.showTypeOf}
+          onChange={(v) => setGraphFilter({ showTypeOf: v })}
+        />
         <div className="flex items-center gap-2 pt-0.5">
           <span className="text-xs text-muted-foreground w-28">Min connections</span>
           <Slider

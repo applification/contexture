@@ -11,13 +11,24 @@ export interface ClassNodeData extends Record<string, unknown> {
   warningCount: number;
 }
 
+export interface IndividualNodeData extends Record<string, unknown> {
+  label: string;
+  uri: string;
+  comment?: string;
+  types: string[];
+  typeLabels: string[];
+  errorCount: number;
+  warningCount: number;
+}
+
 export interface GroupNodeData extends Record<string, unknown> {
   label: string;
 }
 
 export type ClassNode = Node<ClassNodeData, 'class'>;
+export type IndividualNode = Node<IndividualNodeData, 'individual'>;
 export type GroupNode = Node<GroupNodeData, 'group'>;
-export type OntographNode = ClassNode | GroupNode;
+export type OntographNode = ClassNode | IndividualNode | GroupNode;
 
 export interface ObjPropEdgeData extends Record<string, unknown> {
   label: string;
@@ -40,7 +51,7 @@ function localName(uri: string): string {
 }
 
 export interface ReactFlowElements {
-  nodes: ClassNode[];
+  nodes: (ClassNode | IndividualNode)[];
   edges: Edge[];
 }
 
@@ -60,7 +71,7 @@ export function ontologyToReactFlowElements(
       }
     }
   }
-  const nodes: ClassNode[] = [];
+  const nodes: (ClassNode | IndividualNode)[] = [];
   const edges: Edge[] = [];
 
   // Build map of datatype properties by domain class
@@ -133,6 +144,40 @@ export function ontologyToReactFlowElements(
           data: { label, uri: prop.uri },
         });
       }
+    }
+  }
+
+  // Individual nodes
+  const totalAll = ontology.classes.size + ontology.individuals.size;
+  const cols = Math.ceil(Math.sqrt(totalAll));
+  for (const ind of ontology.individuals.values()) {
+    const row = Math.floor(idx / cols);
+    const col = idx % cols;
+    nodes.push({
+      id: ind.uri,
+      type: 'individual',
+      position: { x: col * 260, y: row * 160 },
+      data: {
+        label: ind.label || localName(ind.uri),
+        uri: ind.uri,
+        comment: ind.comment,
+        types: ind.types,
+        typeLabels: ind.types.map((t) => ontology.classes.get(t)?.label || localName(t)),
+        errorCount: errorCounts.get(ind.uri) ?? 0,
+        warningCount: warningCounts.get(ind.uri) ?? 0,
+      },
+    } as IndividualNode);
+    idx++;
+
+    // rdf:type edges from individual to its classes
+    for (const typeUri of ind.types) {
+      edges.push({
+        id: `typeof-${ind.uri}-${typeUri}`,
+        source: ind.uri,
+        target: typeUri,
+        type: 'typeOf',
+        data: { label: 'rdf:type' },
+      });
     }
   }
 

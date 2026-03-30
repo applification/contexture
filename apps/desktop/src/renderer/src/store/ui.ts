@@ -7,6 +7,8 @@ export interface GraphFilters {
   showDisjointWith: boolean;
   showObjectProperties: boolean;
   showDatatypeProperties: boolean;
+  showIndividuals: boolean;
+  showTypeOf: boolean;
   minDegree: number;
 }
 
@@ -19,6 +21,8 @@ const DEFAULT_FILTERS: GraphFilters = {
   showDisjointWith: true,
   showObjectProperties: true,
   showDatatypeProperties: true,
+  showIndividuals: true,
+  showTypeOf: true,
   minDegree: 0,
 };
 

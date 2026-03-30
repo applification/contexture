@@ -93,6 +93,7 @@ export function MetricsPanel(): React.JSX.Element {
       {/* KPI Cards */}
       <div className="flex gap-2 px-4 pt-3">
         <KpiCard label="Classes" value={summary.totalClasses} />
+        <KpiCard label="Individuals" value={summary.individuals} />
         <KpiCard label="Obj Props" value={summary.objectProperties} />
         <KpiCard label="Data Props" value={summary.datatypeProperties} />
       </div>

@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import { track } from '../lib/analytics';
 import { type ParseWarning, parseTurtleWithWarnings } from '../model/parse';
 import { serializeToTurtle } from '../model/serialize';
-import type { DatatypeProperty, ObjectProperty, Ontology, OntologyClass } from '../model/types';
+import type {
+  DatatypeProperty,
+  Individual,
+  ObjectProperty,
+  Ontology,
+  OntologyClass,
+} from '../model/types';
 import { createEmptyOntology } from '../model/types';
 
 interface OntologyState {
@@ -34,6 +40,11 @@ interface OntologyState {
   updateDatatypeProperty: (uri: string, changes: Partial<DatatypeProperty>) => void;
   removeDatatypeProperty: (uri: string) => void;
 
+  // Individual operations
+  addIndividual: (uri: string, ind?: Partial<Individual>) => void;
+  updateIndividual: (uri: string, changes: Partial<Individual>) => void;
+  removeIndividual: (uri: string) => void;
+
   // Undo/redo support
   restoreOntology: (ontology: Ontology) => void;
 }
@@ -49,6 +60,7 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
     set({ ontology, filePath: filePath ?? null, isDirty: false, importWarnings: warnings });
     track('ontology_loaded', {
       classCount: ontology.classes.size,
+      individualCount: ontology.individuals.size,
       source: filePath?.startsWith('Sample') ? 'sample' : 'file',
     });
   },
@@ -69,12 +81,7 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
 
   addClass: (uri, partial) => {
     set((state) => {
-      const ontology = structuredClone(state.ontology);
-      // structuredClone converts Maps to plain objects, so reconstruct
-      ontology.prefixes = new Map(state.ontology.prefixes);
-      ontology.classes = new Map(state.ontology.classes);
-      ontology.objectProperties = new Map(state.ontology.objectProperties);
-      ontology.datatypeProperties = new Map(state.ontology.datatypeProperties);
+      const ontology = cloneOntology(state.ontology);
 
       const isFirst = ontology.classes.size === 0;
       ontology.classes.set(uri, {
@@ -195,6 +202,40 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
     });
   },
 
+  addIndividual: (uri, partial) => {
+    set((state) => {
+      const ontology = cloneOntology(state.ontology);
+      ontology.individuals.set(uri, {
+        uri,
+        types: [],
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+        ...partial,
+      });
+      track('individual_added');
+      return { ontology, isDirty: true };
+    });
+  },
+
+  updateIndividual: (uri, changes) => {
+    set((state) => {
+      const existing = state.ontology.individuals.get(uri);
+      if (!existing) return state;
+
+      const ontology = cloneOntology(state.ontology);
+      ontology.individuals.set(uri, { ...existing, ...changes });
+      return { ontology, isDirty: true };
+    });
+  },
+
+  removeIndividual: (uri) => {
+    set((state) => {
+      const ontology = cloneOntology(state.ontology);
+      ontology.individuals.delete(uri);
+      return { ontology, isDirty: true };
+    });
+  },
+
   restoreOntology: (ontology) => set({ ontology: cloneOntology(ontology), isDirty: true }),
 }));
 
@@ -217,6 +258,17 @@ function cloneOntology(ontology: Ontology): Ontology {
       Array.from(ontology.datatypeProperties.entries()).map(([k, v]) => [
         k,
         { ...v, domain: [...v.domain] },
+      ]),
+    ),
+    individuals: new Map(
+      Array.from(ontology.individuals.entries()).map(([k, v]) => [
+        k,
+        {
+          ...v,
+          types: [...v.types],
+          objectPropertyAssertions: v.objectPropertyAssertions.map((a) => ({ ...a })),
+          dataPropertyAssertions: v.dataPropertyAssertions.map((a) => ({ ...a })),
+        },
       ]),
     ),
   };

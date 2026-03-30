@@ -4,7 +4,7 @@ export interface ValidationError {
   severity: 'error' | 'warning';
   message: string;
   elementUri: string;
-  elementType: 'class' | 'objectProperty' | 'datatypeProperty';
+  elementType: 'class' | 'objectProperty' | 'datatypeProperty' | 'individual';
 }
 
 export function validateOntology(ontology: Ontology): ValidationError[] {
@@ -108,6 +108,41 @@ export function validateOntology(ontology: Ontology): ValidationError[] {
         message: `Inverse property "${localName(prop.inverseOf)}" does not exist`,
         elementUri: prop.uri,
         elementType: 'objectProperty',
+      });
+    }
+  }
+
+  // Check individuals
+  for (const ind of ontology.individuals.values()) {
+    // Type assertions should reference existing classes
+    for (const typeUri of ind.types) {
+      if (!ontology.classes.has(typeUri)) {
+        errors.push({
+          severity: 'warning',
+          message: `Type class "${localName(typeUri)}" does not exist`,
+          elementUri: ind.uri,
+          elementType: 'individual',
+        });
+      }
+    }
+
+    // Individual with no type assertion
+    if (ind.types.length === 0) {
+      errors.push({
+        severity: 'warning',
+        message: 'Individual has no type assertion',
+        elementUri: ind.uri,
+        elementType: 'individual',
+      });
+    }
+
+    // Individual with no label
+    if (!ind.label) {
+      errors.push({
+        severity: 'warning',
+        message: 'Individual has no label',
+        elementUri: ind.uri,
+        elementType: 'individual',
       });
     }
   }

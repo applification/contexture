@@ -60,6 +60,17 @@ export function GraphSearchBar(): React.JSX.Element {
         matches.push({ id: cls.uri, label: `${label} (comment)`, matchType: 'comment' });
       }
     }
+    // Search individuals
+    for (const ind of ontology.individuals.values()) {
+      const label = ind.label || localName(ind.uri);
+      if (label.toLowerCase().includes(q)) {
+        matches.push({ id: ind.uri, label: `${label} ◆`, matchType: 'label' });
+      } else if (ind.uri.toLowerCase().includes(q)) {
+        matches.push({ id: ind.uri, label: `${label} ◆ (URI)`, matchType: 'uri' });
+      } else if (ind.comment?.toLowerCase().includes(q)) {
+        matches.push({ id: ind.uri, label: `${label} ◆ (comment)`, matchType: 'comment' });
+      }
+    }
     // Also search object properties (match shows domain class)
     for (const prop of ontology.objectProperties.values()) {
       const propLabel = prop.label || localName(prop.uri);
@@ -78,7 +89,7 @@ export function GraphSearchBar(): React.JSX.Element {
     setResults(matches.slice(0, 10));
     setActiveIndex(0);
     setOpen(matches.length > 0);
-  }, [query, classes, ontology.objectProperties.values]);
+  }, [query, classes, ontology.objectProperties.values, ontology.individuals.values]);
 
   // Click outside to close
   useEffect(() => {

@@ -21,6 +21,7 @@ import { useLayoutSidecar } from '@renderer/hooks/useLayoutSidecar';
 import {
   type ClassNode,
   type GroupNode,
+  type IndividualNode,
   ontologyToReactFlowElements,
 } from '@renderer/model/reactflow';
 import { validateOntology } from '@renderer/services/validation';
@@ -31,12 +32,15 @@ import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { DisjointWithEdge } from './edges/DisjointWithEdge';
 import { ObjectPropertyEdge } from './edges/ObjectPropertyEdge';
 import { SubClassOfEdge } from './edges/SubClassOfEdge';
+import { TypeOfEdge } from './edges/TypeOfEdge';
 import { GraphLegend } from './GraphLegend';
 import { ClassNode as ClassNodeComponent } from './nodes/ClassNode';
 import { GroupNode as GroupNodeComponent } from './nodes/GroupNode';
+import { IndividualNode as IndividualNodeComponent } from './nodes/IndividualNode';
 
 const NODE_TYPES: NodeTypes = {
   class: ClassNodeComponent as unknown as NodeTypes['class'],
+  individual: IndividualNodeComponent as unknown as NodeTypes['individual'],
   group: GroupNodeComponent as unknown as NodeTypes['group'],
 };
 
@@ -44,6 +48,7 @@ const EDGE_TYPES: EdgeTypes = {
   subClassOf: SubClassOfEdge,
   objectProperty: ObjectPropertyEdge as EdgeTypes[string],
   disjointWith: DisjointWithEdge,
+  typeOf: TypeOfEdge,
 };
 
 interface ContextMenuState {
@@ -74,7 +79,9 @@ function GraphFlow(): React.JSX.Element {
   const focusNodeId = useUIStore((s) => s.focusNodeId);
   const setFocusNode = useUIStore((s) => s.setFocusNode);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<ClassNode | GroupNode>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<ClassNode | IndividualNode | GroupNode>(
+    [],
+  );
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -223,7 +230,7 @@ function GraphFlow(): React.JSX.Element {
       // Data-only change: update node data without repositioning
       setNodes((prev) =>
         prev.map((n) => {
-          if (n.type !== 'class') return n;
+          if (n.type !== 'class' && n.type !== 'individual') return n;
           const updated = newNodes.find((nn) => nn.id === n.id);
           return updated ? { ...n, data: updated.data } : n;
         }),
@@ -267,8 +274,14 @@ function GraphFlow(): React.JSX.Element {
     if (e.type === 'subClassOf' && !graphFilters.showSubClassOf) return false;
     if (e.type === 'disjointWith' && !graphFilters.showDisjointWith) return false;
     if (e.type === 'objectProperty' && !graphFilters.showObjectProperties) return false;
+    if (e.type === 'typeOf' && !graphFilters.showTypeOf) return false;
     return true;
   });
+
+  // Filter individual nodes
+  const filteredNodes = graphFilters.showIndividuals
+    ? nodes
+    : nodes.filter((n) => n.type !== 'individual');
 
   // Filter nodes by minimum degree
   const visibleNodeIds = new Set<string>();
@@ -278,25 +291,27 @@ function GraphFlow(): React.JSX.Element {
       degreeMap.set(e.source, (degreeMap.get(e.source) ?? 0) + 1);
       degreeMap.set(e.target, (degreeMap.get(e.target) ?? 0) + 1);
     });
-    nodes.forEach((n) => {
+    filteredNodes.forEach((n) => {
       if (n.type === 'group' || (degreeMap.get(n.id) ?? 0) >= graphFilters.minDegree) {
         visibleNodeIds.add(n.id);
       }
     });
   }
   const visibleNodes =
-    graphFilters.minDegree > 0 ? nodes.filter((n) => visibleNodeIds.has(n.id)) : nodes;
+    graphFilters.minDegree > 0
+      ? filteredNodes.filter((n) => visibleNodeIds.has(n.id))
+      : filteredNodes;
 
   // Save positions to sidecar when nodes change (debounced via the 'onNodesChange' handler)
   const handleNodesChange = useCallback(
-    (changes: NodeChange<ClassNode | GroupNode>[]) => {
+    (changes: NodeChange<ClassNode | IndividualNode | GroupNode>[]) => {
       onNodesChange(changes);
       // Save positions after drag ends
       const hasDragStop = changes.some((c) => c.type === 'position' && !c.dragging);
       if (hasDragStop) {
         const posData: Record<string, { x: number; y: number }> = {};
         nodesRef.current.forEach((n) => {
-          if (n.type === 'class') posData[n.id] = n.position;
+          if (n.type === 'class' || n.type === 'individual') posData[n.id] = n.position;
         });
         savePositions({ positions: posData });
       }

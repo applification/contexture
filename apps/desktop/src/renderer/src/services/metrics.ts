@@ -5,6 +5,7 @@ export interface OntologyMetrics {
     totalClasses: number;
     objectProperties: number;
     datatypeProperties: number;
+    individuals: number;
   };
   structure: {
     maxDepth: number;
@@ -36,11 +37,12 @@ export interface OntologyMetrics {
 }
 
 export function computeMetrics(ontology: Ontology): OntologyMetrics {
-  const { classes, objectProperties, datatypeProperties } = ontology;
+  const { classes, objectProperties, datatypeProperties, individuals } = ontology;
 
   const totalClasses = classes.size;
   const totalObjProps = objectProperties.size;
   const totalDtProps = datatypeProperties.size;
+  const totalIndividuals = individuals.size;
 
   // Build parent→children map and child→parents map
   const childrenOf = new Map<string, string[]>();
@@ -270,6 +272,7 @@ export function computeMetrics(ontology: Ontology): OntologyMetrics {
       totalClasses,
       objectProperties: totalObjProps,
       datatypeProperties: totalDtProps,
+      individuals: totalIndividuals,
     },
     structure: {
       maxDepth,

@@ -76,6 +76,37 @@ export function serializeToTurtle(ontology: Ontology): string {
     writer.addQuad(subject, namedNode(`${RDFS}range`), namedNode(prop.range));
   }
 
+  // Write individuals
+  for (const ind of ontology.individuals.values()) {
+    const subject = namedNode(ind.uri);
+
+    writer.addQuad(subject, namedNode(`${RDF}type`), namedNode(`${OWL}NamedIndividual`));
+
+    for (const typeUri of ind.types) {
+      writer.addQuad(subject, namedNode(`${RDF}type`), namedNode(typeUri));
+    }
+    if (ind.label) {
+      writer.addQuad(subject, namedNode(`${RDFS}label`), literal(ind.label));
+    }
+    if (ind.comment) {
+      writer.addQuad(subject, namedNode(`${RDFS}comment`), literal(ind.comment));
+    }
+    for (const assertion of ind.objectPropertyAssertions) {
+      writer.addQuad(subject, namedNode(assertion.property), namedNode(assertion.target));
+    }
+    for (const assertion of ind.dataPropertyAssertions) {
+      if (assertion.datatype) {
+        writer.addQuad(
+          subject,
+          namedNode(assertion.property),
+          literal(assertion.value, namedNode(assertion.datatype)),
+        );
+      } else {
+        writer.addQuad(subject, namedNode(assertion.property), literal(assertion.value));
+      }
+    }
+  }
+
   let result = '';
   writer.end((_error, output) => {
     result = output;

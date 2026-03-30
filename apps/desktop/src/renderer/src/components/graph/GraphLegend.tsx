@@ -17,12 +17,22 @@ const EDGE_ITEMS = [
     color: 'var(--graph-edge-disjoint)',
     dash: '3,4',
   },
+  {
+    label: 'Type (instance-of)',
+    color: 'var(--graph-edge-typeof, oklch(0.65 0.15 160))',
+    dash: '4,3',
+  },
 ] as const;
 
 const NODE_ITEMS = [
-  { label: 'Class', border: 'var(--graph-node-border)' },
-  { label: 'Selected', border: 'var(--graph-node-selected)' },
-  { label: 'Adjacent', border: 'var(--graph-node-adjacent)' },
+  { label: 'Class', border: 'var(--graph-node-border)', style: 'solid' as const },
+  {
+    label: 'Individual',
+    border: 'var(--graph-node-individual-border, oklch(0.65 0.15 160))',
+    style: 'dashed' as const,
+  },
+  { label: 'Selected', border: 'var(--graph-node-selected)', style: 'solid' as const },
+  { label: 'Adjacent', border: 'var(--graph-node-adjacent)', style: 'solid' as const },
 ] as const;
 
 export const GraphLegend = memo(function GraphLegend() {
@@ -73,7 +83,8 @@ export const GraphLegend = memo(function GraphLegend() {
                 <div
                   className="size-3.5 rounded shrink-0"
                   style={{
-                    border: `2px solid ${item.border}`,
+                    border: `2px ${item.style} ${item.border}`,
+                    borderRadius: item.style === 'dashed' ? 6 : undefined,
                     background: 'var(--graph-node-body-bg)',
                   }}
                 />

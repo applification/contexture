@@ -3,6 +3,7 @@ export interface Ontology {
   classes: Map<string, OntologyClass>;
   objectProperties: Map<string, ObjectProperty>;
   datatypeProperties: Map<string, DatatypeProperty>;
+  individuals: Map<string, Individual>;
 }
 
 export interface OntologyClass {
@@ -34,6 +35,15 @@ export interface DatatypeProperty {
   maxCardinality?: number;
 }
 
+export interface Individual {
+  uri: string;
+  label?: string;
+  comment?: string;
+  types: string[];
+  objectPropertyAssertions: { property: string; target: string }[];
+  dataPropertyAssertions: { property: string; value: string; datatype?: string }[];
+}
+
 export function createEmptyOntology(): Ontology {
   return {
     prefixes: new Map([
@@ -45,5 +55,6 @@ export function createEmptyOntology(): Ontology {
     classes: new Map(),
     objectProperties: new Map(),
     datatypeProperties: new Map(),
+    individuals: new Map(),
   };
 }
