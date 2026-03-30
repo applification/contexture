@@ -6,12 +6,27 @@ export interface Ontology {
   individuals: Map<string, Individual>;
 }
 
+export type RestrictionType =
+  | 'someValuesFrom'
+  | 'allValuesFrom'
+  | 'hasValue'
+  | 'minCardinality'
+  | 'maxCardinality'
+  | 'exactCardinality';
+
+export interface Restriction {
+  onProperty: string;
+  type: RestrictionType;
+  value: string;
+}
+
 export interface OntologyClass {
   uri: string;
   label?: string;
   comment?: string;
   subClassOf: string[];
   disjointWith: string[];
+  restrictions?: Restriction[];
 }
 
 export interface ObjectProperty {
