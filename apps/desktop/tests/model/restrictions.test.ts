@@ -39,11 +39,11 @@ describe('parseTurtle — owl:Restriction support', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
       expect(person.restrictions).toBeDefined();
-      const svf = person.restrictions!.find(
+      const svf = person.restrictions?.find(
         (r) => r.type === 'someValuesFrom' && r.onProperty === `${EX}worksFor`,
       );
       expect(svf).toBeDefined();
-      expect(svf!.value).toBe(`${EX}Organization`);
+      expect(svf?.value).toBe(`${EX}Organization`);
     });
   });
 
@@ -51,11 +51,11 @@ describe('parseTurtle — owl:Restriction support', () => {
     it('Person has allValuesFrom restriction on memberOf -> Department', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
-      const avf = person.restrictions!.find(
+      const avf = person.restrictions?.find(
         (r) => r.type === 'allValuesFrom' && r.onProperty === `${EX}memberOf`,
       );
       expect(avf).toBeDefined();
-      expect(avf!.value).toBe(`${EX}Department`);
+      expect(avf?.value).toBe(`${EX}Department`);
     });
   });
 
@@ -64,11 +64,11 @@ describe('parseTurtle — owl:Restriction support', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const employee = ontology.classes.get(`${EX}Employee`) as OntologyClass;
       expect(employee.restrictions).toBeDefined();
-      const hv = employee.restrictions!.find(
+      const hv = employee.restrictions?.find(
         (r) => r.type === 'hasValue' && r.onProperty === `${EX}worksFor`,
       );
       expect(hv).toBeDefined();
-      expect(hv!.value).toBe(`${EX}AcmeCorp`);
+      expect(hv?.value).toBe(`${EX}AcmeCorp`);
     });
 
     it('Employee also has regular subClassOf Person', () => {
@@ -82,11 +82,11 @@ describe('parseTurtle — owl:Restriction support', () => {
     it('Person has minCardinality 1 on hasEmail', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
-      const mc = person.restrictions!.find(
+      const mc = person.restrictions?.find(
         (r) => r.type === 'minCardinality' && r.onProperty === `${EX}hasEmail`,
       );
       expect(mc).toBeDefined();
-      expect(mc!.value).toBe('1');
+      expect(mc?.value).toBe('1');
     });
   });
 
@@ -94,11 +94,11 @@ describe('parseTurtle — owl:Restriction support', () => {
     it('Person has maxCardinality 5 on manages', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
-      const mc = person.restrictions!.find(
+      const mc = person.restrictions?.find(
         (r) => r.type === 'maxCardinality' && r.onProperty === `${EX}manages`,
       );
       expect(mc).toBeDefined();
-      expect(mc!.value).toBe('5');
+      expect(mc?.value).toBe('5');
     });
   });
 
@@ -107,11 +107,11 @@ describe('parseTurtle — owl:Restriction support', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const dept = ontology.classes.get(`${EX}Department`) as OntologyClass;
       expect(dept.restrictions).toBeDefined();
-      const ec = dept.restrictions!.find(
+      const ec = dept.restrictions?.find(
         (r) => r.type === 'exactCardinality' && r.onProperty === `${EX}manages`,
       );
       expect(ec).toBeDefined();
-      expect(ec!.value).toBe('1');
+      expect(ec?.value).toBe('1');
     });
   });
 
@@ -120,13 +120,13 @@ describe('parseTurtle — owl:Restriction support', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
       expect(person.restrictions).toBeDefined();
-      expect(person.restrictions!.length).toBe(4);
+      expect(person.restrictions?.length).toBe(4);
     });
 
     it('Person restrictions cover 4 different types', () => {
       const ontology = parseTurtle(restrictionsTurtle);
       const person = ontology.classes.get(`${EX}Person`) as OntologyClass;
-      const types = new Set(person.restrictions!.map((r) => r.type));
+      const types = new Set(person.restrictions?.map((r) => r.type));
       expect(types).toContain('someValuesFrom');
       expect(types).toContain('allValuesFrom');
       expect(types).toContain('minCardinality');
@@ -136,11 +136,11 @@ describe('parseTurtle — owl:Restriction support', () => {
 
   describe('edge cases', () => {
     it('restriction with undeclared property parses with warning', () => {
-      const { ontology, warnings } = parseTurtleWithWarnings(restrictionsTurtle);
+      const { ontology } = parseTurtleWithWarnings(restrictionsTurtle);
       const contractor = ontology.classes.get(`${EX}Contractor`) as OntologyClass;
       expect(contractor.restrictions).toBeDefined();
-      expect(contractor.restrictions!.length).toBe(1);
-      expect(contractor.restrictions![0].onProperty).toBe(`${EX}undeclaredProp`);
+      expect(contractor.restrictions?.length).toBe(1);
+      expect(contractor.restrictions?.[0].onProperty).toBe(`${EX}undeclaredProp`);
     });
 
     it('restriction without onProperty emits warning and is skipped', () => {

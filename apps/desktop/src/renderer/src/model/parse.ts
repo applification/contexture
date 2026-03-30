@@ -178,15 +178,17 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
     }
 
     if (p === `${OWL}onProperty`) {
-      if (!restrictionProps.has(s)) restrictionProps.set(s, {});
-      restrictionProps.get(s)!.onProperty = o;
+      const entry = restrictionProps.get(s) ?? {};
+      entry.onProperty = o;
+      restrictionProps.set(s, entry);
     }
 
     const rType = RESTRICTION_VALUE_PREDICATES[p];
     if (rType) {
-      if (!restrictionProps.has(s)) restrictionProps.set(s, {});
-      restrictionProps.get(s)!.type = rType;
-      restrictionProps.get(s)!.value = o;
+      const entry = restrictionProps.get(s) ?? {};
+      entry.type = rType;
+      entry.value = o;
+      restrictionProps.set(s, entry);
     }
   }
 
