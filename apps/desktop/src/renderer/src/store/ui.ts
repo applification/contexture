@@ -9,6 +9,7 @@ export interface GraphFilters {
   showDatatypeProperties: boolean;
   showIndividuals: boolean;
   showTypeOf: boolean;
+  showRestrictions: boolean;
   minDegree: number;
 }
 
@@ -23,6 +24,7 @@ const DEFAULT_FILTERS: GraphFilters = {
   showDatatypeProperties: true,
   showIndividuals: true,
   showTypeOf: true,
+  showRestrictions: true,
   minDegree: 0,
 };
 

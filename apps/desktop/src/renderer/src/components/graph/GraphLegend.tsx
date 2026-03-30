@@ -22,6 +22,11 @@ const EDGE_ITEMS = [
     color: 'var(--graph-edge-typeof, oklch(0.65 0.15 160))',
     dash: '4,3',
   },
+  {
+    label: 'Restriction',
+    color: 'var(--graph-edge-restriction)',
+    dash: '6,3',
+  },
 ] as const;
 
 const NODE_ITEMS = [

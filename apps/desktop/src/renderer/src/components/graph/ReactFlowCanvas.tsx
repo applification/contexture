@@ -31,6 +31,7 @@ import { AnimatePresence } from 'motion/react';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { DisjointWithEdge } from './edges/DisjointWithEdge';
 import { ObjectPropertyEdge } from './edges/ObjectPropertyEdge';
+import { RestrictionEdge } from './edges/RestrictionEdge';
 import { SubClassOfEdge } from './edges/SubClassOfEdge';
 import { TypeOfEdge } from './edges/TypeOfEdge';
 import { GraphLegend } from './GraphLegend';
@@ -49,6 +50,7 @@ const EDGE_TYPES: EdgeTypes = {
   objectProperty: ObjectPropertyEdge as EdgeTypes[string],
   disjointWith: DisjointWithEdge,
   typeOf: TypeOfEdge,
+  restriction: RestrictionEdge as EdgeTypes[string],
 };
 
 interface ContextMenuState {
@@ -276,6 +278,7 @@ function GraphFlow(): React.JSX.Element {
     if (e.type === 'disjointWith' && !graphFilters.showDisjointWith) return false;
     if (e.type === 'objectProperty' && !graphFilters.showObjectProperties) return false;
     if (e.type === 'typeOf' && !graphFilters.showTypeOf) return false;
+    if (e.type === 'restriction' && !graphFilters.showRestrictions) return false;
     return true;
   });
 

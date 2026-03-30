@@ -1,12 +1,13 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { ValidationError } from '../services/validation';
-import type { Ontology } from './types';
+import type { Ontology, Restriction } from './types';
 
 export interface ClassNodeData extends Record<string, unknown> {
   label: string;
   uri: string;
   comment?: string;
   datatypeProperties: { uri: string; label: string; range: string }[];
+  restrictions: Restriction[];
   errorCount: number;
   warningCount: number;
 }
@@ -41,6 +42,11 @@ export interface SubClassEdgeData extends Record<string, unknown> {
 
 export interface DisjointEdgeData extends Record<string, unknown> {
   label: string;
+}
+
+export interface RestrictionEdgeData extends Record<string, unknown> {
+  label: string;
+  qualifier: string;
 }
 
 function localName(uri: string): string {
@@ -101,6 +107,7 @@ export function ontologyToReactFlowElements(
         uri: cls.uri,
         comment: cls.comment,
         datatypeProperties: dtPropsByDomain.get(cls.uri) || [],
+        restrictions: cls.restrictions || [],
         errorCount: errorCounts.get(cls.uri) ?? 0,
         warningCount: warningCounts.get(cls.uri) ?? 0,
       },
@@ -128,6 +135,23 @@ export function ontologyToReactFlowElements(
         type: 'disjointWith',
         data: { label: 'disjointWith' },
       });
+    }
+
+    // Restriction edges for someValuesFrom / allValuesFrom targeting other classes
+    if (cls.restrictions) {
+      for (const r of cls.restrictions) {
+        if (r.type !== 'someValuesFrom' && r.type !== 'allValuesFrom') continue;
+        // Only create edge if the target is a known class
+        if (!ontology.classes.has(r.value)) continue;
+        const qualifier = r.type === 'someValuesFrom' ? 'some' : 'only';
+        edges.push({
+          id: `restriction-${cls.uri}-${r.onProperty}-${r.type}-${r.value}`,
+          source: cls.uri,
+          target: r.value,
+          type: 'restriction',
+          data: { label: `${localName(r.onProperty)} [${qualifier}]`, qualifier },
+        });
+      }
     }
   }
 

@@ -1,12 +1,39 @@
 import type { ClassNode as ClassNodeType } from '@renderer/model/reactflow';
+import type { Restriction } from '@renderer/model/types';
 // Floating edges use useInternalNode to compute real intersection points,
 // so handles are invisible and centered — they exist only for RF's connection model.
 import { useUIStore } from '@renderer/store/ui';
 import { Handle, type NodeProps, Position } from '@xyflow/react';
 import { memo } from 'react';
 
+function localName(uri: string): string {
+  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+  return idx >= 0 ? uri.substring(idx + 1) : uri;
+}
+
+function formatRestriction(r: Restriction): string {
+  const prop = localName(r.onProperty);
+  switch (r.type) {
+    case 'someValuesFrom':
+      return `${prop} some ${localName(r.value)}`;
+    case 'allValuesFrom':
+      return `${prop} only ${localName(r.value)}`;
+    case 'hasValue':
+      return `${prop} = ${localName(r.value)}`;
+    case 'minCardinality':
+      return `${prop} [${r.value}..*]`;
+    case 'maxCardinality':
+      return `${prop} [0..${r.value}]`;
+    case 'exactCardinality':
+      return `${prop} [${r.value}..${r.value}]`;
+    default:
+      return `${prop} ${r.type} ${localName(r.value)}`;
+  }
+}
+
 export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNodeType>) {
   const showDatatypeProperties = useUIStore((s) => s.graphFilters.showDatatypeProperties);
+  const showRestrictions = useUIStore((s) => s.graphFilters.showRestrictions);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const adjacentNodeIds = useUIStore((s) => s.adjacentNodeIds);
   const isSelected = selectedNodeId === id;
@@ -143,6 +170,34 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
               >
                 {prop.range}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showRestrictions && data.restrictions.length > 0 && (
+        <div
+          style={{
+            padding: '4px 0',
+            background: 'var(--graph-node-body-bg)',
+            borderTop: '1px solid var(--graph-node-border)',
+          }}
+        >
+          {data.restrictions.map((r) => (
+            <div
+              key={`${r.onProperty}-${r.type}-${r.value}`}
+              style={{
+                padding: '2px 10px',
+                fontSize: 9,
+                color: 'var(--muted-foreground)',
+                fontWeight: 400,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              <span style={{ marginRight: 4 }}>&#8849;</span>
+              {formatRestriction(r)}
             </div>
           ))}
         </div>
