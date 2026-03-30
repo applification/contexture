@@ -14,10 +14,12 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "check": "biome check ."
+    "check": "biome check .",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
+    "husky": "^9.1.7",
     "turbo": "^2.5.4"
   }
 }
