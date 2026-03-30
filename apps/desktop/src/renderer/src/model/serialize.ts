@@ -92,7 +92,11 @@ export function serializeToTurtle(ontology: Ontology): string {
     }
     for (const ann of ontology.ontologyMetadata.annotations) {
       if (ann.datatype) {
-        writer.addQuad(subject, namedNode(ann.property), literal(ann.value, namedNode(ann.datatype)));
+        writer.addQuad(
+          subject,
+          namedNode(ann.property),
+          literal(ann.value, namedNode(ann.datatype)),
+        );
       } else {
         writer.addQuad(subject, namedNode(ann.property), literal(ann.value));
       }

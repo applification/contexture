@@ -6,7 +6,6 @@ import type {
   ObjectProperty,
   Ontology,
   OntologyClass,
-  OntologyMetadata,
   Restriction,
   RestrictionType,
 } from './types';
@@ -247,9 +246,10 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       }
       // Collect other ontology-level annotations (not rdf:type)
       if (p !== `${RDF}type`) {
-        const datatype = quad.object.termType === 'Literal'
-          ? (quad.object as { datatype?: { value: string } }).datatype?.value
-          : undefined;
+        const datatype =
+          quad.object.termType === 'Literal'
+            ? (quad.object as { datatype?: { value: string } }).datatype?.value
+            : undefined;
         ontology.ontologyMetadata.annotations.push({
           property: p,
           value: o,

@@ -226,8 +226,6 @@ describe('edge-cases.ttl', () => {
 
 // ---- Annotations fixture ----
 
-const ANNOT = 'http://example.org/ontology#';
-
 describe('annotations.ttl', () => {
   const turtle = loadFixture('annotations.ttl');
 

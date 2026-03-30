@@ -249,9 +249,7 @@ describe('parseTurtle — annotation properties', () => {
 
   it('parses subPropertyOf on annotation properties', () => {
     const ontology = parseTurtle(annotationsTurtle);
-    const techNote = ontology.annotationProperties.get(
-      `${EX}technicalNote`,
-    ) as AnnotationProperty;
+    const techNote = ontology.annotationProperties.get(`${EX}technicalNote`) as AnnotationProperty;
     expect(techNote).toBeDefined();
     expect(techNote.subPropertyOf).toContain(`${EX}editorialNote`);
   });
@@ -327,9 +325,7 @@ describe('parseTurtle — ontology metadata', () => {
 
   it('parses owl:imports', () => {
     const ontology = parseTurtle(annotationsTurtle);
-    expect(ontology.ontologyMetadata?.imports).toContain(
-      'http://purl.org/dc/elements/1.1/',
-    );
+    expect(ontology.ontologyMetadata?.imports).toContain('http://purl.org/dc/elements/1.1/');
   });
 
   it('parses Dublin Core metadata (dc:title, dc:creator, dc:description)', () => {

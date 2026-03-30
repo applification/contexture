@@ -189,9 +189,7 @@ describe('serializeToTurtle — annotation properties', () => {
     const serialized = serializeToTurtle(original);
     const reparsed = parseTurtle(serialized);
 
-    const techNote = reparsed.annotationProperties.get(
-      `${EX}technicalNote`,
-    ) as AnnotationProperty;
+    const techNote = reparsed.annotationProperties.get(`${EX}technicalNote`) as AnnotationProperty;
     expect(techNote.subPropertyOf).toContain(`${EX}editorialNote`);
   });
 
