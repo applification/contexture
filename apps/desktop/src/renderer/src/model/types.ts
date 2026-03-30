@@ -1,9 +1,39 @@
+export interface AnnotationProperty {
+  uri: string;
+  label?: string;
+  comment?: string;
+  subPropertyOf: string[];
+}
+
+export interface OntologyMetadata {
+  iri: string;
+  versionIRI?: string;
+  imports: string[];
+  annotations: { property: string; value: string; datatype?: string }[];
+}
+
 export interface Ontology {
   prefixes: Map<string, string>;
   classes: Map<string, OntologyClass>;
   objectProperties: Map<string, ObjectProperty>;
   datatypeProperties: Map<string, DatatypeProperty>;
   individuals: Map<string, Individual>;
+  annotationProperties: Map<string, AnnotationProperty>;
+  ontologyMetadata?: OntologyMetadata;
+}
+
+export type RestrictionType =
+  | 'someValuesFrom'
+  | 'allValuesFrom'
+  | 'hasValue'
+  | 'minCardinality'
+  | 'maxCardinality'
+  | 'exactCardinality';
+
+export interface Restriction {
+  onProperty: string;
+  type: RestrictionType;
+  value: string;
 }
 
 export interface OntologyClass {
@@ -12,6 +42,7 @@ export interface OntologyClass {
   comment?: string;
   subClassOf: string[];
   disjointWith: string[];
+  restrictions?: Restriction[];
 }
 
 export interface ObjectProperty {
@@ -56,5 +87,6 @@ export function createEmptyOntology(): Ontology {
     objectProperties: new Map(),
     datatypeProperties: new Map(),
     individuals: new Map(),
+    annotationProperties: new Map(),
   };
 }

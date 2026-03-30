@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { parseTurtle } from '@renderer/model/parse';
 import { serializeToTurtle } from '@renderer/model/serialize';
 import type {
+  AnnotationProperty,
   DatatypeProperty,
   Individual,
   ObjectProperty,
@@ -21,6 +22,11 @@ const peopleTurtle = readFileSync(
 
 const individualsTurtle = readFileSync(
   resolve(__dirname, '../../resources/sample-ontologies/individuals.ttl'),
+  'utf-8',
+);
+
+const annotationsTurtle = readFileSync(
+  resolve(__dirname, '../../resources/sample-ontologies/annotations.ttl'),
   'utf-8',
 );
 
@@ -217,5 +223,53 @@ describe('serializeToTurtle — individuals', () => {
     const serialized = serializeToTurtle(ont);
     const reparsed = parseTurtle(serialized);
     expect(reparsed.individuals.has('http://ex/empty')).toBe(true);
+  });
+});
+
+describe('serializeToTurtle — annotation properties', () => {
+  it('round-trips: preserves annotation properties', () => {
+    const original = parseTurtle(annotationsTurtle);
+    const serialized = serializeToTurtle(original);
+    const reparsed = parseTurtle(serialized);
+
+    expect(reparsed.annotationProperties.size).toBe(original.annotationProperties.size);
+    for (const [uri, prop] of original.annotationProperties) {
+      const reparsedProp = reparsed.annotationProperties.get(uri) as AnnotationProperty;
+      expect(reparsedProp).toBeDefined();
+      expect(reparsedProp.label).toBe(prop.label);
+      expect(reparsedProp.comment).toBe(prop.comment);
+    }
+  });
+
+  it('round-trips: preserves annotation property subPropertyOf', () => {
+    const original = parseTurtle(annotationsTurtle);
+    const serialized = serializeToTurtle(original);
+    const reparsed = parseTurtle(serialized);
+
+    const techNote = reparsed.annotationProperties.get(`${EX}technicalNote`) as AnnotationProperty;
+    expect(techNote.subPropertyOf).toContain(`${EX}editorialNote`);
+  });
+
+  it('round-trips: preserves ontology metadata', () => {
+    const original = parseTurtle(annotationsTurtle);
+    const serialized = serializeToTurtle(original);
+    const reparsed = parseTurtle(serialized);
+
+    expect(reparsed.ontologyMetadata?.iri).toBe(original.ontologyMetadata?.iri);
+    expect(reparsed.ontologyMetadata?.versionIRI).toBe(original.ontologyMetadata?.versionIRI);
+    expect(reparsed.ontologyMetadata?.imports?.sort()).toEqual(
+      original.ontologyMetadata?.imports?.sort(),
+    );
+  });
+
+  it('serializes annotation property with no metadata', () => {
+    const ont = createEmptyOntology();
+    ont.annotationProperties.set('http://ex/note', {
+      uri: 'http://ex/note',
+      subPropertyOf: [],
+    });
+    const serialized = serializeToTurtle(ont);
+    const reparsed = parseTurtle(serialized);
+    expect(reparsed.annotationProperties.has('http://ex/note')).toBe(true);
   });
 });

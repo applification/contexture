@@ -78,6 +78,12 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
           checked={graphFilters.showTypeOf}
           onChange={(v) => setGraphFilter({ showTypeOf: v })}
         />
+        <FilterCheckbox
+          id="filter-restrictions"
+          label="Restrictions"
+          checked={graphFilters.showRestrictions}
+          onChange={(v) => setGraphFilter({ showRestrictions: v })}
+        />
         <div className="flex items-center gap-2 pt-0.5">
           <span className="text-xs text-muted-foreground w-28">Min connections</span>
           <Slider

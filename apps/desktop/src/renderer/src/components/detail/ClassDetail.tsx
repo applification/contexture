@@ -1,4 +1,4 @@
-import type { DatatypeProperty, OntologyClass } from '@renderer/model/types';
+import type { DatatypeProperty, OntologyClass, Restriction } from '@renderer/model/types';
 import { useOntologyStore } from '@renderer/store/ontology';
 import { useUIStore } from '@renderer/store/ui';
 import { Input } from '@/components/ui/input';
@@ -163,6 +163,22 @@ export function ClassDetail({ cls }: Props): React.JSX.Element {
           </div>
         </div>
       )}
+
+      {cls.restrictions && cls.restrictions.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Restrictions</div>
+          <div className="space-y-0.5">
+            {cls.restrictions.map((r) => (
+              <RestrictionPill
+                key={`${r.onProperty}-${r.type}-${r.value}`}
+                restriction={r}
+                ontology={ontology}
+                onFocus={setFocusNode}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -240,6 +256,52 @@ function DatatypePropertyRow({
           className="h-6 text-xs w-14 px-1.5"
         />
       </div>
+    </div>
+  );
+}
+
+function formatRestrictionLabel(r: Restriction): { text: string; targetUri?: string } {
+  const prop = localName(r.onProperty);
+  switch (r.type) {
+    case 'someValuesFrom':
+      return { text: `${prop} some`, targetUri: r.value };
+    case 'allValuesFrom':
+      return { text: `${prop} only`, targetUri: r.value };
+    case 'hasValue':
+      return { text: `${prop} = ${localName(r.value)}` };
+    case 'minCardinality':
+      return { text: `${prop} [${r.value}..*]` };
+    case 'maxCardinality':
+      return { text: `${prop} [0..${r.value}]` };
+    case 'exactCardinality':
+      return { text: `${prop} [${r.value}..${r.value}]` };
+    default:
+      return { text: `${prop} ${r.type} ${localName(r.value)}` };
+  }
+}
+
+function RestrictionPill({
+  restriction,
+  ontology,
+  onFocus,
+}: {
+  restriction: Restriction;
+  ontology: import('@renderer/model/types').Ontology;
+  onFocus: (uri: string) => void;
+}): React.JSX.Element {
+  const { text, targetUri } = formatRestrictionLabel(restriction);
+  return (
+    <div className="text-xs bg-secondary rounded px-2 py-1 flex items-center gap-1 flex-wrap">
+      <span className="font-medium">{text}</span>
+      {targetUri && (
+        <button
+          type="button"
+          className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary cursor-pointer transition-colors"
+          onClick={() => onFocus(targetUri)}
+        >
+          {ontology.classes.get(targetUri)?.label || localName(targetUri)}
+        </button>
+      )}
     </div>
   );
 }

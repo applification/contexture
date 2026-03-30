@@ -271,5 +271,18 @@ function cloneOntology(ontology: Ontology): Ontology {
         },
       ]),
     ),
+    annotationProperties: new Map(
+      Array.from(ontology.annotationProperties.entries()).map(([k, v]) => [
+        k,
+        { ...v, subPropertyOf: [...v.subPropertyOf] },
+      ]),
+    ),
+    ontologyMetadata: ontology.ontologyMetadata
+      ? {
+          ...ontology.ontologyMetadata,
+          imports: [...ontology.ontologyMetadata.imports],
+          annotations: ontology.ontologyMetadata.annotations.map((a) => ({ ...a })),
+        }
+      : undefined,
   };
 }

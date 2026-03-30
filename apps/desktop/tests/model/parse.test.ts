@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseTurtle, parseTurtleWithWarnings } from '@renderer/model/parse';
 import type {
+  AnnotationProperty,
   DatatypeProperty,
   Individual,
   ObjectProperty,
   OntologyClass,
+  OntologyMetadata,
 } from '@renderer/model/types';
 import { describe, expect, it } from 'vitest';
 
@@ -19,6 +21,11 @@ const peopleTurtle = readFileSync(
 
 const individualsTurtle = readFileSync(
   resolve(__dirname, '../../resources/sample-ontologies/individuals.ttl'),
+  'utf-8',
+);
+
+const annotationsTurtle = readFileSync(
+  resolve(__dirname, '../../resources/sample-ontologies/annotations.ttl'),
   'utf-8',
 );
 
@@ -208,5 +215,196 @@ describe('parseTurtle — individuals', () => {
     const ontology = parseTurtle(turtle);
     const thing = ontology.individuals.get('http://example.org/thing') as Individual;
     expect(thing.types).toContain('http://example.org/UndeclaredClass');
+  });
+});
+
+// ---- owl:AnnotationProperty ----
+
+describe('parseTurtle — annotation properties', () => {
+  it('parses annotation property declarations from fixture', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    expect(ontology.annotationProperties.size).toBeGreaterThanOrEqual(5);
+    expect(ontology.annotationProperties.has(`${EX}authorName`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${EX}reviewStatus`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${EX}deprecated`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${EX}seeAlso`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${EX}editorialNote`)).toBe(true);
+  });
+
+  it('parses annotation property labels and comments', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const authorName = ontology.annotationProperties.get(`${EX}authorName`) as AnnotationProperty;
+    expect(authorName.label).toBe('author name');
+    expect(authorName.comment).toBe('The name of the author of this entity');
+  });
+
+  it('parses annotation property with no comment', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const reviewStatus = ontology.annotationProperties.get(
+      `${EX}reviewStatus`,
+    ) as AnnotationProperty;
+    expect(reviewStatus.label).toBe('review status');
+    expect(reviewStatus.comment).toBeUndefined();
+  });
+
+  it('parses subPropertyOf on annotation properties', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const techNote = ontology.annotationProperties.get(`${EX}technicalNote`) as AnnotationProperty;
+    expect(techNote).toBeDefined();
+    expect(techNote.subPropertyOf).toContain(`${EX}editorialNote`);
+  });
+
+  it('handles re-declared standard annotation properties (rdfs:label, rdfs:comment)', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
+    expect(ontology.annotationProperties.has(`${RDFS}label`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${RDFS}comment`)).toBe(true);
+  });
+
+  it('handles Dublin Core terms declared as annotation properties', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const DC = 'http://purl.org/dc/elements/1.1/';
+    expect(ontology.annotationProperties.has(`${DC}creator`)).toBe(true);
+    expect(ontology.annotationProperties.has(`${DC}title`)).toBe(true);
+  });
+
+  it('does not add AnnotationProperty to unsupported warnings', () => {
+    const { warnings } = parseTurtleWithWarnings(annotationsTurtle);
+    const unsupportedWarning = warnings.find(
+      (w) => w.message.includes('Unsupported') && w.message.includes('AnnotationProperty'),
+    );
+    expect(unsupportedWarning).toBeUndefined();
+  });
+
+  it('still parses classes and properties alongside annotation properties', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    expect(ontology.classes.size).toBe(3);
+    expect(ontology.objectProperties.size).toBe(1);
+    expect(ontology.datatypeProperties.size).toBe(1);
+  });
+
+  it('handles minimal annotation property declaration', () => {
+    const turtle = `
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      @prefix ex: <http://example.org/> .
+      ex:myAnnotation a owl:AnnotationProperty .
+    `;
+    const ontology = parseTurtle(turtle);
+    expect(ontology.annotationProperties.size).toBe(1);
+    const prop = ontology.annotationProperties.get(
+      'http://example.org/myAnnotation',
+    ) as AnnotationProperty;
+    expect(prop.uri).toBe('http://example.org/myAnnotation');
+    expect(prop.label).toBeUndefined();
+  });
+
+  it('skips blank node annotation properties with warning', () => {
+    const turtle = `
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      _:b0 a owl:AnnotationProperty .
+    `;
+    const { ontology, warnings } = parseTurtleWithWarnings(turtle);
+    expect(ontology.annotationProperties.size).toBe(0);
+    expect(warnings.some((w) => w.message.includes('Blank node annotation property'))).toBe(true);
+  });
+});
+
+// ---- owl:Ontology metadata ----
+
+describe('parseTurtle — ontology metadata', () => {
+  it('parses ontology IRI', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    expect(ontology.ontologyMetadata).toBeDefined();
+    expect(ontology.ontologyMetadata?.iri).toBe('http://example.org/ontology');
+  });
+
+  it('parses versionIRI', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    expect(ontology.ontologyMetadata?.versionIRI).toBe('http://example.org/ontology/1.0');
+  });
+
+  it('parses owl:imports', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    expect(ontology.ontologyMetadata?.imports).toContain('http://purl.org/dc/elements/1.1/');
+  });
+
+  it('parses Dublin Core metadata (dc:title, dc:creator, dc:description)', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const meta = ontology.ontologyMetadata as OntologyMetadata;
+    expect(meta.annotations).toBeDefined();
+
+    const DC = 'http://purl.org/dc/elements/1.1/';
+    const title = meta.annotations.find((a) => a.property === `${DC}title`);
+    expect(title?.value).toBe('Example Annotation Ontology');
+
+    const creator = meta.annotations.find((a) => a.property === `${DC}creator`);
+    expect(creator?.value).toBe('QA Engineer');
+
+    const description = meta.annotations.find((a) => a.property === `${DC}description`);
+    expect(description?.value).toBe(
+      'A test ontology exercising owl:AnnotationProperty and owl:Ontology metadata',
+    );
+  });
+
+  it('parses rdfs:comment on ontology', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const meta = ontology.ontologyMetadata as OntologyMetadata;
+    const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
+    const comment = meta.annotations.find((a) => a.property === `${RDFS}comment`);
+    expect(comment?.value).toBe('Top-level ontology comment');
+  });
+
+  it('parses typed literal annotations (dcterms:created as xsd:date)', () => {
+    const ontology = parseTurtle(annotationsTurtle);
+    const meta = ontology.ontologyMetadata as OntologyMetadata;
+    const DCTERMS = 'http://purl.org/dc/terms/';
+    const created = meta.annotations.find((a) => a.property === `${DCTERMS}created`);
+    expect(created?.value).toBe('2026-03-30');
+    expect(created?.datatype).toBe(`${XSD}date`);
+  });
+
+  it('does not add Ontology to unsupported warnings', () => {
+    const { warnings } = parseTurtleWithWarnings(annotationsTurtle);
+    const unsupportedWarning = warnings.find(
+      (w) => w.message.includes('Unsupported') && w.message.includes('Ontology'),
+    );
+    expect(unsupportedWarning).toBeUndefined();
+  });
+
+  it('handles ontology with no metadata', () => {
+    const turtle = `
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      @prefix ex: <http://example.org/> .
+      ex:MyOntology a owl:Ontology .
+    `;
+    const ontology = parseTurtle(turtle);
+    expect(ontology.ontologyMetadata).toBeDefined();
+    expect(ontology.ontologyMetadata?.iri).toBe('http://example.org/MyOntology');
+    expect(ontology.ontologyMetadata?.versionIRI).toBeUndefined();
+    expect(ontology.ontologyMetadata?.imports).toEqual([]);
+    expect(ontology.ontologyMetadata?.annotations).toEqual([]);
+  });
+
+  it('handles multiple owl:imports', () => {
+    const turtle = `
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      <http://example.org/ont> a owl:Ontology ;
+          owl:imports <http://example.org/base> ;
+          owl:imports <http://example.org/ext> .
+    `;
+    const ontology = parseTurtle(turtle);
+    expect(ontology.ontologyMetadata?.imports).toHaveLength(2);
+    expect(ontology.ontologyMetadata?.imports).toContain('http://example.org/base');
+    expect(ontology.ontologyMetadata?.imports).toContain('http://example.org/ext');
+  });
+
+  it('returns undefined ontologyMetadata when no owl:Ontology declaration exists', () => {
+    const turtle = `
+      @prefix owl: <http://www.w3.org/2002/07/owl#> .
+      @prefix ex: <http://example.org/> .
+      ex:Foo a owl:Class .
+    `;
+    const ontology = parseTurtle(turtle);
+    expect(ontology.ontologyMetadata).toBeUndefined();
   });
 });

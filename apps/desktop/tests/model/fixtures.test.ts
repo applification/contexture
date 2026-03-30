@@ -51,6 +51,13 @@ describe('all fixtures: parse and round-trip', () => {
         const reparsed = parseTurtle(serialized);
         expect(reparsed.datatypeProperties.size).toBe(original.datatypeProperties.size);
       });
+
+      it('round-trips: annotation property count preserved', () => {
+        const original = parseTurtle(turtle);
+        const serialized = serializeToTurtle(original);
+        const reparsed = parseTurtle(serialized);
+        expect(reparsed.annotationProperties.size).toBe(original.annotationProperties.size);
+      });
     });
   }
 });
@@ -214,6 +221,49 @@ describe('edge-cases.ttl', () => {
     expect(o.datatypeProperties.get(`${EDGE}shortVal`)?.range).toBe(`${XSD}short`);
     expect(o.datatypeProperties.get(`${EDGE}longVal`)?.range).toBe(`${XSD}long`);
     expect(o.datatypeProperties.get(`${EDGE}durationVal`)?.range).toBe(`${XSD}time`);
+  });
+});
+
+// ---- Annotations fixture ----
+
+describe('annotations.ttl', () => {
+  const turtle = loadFixture('annotations.ttl');
+
+  it('parses 3 classes', () => {
+    const o = parseTurtle(turtle);
+    expect(o.classes.size).toBe(3);
+  });
+
+  it('parses at least 5 custom annotation properties', () => {
+    const o = parseTurtle(turtle);
+    expect(o.annotationProperties.size).toBeGreaterThanOrEqual(5);
+  });
+
+  it('parses ontology metadata with IRI and versionIRI', () => {
+    const o = parseTurtle(turtle);
+    expect(o.ontologyMetadata).toBeDefined();
+    expect(o.ontologyMetadata?.iri).toBe('http://example.org/ontology');
+    expect(o.ontologyMetadata?.versionIRI).toBe('http://example.org/ontology/1.0');
+  });
+
+  it('round-trips annotation property count', () => {
+    const original = parseTurtle(turtle);
+    const serialized = serializeToTurtle(original);
+    const reparsed = parseTurtle(serialized);
+    expect(reparsed.annotationProperties.size).toBe(original.annotationProperties.size);
+  });
+
+  it('round-trips ontology metadata IRI', () => {
+    const original = parseTurtle(turtle);
+    const serialized = serializeToTurtle(original);
+    const reparsed = parseTurtle(serialized);
+    expect(reparsed.ontologyMetadata?.iri).toBe(original.ontologyMetadata?.iri);
+  });
+
+  it('produces no unsupported warnings for AnnotationProperty or Ontology', () => {
+    const { warnings } = parseTurtleWithWarnings(turtle);
+    const unsupported = warnings.filter((w) => w.message.includes('Unsupported'));
+    expect(unsupported).toEqual([]);
   });
 });
 

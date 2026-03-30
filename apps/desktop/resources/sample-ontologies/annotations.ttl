@@ -1,0 +1,90 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix ex: <http://example.org/ontology#> .
+
+## Ontology header — declares the ontology IRI, version, imports, and Dublin Core metadata
+
+<http://example.org/ontology> a owl:Ontology ;
+    owl:versionIRI <http://example.org/ontology/1.0> ;
+    owl:imports <http://purl.org/dc/elements/1.1/> ;
+    dc:title "Example Annotation Ontology" ;
+    dc:creator "QA Engineer" ;
+    dc:description "A test ontology exercising owl:AnnotationProperty and owl:Ontology metadata" ;
+    dcterms:created "2026-03-30"^^xsd:date ;
+    rdfs:comment "Top-level ontology comment" .
+
+## Annotation property declarations — custom beyond rdfs:label/comment
+
+ex:authorName a owl:AnnotationProperty ;
+    rdfs:label "author name" ;
+    rdfs:comment "The name of the author of this entity" .
+
+ex:reviewStatus a owl:AnnotationProperty ;
+    rdfs:label "review status" .
+
+ex:deprecated a owl:AnnotationProperty ;
+    rdfs:label "deprecated" ;
+    rdfs:comment "Indicates whether the annotated entity is deprecated" .
+
+ex:seeAlso a owl:AnnotationProperty ;
+    rdfs:label "see also" .
+
+ex:editorialNote a owl:AnnotationProperty ;
+    rdfs:label "editorial note" ;
+    rdfs:comment "Internal notes for ontology editors" .
+
+## Annotation property with rdfs:subPropertyOf (hierarchy)
+
+ex:technicalNote a owl:AnnotationProperty ;
+    rdfs:subPropertyOf ex:editorialNote ;
+    rdfs:label "technical note" .
+
+## Standard annotation properties re-declared (legal in OWL 2)
+
+rdfs:label a owl:AnnotationProperty .
+rdfs:comment a owl:AnnotationProperty .
+
+## Dublin Core terms used as annotation properties
+
+dc:creator a owl:AnnotationProperty .
+dc:title a owl:AnnotationProperty .
+
+## Classes using custom annotation properties
+
+ex:Person a owl:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being" ;
+    ex:authorName "Jane Ontologist" ;
+    ex:reviewStatus "approved" .
+
+ex:Organisation a owl:Class ;
+    rdfs:label "Organisation" ;
+    rdfs:comment "A formal group of people" ;
+    ex:deprecated "false" ;
+    ex:editorialNote "Consider splitting into ForProfit and NonProfit subclasses" .
+
+ex:LegacyEntity a owl:Class ;
+    rdfs:label "Legacy Entity" ;
+    ex:deprecated "true" ;
+    ex:seeAlso "Use ex:Person or ex:Organisation instead" .
+
+## Object property with annotation
+
+ex:worksFor a owl:ObjectProperty ;
+    rdfs:label "works for" ;
+    rdfs:domain ex:Person ;
+    rdfs:range ex:Organisation ;
+    ex:reviewStatus "draft" .
+
+## Datatype property with annotation
+
+ex:name a owl:DatatypeProperty ;
+    rdfs:label "name" ;
+    rdfs:domain ex:Person ;
+    rdfs:range xsd:string ;
+    ex:authorName "Jane Ontologist" .

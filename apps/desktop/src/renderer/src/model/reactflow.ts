@@ -1,12 +1,13 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { ValidationError } from '../services/validation';
-import type { Ontology } from './types';
+import type { Ontology, Restriction } from './types';
 
 export interface ClassNodeData extends Record<string, unknown> {
   label: string;
   uri: string;
   comment?: string;
   datatypeProperties: { uri: string; label: string; range: string }[];
+  restrictions: Restriction[];
   errorCount: number;
   warningCount: number;
 }
@@ -41,6 +42,11 @@ export interface SubClassEdgeData extends Record<string, unknown> {
 
 export interface DisjointEdgeData extends Record<string, unknown> {
   label: string;
+}
+
+export interface RestrictionEdgeData extends Record<string, unknown> {
+  label: string;
+  qualifier: string;
 }
 
 function localName(uri: string): string {
@@ -101,6 +107,7 @@ export function ontologyToReactFlowElements(
         uri: cls.uri,
         comment: cls.comment,
         datatypeProperties: dtPropsByDomain.get(cls.uri) || [],
+        restrictions: cls.restrictions || [],
         errorCount: errorCounts.get(cls.uri) ?? 0,
         warningCount: warningCounts.get(cls.uri) ?? 0,
       },
@@ -131,11 +138,14 @@ export function ontologyToReactFlowElements(
     }
   }
 
-  // Object property edges
+  // Build set of (source, target, property) tuples covered by object property edges
+  // so restriction edges can skip duplicates
+  const objPropEdgePairs = new Set<string>();
   for (const prop of ontology.objectProperties.values()) {
     const label = prop.label || localName(prop.uri);
     for (const domainUri of prop.domain) {
       for (const rangeUri of prop.range) {
+        objPropEdgePairs.add(`${domainUri}|${rangeUri}|${prop.uri}`);
         edges.push({
           id: `objprop-${prop.uri}-${domainUri}-${rangeUri}`,
           source: domainUri,
@@ -144,6 +154,25 @@ export function ontologyToReactFlowElements(
           data: { label, uri: prop.uri },
         });
       }
+    }
+  }
+
+  // Restriction edges for someValuesFrom / allValuesFrom targeting other classes
+  // Skip when an object property edge already covers the same source→target→property
+  for (const cls of ontology.classes.values()) {
+    if (!cls.restrictions) continue;
+    for (const r of cls.restrictions) {
+      if (r.type !== 'someValuesFrom' && r.type !== 'allValuesFrom') continue;
+      if (!ontology.classes.has(r.value)) continue;
+      if (objPropEdgePairs.has(`${cls.uri}|${r.value}|${r.onProperty}`)) continue;
+      const qualifier = r.type === 'someValuesFrom' ? 'some' : 'only';
+      edges.push({
+        id: `restriction-${cls.uri}-${r.onProperty}-${r.type}-${r.value}`,
+        source: cls.uri,
+        target: r.value,
+        type: 'restriction',
+        data: { label: `${localName(r.onProperty)} [${qualifier}]`, qualifier },
+      });
     }
   }
 

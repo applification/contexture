@@ -1,10 +1,13 @@
 import { Parser, type Quad } from 'n3';
 import type {
+  AnnotationProperty,
   DatatypeProperty,
   Individual,
   ObjectProperty,
   Ontology,
   OntologyClass,
+  Restriction,
+  RestrictionType,
 } from './types';
 import { createEmptyOntology } from './types';
 
@@ -70,6 +73,15 @@ function getOrCreateIndividual(ontology: Ontology, uri: string): Individual {
     ontology.individuals.set(uri, ind);
   }
   return ind;
+}
+
+function getOrCreateAnnotationProperty(ontology: Ontology, uri: string): AnnotationProperty {
+  let prop = ontology.annotationProperties.get(uri);
+  if (!prop) {
+    prop = { uri, subPropertyOf: [] };
+    ontology.annotationProperties.set(uri, prop);
+  }
+  return prop;
 }
 
 export interface ParseWarning {
@@ -142,7 +154,68 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         } else {
           getOrCreateIndividual(ontology, s);
         }
+      } else if (o === `${OWL}AnnotationProperty`) {
+        if (quad.subject.termType === 'BlankNode') {
+          warnings.push({
+            severity: 'warning',
+            message: `Blank node annotation property ignored: ${s}`,
+          });
+        } else {
+          getOrCreateAnnotationProperty(ontology, s);
+        }
+      } else if (o === `${OWL}Ontology`) {
+        if (quad.subject.termType !== 'BlankNode') {
+          ontology.ontologyMetadata = {
+            iri: s,
+            imports: [],
+            annotations: [],
+          };
+        }
       }
+    }
+  }
+
+  // Restriction pass: collect blank nodes typed as owl:Restriction
+  const restrictionBlankNodes = new Set<string>();
+  const restrictionProps = new Map<
+    string,
+    { onProperty?: string; type?: RestrictionType; value?: string }
+  >();
+
+  const RESTRICTION_VALUE_PREDICATES: Record<string, RestrictionType> = {
+    [`${OWL}someValuesFrom`]: 'someValuesFrom',
+    [`${OWL}allValuesFrom`]: 'allValuesFrom',
+    [`${OWL}hasValue`]: 'hasValue',
+    [`${OWL}minCardinality`]: 'minCardinality',
+    [`${OWL}maxCardinality`]: 'maxCardinality',
+    [`${OWL}cardinality`]: 'exactCardinality',
+    [`${OWL}minQualifiedCardinality`]: 'minCardinality',
+    [`${OWL}maxQualifiedCardinality`]: 'maxCardinality',
+    [`${OWL}qualifiedCardinality`]: 'exactCardinality',
+  };
+
+  for (const quad of quads) {
+    const s = quad.subject.value;
+    const p = quad.predicate.value;
+    const o = quad.object.value;
+
+    if (p === `${RDF}type` && o === `${OWL}Restriction`) {
+      restrictionBlankNodes.add(s);
+      if (!restrictionProps.has(s)) restrictionProps.set(s, {});
+    }
+
+    if (p === `${OWL}onProperty`) {
+      const entry = restrictionProps.get(s) ?? {};
+      entry.onProperty = o;
+      restrictionProps.set(s, entry);
+    }
+
+    const rType = RESTRICTION_VALUE_PREDICATES[p];
+    if (rType) {
+      const entry = restrictionProps.get(s) ?? {};
+      entry.type = rType;
+      entry.value = o;
+      restrictionProps.set(s, entry);
     }
   }
 
@@ -161,12 +234,38 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       continue;
     }
 
+    // owl:Ontology metadata — must come before rdfs:label/comment to capture ontology-level annotations
+    if (ontology.ontologyMetadata && s === ontology.ontologyMetadata.iri) {
+      if (p === `${OWL}versionIRI`) {
+        ontology.ontologyMetadata.versionIRI = o;
+        continue;
+      }
+      if (p === `${OWL}imports`) {
+        ontology.ontologyMetadata.imports.push(o);
+        continue;
+      }
+      // Collect other ontology-level annotations (not rdf:type)
+      if (p !== `${RDF}type`) {
+        const datatype =
+          quad.object.termType === 'Literal'
+            ? (quad.object as { datatype?: { value: string } }).datatype?.value
+            : undefined;
+        ontology.ontologyMetadata.annotations.push({
+          property: p,
+          value: o,
+          datatype: datatype || undefined,
+        });
+        continue;
+      }
+    }
+
     if (p === `${RDFS}label`) {
       const literal = quad.object.termType === 'Literal' ? quad.object.value : o;
       const cls = ontology.classes.get(s);
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
       const ind = ontology.individuals.get(s);
+      const annProp = ontology.annotationProperties.get(s);
       if (cls) {
         cls.label = literal;
       } else if (objProp) {
@@ -175,6 +274,8 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         dtProp.label = literal;
       } else if (ind) {
         ind.label = literal;
+      } else if (annProp) {
+        annProp.label = literal;
       }
       continue;
     }
@@ -185,6 +286,7 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
       const ind = ontology.individuals.get(s);
+      const annProp = ontology.annotationProperties.get(s);
       if (cls) {
         cls.comment = literal;
       } else if (objProp) {
@@ -193,11 +295,43 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         dtProp.comment = literal;
       } else if (ind) {
         ind.comment = literal;
+      } else if (annProp) {
+        annProp.comment = literal;
+      }
+      continue;
+    }
+
+    // rdfs:subPropertyOf for annotation properties
+    if (p === `${RDFS}subPropertyOf`) {
+      const annProp = ontology.annotationProperties.get(s);
+      if (annProp && !annProp.subPropertyOf.includes(o)) {
+        annProp.subPropertyOf.push(o);
       }
       continue;
     }
 
     if (p === `${RDFS}subClassOf`) {
+      if (restrictionBlankNodes.has(o)) {
+        const rData = restrictionProps.get(o);
+        if (!rData?.onProperty) {
+          warnings.push({
+            severity: 'warning',
+            message: `Restriction on ${s} missing owl:onProperty — skipped`,
+          });
+          continue;
+        }
+        if (rData.type && rData.value !== undefined) {
+          const cls = getOrCreateClass(ontology, s);
+          const restriction: Restriction = {
+            onProperty: rData.onProperty,
+            type: rData.type,
+            value: rData.value,
+          };
+          if (!cls.restrictions) cls.restrictions = [];
+          cls.restrictions.push(restriction);
+        }
+        continue;
+      }
       const cls = getOrCreateClass(ontology, s);
       getOrCreateClass(ontology, o);
       if (!cls.subClassOf.includes(o)) {
@@ -268,12 +402,7 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
 
   // Detect unsupported OWL constructs
   const unsupported = new Set<string>();
-  const UNSUPPORTED_TYPES = [
-    `${OWL}Restriction`,
-    `${OWL}AllDifferent`,
-    `${OWL}AnnotationProperty`,
-    `${OWL}Ontology`,
-  ];
+  const UNSUPPORTED_TYPES = [`${OWL}AllDifferent`];
   for (const quad of quads) {
     if (quad.predicate.value === `${RDF}type` && UNSUPPORTED_TYPES.includes(quad.object.value)) {
       const name = quad.object.value.split('#').pop() || quad.object.value;

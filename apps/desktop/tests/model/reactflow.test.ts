@@ -189,3 +189,61 @@ describe('ontologyToReactFlowElements — individuals', () => {
     expect(indNodes.every((n) => typeof n.position.x === 'number')).toBe(true);
   });
 });
+
+describe('ontologyToReactFlowElements — restriction edges', () => {
+  it('creates restriction edge when no object property edge covers the same pair', () => {
+    const ont = createEmptyOntology();
+    ont.classes.set('http://ex/A', {
+      uri: 'http://ex/A',
+      subClassOf: [],
+      disjointWith: [],
+      restrictions: [{ onProperty: 'http://ex/rel', type: 'someValuesFrom', value: 'http://ex/B' }],
+    });
+    ont.classes.set('http://ex/B', { uri: 'http://ex/B', subClassOf: [], disjointWith: [] });
+    const result = ontologyToReactFlowElements(ont);
+    const restrictionEdges = result.edges.filter((e) => e.type === 'restriction');
+    expect(restrictionEdges).toHaveLength(1);
+    expect(restrictionEdges[0].source).toBe('http://ex/A');
+    expect(restrictionEdges[0].target).toBe('http://ex/B');
+  });
+
+  it('skips restriction edge when object property edge already covers the same source→target→property', () => {
+    const ont = createEmptyOntology();
+    ont.classes.set('http://ex/A', {
+      uri: 'http://ex/A',
+      subClassOf: [],
+      disjointWith: [],
+      restrictions: [{ onProperty: 'http://ex/rel', type: 'someValuesFrom', value: 'http://ex/B' }],
+    });
+    ont.classes.set('http://ex/B', { uri: 'http://ex/B', subClassOf: [], disjointWith: [] });
+    ont.objectProperties.set('http://ex/rel', {
+      uri: 'http://ex/rel',
+      domain: ['http://ex/A'],
+      range: ['http://ex/B'],
+    });
+    const result = ontologyToReactFlowElements(ont);
+    const restrictionEdges = result.edges.filter((e) => e.type === 'restriction');
+    expect(restrictionEdges).toHaveLength(0);
+    const objEdges = result.edges.filter((e) => e.type === 'objectProperty');
+    expect(objEdges).toHaveLength(1);
+  });
+
+  it('keeps restriction edge when object property covers a different property', () => {
+    const ont = createEmptyOntology();
+    ont.classes.set('http://ex/A', {
+      uri: 'http://ex/A',
+      subClassOf: [],
+      disjointWith: [],
+      restrictions: [{ onProperty: 'http://ex/rel2', type: 'allValuesFrom', value: 'http://ex/B' }],
+    });
+    ont.classes.set('http://ex/B', { uri: 'http://ex/B', subClassOf: [], disjointWith: [] });
+    ont.objectProperties.set('http://ex/rel1', {
+      uri: 'http://ex/rel1',
+      domain: ['http://ex/A'],
+      range: ['http://ex/B'],
+    });
+    const result = ontologyToReactFlowElements(ont);
+    const restrictionEdges = result.edges.filter((e) => e.type === 'restriction');
+    expect(restrictionEdges).toHaveLength(1);
+  });
+});
