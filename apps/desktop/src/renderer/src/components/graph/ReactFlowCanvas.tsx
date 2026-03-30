@@ -232,7 +232,8 @@ function GraphFlow(): React.JSX.Element {
         prev.map((n) => {
           if (n.type !== 'class' && n.type !== 'individual') return n;
           const updated = newNodes.find((nn) => nn.id === n.id);
-          return updated ? { ...n, data: updated.data } : n;
+          if (!updated) return n;
+          return { ...n, data: updated.data } as typeof n;
         }),
       );
       setEdges(newEdges);
