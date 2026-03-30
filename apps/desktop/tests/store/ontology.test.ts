@@ -228,4 +228,74 @@ describe('useOntologyStore', () => {
       expect(useOntologyStore.getState().isDirty).toBe(true);
     });
   });
+
+  describe('individual operations', () => {
+    it('adds an individual with defaults', () => {
+      useOntologyStore.getState().addIndividual('http://ex/john');
+      const ind = useOntologyStore.getState().ontology.individuals.get('http://ex/john');
+      expect(ind).toBeDefined();
+      expect(ind?.uri).toBe('http://ex/john');
+      expect(ind?.types).toEqual([]);
+      expect(ind?.objectPropertyAssertions).toEqual([]);
+      expect(ind?.dataPropertyAssertions).toEqual([]);
+      expect(useOntologyStore.getState().isDirty).toBe(true);
+    });
+
+    it('adds an individual with partial data', () => {
+      useOntologyStore.getState().addIndividual('http://ex/john', {
+        label: 'John',
+        types: ['http://ex/Person'],
+      });
+      const ind = useOntologyStore.getState().ontology.individuals.get('http://ex/john');
+      expect(ind?.label).toBe('John');
+      expect(ind?.types).toEqual(['http://ex/Person']);
+    });
+
+    it('updates an existing individual', () => {
+      useOntologyStore.getState().addIndividual('http://ex/john', { label: 'John' });
+      useOntologyStore.getState().updateIndividual('http://ex/john', { label: 'John Smith' });
+      expect(useOntologyStore.getState().ontology.individuals.get('http://ex/john')?.label).toBe(
+        'John Smith',
+      );
+    });
+
+    it('does nothing for non-existent individual', () => {
+      const before = useOntologyStore.getState().ontology;
+      useOntologyStore.getState().updateIndividual('http://ex/nope', { label: 'X' });
+      expect(useOntologyStore.getState().ontology).toBe(before);
+    });
+
+    it('removes an individual', () => {
+      useOntologyStore.getState().addIndividual('http://ex/john');
+      useOntologyStore.getState().removeIndividual('http://ex/john');
+      expect(useOntologyStore.getState().ontology.individuals.has('http://ex/john')).toBe(false);
+    });
+
+    it('loads individuals from turtle', () => {
+      const turtle = `
+        @prefix owl: <http://www.w3.org/2002/07/owl#> .
+        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+        @prefix : <http://example.org/> .
+
+        :Person a owl:Class ; rdfs:label "Person" .
+        :john a owl:NamedIndividual, :Person ;
+            rdfs:label "John" .
+      `;
+      useOntologyStore.getState().loadFromTurtle(turtle);
+      const { ontology } = useOntologyStore.getState();
+      expect(ontology.individuals.size).toBe(1);
+      expect(ontology.individuals.has('http://example.org/john')).toBe(true);
+      expect(ontology.individuals.get('http://example.org/john')?.label).toBe('John');
+    });
+
+    it('exports individuals in turtle round-trip', () => {
+      useOntologyStore.getState().addIndividual('http://ex/john', {
+        label: 'John',
+        types: ['http://ex/Person'],
+      });
+      const exported = useOntologyStore.getState().exportToTurtle();
+      expect(exported).toContain('John');
+      expect(exported).toContain('NamedIndividual');
+    });
+  });
 });

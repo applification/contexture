@@ -169,3 +169,93 @@ describe('validateOntology', () => {
     ).toBe(true);
   });
 });
+
+describe('validateOntology — individuals', () => {
+  it('returns no errors for valid individual', () => {
+    const o = makeOntology((o) => {
+      o.classes.set(`${EX}Person`, {
+        uri: `${EX}Person`,
+        label: 'Person',
+        subClassOf: [],
+        disjointWith: [],
+      });
+      o.individuals.set(`${EX}john`, {
+        uri: `${EX}john`,
+        label: 'John',
+        types: [`${EX}Person`],
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+      });
+    });
+    const errors = validateOntology(o).filter((e) => e.elementType === 'individual');
+    expect(errors).toEqual([]);
+  });
+
+  it('warns on individual with no type assertion', () => {
+    const o = makeOntology((o) => {
+      o.individuals.set(`${EX}orphan`, {
+        uri: `${EX}orphan`,
+        label: 'Orphan',
+        types: [],
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+      });
+    });
+    const errors = validateOntology(o);
+    expect(
+      errors.some(
+        (e) =>
+          e.elementType === 'individual' &&
+          e.severity === 'warning' &&
+          e.message.includes('no type assertion'),
+      ),
+    ).toBe(true);
+  });
+
+  it('warns on individual with dangling type reference', () => {
+    const o = makeOntology((o) => {
+      o.individuals.set(`${EX}thing`, {
+        uri: `${EX}thing`,
+        label: 'Thing',
+        types: [`${EX}NonExistentClass`],
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+      });
+    });
+    const errors = validateOntology(o);
+    expect(
+      errors.some(
+        (e) =>
+          e.elementType === 'individual' &&
+          e.severity === 'warning' &&
+          e.message.includes('does not exist'),
+      ),
+    ).toBe(true);
+  });
+
+  it('warns on individual with no label', () => {
+    const o = makeOntology((o) => {
+      o.classes.set(`${EX}Person`, {
+        uri: `${EX}Person`,
+        label: 'Person',
+        subClassOf: [],
+        disjointWith: [],
+      });
+      o.individuals.set(`${EX}noLabel`, {
+        uri: `${EX}noLabel`,
+        types: [`${EX}Person`],
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+      });
+    });
+    const errors = validateOntology(o);
+    expect(
+      errors.some(
+        (e) =>
+          e.elementType === 'individual' &&
+          e.severity === 'warning' &&
+          e.message.includes('no label'),
+      ),
+    ).toBe(true);
+  });
+});

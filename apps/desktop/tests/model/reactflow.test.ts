@@ -1,4 +1,4 @@
-import type { ClassNode } from '@renderer/model/reactflow';
+import type { ClassNode, IndividualNode } from '@renderer/model/reactflow';
 import { ontologyToReactFlowElements } from '@renderer/model/reactflow';
 import type { Ontology } from '@renderer/model/types';
 import { createEmptyOntology } from '@renderer/model/types';
@@ -114,5 +114,78 @@ describe('ontologyToReactFlowElements', () => {
     const positions = result.nodes.map((n) => n.position);
     // All positions should be defined
     expect(positions.every((p) => typeof p.x === 'number' && typeof p.y === 'number')).toBe(true);
+  });
+});
+
+function buildOntologyWithIndividuals(): Ontology {
+  const ont = buildOntology();
+  ont.individuals.set('http://ex/john', {
+    uri: 'http://ex/john',
+    label: 'John',
+    types: ['http://ex/Person'],
+    objectPropertyAssertions: [{ property: 'http://ex/worksAt', target: 'http://ex/acme' }],
+    dataPropertyAssertions: [{ property: 'http://ex/name', value: 'John Smith' }],
+  });
+  ont.individuals.set('http://ex/acme', {
+    uri: 'http://ex/acme',
+    types: [],
+    objectPropertyAssertions: [],
+    dataPropertyAssertions: [],
+  });
+  return ont;
+}
+
+describe('ontologyToReactFlowElements — individuals', () => {
+  it('creates individual nodes', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const indNodes = result.nodes.filter((n) => n.type === 'individual');
+    expect(indNodes).toHaveLength(2);
+  });
+
+  it('sets individual node data correctly', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const johnNode = result.nodes.find((n) => n.id === 'http://ex/john') as IndividualNode;
+    expect(johnNode).toBeDefined();
+    expect(johnNode.type).toBe('individual');
+    expect(johnNode.data.label).toBe('John');
+    expect(johnNode.data.uri).toBe('http://ex/john');
+    expect(johnNode.data.types).toContain('http://ex/Person');
+    expect(johnNode.data.typeLabels).toContain('Person');
+  });
+
+  it('creates typeOf edges from individuals to classes', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const typeOfEdges = result.edges.filter((e) => e.type === 'typeOf');
+    expect(typeOfEdges).toHaveLength(1);
+    expect(typeOfEdges[0].source).toBe('http://ex/john');
+    expect(typeOfEdges[0].target).toBe('http://ex/Person');
+  });
+
+  it('does not create typeOf edges for untyped individuals', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const acmeTypeOfEdges = result.edges.filter(
+      (e) => e.type === 'typeOf' && e.source === 'http://ex/acme',
+    );
+    expect(acmeTypeOfEdges).toHaveLength(0);
+  });
+
+  it('uses localName when individual has no label', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const acmeNode = result.nodes.find((n) => n.id === 'http://ex/acme') as IndividualNode;
+    expect(acmeNode.data.label).toBe('acme');
+  });
+
+  it('includes both class and individual nodes', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const classNodes = result.nodes.filter((n) => n.type === 'class');
+    const indNodes = result.nodes.filter((n) => n.type === 'individual');
+    expect(classNodes.length).toBe(3);
+    expect(indNodes.length).toBe(2);
+  });
+
+  it('positions individual nodes', () => {
+    const result = ontologyToReactFlowElements(buildOntologyWithIndividuals());
+    const indNodes = result.nodes.filter((n) => n.type === 'individual');
+    expect(indNodes.every((n) => typeof n.position.x === 'number')).toBe(true);
   });
 });
