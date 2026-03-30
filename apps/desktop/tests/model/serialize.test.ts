@@ -95,6 +95,67 @@ describe('serializeToTurtle', () => {
   });
 });
 
+describe('serializeToTurtle — determinism', () => {
+  it('produces identical output on repeated serialization', () => {
+    const ont = parseTurtle(peopleTurtle);
+    const first = serializeToTurtle(ont);
+    const second = serializeToTurtle(ont);
+    expect(first).toBe(second);
+  });
+
+  it('produces identical output regardless of insertion order', () => {
+    const ont1 = createEmptyOntology();
+    const ont2 = createEmptyOntology();
+
+    // Insert classes in opposite order
+    const classA = { uri: `${EX}Alpha`, subClassOf: [], disjointWith: [] };
+    const classB = { uri: `${EX}Beta`, label: 'Beta', subClassOf: [], disjointWith: [] };
+    const classC = {
+      uri: `${EX}Charlie`,
+      subClassOf: [`${EX}Alpha`, `${EX}Beta`],
+      disjointWith: [],
+    };
+
+    ont1.classes.set(classA.uri, classA);
+    ont1.classes.set(classB.uri, classB);
+    ont1.classes.set(classC.uri, classC);
+
+    ont2.classes.set(classC.uri, classC);
+    ont2.classes.set(classA.uri, classA);
+    ont2.classes.set(classB.uri, classB);
+
+    expect(serializeToTurtle(ont1)).toBe(serializeToTurtle(ont2));
+  });
+
+  it('sorts prefixes alphabetically', () => {
+    const ont = createEmptyOntology();
+    ont.prefixes.set('z', 'http://z.example.org/');
+    ont.prefixes.set('a', 'http://a.example.org/');
+
+    const output = serializeToTurtle(ont);
+    const prefixLines = output.split('\n').filter((l) => l.startsWith('@prefix'));
+    const prefixNames = prefixLines.map((l) => l.match(/@prefix (\S+):/)?.[1]).filter(Boolean);
+    const sorted = [...prefixNames].sort();
+    expect(prefixNames).toEqual(sorted);
+  });
+
+  it('produces identical output for individuals regardless of insertion order', () => {
+    const ont1 = parseTurtle(individualsTurtle);
+    const ont2 = createEmptyOntology();
+
+    // Copy everything but reverse individual insertion order
+    for (const [k, v] of ont1.prefixes) ont2.prefixes.set(k, v);
+    for (const [k, v] of ont1.classes) ont2.classes.set(k, v);
+    for (const [k, v] of ont1.objectProperties) ont2.objectProperties.set(k, v);
+    for (const [k, v] of ont1.datatypeProperties) ont2.datatypeProperties.set(k, v);
+
+    const indEntries = [...ont1.individuals.entries()].reverse();
+    for (const [k, v] of indEntries) ont2.individuals.set(k, v);
+
+    expect(serializeToTurtle(ont1)).toBe(serializeToTurtle(ont2));
+  });
+});
+
 describe('serializeToTurtle — individuals', () => {
   it('round-trips: preserves individuals', () => {
     const original = parseTurtle(individualsTurtle);
