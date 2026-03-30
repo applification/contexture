@@ -16,7 +16,7 @@ export function serializeToTurtle(ontology: Ontology): string {
   // Sort prefixes alphabetically by prefix name
   const prefixes: Record<string, string> = {};
   for (const key of [...ontology.prefixes.keys()].sort()) {
-    prefixes[key] = ontology.prefixes.get(key)!;
+    prefixes[key] = ontology.prefixes.get(key) ?? '';
   }
 
   const writer = new Writer({ prefixes });
