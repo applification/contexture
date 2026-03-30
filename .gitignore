@@ -17,5 +17,8 @@ playwright-report/
 .env.local
 .env.*.local
 
+# Paperclip agent worktrees and local state
+.paperclip/
+
 # Sensitive docs migrated to Paperclip issue documents (ONT-49)
 Marketing/
