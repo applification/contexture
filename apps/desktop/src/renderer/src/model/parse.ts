@@ -1,10 +1,12 @@
 import { Parser, type Quad } from 'n3';
 import type {
+  AnnotationProperty,
   DatatypeProperty,
   Individual,
   ObjectProperty,
   Ontology,
   OntologyClass,
+  OntologyMetadata,
   Restriction,
   RestrictionType,
 } from './types';
@@ -72,6 +74,15 @@ function getOrCreateIndividual(ontology: Ontology, uri: string): Individual {
     ontology.individuals.set(uri, ind);
   }
   return ind;
+}
+
+function getOrCreateAnnotationProperty(ontology: Ontology, uri: string): AnnotationProperty {
+  let prop = ontology.annotationProperties.get(uri);
+  if (!prop) {
+    prop = { uri, subPropertyOf: [] };
+    ontology.annotationProperties.set(uri, prop);
+  }
+  return prop;
 }
 
 export interface ParseWarning {
@@ -144,6 +155,23 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         } else {
           getOrCreateIndividual(ontology, s);
         }
+      } else if (o === `${OWL}AnnotationProperty`) {
+        if (quad.subject.termType === 'BlankNode') {
+          warnings.push({
+            severity: 'warning',
+            message: `Blank node annotation property ignored: ${s}`,
+          });
+        } else {
+          getOrCreateAnnotationProperty(ontology, s);
+        }
+      } else if (o === `${OWL}Ontology`) {
+        if (quad.subject.termType !== 'BlankNode') {
+          ontology.ontologyMetadata = {
+            iri: s,
+            imports: [],
+            annotations: [],
+          };
+        }
       }
     }
   }
@@ -207,12 +235,37 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       continue;
     }
 
+    // owl:Ontology metadata — must come before rdfs:label/comment to capture ontology-level annotations
+    if (ontology.ontologyMetadata && s === ontology.ontologyMetadata.iri) {
+      if (p === `${OWL}versionIRI`) {
+        ontology.ontologyMetadata.versionIRI = o;
+        continue;
+      }
+      if (p === `${OWL}imports`) {
+        ontology.ontologyMetadata.imports.push(o);
+        continue;
+      }
+      // Collect other ontology-level annotations (not rdf:type)
+      if (p !== `${RDF}type`) {
+        const datatype = quad.object.termType === 'Literal'
+          ? (quad.object as { datatype?: { value: string } }).datatype?.value
+          : undefined;
+        ontology.ontologyMetadata.annotations.push({
+          property: p,
+          value: o,
+          datatype: datatype || undefined,
+        });
+        continue;
+      }
+    }
+
     if (p === `${RDFS}label`) {
       const literal = quad.object.termType === 'Literal' ? quad.object.value : o;
       const cls = ontology.classes.get(s);
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
       const ind = ontology.individuals.get(s);
+      const annProp = ontology.annotationProperties.get(s);
       if (cls) {
         cls.label = literal;
       } else if (objProp) {
@@ -221,6 +274,8 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         dtProp.label = literal;
       } else if (ind) {
         ind.label = literal;
+      } else if (annProp) {
+        annProp.label = literal;
       }
       continue;
     }
@@ -231,6 +286,7 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
       const objProp = ontology.objectProperties.get(s);
       const dtProp = ontology.datatypeProperties.get(s);
       const ind = ontology.individuals.get(s);
+      const annProp = ontology.annotationProperties.get(s);
       if (cls) {
         cls.comment = literal;
       } else if (objProp) {
@@ -239,6 +295,17 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
         dtProp.comment = literal;
       } else if (ind) {
         ind.comment = literal;
+      } else if (annProp) {
+        annProp.comment = literal;
+      }
+      continue;
+    }
+
+    // rdfs:subPropertyOf for annotation properties
+    if (p === `${RDFS}subPropertyOf`) {
+      const annProp = ontology.annotationProperties.get(s);
+      if (annProp && !annProp.subPropertyOf.includes(o)) {
+        annProp.subPropertyOf.push(o);
       }
       continue;
     }
@@ -335,7 +402,7 @@ export function parseTurtleWithWarnings(turtle: string): ParseResult {
 
   // Detect unsupported OWL constructs
   const unsupported = new Set<string>();
-  const UNSUPPORTED_TYPES = [`${OWL}AllDifferent`, `${OWL}AnnotationProperty`, `${OWL}Ontology`];
+  const UNSUPPORTED_TYPES = [`${OWL}AllDifferent`];
   for (const quad of quads) {
     if (quad.predicate.value === `${RDF}type` && UNSUPPORTED_TYPES.includes(quad.object.value)) {
       const name = quad.object.value.split('#').pop() || quad.object.value;

@@ -76,6 +76,44 @@ export function serializeToTurtle(ontology: Ontology): string {
     writer.addQuad(subject, namedNode(`${RDFS}range`), namedNode(prop.range));
   }
 
+  // Write ontology metadata
+  if (ontology.ontologyMetadata) {
+    const subject = namedNode(ontology.ontologyMetadata.iri);
+    writer.addQuad(subject, namedNode(`${RDF}type`), namedNode(`${OWL}Ontology`));
+    if (ontology.ontologyMetadata.versionIRI) {
+      writer.addQuad(
+        subject,
+        namedNode(`${OWL}versionIRI`),
+        namedNode(ontology.ontologyMetadata.versionIRI),
+      );
+    }
+    for (const imp of ontology.ontologyMetadata.imports) {
+      writer.addQuad(subject, namedNode(`${OWL}imports`), namedNode(imp));
+    }
+    for (const ann of ontology.ontologyMetadata.annotations) {
+      if (ann.datatype) {
+        writer.addQuad(subject, namedNode(ann.property), literal(ann.value, namedNode(ann.datatype)));
+      } else {
+        writer.addQuad(subject, namedNode(ann.property), literal(ann.value));
+      }
+    }
+  }
+
+  // Write annotation properties
+  for (const prop of (ontology.annotationProperties ?? new Map()).values()) {
+    const subject = namedNode(prop.uri);
+    writer.addQuad(subject, namedNode(`${RDF}type`), namedNode(`${OWL}AnnotationProperty`));
+    if (prop.label) {
+      writer.addQuad(subject, namedNode(`${RDFS}label`), literal(prop.label));
+    }
+    if (prop.comment) {
+      writer.addQuad(subject, namedNode(`${RDFS}comment`), literal(prop.comment));
+    }
+    for (const parent of prop.subPropertyOf) {
+      writer.addQuad(subject, namedNode(`${RDFS}subPropertyOf`), namedNode(parent));
+    }
+  }
+
   // Write individuals
   for (const ind of ontology.individuals.values()) {
     const subject = namedNode(ind.uri);
