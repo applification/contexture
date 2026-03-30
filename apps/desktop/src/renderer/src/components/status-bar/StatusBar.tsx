@@ -1,4 +1,5 @@
 import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
+import { getAdapterForFilePath } from '@renderer/model/formats';
 import { serializeToTurtle } from '@renderer/model/serialize';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validateOntology } from '@renderer/services/validation';
@@ -25,6 +26,15 @@ export function StatusBar(): React.JSX.Element {
 
   const classCount = ontology.classes.size;
   const propCount = ontology.objectProperties.size + ontology.datatypeProperties.size;
+
+  const formatName = useMemo(() => {
+    if (!filePath) return null;
+    const adapter = getAdapterForFilePath(filePath);
+    if (!adapter) return null;
+    if (adapter.mimeType.includes('turtle')) return 'Turtle';
+    if (adapter.mimeType.includes('rdf+xml')) return 'RDF/XML';
+    return null;
+  }, [filePath]);
 
   const tokenCount = useMemo(() => {
     if (classCount === 0) return 0;
@@ -85,7 +95,16 @@ export function StatusBar(): React.JSX.Element {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {filePath && <span className="text-muted-foreground/60">{filePath}</span>}
+      {filePath && (
+        <span className="flex items-center gap-1.5">
+          <span className="text-muted-foreground/60">{filePath}</span>
+          {formatName && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              {formatName}
+            </span>
+          )}
+        </span>
+      )}
 
       <span className="ml-auto flex items-center gap-4">
         {!hasIssues && classCount > 0 && <span className="text-success/60">No issues</span>}

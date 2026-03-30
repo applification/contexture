@@ -75,7 +75,7 @@ export function MetricsPanel(): React.JSX.Element {
           </EmptyMedia>
           <EmptyTitle className="text-sm font-medium">No ontology loaded</EmptyTitle>
           <EmptyDescription className="text-xs">
-            Open a .ttl file to see ontology metrics.
+            Open an ontology file to see metrics.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>

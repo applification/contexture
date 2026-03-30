@@ -37,7 +37,9 @@ export function registerFileIPC(): void {
 
     const result = await dialog.showOpenDialog(win, {
       filters: [
+        { name: 'All Ontology Files', extensions: ['ttl', 'rdf', 'owl'] },
         { name: 'Turtle', extensions: ['ttl'] },
+        { name: 'RDF/XML', extensions: ['rdf', 'owl'] },
         { name: 'All Files', extensions: ['*'] },
       ],
       properties: ['openFile'],

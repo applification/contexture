@@ -47,6 +47,7 @@ import { useUIStore } from './store/ui';
 
 function App(): React.JSX.Element {
   const ontology = useOntologyStore((s) => s.ontology);
+  const loadFromFile = useOntologyStore((s) => s.loadFromFile);
   const loadFromTurtle = useOntologyStore((s) => s.loadFromTurtle);
   const exportToTurtle = useOntologyStore((s) => s.exportToTurtle);
   const setFilePath = useOntologyStore((s) => s.setFilePath);
@@ -72,9 +73,9 @@ function App(): React.JSX.Element {
   const handleOpen = useCallback(async () => {
     const result = await window.api.openFile();
     if (result) {
-      loadFromTurtle(result.content, result.filePath);
+      loadFromFile(result.content, result.filePath);
     }
-  }, [loadFromTurtle]);
+  }, [loadFromFile]);
 
   const doSave = useCallback(async () => {
     const turtle = exportToTurtle();
@@ -205,10 +206,10 @@ function App(): React.JSX.Element {
     async (filePath: string) => {
       const result = await window.api.openRecentFile(filePath);
       if (result) {
-        loadFromTurtle(result.content, result.filePath);
+        loadFromFile(result.content, result.filePath);
       }
     },
-    [loadFromTurtle],
+    [loadFromFile],
   );
 
   const hasContent = ontology.classes.size > 0;
@@ -266,7 +267,7 @@ function App(): React.JSX.Element {
                     Where knowledge takes shape
                   </p>
                   <p className="text-sm mb-4">
-                    Open a .ttl file or start chatting with Claude to create an ontology
+                    Open an ontology (.ttl, .rdf, .owl) or start chatting with Claude to create one
                   </p>
                   <Button onClick={() => loadFromTurtle(peopleTtl, 'Sample: people.ttl')}>
                     Load sample ontology

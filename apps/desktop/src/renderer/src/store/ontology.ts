@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { track } from '../lib/analytics';
+import { getAdapterForFilePath } from '../model/formats';
 import { type ParseWarning, parseTurtleWithWarnings } from '../model/parse';
 import { serializeToTurtle } from '../model/serialize';
 import type {
@@ -18,6 +19,7 @@ interface OntologyState {
   importWarnings: ParseWarning[];
 
   // Actions
+  loadFromFile: (content: string, filePath: string) => void;
   loadFromTurtle: (turtle: string, filePath?: string) => void;
   clearImportWarnings: () => void;
   exportToTurtle: () => string;
@@ -54,6 +56,20 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
   filePath: null,
   isDirty: false,
   importWarnings: [],
+
+  loadFromFile: (content, filePath) => {
+    const adapter = getAdapterForFilePath(filePath);
+    const { ontology, warnings } = adapter
+      ? adapter.parse(content)
+      : parseTurtleWithWarnings(content);
+    set({ ontology, filePath, isDirty: false, importWarnings: warnings });
+    track('ontology_loaded', {
+      classCount: ontology.classes.size,
+      individualCount: ontology.individuals.size,
+      source: 'file',
+      format: filePath.substring(filePath.lastIndexOf('.')).toLowerCase(),
+    });
+  },
 
   loadFromTurtle: (turtle, filePath) => {
     const { ontology, warnings } = parseTurtleWithWarnings(turtle);

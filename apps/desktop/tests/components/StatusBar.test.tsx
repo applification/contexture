@@ -49,4 +49,22 @@ describe('StatusBar', () => {
     expect(screen.getByText(/0 classes/)).toBeInTheDocument();
     expect(screen.getByText(/0 tokens/)).toBeInTheDocument();
   });
+
+  it('shows Turtle format badge for .ttl files', () => {
+    useOntologyStore.getState().loadFromTurtle('', '/path/to/ontology.ttl');
+    render(<StatusBar />);
+    expect(screen.getByText('Turtle')).toBeInTheDocument();
+  });
+
+  it('shows RDF/XML format badge for .rdf files', () => {
+    useOntologyStore.setState({ filePath: '/path/to/ontology.rdf' });
+    render(<StatusBar />);
+    expect(screen.getByText('RDF/XML')).toBeInTheDocument();
+  });
+
+  it('shows RDF/XML format badge for .owl files', () => {
+    useOntologyStore.setState({ filePath: '/path/to/ontology.owl' });
+    render(<StatusBar />);
+    expect(screen.getByText('RDF/XML')).toBeInTheDocument();
+  });
 });
