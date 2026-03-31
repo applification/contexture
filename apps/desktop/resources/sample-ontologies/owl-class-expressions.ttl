@@ -1,0 +1,41 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex: <http://example.org/expr#> .
+
+ex:A a owl:Class ;
+  owl:equivalentClass ex:B .
+
+ex:EqAnd a owl:Class ;
+  owl:equivalentClass [
+    owl:intersectionOf ( ex:B ex:C )
+  ] .
+
+ex:SubOr a owl:Class ;
+  rdfs:subClassOf [
+    owl:unionOf ( ex:B ex:C ex:D )
+  ] .
+
+ex:SubNot a owl:Class ;
+  rdfs:subClassOf [
+    owl:complementOf ex:B
+  ] .
+
+ex:Nested a owl:Class ;
+  owl:equivalentClass [
+    owl:unionOf (
+      [ owl:intersectionOf ( ex:B ex:C ) ]
+      [ owl:complementOf ex:D ]
+    )
+  ] .
+
+ex:Broken a owl:Class ;
+  owl:equivalentClass _:brokenExpr .
+
+_:brokenExpr owl:unionOf _:loop .
+_:loop rdf:first ex:B ;
+  rdf:rest _:loop .
+
+ex:B a owl:Class .
+ex:C a owl:Class .
+ex:D a owl:Class .
