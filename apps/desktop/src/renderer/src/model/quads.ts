@@ -6,6 +6,7 @@ import type {
   ObjectProperty,
   Ontology,
   OntologyClass,
+  OWLCharacteristic,
   Restriction,
   RestrictionType,
 } from './types';
@@ -51,11 +52,19 @@ function getOrCreateClass(ontology: Ontology, uri: string): OntologyClass {
 function getOrCreateObjectProperty(ontology: Ontology, uri: string): ObjectProperty {
   let prop = ontology.objectProperties.get(uri);
   if (!prop) {
-    prop = { uri, domain: [], range: [] };
+    prop = { uri, domain: [], range: [], characteristics: [] };
     ontology.objectProperties.set(uri, prop);
   }
   return prop;
 }
+
+const OWL_CHARACTERISTIC_MAP: Record<string, OWLCharacteristic> = {
+  [`${OWL}TransitiveProperty`]: 'transitive',
+  [`${OWL}SymmetricProperty`]: 'symmetric',
+  [`${OWL}ReflexiveProperty`]: 'reflexive',
+  [`${OWL}FunctionalProperty`]: 'functional',
+  [`${OWL}InverseFunctionalProperty`]: 'inverseFunctional',
+};
 
 function getOrCreateDatatypeProperty(ontology: Ontology, uri: string): DatatypeProperty {
   let prop = ontology.datatypeProperties.get(uri);
@@ -107,6 +116,9 @@ export function walkQuads(quads: Quad[], prefixes?: Map<string, string>): WalkQu
   // Track declared types to distinguish ObjectProperty from DatatypeProperty
   const declaredTypes = new Map<string, Set<string>>();
 
+  // Collect OWL characteristic type tokens per URI (order-independent)
+  const pendingCharacteristics = new Map<string, OWLCharacteristic[]>();
+
   // First pass: collect type declarations
   for (const quad of quads) {
     const s = quad.subject.value;
@@ -116,6 +128,12 @@ export function walkQuads(quads: Quad[], prefixes?: Map<string, string>): WalkQu
     if (p === `${RDF}type`) {
       if (!declaredTypes.has(s)) declaredTypes.set(s, new Set());
       declaredTypes.get(s)?.add(o);
+
+      const charToken = OWL_CHARACTERISTIC_MAP[o];
+      if (charToken) {
+        if (!pendingCharacteristics.has(s)) pendingCharacteristics.set(s, []);
+        pendingCharacteristics.get(s)?.push(charToken);
+      }
 
       if (o === `${OWL}Class`) {
         getOrCreateClass(ontology, s);
@@ -150,6 +168,14 @@ export function walkQuads(quads: Quad[], prefixes?: Map<string, string>): WalkQu
           };
         }
       }
+    }
+  }
+
+  // Apply collected characteristics to ObjectProperties (handles order-independence)
+  for (const [uri, tokens] of pendingCharacteristics) {
+    const prop = ontology.objectProperties.get(uri);
+    if (prop) {
+      prop.characteristics = tokens;
     }
   }
 

@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { ValidationError } from '../services/validation';
-import type { Ontology, Restriction } from './types';
+import type { Ontology, OWLCharacteristic, Restriction } from './types';
 
 export interface ClassNodeData extends Record<string, unknown> {
   label: string;
@@ -34,6 +34,7 @@ export type OntographNode = ClassNode | IndividualNode | GroupNode;
 export interface ObjPropEdgeData extends Record<string, unknown> {
   label: string;
   uri: string;
+  characteristics?: OWLCharacteristic[];
 }
 
 export interface SubClassEdgeData extends Record<string, unknown> {
@@ -151,7 +152,7 @@ export function ontologyToReactFlowElements(
           source: domainUri,
           target: rangeUri,
           type: 'objectProperty',
-          data: { label, uri: prop.uri },
+          data: { label, uri: prop.uri, characteristics: prop.characteristics },
         });
       }
     }

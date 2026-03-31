@@ -184,6 +184,7 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
         uri,
         domain: [],
         range: [],
+        characteristics: [],
         ...partial,
       });
       track('object_property_added');

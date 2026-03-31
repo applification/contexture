@@ -3,6 +3,7 @@ import { useOntologyStore } from '@renderer/store/ontology';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CharacteristicBadge } from './CharacteristicBadge';
 
 interface Props {
   property: ObjectProperty;
@@ -37,6 +38,17 @@ export function EdgeDetail({ property }: Props): React.JSX.Element {
           }}
         />
       </div>
+
+      {property.characteristics.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Characteristics</p>
+          <div className="flex flex-wrap gap-1.5">
+            {property.characteristics.map((c) => (
+              <CharacteristicBadge key={c} characteristic={c} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {property.domain.length > 0 && (
         <div>

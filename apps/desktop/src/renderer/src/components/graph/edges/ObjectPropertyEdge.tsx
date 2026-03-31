@@ -1,4 +1,5 @@
 import type { ObjPropEdgeData } from '@renderer/model/reactflow';
+import type { OWLCharacteristic } from '@renderer/model/types';
 import { useUIStore } from '@renderer/store/ui';
 import {
   BaseEdge,
@@ -12,6 +13,14 @@ import { memo } from 'react';
 import { getFloatingEdgeParams } from './floating-edge-utils';
 
 type ObjPropEdge = Edge<ObjPropEdgeData>;
+
+const CHAR_ABBREV: Record<OWLCharacteristic, { abbr: string; title: string }> = {
+  transitive: { abbr: 'T', title: 'Transitive' },
+  symmetric: { abbr: 'S', title: 'Symmetric' },
+  reflexive: { abbr: 'R', title: 'Reflexive' },
+  functional: { abbr: 'F', title: 'Functional' },
+  inverseFunctional: { abbr: 'IF', title: 'Inverse Functional' },
+};
 
 function autoRotation(sx: number, sy: number, tx: number, ty: number): number {
   let angle = Math.atan2(ty - sy, tx - sx) * (180 / Math.PI);
@@ -52,6 +61,7 @@ export const ObjectPropertyEdge = memo(function ObjectPropertyEdge({
   const color = 'var(--graph-edge-property)';
   const markerId = `objprop-arrow-${id}`;
   const rotation = autoRotation(sx, sy, tx, ty);
+  const uniqueCharacteristics = [...new Set(data?.characteristics ?? [])];
 
   return (
     <>
@@ -91,6 +101,46 @@ export const ObjectPropertyEdge = memo(function ObjectPropertyEdge({
             className="nodrag nopan"
           >
             {data.label}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+      {uniqueCharacteristics.length > 0 && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + 18}px) rotate(${rotation}deg)`,
+              display: 'flex',
+              gap: 2,
+              opacity: isDimmed ? 0.15 : 1,
+              transition: 'opacity 0.15s ease',
+              pointerEvents: 'none',
+            }}
+            className="nodrag nopan"
+          >
+            {uniqueCharacteristics.map((c) => {
+              const { abbr, title } = CHAR_ABBREV[c];
+              return (
+                <span
+                  key={c}
+                  title={title}
+                  style={{
+                    fontSize: 5,
+                    fontFamily: 'monospace',
+                    height: 10,
+                    background: 'var(--characteristic-badge-bg)',
+                    border: '1px solid var(--characteristic-badge-border)',
+                    color: 'var(--characteristic-badge-text)',
+                    padding: '0 2px',
+                    borderRadius: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {abbr}
+                </span>
+              );
+            })}
           </div>
         </EdgeLabelRenderer>
       )}

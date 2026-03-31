@@ -54,6 +54,9 @@
   --graph-edge-disjoint: oklch(0.60 0.12 15);
   --graph-edge-subclass: oklch(0.50 0.02 270);
   --graph-edge-restriction: oklch(0.65 0.15 280);
+  --characteristic-badge-bg: oklch(0.65 0.12 280 / 0.15);
+  --characteristic-badge-border: oklch(0.65 0.12 280 / 0.50);
+  --characteristic-badge-text: oklch(0.45 0.12 280);
 }
 
 .dark {
@@ -103,6 +106,9 @@
   --graph-edge-disjoint: oklch(0.65 0.12 15);
   --graph-edge-subclass: oklch(0.65 0.015 270);
   --graph-edge-restriction: oklch(0.65 0.15 280);
+  --characteristic-badge-bg: oklch(0.65 0.12 280 / 0.15);
+  --characteristic-badge-border: oklch(0.65 0.12 280 / 0.50);
+  --characteristic-badge-text: oklch(0.75 0.12 280);
 }
 
 @theme inline {

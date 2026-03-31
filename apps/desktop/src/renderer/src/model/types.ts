@@ -45,6 +45,13 @@ export interface OntologyClass {
   restrictions?: Restriction[];
 }
 
+export type OWLCharacteristic =
+  | 'transitive'
+  | 'symmetric'
+  | 'reflexive'
+  | 'functional'
+  | 'inverseFunctional';
+
 export interface ObjectProperty {
   uri: string;
   label?: string;
@@ -54,6 +61,7 @@ export interface ObjectProperty {
   minCardinality?: number;
   maxCardinality?: number;
   inverseOf?: string;
+  characteristics: OWLCharacteristic[];
 }
 
 export interface DatatypeProperty {
