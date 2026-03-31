@@ -80,13 +80,13 @@ export function AnimatedGraph() {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DISTANCE) {
-            const alpha = 0.12 * (1 - dist / CONNECTION_DISTANCE);
+            const alpha = 0.4 * (1 - dist / CONNECTION_DISTANCE);
             ctx.globalAlpha = alpha;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
             ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? accent : primary;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
           }
         }
