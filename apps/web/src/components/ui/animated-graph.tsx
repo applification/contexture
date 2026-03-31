@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react';
 
 const NODE_COUNT = 22;
-const CONNECTION_DISTANCE = 220;
-const NODE_SPEED = 0.25;
+const CONNECTION_DISTANCE = 180;
+const NODE_SPEED = 0.6;
 
 interface AnimNode {
   x: number;
