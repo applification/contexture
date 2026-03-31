@@ -16,6 +16,7 @@
     "typecheck": "bun run typecheck:node && bun run typecheck:web",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "bash e2e/runner.sh",
     "build:win": "bun run build && electron-builder --win --config",
     "build:mac": "bun run build && electron-builder --mac --config",
     "build:linux": "bun run build && electron-builder --linux --config",

@@ -50,6 +50,12 @@ function createWindow(): BrowserWindow {
 
 app.setName('Ontograph');
 
+// Enable CDP for e2e testing when E2E=1
+if (process.env.E2E === '1') {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.E2E_CDP_PORT ?? '9222');
+  app.commandLine.appendSwitch('remote-allow-origins', '*');
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.applification.ontograph');
 
