@@ -37,9 +37,10 @@ export function registerFileIPC(): void {
 
     const result = await dialog.showOpenDialog(win, {
       filters: [
-        { name: 'All Ontology Files', extensions: ['ttl', 'rdf', 'owl'] },
+        { name: 'All Ontology Files', extensions: ['ttl', 'rdf', 'owl', 'jsonld'] },
         { name: 'Turtle', extensions: ['ttl'] },
         { name: 'RDF/XML', extensions: ['rdf', 'owl'] },
+        { name: 'JSON-LD', extensions: ['jsonld'] },
         { name: 'All Files', extensions: ['*'] },
       ],
       properties: ['openFile'],
@@ -75,6 +76,7 @@ export function registerFileIPC(): void {
       filters: [
         { name: 'Turtle', extensions: ['ttl'] },
         { name: 'RDF/XML', extensions: ['rdf', 'owl'] },
+        { name: 'JSON-LD', extensions: ['jsonld'] },
         { name: 'All Files', extensions: ['*'] },
       ],
       defaultPath: 'ontology.ttl',
@@ -95,6 +97,7 @@ export function registerFileIPC(): void {
       filters: [
         { name: 'Turtle', extensions: ['ttl'] },
         { name: 'RDF/XML', extensions: ['rdf', 'owl'] },
+        { name: 'JSON-LD', extensions: ['jsonld'] },
         { name: 'All Files', extensions: ['*'] },
       ],
       defaultPath: 'ontology.ttl',

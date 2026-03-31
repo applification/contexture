@@ -1,5 +1,6 @@
 import type { ParseWarning } from '../quads';
 import type { Ontology } from '../types';
+import { jsonLdAdapter } from './jsonld';
 import { rdfXmlAdapter } from './rdfxml';
 import { turtleAdapter } from './turtle';
 
@@ -15,7 +16,7 @@ export interface FormatAdapter {
   serialize?(ontology: Ontology): string;
 }
 
-const adapters: FormatAdapter[] = [turtleAdapter, rdfXmlAdapter];
+const adapters: FormatAdapter[] = [turtleAdapter, rdfXmlAdapter, jsonLdAdapter];
 
 export function getAdapterForExtension(ext: string): FormatAdapter | undefined {
   const normalized = ext.toLowerCase().startsWith('.')
@@ -44,7 +45,9 @@ export function getOpenDialogFilters(): { name: string; extensions: string[] }[]
       ? 'Turtle'
       : adapter.mimeType.includes('rdf+xml')
         ? 'RDF/XML'
-        : adapter.mimeType;
+        : adapter.mimeType.includes('ld+json')
+          ? 'JSON-LD'
+          : adapter.mimeType;
     filters.push({ name, extensions: exts });
   }
 

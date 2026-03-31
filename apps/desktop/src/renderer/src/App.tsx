@@ -270,7 +270,8 @@ function App(): React.JSX.Element {
                     Where knowledge takes shape
                   </p>
                   <p className="text-sm mb-4">
-                    Open an ontology (.ttl, .rdf, .owl) or start chatting with Claude to create one
+                    Open an ontology (.ttl, .rdf, .owl, .jsonld) or start chatting with Claude to
+                    create one
                   </p>
                   <Button onClick={() => loadFromTurtle(peopleTtl, 'Sample: people.ttl')}>
                     Load sample ontology

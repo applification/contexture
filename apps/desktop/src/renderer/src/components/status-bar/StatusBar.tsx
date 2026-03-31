@@ -33,6 +33,7 @@ export function StatusBar(): React.JSX.Element {
     if (!adapter) return null;
     if (adapter.mimeType.includes('turtle')) return 'Turtle';
     if (adapter.mimeType.includes('rdf+xml')) return 'RDF/XML';
+    if (adapter.mimeType.includes('ld+json')) return 'JSON-LD';
     return null;
   }, [filePath]);
 
