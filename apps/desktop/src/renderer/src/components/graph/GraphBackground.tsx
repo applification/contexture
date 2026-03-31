@@ -5,6 +5,9 @@ interface Node {
   y: number;
   vx: number;
   vy: number;
+  isAccent: boolean;
+  outerR: number;
+  innerR: number;
 }
 
 const NODE_COUNT = 18;
@@ -39,11 +42,14 @@ export function GraphBackground() {
     const h = () => canvas.offsetHeight;
 
     // Initialize nodes
-    nodesRef.current = Array.from({ length: NODE_COUNT }, () => ({
+    nodesRef.current = Array.from({ length: NODE_COUNT }, (_, i) => ({
       x: Math.random() * w(),
       y: Math.random() * h(),
       vx: (Math.random() - 0.5) * NODE_SPEED,
       vy: (Math.random() - 0.5) * NODE_SPEED,
+      isAccent: i % 3 === 0,
+      outerR: 5 + Math.random() * 3,
+      innerR: 2.5 + Math.random() * 1.5,
     }));
 
     const style = getComputedStyle(document.documentElement);
@@ -74,25 +80,35 @@ export function GraphBackground() {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DISTANCE) {
-            const opacity = 0.08 * (1 - dist / CONNECTION_DISTANCE);
+            ctx.globalAlpha = 0.4 * (1 - dist / CONNECTION_DISTANCE);
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = `color-mix(in oklch, ${primaryColor} 100%, transparent ${(1 - opacity) * 100}%)`;
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? accentColor : primaryColor;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
           }
         }
       }
 
-      // Draw nodes
-      for (let i = 0; i < nodes.length; i++) {
-        const color = i % 3 === 0 ? accentColor : primaryColor;
+      // Draw nodes — outer halo + inner dot
+      for (const node of nodes) {
+        const color = node.isAccent ? accentColor : primaryColor;
+
+        ctx.globalAlpha = 0.15;
         ctx.beginPath();
-        ctx.arc(nodes[i].x, nodes[i].y, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = `color-mix(in oklch, ${color} 100%, transparent 85%)`;
+        ctx.arc(node.x, node.y, node.outerR, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.innerR, 0, Math.PI * 2);
+        ctx.fillStyle = color;
         ctx.fill();
       }
+
+      ctx.globalAlpha = 1;
 
       animRef.current = requestAnimationFrame(draw);
     }
@@ -108,11 +124,5 @@ export function GraphBackground() {
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ opacity: 0.6 }}
-    />
-  );
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />;
 }
