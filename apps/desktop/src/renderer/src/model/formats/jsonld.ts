@@ -160,7 +160,7 @@ export const jsonLdAdapter: FormatAdapter = {
   parse(_content: string): ParseResult {
     return {
       ontology: createEmptyOntology(),
-      warnings: [{ severity: 'error', message: 'JSON-LD parsing requires async — use parseAsync' }],
+      warnings: [{ severity: 'error', message: 'JSON-LD parsing requires async - use parseAsync' }],
     };
   },
   parseAsync: parseJsonLdAsync,
