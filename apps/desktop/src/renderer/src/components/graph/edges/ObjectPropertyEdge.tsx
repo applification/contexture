@@ -138,6 +138,7 @@ export const ObjectPropertyEdge = memo(function ObjectPropertyEdge({
                   key={c}
                   title={title}
                   style={{
+                    pointerEvents: 'auto',
                     fontSize: 5,
                     fontFamily: 'monospace',
                     height: 10,
