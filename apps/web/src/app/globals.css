@@ -141,52 +141,6 @@ body {
   animation: fade-in-up 0.8s ease-out 0.45s both;
 }
 
-/* Animated node graph background */
-@keyframes node-float {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(3px, -5px); }
-  50% { transform: translate(-2px, 3px); }
-  75% { transform: translate(4px, 2px); }
-}
-
-@keyframes node-float-delay {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(-4px, 3px); }
-  50% { transform: translate(3px, -4px); }
-  75% { transform: translate(-2px, -2px); }
-}
-
-@keyframes node-float-slow {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(2px, 4px); }
-  50% { transform: translate(-3px, -2px); }
-  75% { transform: translate(5px, -3px); }
-}
-
-@keyframes edge-pulse {
-  0%, 100% { stroke-opacity: 0.08; }
-  50% { stroke-opacity: 0.2; }
-}
-
-.animate-node-float {
-  animation: node-float 8s ease-in-out infinite;
-}
-
-.animate-node-float-delay {
-  animation: node-float-delay 10s ease-in-out infinite;
-}
-
-.animate-node-float-slow {
-  animation: node-float-slow 12s ease-in-out infinite;
-}
-
-.animate-edge-pulse {
-  animation: edge-pulse 6s ease-in-out infinite;
-}
-
-.animate-edge-pulse-delay {
-  animation: edge-pulse 6s ease-in-out 3s infinite;
-}
 
 /* Screenshot showcase treatment */
 .screenshot-glow {
@@ -213,14 +167,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-float-slow,
   .animate-float-slower,
-  .animate-node-float,
-  .animate-node-float-delay,
-  .animate-node-float-slow,
-  .animate-edge-pulse,
-  .animate-edge-pulse-delay {
-    animation: none;
-  }
-
   .animate-fade-in-up,
   .animate-fade-in-up-delay-1,
   .animate-fade-in-up-delay-2,

@@ -1,6 +1,12 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 
-interface Node {
+const NODE_COUNT = 22;
+const CONNECTION_DISTANCE = 180;
+const NODE_SPEED = 0.6;
+
+interface AnimNode {
   x: number;
   y: number;
   vx: number;
@@ -10,25 +16,22 @@ interface Node {
   innerR: number;
 }
 
-const NODE_COUNT = 18;
-const CONNECTION_DISTANCE = 140;
-const NODE_SPEED = 0.3;
-
-export function GraphBackground() {
+export function AnimatedGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const nodesRef = useRef<Node[]>([]);
+  const nodesRef = useRef<AnimNode[]>([]);
   const animRef = useRef<number>(0);
 
   useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     const cvs = canvasRef.current;
     if (!cvs) return;
 
     const context = cvs.getContext('2d');
     if (!context) return;
 
-    // Store in consts so closures retain the non-null narrowing
-    const canvas: HTMLCanvasElement = cvs;
-    const ctx: CanvasRenderingContext2D = context;
+    const canvas = cvs;
+    const ctx = context;
 
     function resize() {
       const dpr = window.devicePixelRatio || 1;
@@ -41,15 +44,14 @@ export function GraphBackground() {
     const w = () => canvas.offsetWidth;
     const h = () => canvas.offsetHeight;
 
-    // Initialize nodes
     nodesRef.current = Array.from({ length: NODE_COUNT }, (_, i) => ({
       x: Math.random() * w(),
       y: Math.random() * h(),
       vx: (Math.random() - 0.5) * NODE_SPEED,
       vy: (Math.random() - 0.5) * NODE_SPEED,
       isAccent: i % 3 === 0,
-      outerR: 5 + Math.random() * 3,
-      innerR: 2.5 + Math.random() * 1.5,
+      outerR: 6 + Math.random() * 4,
+      innerR: 3 + Math.random() * 2,
     }));
 
     const style = getComputedStyle(document.documentElement);
@@ -60,10 +62,9 @@ export function GraphBackground() {
       ctx.clearRect(0, 0, width, height);
 
       const nodes = nodesRef.current;
-      const primaryColor = style.getPropertyValue('--primary').trim() || 'oklch(0.45 0.15 270)';
-      const accentColor = style.getPropertyValue('--accent').trim() || 'oklch(0.75 0.15 195)';
+      const primary = style.getPropertyValue('--primary').trim();
+      const accent = style.getPropertyValue('--accent').trim();
 
-      // Update positions
       for (const node of nodes) {
         node.x += node.vx;
         node.y += node.vy;
@@ -73,27 +74,26 @@ export function GraphBackground() {
         node.y = Math.max(0, Math.min(height, node.y));
       }
 
-      // Draw connections
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[i].x - nodes[j].x;
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DISTANCE) {
-            ctx.globalAlpha = 0.4 * (1 - dist / CONNECTION_DISTANCE);
+            const alpha = 0.4 * (1 - dist / CONNECTION_DISTANCE);
+            ctx.globalAlpha = alpha;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? accentColor : primaryColor;
+            ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? accent : primary;
             ctx.lineWidth = 1.5;
             ctx.stroke();
           }
         }
       }
 
-      // Draw nodes — outer halo + inner dot
       for (const node of nodes) {
-        const color = node.isAccent ? accentColor : primaryColor;
+        const color = node.isAccent ? accent : primary;
 
         ctx.globalAlpha = 0.15;
         ctx.beginPath();
@@ -109,18 +109,17 @@ export function GraphBackground() {
       }
 
       ctx.globalAlpha = 1;
-
       animRef.current = requestAnimationFrame(draw);
     }
 
     draw();
 
-    const resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(canvas);
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     return () => {
       cancelAnimationFrame(animRef.current);
-      resizeObserver.disconnect();
+      ro.disconnect();
     };
   }, []);
 
