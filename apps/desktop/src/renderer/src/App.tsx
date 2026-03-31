@@ -73,20 +73,20 @@ function App(): React.JSX.Element {
   const handleOpen = useCallback(async () => {
     const result = await window.api.openFile();
     if (result) {
-      loadFromFile(result.content, result.filePath);
+      await loadFromFile(result.content, result.filePath);
     }
   }, [loadFromFile]);
 
   const doSave = useCallback(async () => {
     const currentPath = useOntologyStore.getState().filePath;
     if (currentPath && !currentPath.startsWith('sample://') && !currentPath.startsWith('Sample:')) {
-      const content = serializeForFilePath(currentPath);
+      const content = await serializeForFilePath(currentPath);
       await window.api.saveFile(currentPath, content);
       markClean();
     } else {
       const newPath = await window.api.saveFileAsDialog();
       if (newPath) {
-        const content = serializeForFilePath(newPath);
+        const content = await serializeForFilePath(newPath);
         await window.api.saveFile(newPath, content);
         setFilePath(newPath);
         markClean();
@@ -97,7 +97,7 @@ function App(): React.JSX.Element {
   const doSaveAs = useCallback(async () => {
     const newPath = await window.api.saveFileAsDialog();
     if (newPath) {
-      const content = serializeForFilePath(newPath);
+      const content = await serializeForFilePath(newPath);
       await window.api.saveFile(newPath, content);
       setFilePath(newPath);
       markClean();
@@ -209,7 +209,7 @@ function App(): React.JSX.Element {
     async (filePath: string) => {
       const result = await window.api.openRecentFile(filePath);
       if (result) {
-        loadFromFile(result.content, result.filePath);
+        await loadFromFile(result.content, result.filePath);
       }
     },
     [loadFromFile],

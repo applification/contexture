@@ -52,6 +52,7 @@
     "elkjs": "^0.11.1",
     "lucide-react": "^1.6.0",
     "motion": "^12.38.0",
+    "jsonld": "^9.0.0",
     "n3": "^2.0.3",
     "posthog-js": "^1.364.1",
     "rdfxml-streaming-parser": "^3.2.0",

@@ -14,6 +14,8 @@ export interface FormatAdapter {
   mimeType: string;
   parse(content: string): ParseResult;
   serialize?(ontology: Ontology): string;
+  parseAsync?(content: string): Promise<ParseResult>;
+  serializeAsync?(ontology: Ontology): Promise<string>;
 }
 
 const adapters: FormatAdapter[] = [turtleAdapter, rdfXmlAdapter, jsonLdAdapter];

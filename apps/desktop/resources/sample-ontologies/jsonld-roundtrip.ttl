@@ -1,0 +1,54 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <http://example.org/ontograph#> .
+@prefix dc: <http://purl.org/dc/terms/> .
+
+<http://example.org/ontograph>
+  a owl:Ontology ;
+  owl:versionIRI <http://example.org/ontograph/1.0.0> ;
+  owl:imports <http://example.org/shared> ;
+  dc:title "Ontograph JSON-LD Round Trip Fixture" ;
+  dc:description "Canonical fixture for JSON-LD adapter verification" .
+
+ex:Person a owl:Class ;
+  rdfs:label "Person" ;
+  rdfs:comment "A human being" .
+
+ex:Employee a owl:Class ;
+  rdfs:label "Employee" ;
+  rdfs:subClassOf ex:Person .
+
+ex:Contractor a owl:Class ;
+  rdfs:label "Contractor" ;
+  owl:disjointWith ex:Employee .
+
+ex:worksWith a owl:ObjectProperty ;
+  rdfs:label "works with" ;
+  rdfs:domain ex:Person ;
+  rdfs:range ex:Person ;
+  owl:inverseOf ex:worksWith .
+
+ex:employeeId a owl:DatatypeProperty ;
+  rdfs:label "employee id" ;
+  rdfs:domain ex:Employee ;
+  rdfs:range xsd:string .
+
+ex:active a owl:DatatypeProperty ;
+  rdfs:label "active" ;
+  rdfs:domain ex:Person ;
+  rdfs:range xsd:boolean .
+
+ex:Alice a owl:NamedIndividual ;
+  rdf:type ex:Employee ;
+  rdfs:label "Alice" ;
+  ex:employeeId "E-001"^^xsd:string ;
+  ex:active "true"^^xsd:boolean ;
+  ex:worksWith ex:Bob .
+
+ex:Bob a owl:NamedIndividual ;
+  rdf:type ex:Contractor ;
+  rdfs:label "Bob" ;
+  ex:active "false"^^xsd:boolean ;
+  ex:worksWith ex:Alice .

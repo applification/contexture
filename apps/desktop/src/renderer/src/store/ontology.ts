@@ -20,11 +20,11 @@ interface OntologyState {
   importWarnings: ParseWarning[];
 
   // Actions
-  loadFromFile: (content: string, filePath: string) => void;
+  loadFromFile: (content: string, filePath: string) => Promise<void>;
   loadFromTurtle: (turtle: string, filePath?: string) => void;
   clearImportWarnings: () => void;
   exportToTurtle: () => string;
-  serializeForFilePath: (filePath: string) => string;
+  serializeForFilePath: (filePath: string) => Promise<string>;
   reset: () => void;
   setFilePath: (path: string | null) => void;
   markClean: () => void;
@@ -59,11 +59,14 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
   isDirty: false,
   importWarnings: [],
 
-  loadFromFile: (content, filePath) => {
+  loadFromFile: async (content, filePath) => {
     const adapter = getAdapterForFilePath(filePath);
-    const { ontology, warnings } = adapter
-      ? adapter.parse(content)
-      : parseTurtleWithWarnings(content);
+    const result = adapter?.parseAsync
+      ? await adapter.parseAsync(content)
+      : adapter
+        ? adapter.parse(content)
+        : parseTurtleWithWarnings(content);
+    const { ontology, warnings } = result;
     set({ ontology, filePath, isDirty: false, importWarnings: warnings });
     track('ontology_loaded', {
       classCount: ontology.classes.size,
@@ -90,12 +93,14 @@ export const useOntologyStore = create<OntologyState>((set, get) => ({
     return serializeToTurtle(get().ontology);
   },
 
-  serializeForFilePath: (filePath) => {
+  serializeForFilePath: async (filePath) => {
     const ontology = get().ontology;
+    const adapter = getAdapterForFilePath(filePath);
     const ext = filePath.substring(filePath.lastIndexOf('.')).toLowerCase();
+    track('ontology_exported', { classCount: ontology.classes.size, format: ext });
+    if (adapter?.serializeAsync) return adapter.serializeAsync(ontology);
+    if (adapter?.serialize) return adapter.serialize(ontology);
     const isRdfXml = ext === '.rdf' || ext === '.owl';
-    const format = isRdfXml ? 'rdf+xml' : 'turtle';
-    track('ontology_exported', { classCount: ontology.classes.size, format });
     return isRdfXml ? serializeToRdfXml(ontology) : serializeToTurtle(ontology);
   },
 
