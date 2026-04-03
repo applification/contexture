@@ -1,4 +1,5 @@
 import { track } from '@renderer/lib/analytics';
+import { executeGraphQuery, type GraphQuery } from '@renderer/model/graphQuery';
 import { serializeToTurtle } from '@renderer/model/serialize';
 import type { OntologyClass } from '@renderer/model/types';
 import { validateOntology } from '@renderer/services/validation';
@@ -170,6 +171,12 @@ export function useClaude(): UseClaudeReturn {
       window.api.onClaudeValidate(() => {
         const errors = validateOntology(store.getState().ontology);
         window.api.respondValidation(JSON.stringify(errors, null, 2));
+      }),
+
+      // Graph query
+      window.api.onClaudeGraphQuery((query: Record<string, unknown>) => {
+        const result = executeGraphQuery(store.getState().ontology, query as GraphQuery);
+        window.api.respondGraphQuery(result);
       }),
 
       // Assistant responses

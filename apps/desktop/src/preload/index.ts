@@ -76,6 +76,8 @@ const api = {
   onClaudeRemoveElement: (callback: Callback<[string, string]>) =>
     onChannel('claude:remove-element', callback),
   onClaudeValidate: (callback: () => void) => onChannel('claude:validate', callback),
+  onClaudeGraphQuery: (callback: Callback<[Record<string, unknown>]>) =>
+    onChannel('claude:graph-query', callback),
 
   // Eval operations
   runEval: (payload: {
@@ -97,6 +99,9 @@ const api = {
   },
   respondValidation: (errors: string): void => {
     ipcRenderer.invoke('claude:validation-response', errors);
+  },
+  respondGraphQuery: (result: Record<string, unknown>): void => {
+    ipcRenderer.invoke('claude:graph-query-response', result);
   },
 
   // Update operations

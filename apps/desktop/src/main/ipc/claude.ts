@@ -153,6 +153,64 @@ const removeElement = tool(
   },
 );
 
+const queryOntology = tool(
+  'query_ontology',
+  'Query the loaded ontology graph for information. Use this to answer questions like "Show me all subclasses of Vehicle", "What properties does Person have?", "List all classes", "Find all instances of Animal". This is a read-only operation — use it for exploration and answering questions, not for making changes.',
+  {
+    type: z
+      .enum([
+        'subclasses',
+        'superclasses',
+        'class_properties',
+        'class_info',
+        'instances',
+        'all_classes',
+        'all_properties',
+        'search',
+      ])
+      .describe(
+        'Query type: subclasses (find all subclasses of a class), superclasses (find parent classes), class_properties (get object and datatype properties for a class), class_info (full details about a class), instances (get individuals of a class), all_classes (list every class), all_properties (list every property), search (text search across labels/URIs)',
+      ),
+    classUri: z
+      .string()
+      .optional()
+      .describe(
+        'URI of the class to query. Required for: subclasses, superclasses, class_properties, class_info, instances',
+      ),
+    transitive: z
+      .boolean()
+      .optional()
+      .describe(
+        'If true, traverse the full hierarchy (not just direct relationships). Defaults to true. Applies to subclasses and superclasses queries.',
+      ),
+    query: z.string().optional().describe('Search term for the search query type'),
+  },
+  async (args) => {
+    return new Promise((resolve) => {
+      const win = getMainWindow();
+      if (!win) {
+        resolve({
+          content: [{ type: 'text' as const, text: 'No window available' }],
+          isError: true,
+        });
+        return;
+      }
+      ipcMain.handleOnce(
+        'claude:graph-query-response',
+        (_event, result: Record<string, unknown>) => {
+          resolve({ content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] });
+        },
+      );
+      win.webContents.send('claude:graph-query', {
+        type: args.type,
+        classUri: args.classUri,
+        transitive: args.transitive !== false,
+        query: args.query,
+      });
+    });
+  },
+);
+
 const validateOntology = tool(
   'validate_ontology',
   'Run validation on the current ontology and return any errors or warnings',
@@ -180,6 +238,7 @@ const ontographServer = createSdkMcpServer({
   version: '0.1.0',
   tools: [
     getCurrentOntology,
+    queryOntology,
     generateOntology,
     addClass,
     addObjectProperty,
@@ -190,7 +249,7 @@ const ontographServer = createSdkMcpServer({
   ],
 });
 
-const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
+const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and query OWL ontologies.
 
 Key guidelines:
 - When creating ontologies, use a consistent namespace prefix (e.g. http://example.org/ontology#)
@@ -200,6 +259,26 @@ Key guidelines:
 - Create meaningful object properties to connect classes
 - Consider subclass hierarchies to organize classes
 - Keep ontologies focused and practical for knowledge graph extraction
+
+## Answering questions about the ontology (read-only queries)
+
+When the user asks questions about the loaded ontology — e.g. "Show me all subclasses of Vehicle", "What properties does Person have?", "List all classes", "Find all instances of Animal" — use the query_ontology tool. Do NOT fetch the full Turtle for simple questions.
+
+Query type guidance:
+- "subclasses of X" → type: subclasses, classUri: <URI of X>
+- "superclasses / parents of X" → type: superclasses, classUri: <URI of X>
+- "properties of X" / "attributes of X" → type: class_properties, classUri: <URI of X>
+- "details about X" / "tell me about X" → type: class_info, classUri: <URI of X>
+- "instances of X" / "individuals of X" → type: instances, classUri: <URI of X>
+- "list all classes" / "what classes exist?" → type: all_classes
+- "list all properties" → type: all_properties
+- "find / search for X" → type: search, query: "X"
+
+When URIs are not known, first use type: search or type: all_classes to find the correct URI, then run the intended query.
+
+Present query results in a clear, human-readable format — use bullet lists, tables, or prose depending on what fits best.
+
+## Modifying the ontology
 
 When the user asks you to create an ontology:
 1. First call get_current_ontology to see what exists
@@ -214,6 +293,7 @@ Always include necessary prefix declarations in generated Turtle:
 
 const ALL_TOOLS = [
   'mcp__ontograph__get_current_ontology',
+  'mcp__ontograph__query_ontology',
   'mcp__ontograph__generate_ontology',
   'mcp__ontograph__add_class',
   'mcp__ontograph__add_object_property',

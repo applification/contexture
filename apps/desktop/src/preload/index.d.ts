@@ -70,6 +70,7 @@ declare global {
       ) => () => void;
       onClaudeRemoveElement: (callback: (uri: string, type: string) => void) => () => void;
       onClaudeValidate: (callback: () => void) => () => void;
+      onClaudeGraphQuery: (callback: (query: Record<string, unknown>) => void) => () => void;
 
       // Eval operations
       runEval: (payload: {
@@ -88,6 +89,7 @@ declare global {
       // Respond to main process
       respondOntology: (turtle: string) => void;
       respondValidation: (errors: string) => void;
+      respondGraphQuery: (result: Record<string, unknown>) => void;
 
       // Update operations
       checkForUpdate: () => Promise<void>;

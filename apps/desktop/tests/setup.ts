@@ -42,9 +42,11 @@ Object.defineProperty(window, 'api', {
     onClaudeModifyClass: vi.fn(noop),
     onClaudeRemoveElement: vi.fn(noop),
     onClaudeValidate: vi.fn(noop),
+    onClaudeGraphQuery: vi.fn(noop),
 
     respondOntology: vi.fn(),
     respondValidation: vi.fn(),
+    respondGraphQuery: vi.fn(),
 
     runEval: vi.fn(),
     abortEval: vi.fn(),
