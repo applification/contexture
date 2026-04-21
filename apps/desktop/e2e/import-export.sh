@@ -12,7 +12,7 @@ fail() { echo "  ✗ $*" >&2; exit 1; }
 skip() { echo "  - $* (skipped)"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/ontograph-e2e}"
+SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/contexture-e2e}"
 mkdir -p "$SCREENSHOT_DIR"
 
 # ── Part 1: Verify sample ontology classes are visible ───────────────────────

@@ -3,8 +3,8 @@ import posthog from 'posthog-js';
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string) || 'https://eu.i.posthog.com';
 
-const OPT_OUT_KEY = 'ontograph-analytics-opt-out';
-const LINKED_VISITOR_KEY = 'ontograph-linked-visitor-id';
+const OPT_OUT_KEY = 'contexture-analytics-opt-out';
+const LINKED_VISITOR_KEY = 'contexture-linked-visitor-id';
 
 function isOptedOut(): boolean {
   return localStorage.getItem(OPT_OUT_KEY) === 'true';

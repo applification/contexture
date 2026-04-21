@@ -3,13 +3,22 @@
 import { usePostHog } from 'posthog-js/react';
 import { useEffect, useState } from 'react';
 
-const CONSENT_KEY = 'ontograph-analytics-consent';
+const CONSENT_KEY = 'contexture-analytics-consent';
+const LEGACY_CONSENT_KEY = 'ontograph-analytics-consent';
 
 type ConsentState = 'granted' | 'denied' | null;
 
 function getStoredConsent(): ConsentState {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(CONSENT_KEY) as ConsentState;
+  const current = localStorage.getItem(CONSENT_KEY) as ConsentState;
+  if (current) return current;
+  // One-shot migration from the Ontograph-era key.
+  const legacy = localStorage.getItem(LEGACY_CONSENT_KEY) as ConsentState;
+  if (legacy) {
+    localStorage.setItem(CONSENT_KEY, legacy);
+    localStorage.removeItem(LEGACY_CONSENT_KEY);
+  }
+  return legacy;
 }
 
 export function ConsentBanner() {

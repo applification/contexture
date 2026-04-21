@@ -8,7 +8,7 @@ set -euo pipefail
 pass() { echo "  ✓ $*"; }
 fail() { echo "  ✗ $*" >&2; exit 1; }
 
-SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/ontograph-e2e}"
+SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/contexture-e2e}"
 mkdir -p "$SCREENSHOT_DIR"
 
 # 1. Verify empty state is shown (no ontology loaded yet in this suite)

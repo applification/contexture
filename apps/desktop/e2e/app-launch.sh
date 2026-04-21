@@ -32,7 +32,7 @@ else
 fi
 
 # 4. Screenshot for visual record
-SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/ontograph-e2e}"
+SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/contexture-e2e}"
 mkdir -p "$SCREENSHOT_DIR"
 agent-browser screenshot --screenshot-dir "$SCREENSHOT_DIR" 2>/dev/null \
   && pass "Screenshot saved to $SCREENSHOT_DIR" \
