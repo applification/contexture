@@ -3,12 +3,12 @@ import { expect, test } from '@playwright/test';
 test.describe('Page navigation', () => {
   test('download page loads', async ({ page }) => {
     await page.goto('/download');
-    await expect(page).toHaveTitle(/Ontograph/i);
+    await expect(page).toHaveTitle(/Contexture/i);
   });
 
   test('brand page loads', async ({ page }) => {
     await page.goto('/brand');
-    await expect(page).toHaveTitle(/Ontograph/i);
+    await expect(page).toHaveTitle(/Contexture/i);
   });
 
   test('404 page shows for invalid routes', async ({ page }) => {

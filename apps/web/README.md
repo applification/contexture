@@ -1,6 +1,6 @@
 # @ontograph/web
 
-The Ontograph marketing website built with Next.js.
+The Contexture marketing website built with Next.js.
 
 ## Tech Stack
 

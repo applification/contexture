@@ -6,7 +6,7 @@ import { PostHogProvider } from '@/components/providers/posthog-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Ontograph — Modern Ontology Editor',
+  title: 'Contexture — Modern Ontology Editor',
   description:
     'AI-powered ontology editor with visual graph editing, OWL/RDF support, and Claude integration. Build the knowledge layer your AI agents need.',
   keywords: [
@@ -27,23 +27,23 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Ontograph — Modern Ontology Editor',
+    title: 'Contexture — Modern Ontology Editor',
     description:
       'Build the knowledge layer your AI agents need. AI-powered ontology editor with visual graph editing, OWL/RDF support, and Claude integration.',
     type: 'website',
-    siteName: 'Ontograph',
+    siteName: 'Contexture',
     images: [
       {
         url: '/images/hero-graph.png',
         width: 1600,
         height: 1200,
-        alt: 'Ontograph visual graph editor showing a People ontology with connected classes',
+        alt: 'Contexture visual graph editor showing a People ontology with connected classes',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Ontograph — Modern Ontology Editor',
+    title: 'Contexture — Modern Ontology Editor',
     description:
       'Build the knowledge layer your AI agents need. AI-powered visual graph editor with OWL/RDF support.',
     images: ['/images/hero-graph.png'],

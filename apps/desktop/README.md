@@ -1,4 +1,4 @@
-# Ontograph
+# Contexture
 
 A modern desktop ontology editor with Claude AI integration. Create, visualize, and edit OWL ontologies in Turtle format through an interactive graph interface.
 
@@ -142,7 +142,7 @@ Sessions support extended thinking and can be reset between conversations.
 
 ## Ontology Model
 
-Ontograph works with [OWL](https://www.w3.org/OWL/) ontologies serialized in [Turtle](https://www.w3.org/TR/turtle/) format (`.ttl`). The core elements are:
+Contexture works with [OWL](https://www.w3.org/OWL/) ontologies serialized in [Turtle](https://www.w3.org/TR/turtle/) format (`.ttl`). The core elements are:
 
 - **Classes** — Concepts with optional labels, comments, `subClassOf` (inheritance), and `disjointWith` relationships
 - **Object Properties** — Relations between classes with domain, range, optional `inverseOf`, and cardinality constraints

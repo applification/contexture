@@ -1,6 +1,6 @@
-# Ontograph
+# Contexture
 
-Create and maintain ontologies using natural language. Ontograph is a visual OWL ontology editor powered by Claude AI, built for AI Researchers and AI Engineers.
+Create and maintain ontologies using natural language. Contexture is a visual OWL ontology editor powered by Claude AI, built for AI Researchers and AI Engineers.
 
 ## Repository Structure
 

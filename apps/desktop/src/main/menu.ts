@@ -7,7 +7,7 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
     ...(isMac
       ? [
           {
-            label: 'Ontograph',
+            label: 'Contexture',
             submenu: [
               { role: 'about' as const },
               { type: 'separator' as const },

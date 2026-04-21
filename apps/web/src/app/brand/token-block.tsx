@@ -10,7 +10,7 @@ import {
   CodeBlockTitle,
 } from '@/components/ai-elements/code-block';
 
-const tokens = `/* Ontograph Design Tokens — CSS Custom Properties */
+const tokens = `/* Contexture Design Tokens — CSS Custom Properties */
 
 /* Primary */
 --primary:            oklch(0.45 0.15 270);   /* light */
