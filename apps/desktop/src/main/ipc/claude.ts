@@ -190,7 +190,7 @@ const ontographServer = createSdkMcpServer({
   ],
 });
 
-const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
+const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Contexture, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
 
 Key guidelines:
 - When creating ontologies, use a consistent namespace prefix (e.g. http://example.org/ontology#)
