@@ -57,7 +57,7 @@ if (process.env.E2E === '1') {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.applification.ontograph');
+  electronApp.setAppUserModelId('com.applification.contexture');
 
   if (is.dev && process.platform === 'darwin') {
     const icon = nativeImage.createFromPath(join(__dirname, '../../build/icon.icns'));
