@@ -15,9 +15,9 @@ test.describe('App Launch', () => {
     await electronApp?.close();
   });
 
-  test('window title contains Ontograph', async () => {
+  test('window title contains Contexture', async () => {
     const title = await electronApp.evaluate(({ app }) => app.getName());
-    expect(title).toBe('Ontograph');
+    expect(title).toBe('Contexture');
   });
 
   test('toolbar is visible', async () => {

@@ -27,7 +27,7 @@ E2E=1 npx playwright test e2e/theme-sidebar.spec.ts
 
 The QA agent (Columbo / CQO) accepts a Paperclip task with the title:
 
-> "Explore Ontograph, find any broken flows, and output new `.spec.ts` test cases for anything not yet covered"
+> "Explore Contexture, find any broken flows, and output new `.spec.ts` test cases for anything not yet covered"
 
 The agent will:
 1. Check out the task and create a branch `paperclip/ONT-NNN-exploratory-<date>`
@@ -70,7 +70,7 @@ Baseline images are committed to `apps/desktop/e2e/snapshots/` and compared on e
 
 ## Coverage discovered in first exploratory run (2026-03-31)
 
-Static analysis of the Ontograph codebase revealed the following flows not covered by the original three specs (`app-launch`, `ontology-crud`, `import-export`):
+Static analysis of the Contexture codebase revealed the following flows not covered by the original three specs (`app-launch`, `ontology-crud`, `import-export`):
 
 | Flow | New spec | Notes |
 |---|---|---|

@@ -32,7 +32,7 @@ else
 fi
 
 # ── Part 2: Load TTL via clipboard paste ─────────────────────────────────────
-# Ontograph accepts pasted Turtle content directly into the graph area.
+# Contexture accepts pasted Turtle content directly into the graph area.
 # We use the built-in sample content rather than reading from disk so the test
 # is self-contained.
 SAMPLE_TTL='@prefix owl: <http://www.w3.org/2002/07/owl#> .

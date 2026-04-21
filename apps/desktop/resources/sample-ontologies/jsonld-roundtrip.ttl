@@ -9,7 +9,7 @@
   a owl:Ontology ;
   owl:versionIRI <http://example.org/ontograph/1.0.0> ;
   owl:imports <http://example.org/shared> ;
-  dc:title "Ontograph JSON-LD Round Trip Fixture" ;
+  dc:title "Contexture JSON-LD Round Trip Fixture" ;
   dc:description "Canonical fixture for JSON-LD adapter verification" .
 
 ex:Person a owl:Class ;

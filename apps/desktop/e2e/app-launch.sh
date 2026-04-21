@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Suite: App Launch
-# Verifies the Ontograph window loads and renders the expected initial state.
+# Verifies the Contexture window loads and renders the expected initial state.
 
 set -euo pipefail
 
 pass() { echo "  ✓ $*"; }
 fail() { echo "  ✗ $*" >&2; exit 1; }
 
-# 1. Page title should be "Ontograph" (set via app.setName in Electron main)
+# 1. Page title should be "Contexture" (set via app.setName in Electron main)
 TITLE=$(agent-browser get title 2>/dev/null || echo "")
-if [[ "$TITLE" == *"Ontograph"* ]]; then
-  pass "Window title contains 'Ontograph' (got: '$TITLE')"
+if [[ "$TITLE" == *"Contexture"* ]]; then
+  pass "Window title contains 'Contexture' (got: '$TITLE')"
 else
-  fail "Unexpected window title: '$TITLE' (expected to contain 'Ontograph')"
+  fail "Unexpected window title: '$TITLE' (expected to contain 'Contexture')"
 fi
 
 # 2. Main UI should be visible — toolbar renders at top of the app
