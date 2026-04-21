@@ -1,5 +1,5 @@
 {
-  "name": "@ontograph/desktop",
+  "name": "@contexture/desktop",
   "version": "0.14.0",
   "description": "A modern ontology editor with Claude integration",
   "main": "./out/main/index.js",

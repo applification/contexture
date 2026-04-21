@@ -1,5 +1,5 @@
-appId: com.applification.ontograph
-productName: Ontograph
+appId: com.applification.contexture
+productName: Contexture
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: Ontograph
+  executableName: Contexture
   icon: build/icon.ico
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
@@ -23,7 +23,7 @@ mac:
   icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSDocumentsFolderUsageDescription: Ontograph needs access to open and save ontology files.
+    - NSDocumentsFolderUsageDescription: Contexture needs access to open and save JSON-LD files.
   notarize: true
   target:
     - dmg

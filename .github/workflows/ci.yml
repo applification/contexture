@@ -39,7 +39,7 @@ jobs:
         run: bun run test
 
       - name: Build desktop
-        run: bun run build --filter=@ontograph/desktop
+        run: bun run build --filter=@contexture/desktop
 
       - name: Build Storybook
         run: cd apps/desktop && npx storybook build
@@ -95,7 +95,7 @@ jobs:
             libx11-xcb1 xvfb
 
       - name: Build desktop app
-        run: bun run build --filter=@ontograph/desktop
+        run: bun run build --filter=@contexture/desktop
 
       - name: Install Playwright Electron browsers
         run: cd apps/desktop && npx playwright install chromium --with-deps

@@ -48,7 +48,7 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-app.setName('Ontograph');
+app.setName('Contexture');
 
 // Enable CDP for e2e testing when E2E=1
 if (process.env.E2E === '1') {

@@ -1,4 +1,4 @@
-# @ontograph/web
+# @contexture/web
 
 The Contexture marketing website built with Next.js.
 
