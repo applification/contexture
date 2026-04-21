@@ -12,7 +12,7 @@
     },
     "apps/desktop": {
       "name": "@ontograph/desktop",
-      "version": "0.13.0",
+      "version": "0.14.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.83",
         "@electron-toolkit/preload": "^3.0.1",
