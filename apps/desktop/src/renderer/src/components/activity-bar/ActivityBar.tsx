@@ -1,5 +1,5 @@
 import type { SidebarTab } from '@renderer/store/ui';
-import { BarChart3, ClipboardList, MessageSquare, MousePointer2 } from 'lucide-react';
+import { ClipboardList, MessageSquare, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityBarProps {
@@ -7,11 +7,16 @@ interface ActivityBarProps {
   onTabChange: (tab: SidebarTab) => void;
 }
 
+/**
+ * The `metrics` tab from the pre-pivot app isn't surfaced here —
+ * Contexture has no `MetricsPanel` equivalent yet. `SidebarTab` still
+ * accepts `'metrics'` so persisted UI state doesn't crash; the bar
+ * just doesn't render a button for it until a metrics panel lands.
+ */
 const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
   { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },
   { id: 'eval', icon: <ClipboardList className="size-4" />, label: 'Eval' },
-  { id: 'metrics', icon: <BarChart3 className="size-4" />, label: 'Metrics' },
 ];
 
 export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React.JSX.Element {
