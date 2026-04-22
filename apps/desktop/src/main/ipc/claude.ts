@@ -175,8 +175,8 @@ const validateOntology = tool(
   },
 );
 
-const ontographServer = createSdkMcpServer({
-  name: 'ontograph',
+const contextureServer = createSdkMcpServer({
+  name: 'contexture',
   version: '0.1.0',
   tools: [
     getCurrentOntology,
@@ -190,7 +190,7 @@ const ontographServer = createSdkMcpServer({
   ],
 });
 
-const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
+const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Contexture, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
 
 Key guidelines:
 - When creating ontologies, use a consistent namespace prefix (e.g. http://example.org/ontology#)
@@ -213,14 +213,14 @@ Always include necessary prefix declarations in generated Turtle:
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`;
 
 const ALL_TOOLS = [
-  'mcp__ontograph__get_current_ontology',
-  'mcp__ontograph__generate_ontology',
-  'mcp__ontograph__add_class',
-  'mcp__ontograph__add_object_property',
-  'mcp__ontograph__add_datatype_property',
-  'mcp__ontograph__modify_class',
-  'mcp__ontograph__remove_element',
-  'mcp__ontograph__validate_ontology',
+  'mcp__contexture__get_current_ontology',
+  'mcp__contexture__generate_ontology',
+  'mcp__contexture__add_class',
+  'mcp__contexture__add_object_property',
+  'mcp__contexture__add_datatype_property',
+  'mcp__contexture__modify_class',
+  'mcp__contexture__remove_element',
+  'mcp__contexture__validate_ontology',
 ];
 
 export function registerClaudeIPC(): void {
@@ -267,7 +267,7 @@ export function registerClaudeIPC(): void {
                 };
 
           const options: Record<string, unknown> = {
-            mcpServers: { ontograph: ontographServer },
+            mcpServers: { contexture: contextureServer },
             allowedTools: ALL_TOOLS,
             disallowedTools: [
               'Read',

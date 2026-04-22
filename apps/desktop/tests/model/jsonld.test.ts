@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 const FIXTURE = resolve(__dirname, '../../resources/sample-ontologies/jsonld-roundtrip.ttl');
 
-const EX = 'http://example.org/ontograph#';
+const EX = 'http://example.org/contexture#';
 
 function getJsonLdAdapter() {
   const adapter = getAdapterForExtension('.jsonld');

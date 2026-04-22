@@ -1,4 +1,4 @@
-// Patches the dev Electron binary's Info.plist so macOS menu bar shows "Ontograph" instead of "Electron"
+// Patches the dev Electron binary's Info.plist so macOS menu bar shows "Contexture" instead of "Electron"
 // Also copies the app icon into the bundle so the dock shows the correct icon in dev mode.
 // Note: the dock tooltip will still say "Electron" in dev — this is expected and fine.
 const { execFileSync } = require('node:child_process');
@@ -12,8 +12,8 @@ const plist = `${electronApp}/Contents/Info.plist`;
 if (!existsSync(plist)) process.exit(0);
 
 try {
-  execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Set CFBundleName Ontograph', plist]);
-  execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Set CFBundleDisplayName Ontograph', plist]);
+  execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Set CFBundleName Contexture', plist]);
+  execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Set CFBundleDisplayName Contexture', plist]);
 } catch {
   // Non-fatal — only affects dev menu bar label
 }

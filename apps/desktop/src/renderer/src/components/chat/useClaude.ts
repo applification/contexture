@@ -48,10 +48,10 @@ interface UseClaudeReturn {
   resetSession: () => void;
 }
 
-const API_KEY_STORAGE = 'ontograph-api-key';
-const AUTH_MODE_STORAGE = 'ontograph-auth-mode';
-const MODEL_STORAGE = 'ontograph-model';
-const THINKING_STORAGE = 'ontograph-thinking-budget';
+const API_KEY_STORAGE = 'contexture-api-key';
+const AUTH_MODE_STORAGE = 'contexture-auth-mode';
+const MODEL_STORAGE = 'contexture-model';
+const THINKING_STORAGE = 'contexture-thinking-budget';
 
 export function useClaude(): UseClaudeReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -68,7 +68,7 @@ export function useClaude(): UseClaudeReturn {
   );
   const [cliDetected, setCliDetected] = useState(false);
   const hasTrackedFirstMessage = useRef(
-    localStorage.getItem('ontograph-tracked-first-message') === 'true',
+    localStorage.getItem('contexture-tracked-first-message') === 'true',
   );
 
   const store = useOntologyStore;
@@ -186,7 +186,7 @@ export function useClaude(): UseClaudeReturn {
 
       // Tool use indicator
       window.api.onClaudeToolUse((toolName: string, toolInput: unknown) => {
-        const shortName = toolName.replace('mcp__ontograph__', '');
+        const shortName = toolName.replace('mcp__contexture__', '');
         setMessages((prev) => [
           ...prev,
           {
@@ -232,7 +232,7 @@ export function useClaude(): UseClaudeReturn {
       if (!hasTrackedFirstMessage.current) {
         track('first_claude_interaction');
         hasTrackedFirstMessage.current = true;
-        localStorage.setItem('ontograph-tracked-first-message', 'true');
+        localStorage.setItem('contexture-tracked-first-message', 'true');
       }
       track('claude_message_sent', { model, authMode });
       setMessages((prev) => [...prev, { id: msgId(), role: 'user', content: message }]);

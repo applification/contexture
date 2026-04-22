@@ -3,7 +3,7 @@
 import { usePostHog } from 'posthog-js/react';
 import { useEffect, useState } from 'react';
 
-const CONSENT_KEY = 'ontograph-analytics-consent';
+const CONSENT_KEY = 'contexture-analytics-consent';
 
 type ConsentState = 'granted' | 'denied' | null;
 

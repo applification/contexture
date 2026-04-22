@@ -40,8 +40,8 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-const AUTH_MODE_STORAGE = 'ontograph-auth-mode';
-const API_KEY_STORAGE = 'ontograph-api-key';
+const AUTH_MODE_STORAGE = 'contexture-auth-mode';
+const API_KEY_STORAGE = 'contexture-api-key';
 
 function getAuth(): { mode: 'api-key'; key: string } | { mode: 'max' } {
   const mode = (localStorage.getItem(AUTH_MODE_STORAGE) || 'max') as 'max' | 'api-key';

@@ -1,9 +1,9 @@
 {
-  "name": "@ontograph/desktop",
+  "name": "@contexture/desktop",
   "version": "0.14.0",
-  "description": "A modern ontology editor with Claude integration",
+  "description": "Visual Zod schema editor with LLM support",
   "main": "./out/main/index.js",
-  "homepage": "https://github.com/DaveHudson/Ontograph",
+  "homepage": "https://github.com/applification/contexture",
   "author": "Applification Ltd",
   "license": "MIT",
   "scripts": {

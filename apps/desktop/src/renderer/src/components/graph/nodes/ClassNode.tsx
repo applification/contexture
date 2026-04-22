@@ -43,7 +43,7 @@ export const ClassNode = memo(function ClassNode({ data, id }: NodeProps<ClassNo
 
   return (
     <div
-      className="ontograph-class-node"
+      className="contexture-class-node"
       style={{
         minWidth: 160,
         maxWidth: 220,

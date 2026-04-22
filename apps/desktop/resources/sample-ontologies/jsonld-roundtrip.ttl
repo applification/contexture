@@ -2,14 +2,14 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex: <http://example.org/ontograph#> .
+@prefix ex: <http://example.org/contexture#> .
 @prefix dc: <http://purl.org/dc/terms/> .
 
-<http://example.org/ontograph>
+<http://example.org/contexture>
   a owl:Ontology ;
-  owl:versionIRI <http://example.org/ontograph/1.0.0> ;
+  owl:versionIRI <http://example.org/contexture/1.0.0> ;
   owl:imports <http://example.org/shared> ;
-  dc:title "Ontograph JSON-LD Round Trip Fixture" ;
+  dc:title "Contexture JSON-LD Round Trip Fixture" ;
   dc:description "Canonical fixture for JSON-LD adapter verification" .
 
 ex:Person a owl:Class ;

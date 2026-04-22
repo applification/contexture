@@ -1,18 +1,32 @@
-# Ontograph
+# Contexture
 
-A modern desktop ontology editor with Claude AI integration. Create, visualize, and edit OWL ontologies in Turtle format through an interactive graph interface.
+A modern desktop Zod schema editor with Claude AI integration. Chat to
+Claude about a domain, build a closed-world schema visually, and generate
+Zod + JSON Schema outputs that downstream LLM pipelines can import.
 
 ## Features
 
-- **Visual Graph Editor** — Interactive node-based visualization of classes, properties, and relationships using React Flow
-- **OWL Ontology Support** — Classes (with subClassOf, disjointWith), Object Properties (domain, range, inverseOf, cardinality), and Datatype Properties
-- **Claude AI Assistant** — Chat-driven ontology creation and modification via the Claude Agent SDK
-- **Real-time Validation** — Detects circular inheritance, missing references, and best-practice violations
-- **Auto Layout** — Force-directed graph layout powered by ELK (Eclipse Layout Kernel) with adaptive algorithms
-- **Graph Filtering** — Toggle visibility of relationship types (inheritance, disjoint, object/datatype properties)
-- **File Management** — Open, save, and export `.ttl` (Turtle) files with recent-file tracking
-- **Undo/Redo** — Full history support (Cmd/Ctrl+Z)
-- **Cross-platform** — macOS, Windows, and Linux builds with auto-update via GitHub Releases
+- **Visual schema editor** — types and fields on a React Flow canvas; edges
+  follow field-level refs.
+- **Claude AI assistant** — chat-driven schema authoring via a small op
+  vocabulary (add type, add field, rename, set discriminator, …) exposed as
+  an in-process MCP server.
+- **IR source of truth** — `.contexture.json` is the canonical project
+  file; `.schema.ts` (Zod) and `.schema.json` are generated alongside and
+  git-checked so products can import them directly.
+- **Curated stdlib** — common types (Email, URL, UUID, Address, Money,
+  PhoneE164, …) referenced by qualified name (`common.Email`) and emitted
+  as `import` statements from `@contexture/runtime/<namespace>`.
+- **Eval panel** — generate sample data (realistic / minimal / edge-case /
+  adversarial) against a selected root type; Zod-validate; save fixtures.
+- **Auto layout** — ELK positions on load, sidecar-persisted overrides.
+- **Undo/redo** — per-action for direct manipulation, per-turn for chat.
+- **Cross-platform** — macOS, Windows, and Linux builds with auto-update
+  via GitHub Releases.
+
+> The Phase 2 pivot away from OWL/RDF/JSON-LD is in progress. The
+> repository retains the OWL editor surface until Phase 2 lands — see
+> [`plans/pivot.md`](../../plans/pivot.md) for the execution plan.
 
 ## Tech Stack
 
@@ -24,10 +38,9 @@ A modern desktop ontology editor with Claude AI integration. Create, visualize, 
 | Graph | @xyflow/react 12, elkjs |
 | Styling | Tailwind CSS 4, shadcn/ui, Radix UI |
 | State | Zustand 5 |
-| Ontology | n3 (Turtle parser/serializer) |
+| Schema | Zod (runtime + IR meta-schema) |
 | AI | @anthropic-ai/claude-agent-sdk |
-| Validation | Zod |
-| Testing | Vitest, Testing Library, jsdom |
+| Testing | Vitest, Testing Library, Playwright |
 
 ## Prerequisites
 
@@ -67,90 +80,29 @@ src/
 │   ├── menu.ts             # Application menu
 │   └── ipc/                # IPC handlers
 │       ├── file.ts         # File open/save
-│       ├── claude.ts       # Claude AI integration
+│       ├── claude.ts       # Claude AI integration + MCP server
 │       ├── eval.ts         # Evaluation panel
 │       └── update.ts       # Auto-update
 ├── preload/
 │   └── index.ts            # window.api bridge
 └── renderer/src/
-    ├── App.tsx              # Root component
-    ├── model/               # Domain model
-    │   ├── types.ts         # Ontology type definitions
-    │   ├── parse.ts         # Turtle → internal model
-    │   ├── serialize.ts     # Internal model → Turtle
-    │   └── reactflow.ts     # Model → React Flow elements
-    ├── store/               # Zustand state management
-    │   ├── ontology.ts      # Ontology data + mutations
-    │   ├── ui.ts            # UI state (selection, theme, sidebar)
-    │   ├── eval.ts          # Evaluation panel state
-    │   └── history.ts       # Undo/redo snapshots
-    ├── services/
-    │   ├── validation.ts    # Ontology validation rules
-    │   └── tokens.ts        # Token counting
-    ├── hooks/
-    │   ├── useELKLayout.ts  # Graph auto-layout
-    │   └── useLayoutSidecar.ts  # Persist node positions
-    └── components/
-        ├── graph/           # Graph canvas, nodes, edges, context menu
-        ├── chat/            # Claude AI chat panel
-        ├── detail/          # Properties editor panel
-        ├── eval/            # Evaluation/query panel
-        ├── validation/      # Validation error display
-        ├── toolbar/         # File/edit controls, graph filters
-        ├── activity-bar/    # Sidebar tab switcher
-        ├── status-bar/      # Bottom status info
-        └── ui/              # shadcn/ui primitives
+    ├── App.tsx             # Root component
+    ├── model/              # Domain model
+    │   ├── types.contexture.ts # IR shape (Phase 2 draft)
+    │   └── …               # legacy OWL model (removed in Phase 2)
+    ├── store/              # Zustand state management
+    ├── services/           # validation, tokens
+    ├── hooks/              # layout, sidecars
+    └── components/         # graph, chat, detail, eval, ui
 tests/                       # Vitest test suites
 build/                       # App icons and resources
-resources/                   # Sample ontologies
+resources/                   # Bundled stdlib + skills (Phase 2)
 ```
-
-## Architecture
-
-### State Management
-
-Three Zustand stores manage application state:
-
-- **ontologyStore** — Core ontology data (classes, object properties, datatype properties), file operations, and dirty tracking. Supports undo/redo via the history store.
-- **uiStore** — Selection, theme, sidebar visibility, graph filters, and layout settings.
-- **historyStore** — Undo stack with up to 50 snapshots, triggered by ontology mutations.
-
-### IPC Architecture
-
-Electron's main and renderer processes communicate via typed IPC channels:
-
-1. **Renderer** calls methods on `window.api` (exposed by the preload script)
-2. **Main process** handles file I/O, Claude sessions, evaluation, and app updates
-3. Results and events flow back to the renderer via IPC responses
-
-### Graph Pipeline
-
-1. **Parse** — Turtle files are parsed into an internal ontology model (Maps of classes and properties)
-2. **Convert** — `ontologyToReactFlowElements` transforms the model into React Flow nodes and edges
-3. **Layout** — ELK algorithm positions nodes (stress layout for small graphs, layered for large)
-4. **Render** — Custom React components render each node and edge type with distinct styling
-
-### Claude AI Integration
-
-The AI assistant uses the Claude Agent SDK with tools that can:
-- Read the current ontology state
-- Create, update, and delete classes and properties
-- Load entire ontologies from Turtle
-- Run validation checks
-
-Sessions support extended thinking and can be reset between conversations.
-
-## Ontology Model
-
-Ontograph works with [OWL](https://www.w3.org/OWL/) ontologies serialized in [Turtle](https://www.w3.org/TR/turtle/) format (`.ttl`). The core elements are:
-
-- **Classes** — Concepts with optional labels, comments, `subClassOf` (inheritance), and `disjointWith` relationships
-- **Object Properties** — Relations between classes with domain, range, optional `inverseOf`, and cardinality constraints
-- **Datatype Properties** — Relations from classes to XSD data types (string, integer, etc.) with domain, range, and cardinality
 
 ## Releases
 
-Releases are automated via GitHub Actions. Pushing a semver git tag triggers the [release workflow](../../.github/workflows/release.yml):
+Releases are automated via GitHub Actions. Pushing a semver git tag
+triggers the release workflow:
 
 ```bash
 # Tag the release
@@ -162,13 +114,16 @@ This will:
 
 1. **Create a GitHub Release** with auto-generated release notes
 2. **Build platform binaries** in parallel (macOS, Windows, Linux)
-3. **Publish artifacts** to the GitHub Release — `.dmg`/`.zip` (macOS), NSIS installer (Windows), AppImage/`.deb` (Linux)
+3. **Publish artifacts** to the GitHub Release — `.dmg`/`.zip` (macOS),
+   NSIS installer (Windows), AppImage/`.deb` (Linux)
 
-macOS builds are code-signed and notarized. The app's built-in auto-updater checks GitHub Releases for new versions.
+macOS builds are code-signed and notarized. The app's built-in
+auto-updater checks GitHub Releases for new versions.
 
 ### Tag format
 
-Tags must match `v*.*.*` (e.g. `v0.1.0`, `v1.0.0-beta.1`). Conventional commits are required.
+Tags must match `v*.*.*` (e.g. `v0.1.0`, `v1.0.0-beta.1`). Conventional
+commits are required.
 
 ## License
 

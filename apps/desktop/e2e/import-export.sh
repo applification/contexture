@@ -12,7 +12,7 @@ fail() { echo "  ✗ $*" >&2; exit 1; }
 skip() { echo "  - $* (skipped)"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/ontograph-e2e}"
+SCREENSHOT_DIR="${E2E_SCREENSHOT_DIR:-/tmp/contexture-e2e}"
 mkdir -p "$SCREENSHOT_DIR"
 
 # ── Part 1: Verify sample ontology classes are visible ───────────────────────
@@ -32,7 +32,7 @@ else
 fi
 
 # ── Part 2: Load TTL via clipboard paste ─────────────────────────────────────
-# Ontograph accepts pasted Turtle content directly into the graph area.
+# Contexture accepts pasted Turtle content directly into the graph area.
 # We use the built-in sample content rather than reading from disk so the test
 # is self-contained.
 SAMPLE_TTL='@prefix owl: <http://www.w3.org/2002/07/owl#> .

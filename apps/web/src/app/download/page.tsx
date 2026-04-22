@@ -4,7 +4,7 @@ import { usePostHog } from 'posthog-js/react';
 import { useEffect } from 'react';
 import { getVisitorId } from '@/lib/visitor-id';
 
-const GITHUB_RELEASES_URL = 'https://github.com/DaveHudson/Ontograph/releases/latest';
+const GITHUB_RELEASES_URL = 'https://github.com/applification/contexture/releases/latest';
 
 export default function DownloadPage() {
   const ph = usePostHog();

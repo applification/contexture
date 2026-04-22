@@ -5,7 +5,7 @@
 @prefix ex: <http://example.org/consistency-errors#> .
 
 # OWL Consistency Error Demo Ontology
-# Loads into the Ontograph desktop app to visually test consistency-error
+# Loads into the Contexture desktop app to visually test consistency-error
 # reporting. Each section deliberately introduces a semantic contradiction
 # that the validator should flag as an error.
 

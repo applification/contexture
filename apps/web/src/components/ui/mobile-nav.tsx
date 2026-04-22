@@ -45,7 +45,7 @@ export function MobileNav() {
               Brand
             </a>
             <a
-              href="https://github.com/DaveHudson/Ontograph"
+              href="https://github.com/applification/contexture"
               onClick={() => setOpen(false)}
               className="py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
             >

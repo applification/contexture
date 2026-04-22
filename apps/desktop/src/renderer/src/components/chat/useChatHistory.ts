@@ -11,8 +11,8 @@ export interface ChatThread {
   updatedAt: number;
 }
 
-const STORAGE_KEY = 'ontograph-chat-threads';
-const ACTIVE_THREAD_KEY = 'ontograph-active-thread';
+const STORAGE_KEY = 'contexture-chat-threads';
+const ACTIVE_THREAD_KEY = 'contexture-active-thread';
 const MAX_THREADS = 50;
 
 function generateId(): string {

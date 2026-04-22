@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
-const ENV_START = '__ONTOGRAPH_ENV_START__';
-const ENV_END = '__ONTOGRAPH_ENV_END__';
+const ENV_START = '__CONTEXTURE_ENV_START__';
+const ENV_END = '__CONTEXTURE_ENV_END__';
 
 // Packaged Electron apps on macOS don't inherit the user's login shell PATH.
 // Spawn an interactive login shell to capture PATH and SSH_AUTH_SOCK so that

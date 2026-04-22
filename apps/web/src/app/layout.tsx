@@ -6,18 +6,18 @@ import { PostHogProvider } from '@/components/providers/posthog-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Contexture — Modern Ontology Editor',
+  title: 'Contexture — Visual Zod schema editor',
   description:
-    'AI-powered ontology editor with visual graph editing, OWL/RDF support, and Claude integration. Build the knowledge layer your AI agents need.',
+    'Visual Zod schema editor with LLM support. Chat with Claude to build closed-world schemas; emit Zod + JSON Schema for your LLM structured-output pipelines.',
   keywords: [
-    'OWL ontology editor',
-    'RDF knowledge graph tool',
-    'AI ontology builder',
-    'ontology editor',
-    'knowledge graph',
+    'Zod schema editor',
+    'visual schema builder',
+    'LLM structured output',
+    'JSON Schema editor',
+    'TypeScript schema tool',
+    'Claude AI',
+    'schema design',
     'AI agents',
-    'ontology',
-    'knowledge layer',
   ],
   icons: {
     icon: [
@@ -27,9 +27,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Contexture — Modern Ontology Editor',
+    title: 'Contexture — Visual Zod schema editor',
     description:
-      'Build the knowledge layer your AI agents need. AI-powered ontology editor with visual graph editing, OWL/RDF support, and Claude integration.',
+      'Chat with Claude to build closed-world Zod schemas. Emit Zod + JSON Schema for your LLM structured-output pipelines.',
     type: 'website',
     siteName: 'Contexture',
     images: [
@@ -37,15 +37,15 @@ export const metadata: Metadata = {
         url: '/images/hero-graph.png',
         width: 1600,
         height: 1200,
-        alt: 'Contexture visual graph editor showing a People ontology with connected classes',
+        alt: 'Contexture visual schema editor showing connected types on a graph canvas',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Contexture — Modern Ontology Editor',
+    title: 'Contexture — Visual Zod schema editor',
     description:
-      'Build the knowledge layer your AI agents need. AI-powered visual graph editor with OWL/RDF support.',
+      'Chat to build closed-world Zod schemas; emit Zod + JSON Schema for LLM structured-output pipelines.',
     images: ['/images/hero-graph.png'],
   },
 };

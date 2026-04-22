@@ -29,7 +29,7 @@ export interface GroupNodeData extends Record<string, unknown> {
 export type ClassNode = Node<ClassNodeData, 'class'>;
 export type IndividualNode = Node<IndividualNodeData, 'individual'>;
 export type GroupNode = Node<GroupNodeData, 'group'>;
-export type OntographNode = ClassNode | IndividualNode | GroupNode;
+export type ContextureNode = ClassNode | IndividualNode | GroupNode;
 
 export interface ObjPropEdgeData extends Record<string, unknown> {
   label: string;

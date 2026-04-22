@@ -1,6 +1,6 @@
 import { posthog } from './posthog';
 
-const VISITOR_ID_KEY = 'ontograph-visitor-id';
+const VISITOR_ID_KEY = 'contexture-visitor-id';
 
 export function getVisitorId(): string {
   if (typeof window === 'undefined') return '';

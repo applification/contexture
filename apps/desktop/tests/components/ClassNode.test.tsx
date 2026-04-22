@@ -128,7 +128,7 @@ describe('ClassNode', () => {
         targetPosition={undefined}
       />,
     );
-    const node = container.querySelector('.ontograph-class-node') as Element;
+    const node = container.querySelector('.contexture-class-node') as Element;
     expect(node.getAttribute('style')).toContain('selected');
   });
 
@@ -151,7 +151,7 @@ describe('ClassNode', () => {
         targetPosition={undefined}
       />,
     );
-    const node = container.querySelector('.ontograph-class-node') as Element;
+    const node = container.querySelector('.contexture-class-node') as Element;
     expect(node.getAttribute('style')).toContain('opacity: 0.2');
   });
 });

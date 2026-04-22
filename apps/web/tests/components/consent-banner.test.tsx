@@ -24,13 +24,13 @@ describe('ConsentBanner', () => {
   });
 
   it('hides when consent already granted', () => {
-    localStorage.setItem('ontograph-analytics-consent', 'granted');
+    localStorage.setItem('contexture-analytics-consent', 'granted');
     const { container } = render(<ConsentBanner />);
     expect(container.innerHTML).toBe('');
   });
 
   it('hides when consent already denied', () => {
-    localStorage.setItem('ontograph-analytics-consent', 'denied');
+    localStorage.setItem('contexture-analytics-consent', 'denied');
     const { container } = render(<ConsentBanner />);
     expect(container.innerHTML).toBe('');
   });
@@ -38,14 +38,14 @@ describe('ConsentBanner', () => {
   it('stores granted consent and hides on accept', () => {
     render(<ConsentBanner />);
     fireEvent.click(screen.getByText('Accept'));
-    expect(localStorage.getItem('ontograph-analytics-consent')).toBe('granted');
+    expect(localStorage.getItem('contexture-analytics-consent')).toBe('granted');
     expect(screen.queryByText('Accept')).not.toBeInTheDocument();
   });
 
   it('stores denied consent and hides on decline', () => {
     render(<ConsentBanner />);
     fireEvent.click(screen.getByText('Decline'));
-    expect(localStorage.getItem('ontograph-analytics-consent')).toBe('denied');
+    expect(localStorage.getItem('contexture-analytics-consent')).toBe('denied');
     expect(screen.queryByText('Decline')).not.toBeInTheDocument();
   });
 });

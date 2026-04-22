@@ -16,7 +16,7 @@ export const IndividualNode = memo(function IndividualNode({
 
   return (
     <div
-      className="ontograph-individual-node"
+      className="contexture-individual-node"
       style={{
         minWidth: 160,
         maxWidth: 220,
