@@ -145,3 +145,12 @@ export function createUndoableContextureStore(initial: Schema) {
  * in one transaction.
  */
 export const useUndoStore = createUndoableContextureStore({ version: '1', types: [] });
+
+// Expose the store on `window` in test/dev so Playwright specs can dispatch
+// ops directly without relying on XYFlow pointer events (which measure the
+// canvas layout and are flaky in headless Electron). No-op in other
+// environments.
+if (typeof window !== 'undefined') {
+  (window as unknown as { __contextureUndoStore?: typeof useUndoStore }).__contextureUndoStore =
+    useUndoStore;
+}

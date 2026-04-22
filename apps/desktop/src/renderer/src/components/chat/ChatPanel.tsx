@@ -6,7 +6,7 @@
  *   - Render the transcript from the hook's `messages` list.
  *   - Provide a multi-line input that submits on Cmd/Ctrl+Enter.
  *   - Show a "thinking" indicator while `isStreaming` is true.
- *   - Render nothing Ontograph/OWL-related.
+ *   - Render nothing from the pre-pivot (legacy) surface.
  *
  * The hook is injected so tests (and Storybook) can drive the panel
  * without a real preload bridge.

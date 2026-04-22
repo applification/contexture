@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "metadata": {
+    "name": "allotment",
+    "description": "Allotment planning — plots, crops, harvests, and growers."
+  },
+  "types": [
+    {
+      "kind": "enum",
+      "name": "CropFamily",
+      "description": "Botanical family a crop belongs to.",
+      "values": [
+        { "value": "brassica" },
+        { "value": "legume" },
+        { "value": "allium" },
+        { "value": "solanum" },
+        { "value": "cucurbit" },
+        { "value": "root" },
+        { "value": "leaf" },
+        { "value": "herb" },
+        { "value": "fruit" },
+        { "value": "other" }
+      ]
+    },
+    {
+      "kind": "enum",
+      "name": "Season",
+      "description": "Growing season a sowing targets.",
+      "values": [
+        { "value": "spring" },
+        { "value": "summer" },
+        { "value": "autumn" },
+        { "value": "winter" }
+      ]
+    },
+    {
+      "kind": "object",
+      "name": "Grower",
+      "description": "Person responsible for a plot.",
+      "fields": [
+        { "name": "name", "type": { "kind": "ref", "typeName": "identity.PersonName" } },
+        {
+          "name": "email",
+          "type": { "kind": "ref", "typeName": "common.Email" },
+          "optional": true
+        },
+        {
+          "name": "handle",
+          "type": { "kind": "ref", "typeName": "identity.Handle" },
+          "optional": true
+        }
+      ]
+    },
+    {
+      "kind": "object",
+      "name": "Plot",
+      "description": "A single plot on the allotment.",
+      "fields": [
+        { "name": "name", "type": { "kind": "string", "min": 1 } },
+        { "name": "areaSqm", "type": { "kind": "number", "min": 0 } },
+        {
+          "name": "location",
+          "type": { "kind": "ref", "typeName": "place.LatLng" },
+          "optional": true
+        },
+        { "name": "grower", "type": { "kind": "ref", "typeName": "Grower" } }
+      ]
+    },
+    {
+      "kind": "object",
+      "name": "Crop",
+      "description": "A crop variety being grown.",
+      "fields": [
+        { "name": "name", "type": { "kind": "string", "min": 1 } },
+        { "name": "family", "type": { "kind": "ref", "typeName": "CropFamily" } },
+        { "name": "varietyNotes", "type": { "kind": "string" }, "optional": true }
+      ]
+    },
+    {
+      "kind": "object",
+      "name": "Sowing",
+      "description": "A planned or actual sowing of a crop into a plot.",
+      "fields": [
+        { "name": "plot", "type": { "kind": "ref", "typeName": "Plot" } },
+        { "name": "crop", "type": { "kind": "ref", "typeName": "Crop" } },
+        { "name": "sownOn", "type": { "kind": "ref", "typeName": "common.ISODate" } },
+        { "name": "season", "type": { "kind": "ref", "typeName": "Season" } }
+      ]
+    },
+    {
+      "kind": "object",
+      "name": "Harvest",
+      "description": "A harvest event recording yield from a plot/crop pairing.",
+      "fields": [
+        { "name": "plot", "type": { "kind": "ref", "typeName": "Plot" } },
+        { "name": "crop", "type": { "kind": "ref", "typeName": "Crop" } },
+        { "name": "date", "type": { "kind": "ref", "typeName": "common.ISODate" } },
+        { "name": "quantityKg", "type": { "kind": "number", "min": 0 } },
+        { "name": "notes", "type": { "kind": "string" }, "optional": true }
+      ]
+    }
+  ]
+}
