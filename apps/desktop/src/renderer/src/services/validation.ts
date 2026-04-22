@@ -19,6 +19,7 @@
  * `path` so the UI can map the message back to the offending field.
  */
 import type { FieldType, Schema } from '../model/types';
+import type { StdlibRegistry } from './stdlib-registry';
 
 export interface ValidationError {
   code: string;
@@ -26,11 +27,21 @@ export interface ValidationError {
   message: string;
 }
 
-export function validate(schema: Schema): ValidationError[] {
+export interface ValidateOptions {
+  /**
+   * Optional stdlib registry used by Rule 2 to resolve qualified refs
+   * (`<namespace>.<TypeName>`) against bundled stdlib namespaces when
+   * no matching `add_import` has been declared. Callers that want
+   * strict import-only resolution (historical behaviour) pass nothing.
+   */
+  stdlib?: StdlibRegistry;
+}
+
+export function validate(schema: Schema, options: ValidateOptions = {}): ValidationError[] {
   if (!schema || schema.version !== '1') return [];
   const errors: ValidationError[] = [];
   errors.push(...checkDuplicateTypeNames(schema));
-  errors.push(...checkRefsResolve(schema));
+  errors.push(...checkRefsResolve(schema, options.stdlib));
   errors.push(...checkDiscriminatedUnions(schema));
   errors.push(...checkEnums(schema));
   errors.push(...checkImportAliases(schema));
@@ -133,14 +144,14 @@ function checkDiscriminatedUnions(schema: Schema): ValidationError[] {
   return errors;
 }
 
-function checkRefsResolve(schema: Schema): ValidationError[] {
+function checkRefsResolve(schema: Schema, stdlib?: StdlibRegistry): ValidationError[] {
   const errors: ValidationError[] = [];
   const localNames = new Set(schema.types.map((t) => t.name));
   const aliases = new Set((schema.imports ?? []).map((i) => i.alias));
 
   const walkField = (t: FieldType, path: string) => {
     if (t.kind === 'ref') {
-      if (!resolves(t.typeName, localNames, aliases)) {
+      if (!resolves(t.typeName, localNames, aliases, stdlib)) {
         errors.push({
           code: 'unresolved_ref',
           path,
@@ -161,11 +172,22 @@ function checkRefsResolve(schema: Schema): ValidationError[] {
   return errors;
 }
 
-function resolves(typeName: string, locals: Set<string>, aliases: Set<string>): boolean {
+function resolves(
+  typeName: string,
+  locals: Set<string>,
+  aliases: Set<string>,
+  stdlib?: StdlibRegistry,
+): boolean {
   const dot = typeName.indexOf('.');
   if (dot === -1) return locals.has(typeName);
-  const alias = typeName.slice(0, dot);
-  return aliases.has(alias);
+  const ns = typeName.slice(0, dot);
+  const name = typeName.slice(dot + 1);
+  // An explicit `add_import` alias satisfies the ref without looking
+  // inside the target module (matches legacy behaviour). A bundled
+  // stdlib namespace satisfies it by name lookup — that's what
+  // `common.Email` without an explicit import relies on.
+  if (aliases.has(ns)) return true;
+  return stdlib?.hasType(ns, name) ?? false;
 }
 
 function checkDuplicateTypeNames(schema: Schema): ValidationError[] {

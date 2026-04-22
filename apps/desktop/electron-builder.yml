@@ -11,6 +11,14 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  # Stdlib IR sidecars — read at app startup so qualified refs
+  # (e.g. `common.Email`) resolve without depending on the published
+  # @contexture/runtime package.
+  - from: ../../packages/stdlib/src
+    to: stdlib
+    filter:
+      - '*.contexture.json'
 win:
   executableName: Contexture
   icon: build/icon.ico
