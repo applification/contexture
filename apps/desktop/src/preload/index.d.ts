@@ -47,6 +47,11 @@ export interface ContextureChatAPI {
   setAuth: (
     auth: { mode: 'max' } | { mode: 'api-key'; key: string },
   ) => Promise<{ ok: boolean; error?: string }>;
+  setModelOptions: (opts: {
+    model?: string;
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+  }) => Promise<{ ok: boolean }>;
+  abort: () => Promise<{ ok: boolean; error?: string }>;
   onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
   onToolUse: (listener: (payload: { name: string; input: unknown }) => void) => Unsubscribe;
   onResult: (listener: (payload: { ok: boolean; error?: string }) => void) => Unsubscribe;

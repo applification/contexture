@@ -1,12 +1,15 @@
 /**
  * ChatPanel — minimal rendering + submit behaviour over the injected
- * chat state. No real hook or preload surface is involved.
+ * chat state. `useClaude` is a dependency; we mock the preload bridge
+ * so it reports a ready Max session by default, which lets the input
+ * accept typing. Tests that want the "not connected" path construct
+ * the bridge with `{ installed: false }`.
  */
 
 import type { ClaudeSchemaChatState } from '@renderer/chat/useClaudeSchemaChat';
 import { ChatPanel } from '@renderer/components/chat/ChatPanel';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function makeChat(overrides: Partial<ClaudeSchemaChatState> = {}): ClaudeSchemaChatState {
   return {
@@ -19,12 +22,41 @@ function makeChat(overrides: Partial<ClaudeSchemaChatState> = {}): ClaudeSchemaC
   };
 }
 
-describe('ChatPanel', () => {
-  afterEach(cleanup);
+function mockBridge(installed: boolean): void {
+  (window as unknown as { contexture: unknown }).contexture = {
+    chat: {
+      detectClaudeCli: vi.fn(async () => ({
+        installed,
+        path: installed ? '/usr/local/bin/claude' : null,
+      })),
+      setAuth: vi.fn(async () => ({ ok: true })),
+      setModelOptions: vi.fn(async () => ({ ok: true })),
+      abort: vi.fn(async () => ({ ok: true })),
+    },
+  };
+}
 
-  it('renders empty-state copy when there are no messages', () => {
+beforeEach(() => {
+  localStorage.clear();
+  mockBridge(true);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe('ChatPanel', () => {
+  it('renders the empty-state "Start a conversation" when ready with no messages', async () => {
     render(<ChatPanel chat={makeChat()} />);
-    expect(screen.getByText(/Start a chat/i)).toBeInTheDocument();
+    // cliDetected is async — wait for the happy-path copy.
+    await waitFor(() => expect(screen.getByText(/Start a conversation/i)).toBeInTheDocument());
+  });
+
+  it('renders the "Not connected" empty state when neither CLI nor key is configured', async () => {
+    mockBridge(false);
+    render(<ChatPanel chat={makeChat()} />);
+    await waitFor(() => expect(screen.getByText(/Not connected/i)).toBeInTheDocument());
   });
 
   it('renders user + assistant messages', () => {
@@ -39,24 +71,41 @@ describe('ChatPanel', () => {
     expect(screen.getByTestId('chat-message-assistant')).toHaveTextContent('Done.');
   });
 
-  it('shows streaming indicator while isStreaming is true', () => {
+  it('shows the streaming indicator while isStreaming is true', () => {
     render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
-    expect(screen.getByTestId('chat-streaming')).toBeInTheDocument();
+    expect(screen.getByText(/Claude is thinking/i)).toBeInTheDocument();
   });
 
-  it('Cmd+Enter in the textarea calls chat.send with the trimmed draft', () => {
+  it('Enter in the textarea calls chat.send with the trimmed draft', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     render(<ChatPanel chat={makeChat({ send })} />);
+    // Wait for useClaude to report ready so the textarea accepts input.
+    await waitFor(() => {
+      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+      expect(ta.disabled).toBe(false);
+    });
     const textarea = screen.getByTestId('chat-input');
     fireEvent.change(textarea, { target: { value: '  hello  ' } });
-    fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
     expect(send).toHaveBeenCalledWith('hello');
   });
 
-  it('Send button is disabled while streaming or when the draft is empty', () => {
-    const { rerender } = render(<ChatPanel chat={makeChat()} />);
-    expect(screen.getByRole('button', { name: /send/i })).toBeDisabled();
-    rerender(<ChatPanel chat={makeChat({ isStreaming: true })} />);
-    expect(screen.getByRole('button', { name: /send/i })).toBeDisabled();
+  it('Shift+Enter inserts a newline instead of submitting', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    render(<ChatPanel chat={makeChat({ send })} />);
+    await waitFor(() => {
+      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+      expect(ta.disabled).toBe(false);
+    });
+    const textarea = screen.getByTestId('chat-input');
+    fireEvent.change(textarea, { target: { value: 'hello' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('swaps Send → Stop while streaming', () => {
+    render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
+    expect(screen.getByTitle('Stop')).toBeInTheDocument();
+    expect(screen.queryByTitle('Send')).not.toBeInTheDocument();
   });
 });

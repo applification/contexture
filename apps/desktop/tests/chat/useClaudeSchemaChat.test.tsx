@@ -32,12 +32,16 @@ function makeApi() {
   const replyOp = vi.fn();
   const detectClaudeCli = vi.fn(async () => ({ installed: false, path: null }));
   const setAuth = vi.fn(async () => ({ ok: true }));
+  const setModelOptions = vi.fn(async () => ({ ok: true }));
+  const abort = vi.fn(async () => ({ ok: true }));
 
   const api: ContextureChatAPI = {
     send,
     setIR,
     detectClaudeCli,
     setAuth,
+    setModelOptions,
+    abort,
     replyOp,
     onAssistant: (l) => {
       listeners.assistant.add(l);

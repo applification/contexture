@@ -35,11 +35,21 @@ const execFileAsync = promisify(execFile);
  * to the CLI when no `ANTHROPIC_API_KEY` is set, so the same detection
  * predicts whether a turn will succeed.
  */
+/**
+ * Cached absolute path to the `claude` CLI binary, populated by
+ * `detectClaudeCli()` the first time the renderer probes. The Agent SDK
+ * needs the absolute path via `pathToClaudeCodeExecutable` because
+ * packaged Electron apps (and sometimes dev) don't inherit a PATH that
+ * sees things like `~/.local/bin/claude`.
+ */
+let detectedClaudePath: string | null = null;
+
 async function detectClaudeCli(): Promise<{ installed: boolean; path: string | null }> {
   try {
     const cmd = process.platform === 'win32' ? 'where' : 'which';
     const { stdout } = await execFileAsync(cmd, ['claude']);
     const path = stdout.trim().split('\n')[0] ?? null;
+    if (path) detectedClaudePath = path;
     return { installed: path !== null && path.length > 0, path };
   } catch {
     return { installed: false, path: null };
@@ -49,11 +59,29 @@ async function detectClaudeCli(): Promise<{ installed: boolean; path: string | n
 /**
  * Current chat auth — set by the renderer via `chat:set-auth` and read
  * at the start of each `query()` call. `max` mode leaves env alone and
- * the SDK will shell out to the Claude CLI; `api-key` mode injects
- * `ANTHROPIC_API_KEY` into the SDK's env for that turn.
+ * the SDK will shell out to the Claude CLI (via `pathToClaudeCodeExecutable`);
+ * `api-key` mode injects `ANTHROPIC_API_KEY` into the SDK's env for that
+ * turn.
  */
 type ChatAuth = { mode: 'max' } | { mode: 'api-key'; key: string };
 let currentAuth: ChatAuth = { mode: 'max' };
+
+type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
+type ThinkingBudget = 'auto' | 'low' | 'med' | 'high';
+const THINKING_TOKENS: Record<ThinkingBudget, number | undefined> = {
+  auto: undefined,
+  low: 2048,
+  med: 8192,
+  high: 16000,
+};
+let currentModel: ModelId = 'claude-sonnet-4-6';
+let currentThinkingBudget: ThinkingBudget = 'auto';
+
+/**
+ * Handle on the in-flight `query()` iterator so `chat:abort` can
+ * interrupt it. `null` while nothing is running.
+ */
+let currentQuery: { interrupt(): Promise<void> } | null = null;
 
 export interface ClaudeIpc {
   forwardOp: ForwardOpFn;
@@ -106,9 +134,10 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   const skillsPluginPath = resolveSkillsPluginPath();
 
   const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPrompt }) {
-    // Project the current auth into the SDK options. Max mode relies on
-    // the CLI's existing OAuth login; api-key mode overrides the env
-    // var for the spawned SDK process.
+    // Project the current auth into the SDK options. Max mode points
+    // the SDK at the cached absolute binary path (the SDK spawns that
+    // binary to authenticate against the user's OAuth session);
+    // api-key mode overrides the env var for the spawned SDK process.
     const env: Record<string, string> | undefined =
       currentAuth.mode === 'api-key' && currentAuth.key
         ? { ANTHROPIC_API_KEY: currentAuth.key }
@@ -117,14 +146,24 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
       prompt,
       options: {
         systemPrompt,
+        model: currentModel,
+        ...(THINKING_TOKENS[currentThinkingBudget] !== undefined
+          ? { maxThinkingTokens: THINKING_TOKENS[currentThinkingBudget] }
+          : {}),
         mcpServers: { 'contexture-ops': mcpServer },
+        pathToClaudeCodeExecutable: detectedClaudePath ?? 'claude',
         ...(skillsPluginPath ? { plugins: [{ type: 'local', path: skillsPluginPath }] } : {}),
         ...(env ? { env } : {}),
       },
     });
-    for await (const msg of iterator) {
-      const mapped = mapSdkMessage(msg);
-      if (mapped) yield mapped;
+    currentQuery = iterator;
+    try {
+      for await (const msg of iterator) {
+        const mapped = mapSdkMessage(msg);
+        if (mapped) yield mapped;
+      }
+    } finally {
+      if (currentQuery === iterator) currentQuery = null;
     }
   };
 
@@ -148,7 +187,18 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     }
   });
 
-  ipcMain.handle('claude:detect-cli', async () => detectClaudeCli());
+  // Probe PATH once at startup so the SDK has an absolute binary path
+  // ready for the first chat turn, even if the renderer never opens
+  // the auth popover.
+  detectClaudeCli().catch(() => undefined);
+
+  ipcMain.handle('claude:detect-cli', async () => {
+    // Short-circuit on a previous successful probe — the binary doesn't
+    // move between launches, so re-running `which` per renderer mount
+    // is wasted work.
+    if (detectedClaudePath) return { installed: true, path: detectedClaudePath };
+    return detectClaudeCli();
+  });
 
   ipcMain.handle('claude:set-auth', (_evt, payload: ChatAuth) => {
     // Shallow-validate the incoming payload — anything else we just
@@ -162,6 +212,27 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
       return { ok: true };
     }
     return { ok: false, error: 'invalid auth payload' };
+  });
+
+  ipcMain.handle(
+    'claude:set-model-options',
+    (_evt, payload: { model?: ModelId; thinkingBudget?: ThinkingBudget }) => {
+      if (payload?.model) currentModel = payload.model;
+      if (payload?.thinkingBudget) currentThinkingBudget = payload.thinkingBudget;
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle('chat:abort', async () => {
+    const q = currentQuery;
+    if (!q) return { ok: false, error: 'no active query' };
+    try {
+      await q.interrupt();
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
   });
 
   return { forwardOp, turnContext, mcpServer, turnController, chatDriver };

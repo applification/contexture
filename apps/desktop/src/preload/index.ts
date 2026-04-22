@@ -42,6 +42,15 @@ const chat = {
     auth: { mode: 'max' } | { mode: 'api-key'; key: string },
   ): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('claude:set-auth', auth) as Promise<{ ok: boolean; error?: string }>,
+  /** Update the model + thinking-effort used by the next SDK query. */
+  setModelOptions: (opts: {
+    model?: string;
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+  }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('claude:set-model-options', opts) as Promise<{ ok: boolean }>,
+  /** Interrupt the in-flight query (stop button). */
+  abort: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('chat:abort') as Promise<{ ok: boolean; error?: string }>,
   onAssistant: (listener: (payload: { text: string }) => void) =>
     subscribe('chat:assistant', listener as (p: unknown) => void),
   onToolUse: (listener: (payload: { name: string; input: unknown }) => void) =>

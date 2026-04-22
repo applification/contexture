@@ -203,6 +203,8 @@ function noopChatApi() {
     setIR: () => undefined,
     detectClaudeCli: async () => ({ installed: false, path: null }),
     setAuth: async () => ({ ok: false, error: 'chat unavailable' }),
+    setModelOptions: async () => ({ ok: false }),
+    abort: async () => ({ ok: false, error: 'chat unavailable' }),
     replyOp: () => undefined,
     onAssistant: () => unsub,
     onToolUse: () => unsub,

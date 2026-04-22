@@ -1,23 +1,21 @@
 /**
- * `useClaude` — auth + readiness state for the chat session.
+ * `useClaude` — chat-session settings that live on the renderer side.
+ *
+ * Owns the user-facing knobs the pre-pivot app surfaced in the toolbar
+ * popover + prompt input: auth mode, api key, selected model, and
+ * thinking-effort. Each knob is persisted to localStorage and pushed
+ * to main (`window.contexture.chat.setAuth` / `setModelOptions`) so the
+ * next SDK `query()` call reads the latest state.
  *
  * Unlike the pre-pivot `useClaude`, this hook doesn't own messages or
- * tool callbacks — those live in `useClaudeSchemaChat` now, driven by
- * the Agent SDK turn pipeline. This hook just tracks:
- *
- *   - **auth mode** (`max` = Claude CLI / OAuth; `api-key` = raw key)
- *   - **api key** (only relevant for `api-key` mode; persisted to
- *     localStorage so the user doesn't re-enter on every launch)
- *   - **cliDetected** (is `claude` on PATH?)
- *   - **isReady** (true when the current mode has enough to run a
- *     turn — CLI installed for `max`, non-empty key for `api-key`)
- *
- * Every setter also pushes the current auth to main via
- * `window.contexture.chat.setAuth` so the next SDK query picks it up.
+ * tool callbacks — those live in `useClaudeSchemaChat`, driven by the
+ * Agent SDK turn pipeline.
  */
 import { useCallback, useEffect, useState } from 'react';
 
 export type AuthMode = 'max' | 'api-key';
+export type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
+export type ThinkingBudget = 'auto' | 'low' | 'med' | 'high';
 
 interface UseClaudeReturn {
   authMode: AuthMode;
@@ -26,14 +24,27 @@ interface UseClaudeReturn {
   setApiKey: (key: string) => void;
   cliDetected: boolean;
   isReady: boolean;
+  model: ModelId;
+  setModel: (model: ModelId) => void;
+  thinkingBudget: ThinkingBudget;
+  setThinkingBudget: (budget: ThinkingBudget) => void;
 }
 
 const API_KEY_STORAGE = 'contexture-claude-api-key';
 const AUTH_MODE_STORAGE = 'contexture-claude-auth-mode';
+const MODEL_STORAGE = 'contexture-claude-model';
+const THINKING_STORAGE = 'contexture-claude-thinking-budget';
 
-function pushAuth(auth: { mode: 'max' } | { mode: 'api-key'; key: string }): void {
+type AuthPayload = { mode: 'max' } | { mode: 'api-key'; key: string };
+
+function pushAuth(auth: AuthPayload): void {
   if (typeof window === 'undefined' || !window.contexture?.chat?.setAuth) return;
   window.contexture.chat.setAuth(auth).catch(() => undefined);
+}
+
+function pushModelOptions(model: ModelId, thinkingBudget: ThinkingBudget): void {
+  if (typeof window === 'undefined' || !window.contexture?.chat?.setModelOptions) return;
+  window.contexture.chat.setModelOptions({ model, thinkingBudget }).catch(() => undefined);
 }
 
 export function useClaude(): UseClaudeReturn {
@@ -44,6 +55,12 @@ export function useClaude(): UseClaudeReturn {
     () => localStorage.getItem(API_KEY_STORAGE) ?? '',
   );
   const [cliDetected, setCliDetected] = useState<boolean>(false);
+  const [model, setModelState] = useState<ModelId>(
+    () => (localStorage.getItem(MODEL_STORAGE) as ModelId | null) ?? 'claude-sonnet-4-6',
+  );
+  const [thinkingBudget, setThinkingBudgetState] = useState<ThinkingBudget>(
+    () => (localStorage.getItem(THINKING_STORAGE) as ThinkingBudget | null) ?? 'auto',
+  );
 
   // One-shot CLI probe on mount; also picks a sensible default auth
   // mode the first time the user opens the app (CLI found → Max;
@@ -62,14 +79,13 @@ export function useClaude(): UseClaudeReturn {
       .catch(() => undefined);
   }, []);
 
-  // Push the initial auth snapshot to main so the first turn uses it
-  // without requiring the user to open the popover first. Subsequent
-  // updates flow through the setters below, so a one-shot mount effect
-  // is what we want — extra re-syncs would race the setters.
+  // Push the initial auth + model snapshot to main so the first turn
+  // uses it without requiring the user to open the popover first.
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot initial sync
   useEffect(() => {
     if (authMode === 'max') pushAuth({ mode: 'max' });
     else pushAuth({ mode: 'api-key', key: apiKey });
+    pushModelOptions(model, thinkingBudget);
   }, []);
 
   const setAuthMode = useCallback(
@@ -92,7 +108,36 @@ export function useClaude(): UseClaudeReturn {
     [authMode],
   );
 
+  const setModel = useCallback(
+    (next: ModelId) => {
+      setModelState(next);
+      localStorage.setItem(MODEL_STORAGE, next);
+      pushModelOptions(next, thinkingBudget);
+    },
+    [thinkingBudget],
+  );
+
+  const setThinkingBudget = useCallback(
+    (next: ThinkingBudget) => {
+      setThinkingBudgetState(next);
+      localStorage.setItem(THINKING_STORAGE, next);
+      pushModelOptions(model, next);
+    },
+    [model],
+  );
+
   const isReady = authMode === 'max' ? cliDetected : apiKey.length > 0;
 
-  return { authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady };
+  return {
+    authMode,
+    setAuthMode,
+    apiKey,
+    setApiKey,
+    cliDetected,
+    isReady,
+    model,
+    setModel,
+    thinkingBudget,
+    setThinkingBudget,
+  };
 }
