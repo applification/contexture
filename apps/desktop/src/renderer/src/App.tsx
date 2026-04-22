@@ -28,6 +28,7 @@ import { useClaudeSchemaChat } from './chat/useClaudeSchemaChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
+import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
@@ -71,6 +72,49 @@ export default function App(): React.JSX.Element {
     if (sidebarVisible) sidebarRef.current?.expand();
     else sidebarRef.current?.collapse();
   }, [sidebarVisible]);
+
+  // Global keyboard shortcuts — forwarded from the document so they
+  // work regardless of canvas focus. Inputs / textareas get a pass so
+  // we don't intercept typing.
+  useEffect(() => {
+    function onKey(ev: KeyboardEvent): void {
+      const target = ev.target as HTMLElement | null;
+      const inInput =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      if (ev.key === 'Escape') {
+        useUIStore.getState().setSelectedNode(null);
+        useUIStore.getState().setSelectedEdge(null);
+        return;
+      }
+
+      if (inInput) return;
+
+      const mod = ev.metaKey || ev.ctrlKey;
+      if (mod && (ev.key === 'z' || ev.key === 'Z')) {
+        ev.preventDefault();
+        if (ev.shiftKey) useUndoStore.getState().redo();
+        else useUndoStore.getState().undo();
+        return;
+      }
+      if (mod && (ev.key === 'y' || ev.key === 'Y')) {
+        ev.preventDefault();
+        useUndoStore.getState().redo();
+        return;
+      }
+
+      if (ev.key === 'Delete' || ev.key === 'Backspace') {
+        const selected = useUIStore.getState().selectedNodeId;
+        if (!selected) return;
+        ev.preventDefault();
+        const result = useUndoStore.getState().apply({ kind: 'delete_type', name: selected });
+        if ('schema' in result) useUIStore.getState().setSelectedNode(null);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   const loadSample = useCallback(() => {
     useUndoStore
@@ -191,6 +235,7 @@ export default function App(): React.JSX.Element {
       </ResizablePanelGroup>
 
       <StatusBar />
+      <DocumentDialogs />
     </div>
   );
 }
