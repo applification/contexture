@@ -78,10 +78,11 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps) {
   const undo = useCallback(() => useUndoStore.getState().undo(), []);
   const redo = useCallback(() => useUndoStore.getState().redo(), []);
 
-  const { setSelectedNode, selectedNodeId } = useUIStore((s) => ({
-    setSelectedNode: s.setSelectedNode,
-    selectedNodeId: s.selectedNodeId,
-  }));
+  // Separate selectors — returning a fresh object from a single selector
+  // each render triggers React's "getSnapshot should be cached" warning
+  // and an infinite re-render loop in development.
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
 
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(
     () => buildGraph({ schema, positions }),

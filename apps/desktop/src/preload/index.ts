@@ -1,7 +1,9 @@
 /**
- * Preload bridge — the `window.contexture` surface the renderer uses
- * to talk to main over IPC. This is intentionally minimal and typed
- * (see `index.d.ts`); main-side handlers live in `src/main/ipc/*`.
+ * Preload bridge — `window.contexture` is the new curated surface, and
+ * `window.api` carries legacy methods the pre-pivot renderer still uses
+ * (UpdateBanner, useLayoutSidecar, useChatSidecar). Everything goes
+ * through one allowlist of IPC channels so there's a single place to
+ * audit main-side handlers.
  *
  * Each method either:
  *   - invokes a main-side handler (`ipcRenderer.invoke`) and returns a
@@ -9,10 +11,9 @@
  *   - subscribes to a main-side event stream (`ipcRenderer.on`) and
  *     returns an unsubscribe function.
  *
- * Renderer code should never touch `ipcRenderer` directly — always go
- * through `window.contexture` so there's one place to audit the main
- * surface.
+ * Renderer code should never touch `ipcRenderer` directly.
  */
+import { promises as fs } from 'node:fs';
 import { electronAPI } from '@electron-toolkit/preload';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -27,10 +28,8 @@ function subscribe(channel: string, listener: (payload: unknown) => void): Unsub
 }
 
 const chat = {
-  /** Send a user message and run one chat turn. */
   send: (message: string) =>
     ipcRenderer.invoke('chat:send', message) as Promise<{ ok: boolean; error?: string }>,
-  /** Push the current IR to main so the next turn's system prompt has it. */
   setIR: (ir: unknown) => ipcRenderer.send('claude:turn-start-ir', ir),
   onAssistant: (listener: (payload: { text: string }) => void) =>
     subscribe('chat:assistant', listener as (p: unknown) => void),
@@ -40,11 +39,9 @@ const chat = {
     subscribe('chat:result', listener as (p: unknown) => void),
   onError: (listener: (payload: { message: string }) => void) =>
     subscribe('chat:error', listener as (p: unknown) => void),
-  /** Turn boundary events from `ChatTurnController`. */
   onTurnBegin: (listener: () => void) => subscribe('turn:begin', listener),
   onTurnCommit: (listener: () => void) => subscribe('turn:commit', listener),
   onTurnRollback: (listener: () => void) => subscribe('turn:rollback', listener),
-  /** Reply to an op-request with the renderer's apply result. */
   replyOp: (id: string, result: unknown) => ipcRenderer.send('claude:op-reply', { id, result }),
   onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) =>
     subscribe('claude:op-request', listener as (p: unknown) => void),
@@ -52,10 +49,65 @@ const chat = {
 
 const contexture = { chat };
 
+/**
+ * Legacy surface. Sidecar reads/writes use the preload process's
+ * Node `fs` directly — the files live next to the open document and
+ * don't need a main-side dialog. Update + menu handlers route through
+ * the existing `update:*` / `file:*` IPC channels.
+ */
+const legacyApi = {
+  readFileSilent: async (path: string): Promise<string | null> => {
+    try {
+      return await fs.readFile(path, 'utf-8');
+    } catch {
+      return null;
+    }
+  },
+  saveFile: async (path: string, contents: string): Promise<void> => {
+    await fs.writeFile(path, contents, 'utf-8');
+  },
+  openFile: () => ipcRenderer.invoke('file:open-dialog'),
+  saveFileAs: () => ipcRenderer.invoke('file:save-as-dialog'),
+  onMenuFileOpen: (listener: (path: string) => void) =>
+    subscribe('menu:file-open', listener as (p: unknown) => void),
+  onMenuFileSave: (listener: () => void) =>
+    subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
+  onMenuFileSaveAs: (listener: () => void) =>
+    subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
+
+  getUpdateState: () => ipcRenderer.invoke('update:get-state'),
+  onUpdateState: (listener: (state: unknown) => void) => subscribe('update:state', listener),
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => {
+    void ipcRenderer.invoke('update:install');
+  },
+  openReleasesPage: () => {
+    void ipcRenderer.invoke('update:open-releases');
+  },
+
+  // Legacy assistant channels kept as no-ops so `ImprovementHUD` won't
+  // crash on import — the pre-pivot UI lands in the bin when the new
+  // App shell fully replaces it.
+  onClaudeAssistantText:
+    (_listener: (text: string) => void): Unsubscribe =>
+    () =>
+      undefined,
+  onClaudeResult:
+    (_listener: (r?: unknown) => void): Unsubscribe =>
+    () =>
+      undefined,
+  onClaudeError:
+    (_listener: (e?: unknown) => void): Unsubscribe =>
+    () =>
+      undefined,
+};
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('contexture', contexture);
+    contextBridge.exposeInMainWorld('api', legacyApi);
   } catch (err) {
     console.error(err);
   }

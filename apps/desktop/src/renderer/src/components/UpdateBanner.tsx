@@ -5,6 +5,9 @@ export function UpdateBanner(): React.JSX.Element | null {
   const [update, setUpdate] = useState<UpdateState>({ status: 'idle' });
 
   useEffect(() => {
+    // Tolerate environments without the preload bridge (Storybook,
+    // vitest-in-jsdom, early dev before contextBridge exposure).
+    if (!window.api?.getUpdateState) return;
     window.api.getUpdateState().then(setUpdate);
     return window.api.onUpdateState(setUpdate);
   }, []);
