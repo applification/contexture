@@ -3,41 +3,26 @@ import { memo, useState } from 'react';
 
 const EDGE_ITEMS = [
   {
-    label: 'Subclass (is-a)',
-    color: 'var(--graph-edge-subclass)',
-    dash: '8,4',
-  },
-  {
-    label: 'Object property',
-    color: 'var(--graph-edge-property)',
+    label: 'Ref',
+    color: 'var(--graph-edge-ref, currentColor)',
     dash: undefined,
   },
   {
-    label: 'Disjoint with',
-    color: 'var(--graph-edge-disjoint)',
-    dash: '3,4',
-  },
-  {
-    label: 'Type (instance-of)',
-    color: 'var(--graph-edge-typeof, oklch(0.65 0.15 160))',
-    dash: '4,3',
-  },
-  {
-    label: 'Restriction',
-    color: 'var(--graph-edge-restriction)',
-    dash: '6,3',
+    label: 'Import (cross-boundary)',
+    color: 'var(--graph-edge-import, oklch(0.55 0.04 240))',
+    dash: '6,4',
   },
 ] as const;
 
 const NODE_ITEMS = [
-  { label: 'Class', border: 'var(--graph-node-border)', style: 'solid' as const },
+  { label: 'Type', border: 'var(--graph-node-border)', style: 'solid' as const },
   {
-    label: 'Individual',
-    border: 'var(--graph-node-individual-border, oklch(0.65 0.15 160))',
+    label: 'Import',
+    border: 'var(--graph-node-border)',
     style: 'dashed' as const,
   },
+  { label: 'Field', border: 'var(--graph-node-border)', style: 'solid' as const },
   { label: 'Selected', border: 'var(--graph-node-selected)', style: 'solid' as const },
-  { label: 'Adjacent', border: 'var(--graph-node-adjacent)', style: 'solid' as const },
 ] as const;
 
 export const GraphLegend = memo(function GraphLegend() {
