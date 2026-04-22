@@ -8,8 +8,10 @@
  * lives in the pure modules, which have their own tests.
  */
 
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
 import type { Schema } from '@renderer/model/types';
 import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
@@ -24,6 +26,34 @@ import {
   makeIpcForwardOp,
   TurnContext,
 } from './claude-bridge';
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Look for a `claude` binary on PATH. Used by the auth popover to
+ * tell the user whether Max mode is viable; the Agent SDK shells out
+ * to the CLI when no `ANTHROPIC_API_KEY` is set, so the same detection
+ * predicts whether a turn will succeed.
+ */
+async function detectClaudeCli(): Promise<{ installed: boolean; path: string | null }> {
+  try {
+    const cmd = process.platform === 'win32' ? 'where' : 'which';
+    const { stdout } = await execFileAsync(cmd, ['claude']);
+    const path = stdout.trim().split('\n')[0] ?? null;
+    return { installed: path !== null && path.length > 0, path };
+  } catch {
+    return { installed: false, path: null };
+  }
+}
+
+/**
+ * Current chat auth — set by the renderer via `chat:set-auth` and read
+ * at the start of each `query()` call. `max` mode leaves env alone and
+ * the SDK will shell out to the Claude CLI; `api-key` mode injects
+ * `ANTHROPIC_API_KEY` into the SDK's env for that turn.
+ */
+type ChatAuth = { mode: 'max' } | { mode: 'api-key'; key: string };
+let currentAuth: ChatAuth = { mode: 'max' };
 
 export interface ClaudeIpc {
   forwardOp: ForwardOpFn;
@@ -76,12 +106,20 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   const skillsPluginPath = resolveSkillsPluginPath();
 
   const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPrompt }) {
+    // Project the current auth into the SDK options. Max mode relies on
+    // the CLI's existing OAuth login; api-key mode overrides the env
+    // var for the spawned SDK process.
+    const env: Record<string, string> | undefined =
+      currentAuth.mode === 'api-key' && currentAuth.key
+        ? { ANTHROPIC_API_KEY: currentAuth.key }
+        : undefined;
     const iterator = query({
       prompt,
       options: {
         systemPrompt,
         mcpServers: { 'contexture-ops': mcpServer },
         ...(skillsPluginPath ? { plugins: [{ type: 'local', path: skillsPluginPath }] } : {}),
+        ...(env ? { env } : {}),
       },
     });
     for await (const msg of iterator) {
@@ -108,6 +146,22 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
       const message = err instanceof Error ? err.message : String(err);
       return { ok: false, error: message };
     }
+  });
+
+  ipcMain.handle('claude:detect-cli', async () => detectClaudeCli());
+
+  ipcMain.handle('claude:set-auth', (_evt, payload: ChatAuth) => {
+    // Shallow-validate the incoming payload — anything else we just
+    // reject rather than silently falling back.
+    if (payload?.mode === 'max') {
+      currentAuth = { mode: 'max' };
+      return { ok: true };
+    }
+    if (payload?.mode === 'api-key' && typeof payload.key === 'string') {
+      currentAuth = { mode: 'api-key', key: payload.key };
+      return { ok: true };
+    }
+    return { ok: false, error: 'invalid auth payload' };
   });
 
   return { forwardOp, turnContext, mcpServer, turnController, chatDriver };

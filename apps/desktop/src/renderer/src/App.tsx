@@ -201,6 +201,8 @@ function noopChatApi() {
   return {
     send: async () => ({ ok: false, error: 'chat unavailable (no preload bridge)' }),
     setIR: () => undefined,
+    detectClaudeCli: async () => ({ installed: false, path: null }),
+    setAuth: async () => ({ ok: false, error: 'chat unavailable' }),
     replyOp: () => undefined,
     onAssistant: () => unsub,
     onToolUse: () => unsub,

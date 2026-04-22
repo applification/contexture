@@ -43,6 +43,10 @@ export interface LegacyAPI {
 export interface ContextureChatAPI {
   send: (message: string) => Promise<{ ok: boolean; error?: string }>;
   setIR: (ir: unknown) => void;
+  detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>;
+  setAuth: (
+    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
+  ) => Promise<{ ok: boolean; error?: string }>;
   onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
   onToolUse: (listener: (payload: { name: string; input: unknown }) => void) => Unsubscribe;
   onResult: (listener: (payload: { ok: boolean; error?: string }) => void) => Unsubscribe;

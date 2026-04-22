@@ -31,6 +31,17 @@ const chat = {
   send: (message: string) =>
     ipcRenderer.invoke('chat:send', message) as Promise<{ ok: boolean; error?: string }>,
   setIR: (ir: unknown) => ipcRenderer.send('claude:turn-start-ir', ir),
+  /** Is the `claude` CLI binary on PATH? Used by the auth popover. */
+  detectClaudeCli: () =>
+    ipcRenderer.invoke('claude:detect-cli') as Promise<{
+      installed: boolean;
+      path: string | null;
+    }>,
+  /** Swap between Max (CLI / OAuth) and api-key auth. */
+  setAuth: (
+    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
+  ): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('claude:set-auth', auth) as Promise<{ ok: boolean; error?: string }>,
   onAssistant: (listener: (payload: { text: string }) => void) =>
     subscribe('chat:assistant', listener as (p: unknown) => void),
   onToolUse: (listener: (payload: { name: string; input: unknown }) => void) =>
