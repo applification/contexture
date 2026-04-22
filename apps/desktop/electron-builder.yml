@@ -19,6 +19,12 @@ extraResources:
     to: stdlib
     filter:
       - '*.contexture.json'
+  # Contexture skills plugin — Agent SDK loads these at session start.
+  - from: resources/skills
+    to: skills
+    filter:
+      - '.claude-plugin/**'
+      - 'skills/**'
 win:
   executableName: Contexture
   icon: build/icon.ico

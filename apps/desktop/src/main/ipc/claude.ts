@@ -8,10 +8,12 @@
  * lives in the pure modules, which have their own tests.
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
 import type { Schema } from '@renderer/model/types';
 import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
-import { type BrowserWindow, ipcMain } from 'electron';
+import { app, type BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
 import { createOpTools, type OpToolDescriptor } from '../ops';
 import { ChatDriver, type DriverQueryFn, type DriverSdkMessage } from './chat-driver';
@@ -71,12 +73,15 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   };
   const turnController = new ChatTurnController(turnTransport);
 
+  const skillsPluginPath = resolveSkillsPluginPath();
+
   const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPrompt }) {
     const iterator = query({
       prompt,
       options: {
         systemPrompt,
         mcpServers: { 'contexture-ops': mcpServer },
+        ...(skillsPluginPath ? { plugins: [{ type: 'local', path: skillsPluginPath }] } : {}),
       },
     });
     for await (const msg of iterator) {
@@ -151,6 +156,28 @@ function mapSdkMessage(msg: unknown): DriverSdkMessage | null {
       ok: rm.subtype === 'success' && rm.is_error !== true,
       error: rm.is_error ? rm.result : undefined,
     };
+  }
+  return null;
+}
+
+/**
+ * Locate the bundled skills plugin directory.
+ *
+ * In production the directory ships under `process.resourcesPath/skills`
+ * via `electron-builder`'s `extraResources` entry. In dev we fall back
+ * to the in-tree copy so `electron-vite dev` works without a packaged
+ * build. Returns `null` when neither exists so the SDK query runs
+ * without plugins instead of blowing up at session start.
+ */
+function resolveSkillsPluginPath(): string | null {
+  const candidates = [
+    join(process.resourcesPath ?? '', 'skills'),
+    join(app.getAppPath(), 'resources', 'skills'),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && existsSync(join(candidate, '.claude-plugin', 'plugin.json'))) {
+      return candidate;
+    }
   }
   return null;
 }
