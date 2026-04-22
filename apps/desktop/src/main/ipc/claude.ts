@@ -13,6 +13,7 @@ import type { Schema } from '@renderer/model/types';
 import { type BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
 import { createOpTools, type OpToolDescriptor } from '../ops';
+import { ChatTurnController, type TurnTransport } from './chat-turn';
 import {
   type BridgeTransport,
   type ForwardOpFn,
@@ -25,6 +26,13 @@ export interface ClaudeIpc {
   turnContext: TurnContext;
   /** The assembled SDK MCP server with all 13 op tools bound. */
   mcpServer: ReturnType<typeof createSdkMcpServer>;
+  /**
+   * Wraps a chat turn's op-dispatch body in `turn:begin` / `turn:commit`
+   * (or `turn:rollback` on failure). The Agent-SDK driver calls
+   * `turnController.run(async () => { for await (const msg of query(...)) … })`
+   * once per user turn.
+   */
+  turnController: ChatTurnController;
 }
 
 export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
@@ -52,7 +60,14 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     tools: descriptors.map(toSdkTool),
   });
 
-  return { forwardOp, turnContext, mcpServer };
+  const turnTransport: TurnTransport = {
+    send: (channel, payload) => {
+      mainWindow.webContents.send(channel, payload);
+    },
+  };
+  const turnController = new ChatTurnController(turnTransport);
+
+  return { forwardOp, turnContext, mcpServer, turnController };
 }
 
 function toSdkTool(descriptor: OpToolDescriptor) {
