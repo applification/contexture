@@ -8,11 +8,13 @@
  * lives in the pure modules, which have their own tests.
  */
 
-import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
+import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
 import type { Schema } from '@renderer/model/types';
+import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
 import { type BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
 import { createOpTools, type OpToolDescriptor } from '../ops';
+import { ChatDriver, type DriverQueryFn, type DriverSdkMessage } from './chat-driver';
 import { ChatTurnController, type TurnTransport } from './chat-turn';
 import {
   type BridgeTransport,
@@ -33,6 +35,8 @@ export interface ClaudeIpc {
    * once per user turn.
    */
   turnController: ChatTurnController;
+  /** Chat driver orchestrating Agent-SDK `query()` per user message. */
+  chatDriver: ChatDriver;
 }
 
 export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
@@ -67,7 +71,88 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   };
   const turnController = new ChatTurnController(turnTransport);
 
-  return { forwardOp, turnContext, mcpServer, turnController };
+  const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPrompt }) {
+    const iterator = query({
+      prompt,
+      options: {
+        systemPrompt,
+        mcpServers: { 'contexture-ops': mcpServer },
+      },
+    });
+    for await (const msg of iterator) {
+      const mapped = mapSdkMessage(msg);
+      if (mapped) yield mapped;
+    }
+  };
+
+  const chatDriver = new ChatDriver({
+    query: sdkQuery,
+    transport: {
+      send: (channel, payload) => mainWindow.webContents.send(channel, payload),
+    },
+    turnController,
+    getCurrentIR: () => turnContext.current(),
+    stdlibRegistry: SYSTEM_PROMPT_STDLIB,
+  });
+
+  ipcMain.handle('chat:send', async (_evt, userMessage: string) => {
+    try {
+      await chatDriver.send(userMessage);
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+  });
+
+  return { forwardOp, turnContext, mcpServer, turnController, chatDriver };
+}
+
+/**
+ * Squeeze the SDK's wide message union down to the `DriverSdkMessage`
+ * shape. Only `assistant`, `user` tool-use blocks, and `result` are
+ * forwarded to the renderer — intermediate status / stream / hook
+ * messages are dropped to keep the chat transcript clean.
+ */
+function mapSdkMessage(msg: unknown): DriverSdkMessage | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const m = msg as { type: string; message?: { content?: unknown } };
+  if (m.type === 'assistant') {
+    const content = Array.isArray(m.message?.content) ? m.message?.content : [];
+    const textParts = content
+      .filter(
+        (p): p is { type: 'text'; text: string } =>
+          !!p &&
+          typeof p === 'object' &&
+          (p as { type?: unknown }).type === 'text' &&
+          typeof (p as { text?: unknown }).text === 'string',
+      )
+      .map((p) => p.text);
+    const toolUseParts = content.filter(
+      (p): p is { type: 'tool_use'; name: string; input: unknown } =>
+        !!p && typeof p === 'object' && (p as { type?: unknown }).type === 'tool_use',
+    );
+    if (textParts.length > 0) {
+      return { type: 'assistant', text: textParts.join('') };
+    }
+    if (toolUseParts.length > 0) {
+      return {
+        type: 'tool_use',
+        name: toolUseParts[0].name,
+        input: toolUseParts[0].input,
+      };
+    }
+    return null;
+  }
+  if (m.type === 'result') {
+    const rm = m as { type: 'result'; subtype?: string; is_error?: boolean; result?: string };
+    return {
+      type: 'result',
+      ok: rm.subtype === 'success' && rm.is_error !== true,
+      error: rm.is_error ? rm.result : undefined,
+    };
+  }
+  return null;
 }
 
 function toSdkTool(descriptor: OpToolDescriptor) {
