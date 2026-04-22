@@ -49,7 +49,7 @@ export function ConsentBanner() {
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50 rounded-xl border border-border bg-card p-4 shadow-lg">
       <p className="text-sm text-muted-foreground mb-3">
-        We use privacy-friendly analytics to improve Ontograph. No personal data is collected.
+        We use privacy-friendly analytics to improve Contexture. No personal data is collected.
       </p>
       <div className="flex gap-2">
         <button

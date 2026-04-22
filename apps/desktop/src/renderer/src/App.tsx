@@ -309,7 +309,7 @@ function App(): React.JSX.Element {
                 <GraphBackground />
                 <div className="relative z-10 text-center text-muted-foreground max-w-sm">
                   <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">
-                    Ontograph
+                    Contexture
                   </h1>
                   <p className="text-xs text-muted-foreground/70 mb-3">
                     Where knowledge takes shape

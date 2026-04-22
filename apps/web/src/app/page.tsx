@@ -97,7 +97,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <LogoMark className="size-6" />
-            Ontograph
+            Contexture
           </span>
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">
@@ -154,7 +154,7 @@ export default function Home() {
             Where knowledge takes shape.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Ontograph pairs a visual graph editor with AI that understands OWL — so you can create
+            Contexture pairs a visual graph editor with AI that understands OWL — so you can create
             production-ready ontologies through natural language.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
@@ -188,7 +188,7 @@ export default function Home() {
               <ThemeImage
                 srcLight="/images/hero-graph-light.png"
                 srcDark="/images/hero-graph.png"
-                alt="Ontograph visual graph editor showing a People ontology with Person, Employee, Manager and Organisation classes connected by subClassOf and object property edges"
+                alt="Contexture visual graph editor showing a People ontology with Person, Employee, Manager and Organisation classes connected by subClassOf and object property edges"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -242,7 +242,7 @@ export default function Home() {
             <ThemeImage
               srcLight="/images/graph-detail-light.png"
               srcDark="/images/graph-detail.png"
-              alt="Ontograph showing the graph editor with a selected Person node and its properties panel displaying class details, datatype properties, and relationships"
+              alt="Contexture showing the graph editor with a selected Person node and its properties panel displaying class details, datatype properties, and relationships"
               width={1600}
               height={1200}
               className="w-full h-auto"
@@ -351,7 +351,7 @@ export default function Home() {
               Your AI agents are only as smart as the knowledge behind them
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Ontograph lets you build, visualize, and validate the structured knowledge layer that
+              Contexture lets you build, visualize, and validate the structured knowledge layer that
               makes AI reliable.
             </p>
           </div>
@@ -426,7 +426,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-2">
             <LogoMark className="size-4" />
-            Ontograph
+            Contexture
           </span>
           <div className="flex items-center gap-6">
             <a href="/brand" className="hover:text-foreground transition-colors">
