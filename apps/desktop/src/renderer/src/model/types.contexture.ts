@@ -7,8 +7,8 @@
  * committed during Phase 0 so that Phase 2 work can promote it (and its Zod
  * meta-schema sibling) into the live model layer.
  *
- * Do NOT import these types from anywhere yet. The current OWL/RDF model lives
- * in `./types.ts`. When Phase 2 begins, these types will replace that module.
+ * Not yet wired up — later Phase 2 slices (#80 onward) promote this into the
+ * live model layer and its Zod meta-schema sibling.
  */
 
 export type Schema = {

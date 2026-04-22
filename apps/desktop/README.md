@@ -24,8 +24,8 @@ Zod + JSON Schema outputs that downstream LLM pipelines can import.
 - **Cross-platform** — macOS, Windows, and Linux builds with auto-update
   via GitHub Releases.
 
-> The Phase 2 pivot away from OWL/RDF/JSON-LD is in progress. The
-> repository retains the OWL editor surface until Phase 2 lands — see
+> Phase 2 is in progress: the legacy editor surface has been deleted
+> and the IR-first replacement is being rebuilt slice by slice. See
 > [`plans/pivot.md`](../../plans/pivot.md) for the execution plan.
 
 ## Tech Stack
@@ -78,20 +78,12 @@ src/
 ├── main/                   # Electron main process
 │   ├── index.ts            # Entry point, window management
 │   ├── menu.ts             # Application menu
-│   └── ipc/                # IPC handlers
-│       ├── file.ts         # File open/save
-│       ├── claude.ts       # Claude AI integration + MCP server
-│       ├── eval.ts         # Evaluation panel
-│       └── update.ts       # Auto-update
-├── preload/
-│   └── index.ts            # window.api bridge
+│   └── ipc/                # IPC handlers (sidecar I/O, MCP, update)
+├── preload/                # window.api bridge (Phase 2 rebuild)
 └── renderer/src/
-    ├── App.tsx             # Root component
-    ├── model/              # Domain model
-    │   ├── types.contexture.ts # IR shape (Phase 2 draft)
-    │   └── …               # legacy OWL model (removed in Phase 2)
+    ├── model/              # IR types + meta-schema (Phase 2)
     ├── store/              # Zustand state management
-    ├── services/           # validation, tokens
+    ├── services/           # tokens
     ├── hooks/              # layout, sidecars
     └── components/         # graph, chat, detail, eval, ui
 tests/                       # Vitest test suites

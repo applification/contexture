@@ -2,31 +2,9 @@ import { create } from 'zustand';
 
 type Theme = 'dark' | 'light';
 
-export interface GraphFilters {
-  showSubClassOf: boolean;
-  showDisjointWith: boolean;
-  showObjectProperties: boolean;
-  showDatatypeProperties: boolean;
-  showIndividuals: boolean;
-  showTypeOf: boolean;
-  showRestrictions: boolean;
-  minDegree: number;
-}
-
 export interface GraphLayout {
   nodeSpacing: number;
 }
-
-const DEFAULT_FILTERS: GraphFilters = {
-  showSubClassOf: true,
-  showDisjointWith: true,
-  showObjectProperties: true,
-  showDatatypeProperties: true,
-  showIndividuals: true,
-  showTypeOf: true,
-  showRestrictions: true,
-  minDegree: 0,
-};
 
 const DEFAULT_LAYOUT: GraphLayout = {
   nodeSpacing: 180,
@@ -43,7 +21,6 @@ interface UIState {
   theme: Theme;
   chatOpen: boolean;
   sidebarVisible: boolean;
-  graphFilters: GraphFilters;
   graphLayout: GraphLayout;
   focusNodeId: string | null;
   sidebarTab: SidebarTab;
@@ -58,7 +35,6 @@ interface UIState {
   setChatOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setSidebarVisible: (visible: boolean) => void;
-  setGraphFilter: (patch: Partial<GraphFilters>) => void;
   setGraphLayout: (patch: Partial<GraphLayout>) => void;
   resetGraphControls: () => void;
   setFocusNode: (id: string | null) => void;
@@ -77,7 +53,6 @@ export const useUIStore = create<UIState>((set) => ({
   theme: 'dark',
   chatOpen: true,
   sidebarVisible: true,
-  graphFilters: { ...DEFAULT_FILTERS },
   graphLayout: { ...DEFAULT_LAYOUT },
   focusNodeId: null,
   sidebarTab: 'chat',
@@ -104,10 +79,8 @@ export const useUIStore = create<UIState>((set) => ({
   setChatOpen: (open) => set({ chatOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
   setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
-  setGraphFilter: (patch) => set((s) => ({ graphFilters: { ...s.graphFilters, ...patch } })),
   setGraphLayout: (patch) => set((s) => ({ graphLayout: { ...s.graphLayout, ...patch } })),
-  resetGraphControls: () =>
-    set({ graphFilters: { ...DEFAULT_FILTERS }, graphLayout: { ...DEFAULT_LAYOUT } }),
+  resetGraphControls: () => set({ graphLayout: { ...DEFAULT_LAYOUT } }),
   setFocusNode: (id) => set({ focusNodeId: id }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
   setChatDraft: (draft) => set({ chatDraft: draft }),

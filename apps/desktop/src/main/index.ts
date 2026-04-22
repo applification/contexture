@@ -9,9 +9,6 @@ syncShellEnvironment();
 
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
-import { registerClaudeIPC } from './ipc/claude';
-import { registerEvalIPC } from './ipc/eval';
-import { registerFileIPC } from './ipc/file';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
 
@@ -67,10 +64,6 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
-
-  registerFileIPC();
-  registerClaudeIPC();
-  registerEvalIPC();
 
   const mainWindow = createWindow();
   Menu.setApplicationMenu(createMenu(mainWindow));
