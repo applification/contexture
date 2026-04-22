@@ -1,9 +1,14 @@
 import { type BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 
-export function createMenu(mainWindow: BrowserWindow): Menu {
+/**
+ * Build the menu template in isolation so it can be inspected without
+ * booting Electron. `createMenu` is the thin wrapper that asks Electron
+ * to instantiate a `Menu` from the template.
+ */
+export function createMenuTemplate(mainWindow: BrowserWindow): MenuItemConstructorOptions[] {
   const isMac = process.platform === 'darwin';
 
-  const template: MenuItemConstructorOptions[] = [
+  return [
     ...(isMac
       ? [
           {
@@ -26,14 +31,14 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
       label: 'File',
       submenu: [
         {
-          label: 'New Ontology',
+          label: 'New Contexture File',
           accelerator: 'CmdOrCtrl+N',
           click: (): void => {
             mainWindow.webContents.send('menu:file-new');
           },
         },
         {
-          label: 'Open...',
+          label: 'Open Contexture File…',
           accelerator: 'CmdOrCtrl+O',
           click: (): void => {
             mainWindow.webContents.send('menu:file-open');
@@ -48,7 +53,7 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
           },
         },
         {
-          label: 'Save As...',
+          label: 'Save Contexture File As…',
           accelerator: 'CmdOrCtrl+Shift+S',
           click: (): void => {
             mainWindow.webContents.send('menu:file-save-as');
@@ -95,6 +100,8 @@ export function createMenu(mainWindow: BrowserWindow): Menu {
       ],
     },
   ];
+}
 
-  return Menu.buildFromTemplate(template);
+export function createMenu(mainWindow: BrowserWindow): Menu {
+  return Menu.buildFromTemplate(createMenuTemplate(mainWindow));
 }

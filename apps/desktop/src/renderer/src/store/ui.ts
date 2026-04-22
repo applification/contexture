@@ -42,6 +42,8 @@ interface UIState {
   setChatDraft: (draft: string) => void;
   pendingChatMessage: { message: string; context: string } | null;
   setPendingChatMessage: (msg: { message: string; context: string } | null) => void;
+  chatHistoryPersistence: boolean;
+  setChatHistoryPersistence: (enabled: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -58,6 +60,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarTab: 'chat',
   chatDraft: '',
   pendingChatMessage: null,
+  chatHistoryPersistence: true,
 
   setSelectedNode: (id) => set({ selectedNodeId: id, selectedNodeIds: id ? [id] : [] }),
   toggleSelectedNode: (id) =>
@@ -85,4 +88,5 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
   setChatDraft: (draft) => set({ chatDraft: draft }),
   setPendingChatMessage: (msg) => set({ pendingChatMessage: msg }),
+  setChatHistoryPersistence: (enabled) => set({ chatHistoryPersistence: enabled }),
 }));

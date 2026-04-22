@@ -1,0 +1,148 @@
+/**
+ * Save bundle construction + atomic write for a `.contexture.json` document.
+ *
+ * `buildSaveBundle(input)` is pure: given the in-memory IR plus the two
+ * disposable sidecars, it returns the five files that should end up on
+ * disk for this save — the IR, layout sidecar, chat sidecar, and the two
+ * generated artifacts (`.schema.ts` and `.schema.json`). The generated
+ * files carry a 'do not edit' header; the Zod emitter already emits its
+ * own so we only decorate the JSON Schema output here.
+ *
+ * `writeBundleAtomic(files)` is the impure counterpart: for each file it
+ * writes to a `.tmp` sibling and renames into place, and on any failure
+ * it rolls back every already-renamed file by restoring the previous
+ * content (read before rename) or deleting it if it did not exist.
+ * Callers either see every file updated or every file unchanged.
+ */
+
+import { promises as fs } from 'node:fs';
+import { type ChatHistory, saveChatHistory } from '@renderer/model/chat-history';
+import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
+import { emit as emitZod } from '@renderer/model/emit-zod';
+import { type Layout, saveLayout } from '@renderer/model/layout';
+import { save as saveIR } from '@renderer/model/load';
+import type { Schema } from '@renderer/model/types';
+
+export const IR_SUFFIX = '.contexture.json';
+export const LAYOUT_SUFFIX = '.contexture.layout.json';
+export const CHAT_SUFFIX = '.contexture.chat.json';
+export const SCHEMA_TS_SUFFIX = '.schema.ts';
+export const SCHEMA_JSON_SUFFIX = '.schema.json';
+
+export interface SaveFile {
+  path: string;
+  content: string;
+}
+
+export interface SaveBundle {
+  /** The five files, in a stable order: ir, layout, chat, schema.ts, schema.json. */
+  files: SaveFile[];
+}
+
+export interface BuildSaveBundleInput {
+  /** Absolute path to the `.contexture.json` file. */
+  irPath: string;
+  schema: Schema;
+  layout: Layout;
+  chat: ChatHistory;
+}
+
+/**
+ * Compute the five sibling paths given the IR path.
+ * Throws if `irPath` does not end in `.contexture.json` — the Open filter
+ * guarantees this but we're defensive.
+ */
+export function bundlePathsFor(irPath: string): {
+  ir: string;
+  layout: string;
+  chat: string;
+  schemaTs: string;
+  schemaJson: string;
+} {
+  if (!irPath.endsWith(IR_SUFFIX)) {
+    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${irPath}`);
+  }
+  const base = irPath.slice(0, -IR_SUFFIX.length);
+  return {
+    ir: irPath,
+    layout: `${base}${LAYOUT_SUFFIX}`,
+    chat: `${base}${CHAT_SUFFIX}`,
+    schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
+    schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
+  };
+}
+
+/**
+ * Atomic multi-file write.
+ *
+ * Strategy:
+ *   1. Snapshot the prior content of every destination that already exists,
+ *      plus a flag for those that don't, so rollback can restore the exact
+ *      pre-save filesystem state.
+ *   2. For each file, write to `<path>.tmp` then `rename` into place. On a
+ *      single filesystem rename is atomic, so at any moment each path is
+ *      either fully old or fully new.
+ *   3. If any step throws, unwind: restore prior content for files that had
+ *      one, delete files that didn't, and discard any leftover `.tmp` files.
+ *      Then rethrow the original error so the caller sees the real cause.
+ *
+ * This does not defend against crashes mid-pipeline (only process-level
+ * failures). That is acceptable: the OS rename guarantee keeps each file
+ * individually consistent, and the IR is always the source of truth.
+ */
+export async function writeBundleAtomic(bundle: SaveBundle): Promise<void> {
+  interface Snapshot {
+    path: string;
+    existed: boolean;
+    prior?: Buffer;
+    renamed: boolean;
+  }
+
+  const snapshots: Snapshot[] = [];
+  try {
+    for (const file of bundle.files) {
+      const snap: Snapshot = { path: file.path, existed: false, renamed: false };
+      try {
+        snap.prior = await fs.readFile(file.path);
+        snap.existed = true;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      }
+      snapshots.push(snap);
+
+      const tmpPath = `${file.path}.tmp`;
+      await fs.writeFile(tmpPath, file.content);
+      await fs.rename(tmpPath, file.path);
+      snap.renamed = true;
+    }
+  } catch (err) {
+    // Rollback in reverse.
+    for (const snap of snapshots.slice().reverse()) {
+      if (snap.renamed) {
+        if (snap.existed && snap.prior !== undefined) {
+          await fs.writeFile(snap.path, snap.prior).catch(() => undefined);
+        } else {
+          await fs.rm(snap.path, { force: true }).catch(() => undefined);
+        }
+      }
+      // Clean stray tmp if the rename never happened.
+      await fs.rm(`${snap.path}.tmp`, { force: true }).catch(() => undefined);
+    }
+    throw err;
+  }
+}
+
+export function buildSaveBundle(input: BuildSaveBundleInput): SaveBundle {
+  const paths = bundlePathsFor(input.irPath);
+  const jsonSchemaHeader = `// Generated by Contexture from ${input.irPath}. Do not edit.\n`;
+  const jsonSchemaBody = JSON.stringify(emitJsonSchema(input.schema), null, 2);
+  return {
+    files: [
+      { path: paths.ir, content: saveIR(input.schema) },
+      { path: paths.layout, content: saveLayout(input.layout) },
+      { path: paths.chat, content: saveChatHistory(input.chat) },
+      { path: paths.schemaTs, content: emitZod(input.schema, input.irPath) },
+      { path: paths.schemaJson, content: jsonSchemaHeader + jsonSchemaBody },
+    ],
+  };
+}
