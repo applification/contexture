@@ -1,14 +1,10 @@
 /**
- * Contexture IR shape (v1) — DRAFT for Phase 2.
+ * Contexture IR shape (v1) — the single source of truth for the schema model.
  *
- * Source of truth: `plans/pivot.md` §IR shape (v1).
+ * Spec: `plans/pivot.md` §IR shape (v1).
  *
- * This file is intentionally unused at this phase: it is a pinned type contract
- * committed during Phase 0 so that Phase 2 work can promote it (and its Zod
- * meta-schema sibling) into the live model layer.
- *
- * Not yet wired up — later Phase 2 slices (#80 onward) promote this into the
- * live model layer and its Zod meta-schema sibling.
+ * The runtime validator lives in `./ir-schema.ts`; the two files must stay in
+ * sync. Prefer adding new kinds here first, then extending the Zod meta-schema.
  */
 
 export type Schema = {
