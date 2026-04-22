@@ -48,6 +48,8 @@ export interface UndoableState {
   canRedo: boolean;
 }
 
+export type UndoableContextureStore = ReturnType<typeof createUndoableContextureStore>;
+
 export function createUndoableContextureStore(initial: Schema) {
   return create<UndoableState>((set, get) => {
     const recompute = (past: Schema[], future: Schema[]) => ({
@@ -134,3 +136,12 @@ export function createUndoableContextureStore(initial: Schema) {
     };
   });
 }
+
+/**
+ * App-wide undoable store seeded with an empty v1 IR. Detail panels and
+ * canvas interactions dispatch every mutation through `useUndoStore.getState().apply()`
+ * so direct-manipulation edits become single-entry undo steps and the
+ * chat turn binder (see `chat/turn-binder.ts`) can wrap a chain of ops
+ * in one transaction.
+ */
+export const useUndoStore = createUndoableContextureStore({ version: '1', types: [] });
