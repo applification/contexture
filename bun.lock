@@ -15,6 +15,7 @@
       "version": "0.14.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.83",
+        "@contexture/runtime": "workspace:*",
         "@contexture/stdlib": "workspace:*",
         "@electron-toolkit/preload": "^3.0.1",
         "@electron-toolkit/utils": "^4.0.0",
@@ -110,6 +111,20 @@
         "tailwindcss": "^4",
         "typescript": "^5",
         "vitest": "^3.2.1",
+      },
+    },
+    "packages/runtime": {
+      "name": "@contexture/runtime",
+      "version": "0.14.0",
+      "dependencies": {
+        "@contexture/stdlib": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.2",
+        "zod": "^4.3.6",
+      },
+      "peerDependencies": {
+        "zod": "^4.3.6",
       },
     },
     "packages/stdlib": {
@@ -245,6 +260,8 @@
     "@chevrotain/utils": ["@chevrotain/utils@11.1.2", "", {}, "sha512-4mudFAQ6H+MqBTfqLmU7G1ZwRzCLfJEooL/fsF6rCX5eePMbGhoy5n4g+G4vlh2muDcsCTJtL+uKbOzWxs5LHA=="],
 
     "@contexture/desktop": ["@contexture/desktop@workspace:apps/desktop"],
+
+    "@contexture/runtime": ["@contexture/runtime@workspace:packages/runtime"],
 
     "@contexture/stdlib": ["@contexture/stdlib@workspace:packages/stdlib"],
 
