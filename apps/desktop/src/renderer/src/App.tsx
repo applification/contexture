@@ -19,7 +19,7 @@
  * sidebar button).
  */
 
-import { ChevronDown, MousePointer2, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { evalRootCandidates } from './chat/eval-prompt';
@@ -46,6 +46,7 @@ import {
 } from './components/ui/empty';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
+import { useFileMenu } from './hooks/useFileMenu';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { STDLIB_REGISTRY } from './services/stdlib-registry';
@@ -59,6 +60,7 @@ export default function App(): React.JSX.Element {
 
   const [positions, setPositions] = useState<Record<string, CanvasPosition>>({});
   const [showGraphControls, setShowGraphControls] = useState(false);
+  const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const activeTab = useUIStore((s) => s.sidebarTab);
   const setActiveTab = useUIStore((s) => s.setSidebarTab);
@@ -129,6 +131,26 @@ export default function App(): React.JSX.Element {
         : noopChatApi(),
   });
 
+  const fileMenu = useFileMenu();
+
+  // Pull the recent-files list when the empty state might need it and
+  // again whenever the file-path changes (a successful open/save
+  // bumps the list).
+  useEffect(() => {
+    const api = window.contexture?.file;
+    if (!api) return;
+    let cancelled = false;
+    api
+      .getRecentFiles()
+      .then((list) => {
+        if (!cancelled) setRecentFiles(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const ev = useClaudeEval({
     api: {
       generate: async () => ({ sample: {} }),
@@ -187,7 +209,11 @@ export default function App(): React.JSX.Element {
             {hasSchema ? (
               <GraphCanvas positions={positions} onPositionsChange={setPositions} />
             ) : (
-              <EmptyState onLoadSample={loadSample} />
+              <EmptyState
+                onLoadSample={loadSample}
+                recentFiles={recentFiles}
+                onOpenRecent={fileMenu.handleOpenPath}
+              />
             )}
           </div>
         </ResizablePanel>
@@ -235,12 +261,20 @@ export default function App(): React.JSX.Element {
       </ResizablePanelGroup>
 
       <StatusBar />
-      <DocumentDialogs />
+      <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
     </div>
   );
 }
 
-function EmptyState({ onLoadSample }: { onLoadSample: () => void }): React.JSX.Element {
+function EmptyState({
+  onLoadSample,
+  recentFiles,
+  onOpenRecent,
+}: {
+  onLoadSample: () => void;
+  recentFiles: string[];
+  onOpenRecent: (path: string) => void;
+}): React.JSX.Element {
   return (
     <div
       className="relative w-full h-full flex items-center justify-center overflow-hidden"
@@ -255,6 +289,31 @@ function EmptyState({ onLoadSample }: { onLoadSample: () => void }): React.JSX.E
           Claude to create one.
         </p>
         <Button onClick={onLoadSample}>Load allotment sample</Button>
+
+        {recentFiles.length > 0 && (
+          <div className="mt-6 text-left">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
+              <Clock className="size-3" />
+              <span>Recent files</span>
+            </div>
+            <div className="space-y-0.5">
+              {recentFiles.slice(0, 5).map((fp) => (
+                <button
+                  type="button"
+                  key={fp}
+                  onClick={() => onOpenRecent(fp)}
+                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
+                  title={fp}
+                >
+                  {fp.split('/').pop()}
+                  <span className="text-muted-foreground/50 ml-1.5">
+                    {fp.split('/').slice(0, -1).join('/')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

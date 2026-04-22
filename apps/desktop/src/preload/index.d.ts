@@ -63,8 +63,27 @@ export interface ContextureChatAPI {
   onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) => Unsubscribe;
 }
 
+export interface ContextureFileAPI {
+  openDialog: () => Promise<{ irPath: string; content: string } | null>;
+  saveAsDialog: () => Promise<string | null>;
+  save: (payload: {
+    irPath: string;
+    schema: unknown;
+    layout: unknown;
+    chat: unknown;
+  }) => Promise<void>;
+  read: (irPath: string) => Promise<{ irPath: string; content: string }>;
+  getRecentFiles: () => Promise<string[]>;
+  openRecent: (filePath: string) => Promise<{ irPath: string; content: string } | null>;
+  onMenuNew: (listener: () => void) => Unsubscribe;
+  onMenuOpen: (listener: () => void) => Unsubscribe;
+  onMenuSave: (listener: () => void) => Unsubscribe;
+  onMenuSaveAs: (listener: () => void) => Unsubscribe;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
+  file: ContextureFileAPI;
 }
 
 declare global {

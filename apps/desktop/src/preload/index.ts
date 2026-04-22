@@ -67,7 +67,45 @@ const chat = {
     subscribe('claude:op-request', listener as (p: unknown) => void),
 };
 
-const contexture = { chat };
+const file = {
+  /** Show the OS open dialog and return the file path + raw contents. */
+  openDialog: () =>
+    ipcRenderer.invoke('file:open-dialog') as Promise<{
+      irPath: string;
+      content: string;
+    } | null>,
+  /** Show the OS save-as dialog and return the chosen path. */
+  saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
+  /** Write the five-file bundle atomically under `irPath`. */
+  save: (payload: {
+    irPath: string;
+    schema: unknown;
+    layout: unknown;
+    chat: unknown;
+  }): Promise<void> => ipcRenderer.invoke('file:save', payload) as Promise<void>,
+  /** Read a `.contexture.json` by absolute path (no dialog). */
+  read: (irPath: string) =>
+    ipcRenderer.invoke('file:read', irPath) as Promise<{ irPath: string; content: string }>,
+  /** List of most-recently-opened paths (most-recent first). */
+  getRecentFiles: () => ipcRenderer.invoke('file:recent-files') as Promise<string[]>,
+  /** Open a path from the recent-files list; returns null if it's gone. */
+  openRecent: (filePath: string) =>
+    ipcRenderer.invoke('file:open-recent', filePath) as Promise<{
+      irPath: string;
+      content: string;
+    } | null>,
+  /** Menu-bar -> renderer subscriptions. */
+  onMenuNew: (listener: () => void) =>
+    subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
+  onMenuOpen: (listener: () => void) =>
+    subscribe('menu:file-open', (() => listener()) as (p: unknown) => void),
+  onMenuSave: (listener: () => void) =>
+    subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
+  onMenuSaveAs: (listener: () => void) =>
+    subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
+};
+
+const contexture = { chat, file };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's
