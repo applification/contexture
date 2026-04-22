@@ -1,0 +1,123 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emit (JSON Schema) > snapshot: representative IR covering all 4 TypeDef kinds and all 8 FieldType kinds 1`] = `
+{
+  "$defs": {
+    "Click": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "click",
+        },
+        "x": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "type",
+        "x",
+      ],
+      "type": "object",
+    },
+    "Event": {
+      "discriminator": {
+        "propertyName": "type",
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Click",
+        },
+        {
+          "$ref": "#/$defs/Hover",
+        },
+      ],
+    },
+    "Hover": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string",
+        },
+        "type": {
+          "const": "hover",
+        },
+      },
+      "required": [
+        "type",
+        "target",
+      ],
+      "type": "object",
+    },
+    "Money": {
+      "properties": {
+        "amount": {
+          "type": "number",
+        },
+        "currency": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "amount",
+        "currency",
+      ],
+      "type": "object",
+    },
+    "Post": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "$ref": "@contexture/runtime/common#/$defs/Email",
+        },
+        "createdAt": {
+          "format": "date-time",
+          "type": "string",
+        },
+        "kind": {
+          "const": "post",
+        },
+        "linked": {
+          "$ref": "./other.schema.json#/$defs/Ref",
+        },
+        "published": {
+          "default": false,
+          "type": "boolean",
+        },
+        "tags": {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string",
+        },
+        "views": {
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "title",
+        "views",
+        "published",
+        "createdAt",
+        "kind",
+        "author",
+        "linked",
+      ],
+      "type": "object",
+    },
+    "Role": {
+      "enum": [
+        "admin",
+        "member",
+      ],
+      "type": "string",
+    },
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+}
+`;
