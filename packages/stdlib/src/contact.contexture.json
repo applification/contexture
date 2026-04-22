@@ -1,0 +1,16 @@
+{
+  "version": "1",
+  "metadata": {
+    "name": "contact",
+    "description": "Reachable-identity primitives."
+  },
+  "types": [
+    {
+      "kind": "raw",
+      "name": "PhoneE164",
+      "description": "ITU-T E.164 phone number.",
+      "zod": "z.string().regex(/^\\+[1-9]\\d{1,14}$/)",
+      "jsonSchema": { "type": "string", "pattern": "^\\+[1-9]\\d{1,14}$" }
+    }
+  ]
+}
