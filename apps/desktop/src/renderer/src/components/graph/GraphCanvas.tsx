@@ -86,6 +86,8 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const setAdjacency = useUIStore((s) => s.setAdjacency);
+  const setSidebarTab = useUIStore((s) => s.setSidebarTab);
+  const setSidebarVisible = useUIStore((s) => s.setSidebarVisible);
 
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(
     () => buildGraph({ schema, positions }),
@@ -265,6 +267,18 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
     [dispatch],
   );
 
+  // Double-click a node → focus its properties in the sidebar.
+  // Mirrors the pre-pivot behaviour: selects the node, expands the
+  // sidebar (if collapsed), and flips to the `properties` tab.
+  const onNodeDoubleClick: ReactFlowProps['onNodeDoubleClick'] = useCallback(
+    (_event, node) => {
+      setSelectedNode(node.id);
+      setSidebarVisible(true);
+      setSidebarTab('properties');
+    },
+    [setSelectedNode, setSidebarVisible, setSidebarTab],
+  );
+
   const onKeyDown = useCallback(
     (ev: React.KeyboardEvent<HTMLDivElement>) => {
       const e: InteractionKeyEvent = {
@@ -303,6 +317,7 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
         onConnect={onConnect}
         onDoubleClick={onPaneDoubleClick}
         onNodeClick={(_, node) => setSelectedNode(node.id)}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={() => setSelectedNode(null)}
         onEdgeClick={(_, edge) => {
           const data = edge.data as RefEdgeData | undefined;
