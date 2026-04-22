@@ -14,14 +14,22 @@ const sharedAliases = {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // Keep `@contexture/*` workspace packages inlined into the main/preload
+    // bundle. They ship as `.ts` sources with ESM exports, and externalizing
+    // them would leave CJS `require()` calls at runtime that can't load
+    // `export` statements.
+    plugins: [externalizeDepsPlugin({ exclude: ['@contexture/stdlib', '@contexture/runtime'] })],
     resolve: { alias: sharedAliases },
     define: {
       'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    // Keep `@contexture/*` workspace packages inlined into the main/preload
+    // bundle. They ship as `.ts` sources with ESM exports, and externalizing
+    // them would leave CJS `require()` calls at runtime that can't load
+    // `export` statements.
+    plugins: [externalizeDepsPlugin({ exclude: ['@contexture/stdlib', '@contexture/runtime'] })],
     resolve: { alias: sharedAliases },
   },
   renderer: {
