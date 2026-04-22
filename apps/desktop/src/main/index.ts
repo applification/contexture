@@ -9,6 +9,7 @@ syncShellEnvironment();
 
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { registerClaudeIpc } from './ipc/claude';
 import { registerFileIpc } from './ipc/file';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
@@ -70,6 +71,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(createMenu(mainWindow));
   registerUpdateIpc(mainWindow);
   registerFileIpc(mainWindow);
+  registerClaudeIpc(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
