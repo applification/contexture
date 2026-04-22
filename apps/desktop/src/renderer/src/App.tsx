@@ -19,7 +19,7 @@
  * sidebar button).
  */
 
-import { MousePointer2 } from 'lucide-react';
+import { ChevronDown, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { evalRootCandidates } from './chat/eval-prompt';
@@ -29,8 +29,10 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { EvalPanel } from './components/eval/EvalPanel';
+import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { StatusBar } from './components/status-bar/StatusBar';
+import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { Button } from './components/ui/button';
@@ -41,6 +43,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from './components/ui/empty';
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
@@ -54,6 +57,7 @@ export default function App(): React.JSX.Element {
   const hasSchema = schema.types.length > 0;
 
   const [positions, setPositions] = useState<Record<string, CanvasPosition>>({});
+  const [showGraphControls, setShowGraphControls] = useState(false);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const activeTab = useUIStore((s) => s.sidebarTab);
   const setActiveTab = useUIStore((s) => s.setSidebarTab);
@@ -117,6 +121,25 @@ export default function App(): React.JSX.Element {
       >
         <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%">
           <div className="relative w-full h-full">
+            {hasSchema && (
+              <div className="absolute top-2 left-2 z-10">
+                <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      className="h-8 px-2 gap-1.5 shadow-sm"
+                      title="Graph controls"
+                    >
+                      <SlidersHorizontal className="size-4" />
+                      <ChevronDown className="size-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-0 w-72" align="start">
+                    <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
             {hasSchema ? (
               <GraphCanvas positions={positions} onPositionsChange={setPositions} />
             ) : (
@@ -175,9 +198,10 @@ export default function App(): React.JSX.Element {
 function EmptyState({ onLoadSample }: { onLoadSample: () => void }): React.JSX.Element {
   return (
     <div
-      className="relative w-full h-full flex items-center justify-center"
+      className="relative w-full h-full flex items-center justify-center overflow-hidden"
       style={{ background: 'var(--graph-bg)' }}
     >
+      <GraphBackground />
       <div className="relative z-10 text-center text-muted-foreground max-w-sm">
         <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
         <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>

@@ -130,28 +130,29 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const { runLayout } = useELKLayout();
   const { fitView } = useReactFlow();
   const nodesInitialized = useNodesInitialized({ includeHiddenNodes: false });
+  const graphLayout = useUIStore((s) => s.graphLayout);
+  const graphLayoutRef = useRef(graphLayout);
+  graphLayoutRef.current = graphLayout;
+  // Keep refs for callbacks triggered outside React (custom events).
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  const onPositionsChangeRef = useRef(onPositionsChange);
+  onPositionsChangeRef.current = onPositionsChange;
 
-  /*
-   * Layout only re-runs on structural schema changes (tracked via
-   * `layoutPendingRef`). The deps array listed below is what biome
-   * wants, but the gate is the ref — not the deps — so extra re-entries
-   * are cheap (they short-circuit on `!layoutPendingRef.current`).
-   */
-  useEffect(() => {
-    if (!nodesInitialized || !layoutPendingRef.current) return;
-    layoutPendingRef.current = false;
-
-    const toLayout = nodesRef.current.filter((n) => n.type !== 'group');
-    if (toLayout.length === 0) return;
-
-    let cancelled = false;
-    runLayout(toLayout, edgesRef.current).then((result) => {
-      if (cancelled || result.length === 0) return;
+  // One shared layout runner — respects the `respectSidecar` flag so
+  // the top-left "Re-layout" button can stomp on persisted positions
+  // while the initial-load path preserves them.
+  const runLayoutNow = useCallback(
+    async (respectSidecar: boolean) => {
+      const toLayout = nodesRef.current.filter((n) => n.type !== 'group');
+      if (toLayout.length === 0) return;
+      const result = await runLayout(toLayout, edgesRef.current, graphLayoutRef.current);
+      if (result.length === 0) return;
       const positionById = new Map(result.map((p) => [p.id, { x: p.x, y: p.y }]));
-      // Sidecar / parent-held positions win — a user's persisted drag
-      // beats a fresh auto-layout run.
-      if (positions) {
-        for (const [id, p] of Object.entries(positions)) positionById.set(id, p);
+      // Preserve user-held positions only on the initial auto-layout —
+      // a manual Re-layout re-runs ELK without the override.
+      if (respectSidecar && positionsRef.current) {
+        for (const [id, p] of Object.entries(positionsRef.current)) positionById.set(id, p);
       }
       setNodes((prev) =>
         prev.map((n) => {
@@ -159,19 +160,43 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
           return p ? { ...n, position: p } : n;
         }),
       );
-      // Persist the newly computed positions so next reload is instant.
-      const next: Record<string, CanvasPosition> = { ...(positions ?? {}) };
+      const next: Record<string, CanvasPosition> = respectSidecar
+        ? { ...(positionsRef.current ?? {}) }
+        : {};
       positionById.forEach((p, id) => {
         next[id] = p;
       });
-      onPositionsChange?.(next);
-      // Let XYFlow frame everything after positions land.
+      onPositionsChangeRef.current?.(next);
       setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
-    });
+    },
+    [runLayout, fitView],
+  );
+
+  /*
+   * Initial layout: run once the measurements are in and the schema
+   * has changed structurally (tracked by `layoutPendingRef`).
+   */
+  useEffect(() => {
+    if (!nodesInitialized || !layoutPendingRef.current) return;
+    layoutPendingRef.current = false;
+    void runLayoutNow(true);
+  }, [nodesInitialized, runLayoutNow]);
+
+  // Subscribe to the GraphControls bus events.
+  useEffect(() => {
+    function onRelayout(): void {
+      void runLayoutNow(false);
+    }
+    function onFitView(): void {
+      fitView({ padding: 0.15, duration: 400 });
+    }
+    document.addEventListener('graph:relayout', onRelayout);
+    document.addEventListener('graph:fitview', onFitView);
     return () => {
-      cancelled = true;
+      document.removeEventListener('graph:relayout', onRelayout);
+      document.removeEventListener('graph:fitview', onFitView);
     };
-  }, [nodesInitialized, positions, onPositionsChange, fitView, runLayout]);
+  }, [runLayoutNow, fitView]);
 
   // Selection → adjacency dimming.
   useEffect(() => {
