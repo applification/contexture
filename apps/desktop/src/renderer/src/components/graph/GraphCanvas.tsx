@@ -140,10 +140,11 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps) {
       if (target.closest('[data-testid="type-node"]')) return;
       const op = handleDoubleClick(useUndoStore.getState().schema);
       dispatch(op);
-      // Parker the new node near the cursor once XYFlow has registered it.
-      const { type } = op;
+      // Park the new node near the cursor. `handleDoubleClick` always
+      // returns an `add_type` op — narrow so TS sees the `type` field.
+      if (op.kind !== 'add_type') return;
       const pos = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      onPositionsChange?.({ ...(positions ?? {}), [type.name]: pos });
+      onPositionsChange?.({ ...(positions ?? {}), [op.type.name]: pos });
     },
     [dispatch, flow, onPositionsChange, positions],
   );

@@ -137,11 +137,14 @@ function EnumBody({
             )
           )
             return;
+          // Enum-only patch: the runtime kind is narrowed by EnumBody's
+          // caller, but `update_type`'s `patch` distributes across every
+          // TypeDef variant so TS can't prove `values` belongs here.
           dispatch({
             kind: 'update_type',
             name: type.name,
             patch: { values: next.map((value) => ({ value })) },
-          });
+          } as Op);
         }}
       />
     </div>
@@ -201,7 +204,9 @@ function RawBody({
         onBlur={(ev) => {
           const next = ev.target.value;
           if (next !== type.zod) {
-            dispatch({ kind: 'update_type', name: type.name, patch: { zod: next } });
+            // Raw-only patch; see the enum note above — cast narrows the
+            // distributed union.
+            dispatch({ kind: 'update_type', name: type.name, patch: { zod: next } } as Op);
           }
         }}
       />

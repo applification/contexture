@@ -12,16 +12,13 @@
  *     so the user can see the boundary between their schema and an
  *     imported namespace at a glance.
  */
-import { BaseEdge, type EdgeProps, getStraightPath } from '@xyflow/react';
+import { BaseEdge, type Edge, type EdgeProps, getStraightPath } from '@xyflow/react';
 import { memo } from 'react';
 import type { RefEdgeData } from '../schema-to-graph';
 
-type EdgeType = {
-  type: 'ref';
-  data: RefEdgeData;
-};
+type RefEdgeKind = Edge<RefEdgeData, 'ref'>;
 
-export const RefEdge = memo(function RefEdge(props: EdgeProps<EdgeType>) {
+export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const { sourceX, sourceY, targetX, targetY, data, selected } = props;
   const [path] = getStraightPath({ sourceX, sourceY, targetX, targetY });
   const crossBoundary = data?.crossBoundary === true;

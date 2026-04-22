@@ -23,7 +23,7 @@
  * for the Agent SDK via its `tool()` factory at IPC registration time.
  */
 
-import { IRSchema } from '@renderer/model/ir-schema';
+import { IRSchema, IRSchemaObject } from '@renderer/model/ir-schema';
 import type { ApplyResult, Op } from '@renderer/store/ops';
 import { type ZodTypeAny, z } from 'zod';
 
@@ -44,7 +44,12 @@ export interface OpToolDescriptor {
 
 // ---- Field-type + field-def schemas (shared across strict ops) ---------
 
-const FieldTypeSchema: z.ZodType = z.lazy(() =>
+// Using z.lazy keeps the recursive `array.element` case honest (the
+// inner FieldType needs the outer FieldType's schema); but we cast the
+// whole expression to the hand-written `FieldType` so downstream
+// z.infer callers (FieldDefSchema, update_field's patch) see the right
+// discriminated-union type instead of `unknown`.
+const FieldTypeSchema: z.ZodType<import('@renderer/model/types').FieldType> = z.lazy(() =>
   z.union([
     z.object({
       kind: z.literal('string'),
@@ -130,9 +135,9 @@ function lenientTool(
 
 // ---- IR meta-schema checks for type-level payloads ---------------------
 
-const TypeDefItemSchema = IRSchema.shape.types.element;
+const TypeDefItemSchema = IRSchemaObject.shape.types.element;
 const ImportDeclItemSchema = (
-  IRSchema.shape.imports as z.ZodOptional<z.ZodArray<z.ZodType>>
+  IRSchemaObject.shape.imports as z.ZodOptional<z.ZodArray<z.ZodType>>
 ).unwrap().element;
 
 function assertTypeDef(value: unknown, opName: string): void {

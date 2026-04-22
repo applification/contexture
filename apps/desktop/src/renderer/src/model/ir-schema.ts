@@ -137,9 +137,15 @@ const MetadataSchema = z.object({
 // template-literal path on `ImportDecl.kind === 'stdlib'`: Zod reports it as
 // `string`, while `Schema` narrows it to `@contexture/${string}`. The runtime
 // regex enforces the same invariant, so the cast is sound.
-export const IRSchema = z.object({
+// Raw object schema — exposes `.shape` for callers that need to pick
+// a specific field's schema (`src/main/ops/index.ts` narrows to
+// `types.element` and `imports.element`). The public `IRSchema` is cast
+// to the hand-written `Schema` so `parse()` returns the right type.
+export const IRSchemaObject = z.object({
   version: z.literal('1'),
   types: z.array(TypeDefSchema),
   imports: z.array(ImportDeclSchema).optional(),
   metadata: MetadataSchema.optional(),
-}) as unknown as z.ZodType<Schema>;
+});
+
+export const IRSchema = IRSchemaObject as unknown as z.ZodType<Schema>;

@@ -21,7 +21,7 @@
  * #92 only needs the click → selection state flow to exist; the panel
  * lands later.
  */
-import { Handle, type NodeProps, Position } from '@xyflow/react';
+import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
 import { memo, useCallback } from 'react';
 import { useUIStore } from '../../../store/ui';
 import type { TypeNodeData } from '../schema-to-graph';
@@ -33,14 +33,14 @@ export interface FieldSelection {
 
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
 
-export const TypeNode = memo(function TypeNode(
-  props: NodeProps<{ type: 'type'; data: TypeNodeData }>,
-) {
+type TypeNodeKind = Node<TypeNodeData, 'type'>;
+
+export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const { data, selected } = props;
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
 
   const onFieldClick = useCallback(
-    (fieldName: string, ev: React.MouseEvent<HTMLDivElement>) => {
+    (fieldName: string, ev: React.MouseEvent<HTMLElement>) => {
       ev.stopPropagation();
       setSelectedNode(data.typeName);
       // Also emit a DOM event for tests / higher layers that want the
@@ -84,7 +84,7 @@ export const TypeNode = memo(function TypeNode(
               onClick={(ev) => onFieldClick(f.name, ev)}
               onKeyDown={(ev) => {
                 if (ev.key === 'Enter' || ev.key === ' ') {
-                  onFieldClick(f.name, ev as unknown as React.MouseEvent<HTMLDivElement>);
+                  onFieldClick(f.name, ev as unknown as React.MouseEvent<HTMLElement>);
                 }
               }}
             >
