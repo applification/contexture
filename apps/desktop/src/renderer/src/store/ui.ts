@@ -10,7 +10,7 @@ const DEFAULT_LAYOUT: GraphLayout = {
   nodeSpacing: 180,
 };
 
-export type SidebarTab = 'properties' | 'chat' | 'eval' | 'metrics';
+export type SidebarTab = 'properties' | 'chat' | 'schema' | 'eval' | 'metrics';
 
 interface UIState {
   selectedNodeId: string | null;

@@ -237,3 +237,22 @@ body {
 .app-drag-region [role="button"] {
   -webkit-app-region: no-drag;
 }
+
+/*
+ * Shiki dual-theme wiring. With `defaultColor: false`, shiki emits
+ * `--shiki-light` / `--shiki-dark` custom properties on every span
+ * but no actual `color` rule — the caller picks which variable
+ * wins. We default to light and flip to dark under the app's
+ * `.dark` ancestor class, mirroring how Tailwind's dark variant
+ * works elsewhere in the app.
+ */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: transparent;
+}
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: transparent;
+}

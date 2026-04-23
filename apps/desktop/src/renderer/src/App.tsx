@@ -32,6 +32,7 @@ import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
+import { SchemaPanel } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -48,9 +49,11 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { useFileMenu } from './hooks/useFileMenu';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
+import { emit as emitZod } from './model/emit-zod';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { STDLIB_REGISTRY } from './services/stdlib-registry';
 import { validate } from './services/validation';
+import { useDocumentStore } from './store/document';
 import { useUIStore } from './store/ui';
 import { useUndoStore } from './store/undo';
 
@@ -175,6 +178,22 @@ export default function App(): React.JSX.Element {
   const rootCandidates = useMemo(() => evalRootCandidates(schema), [schema]);
   const hasSelection = selectedNodeId !== null;
 
+  // Emit Zod source for the SchemaPanel. Only runs while the Schema
+  // tab is active so we don't burn cycles on every IR change when
+  // the user is looking at Chat / Eval / Properties. Wrapped in
+  // try/catch so a malformed intermediate state (e.g. during a
+  // multi-op chat turn) surfaces as an in-panel error rather than
+  // crashing the sidebar.
+  const filePath = useDocumentStore((s) => s.filePath);
+  const zodEmission = useMemo((): { source: string; error: string | null } => {
+    if (activeTab !== 'schema') return { source: '', error: null };
+    try {
+      return { source: emitZod(schema, filePath ?? '<unsaved>.contexture.json'), error: null };
+    } catch (e) {
+      return { source: '', error: e instanceof Error ? e.message : String(e) };
+    }
+  }, [activeTab, schema, filePath]);
+
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <UpdateBanner />
@@ -250,6 +269,14 @@ export default function App(): React.JSX.Element {
               </div>
               <div className={activeTab !== 'chat' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <ChatPanel chat={chat} />
+              </div>
+              <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <SchemaPanel
+                  zodSource={zodEmission.source}
+                  isEmpty={!hasSchema}
+                  error={zodEmission.error}
+                  onCopy={copyToClipboard}
+                />
               </div>
               <div className={activeTab !== 'eval' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <EvalPanel eval={ev} rootCandidates={rootCandidates} onCopy={copyToClipboard} />
