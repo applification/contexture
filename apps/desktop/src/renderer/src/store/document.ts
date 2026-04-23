@@ -4,7 +4,7 @@
  * belong to the file lifecycle (import warnings, failed-format open,
  * save-while-invalid prompt).
  *
- * Kept separate from the IR (`useUndoStore`) and UI (`useUIStore`)
+ * Kept separate from the IR (`useUndoStore`) and UI chrome / selection
  * stores because it has different lifetimes:
  *   - The IR changes on every op; the path only changes on open/save-as.
  *   - The dirty flag flips on any `apply` that lands outside an open

@@ -1,10 +1,10 @@
 /**
  * Global keyboard shortcuts — driven from the document listener in
- * `App.tsx`. Asserts the outcome via `useUIStore` / `useUndoStore`
+ * `App.tsx`. Asserts the outcome via the selection store / undo store
  * rather than reaching into the implementation.
  */
 import App from '@renderer/App';
-import { useUIStore } from '@renderer/store/ui';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,8 +14,7 @@ beforeEach(() => {
   useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   // Clear past/future by popping until empty.
   while (useUndoStore.getState().canUndo) useUndoStore.getState().undo();
-  useUIStore.getState().setSelectedNode(null);
-  useUIStore.getState().setSelectedEdge(null);
+  useGraphSelectionStore.getState().clear();
   (window as unknown as { contexture: unknown }).contexture = {
     chat: {
       send: vi.fn(async () => ({ ok: false })),
@@ -43,10 +42,10 @@ afterEach(() => {
 
 describe('App global keyboard', () => {
   it('Escape clears selection', () => {
-    useUIStore.getState().setSelectedNode('Plot');
+    useGraphSelectionStore.getState().click('Plot', 'replace');
     render(<App />);
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(useUIStore.getState().selectedNodeId).toBeNull();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBeNull();
   });
 
   it('Cmd+Z undoes the last op', () => {
@@ -66,10 +65,10 @@ describe('App global keyboard', () => {
       kind: 'add_type',
       type: { kind: 'object', name: 'Plot', fields: [] },
     });
-    useUIStore.getState().setSelectedNode('Plot');
+    useGraphSelectionStore.getState().click('Plot', 'replace');
     fireEvent.keyDown(document, { key: 'Delete' });
     expect(useUndoStore.getState().schema.types).toEqual([]);
-    expect(useUIStore.getState().selectedNodeId).toBeNull();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBeNull();
   });
 
   it('ignores typing shortcuts inside inputs', () => {
@@ -78,7 +77,7 @@ describe('App global keyboard', () => {
       kind: 'add_type',
       type: { kind: 'object', name: 'Plot', fields: [] },
     });
-    useUIStore.getState().setSelectedNode('Plot');
+    useGraphSelectionStore.getState().click('Plot', 'replace');
     // Fire Delete on an <input> inside the DOM — it shouldn't delete
     // the selected type.
     const input = document.createElement('input');

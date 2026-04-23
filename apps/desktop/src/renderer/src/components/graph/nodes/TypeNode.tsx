@@ -18,7 +18,7 @@
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
 import { memo, useCallback, useMemo } from 'react';
-import { useUIStore } from '../../../store/ui';
+import { useGraphSelectionStore } from '../../../store/selection';
 import type { TypeNodeData } from '../schema-to-graph';
 
 export interface FieldSelection {
@@ -52,22 +52,22 @@ function headerColorFor(kind: TypeNodeData['kind']): string {
 
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const { data, id } = props;
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const adjacentNodeIds = useUIStore((s) => s.adjacentNodeIds);
+  const click = useGraphSelectionStore((s) => s.click);
+  const primaryNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const adjacentNodeIds = useGraphSelectionStore((s) => s.state.adjacency.nodeIds);
 
-  const isSelected = selectedNodeId === id;
-  const isAdjacent = !isSelected && adjacentNodeIds.includes(id);
-  const isDimmed = selectedNodeId !== null && !isSelected && !isAdjacent;
+  const isSelected = primaryNodeId === id;
+  const isAdjacent = !isSelected && adjacentNodeIds.has(id);
+  const isDimmed = primaryNodeId !== null && !isSelected && !isAdjacent;
 
   const onFieldClick = useCallback(
     (fieldName: string, ev: React.MouseEvent<HTMLElement>) => {
       ev.stopPropagation();
-      setSelectedNode(data.typeName);
+      click(data.typeName, 'replace');
       const detail: FieldSelection = { typeName: data.typeName, fieldName };
       ev.currentTarget.dispatchEvent(new CustomEvent(TYPE_NODE_EVENT, { bubbles: true, detail }));
     },
-    [data.typeName, setSelectedNode],
+    [data.typeName, click],
   );
 
   const borderColor = isSelected

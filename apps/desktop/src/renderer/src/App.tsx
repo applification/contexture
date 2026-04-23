@@ -15,7 +15,7 @@
  *
  * Canvas and side panel sit inside a `ResizablePanelGroup` so the
  * split is drag-adjustable and the side panel can collapse when
- * `useUIStore.sidebarVisible` is false (toggled by the Toolbar's
+ * `useUIChromeStore.sidebarVisible` is false (toggled by the Toolbar's
  * sidebar button).
  */
 
@@ -54,7 +54,8 @@ import allotment from './samples/allotment.contexture.json' with { type: 'json' 
 import { STDLIB_REGISTRY } from './services/stdlib-registry';
 import { validate } from './services/validation';
 import { useDocumentStore } from './store/document';
-import { useUIStore } from './store/ui';
+import { useGraphSelectionStore } from './store/selection';
+import { useUIChromeStore } from './store/ui-chrome';
 import { useUndoStore } from './store/undo';
 
 export default function App(): React.JSX.Element {
@@ -64,10 +65,10 @@ export default function App(): React.JSX.Element {
   const [positions, setPositions] = useState<Record<string, CanvasPosition>>({});
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const activeTab = useUIStore((s) => s.sidebarTab);
-  const setActiveTab = useUIStore((s) => s.setSidebarTab);
-  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
+  const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const activeTab = useUIChromeStore((s) => s.sidebarTab);
+  const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
+  const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
 
   // Drive the collapse/expand imperative API from the UI-store flag so
@@ -89,8 +90,7 @@ export default function App(): React.JSX.Element {
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 
       if (ev.key === 'Escape') {
-        useUIStore.getState().setSelectedNode(null);
-        useUIStore.getState().setSelectedEdge(null);
+        useGraphSelectionStore.getState().clear();
         return;
       }
 
@@ -110,11 +110,11 @@ export default function App(): React.JSX.Element {
       }
 
       if (ev.key === 'Delete' || ev.key === 'Backspace') {
-        const selected = useUIStore.getState().selectedNodeId;
+        const selected = useGraphSelectionStore.getState().state.primaryNodeId;
         if (!selected) return;
         ev.preventDefault();
         const result = useUndoStore.getState().apply({ kind: 'delete_type', name: selected });
-        if ('schema' in result) useUIStore.getState().setSelectedNode(null);
+        if ('schema' in result) useGraphSelectionStore.getState().clearNodes();
       }
     }
     document.addEventListener('keydown', onKey);

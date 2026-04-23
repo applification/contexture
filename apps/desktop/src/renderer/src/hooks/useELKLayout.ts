@@ -1,4 +1,4 @@
-import type { GraphLayout } from '@renderer/store/ui';
+import type { GraphLayout } from '@renderer/store/layout-config';
 import type { Edge, Node } from '@xyflow/react';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { useCallback, useRef } from 'react';

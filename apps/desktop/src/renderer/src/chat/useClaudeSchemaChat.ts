@@ -21,8 +21,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ContextureChatAPI } from '../../../preload/index.d';
 import type { ChatMessage, ChatRole } from '../model/chat-history';
+import { useChatComposerStore } from '../store/chat-composer';
 import type { ApplyResult, Op } from '../store/ops';
-import { useUIStore } from '../store/ui';
 import { useUndoStore } from '../store/undo';
 import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 
@@ -71,7 +71,7 @@ export function useClaudeSchemaChat({
   const [liveAssistant, setLiveAssistant] = useState<string>('');
   const [authRequired, setAuthRequired] = useState(false);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
-  const persistenceEnabled = useUIStore((s) => s.chatHistoryPersistence);
+  const persistenceEnabled = useChatComposerStore((s) => s.chatHistoryPersistence);
 
   // `assistantBufferRef` aggregates assistant text chunks across a turn
   // so the UI sees one final message, not a chunk per websocket frame.
