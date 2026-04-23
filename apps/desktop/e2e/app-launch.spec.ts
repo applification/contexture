@@ -25,8 +25,8 @@ test.describe('App Launch', () => {
   });
 
   test('main content area renders', async () => {
-    // Empty state shows "Load sample ontology"; graph state shows .react-flow container
-    const hasEmptyState = await page.getByText('Load sample ontology').count();
+    // Empty state shows "Load allotment sample"; graph state shows .react-flow container
+    const hasEmptyState = await page.getByText('Load allotment sample').count();
     const hasGraph = await page.locator('.react-flow').count();
     expect(hasEmptyState + hasGraph).toBeGreaterThan(0);
   });

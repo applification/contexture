@@ -33,14 +33,19 @@ test.describe('Import / export round-trip', () => {
     });
 
     const roundTrip = await page.evaluate(async () => {
-      const { load, save } = await import('./model/load');
-      const store = (
-        window as unknown as {
-          __contextureUndoStore: { getState: () => { schema: unknown } };
-        }
-      ).__contextureUndoStore;
-      const current = store.getState().schema;
-      const serialised = save(current as never);
+      // `load` / `save` are exposed on `window.__contextureModel` by
+      // `store/undo.ts` — dynamic `import()` can't resolve renderer
+      // modules in production builds (hashed filenames).
+      const win = window as unknown as {
+        __contextureUndoStore: { getState: () => { schema: unknown } };
+        __contextureModel: {
+          load: (raw: string) => { schema: unknown };
+          save: (schema: unknown) => string;
+        };
+      };
+      const { load, save } = win.__contextureModel;
+      const current = win.__contextureUndoStore.getState().schema;
+      const serialised = save(current);
       const { schema: restored } = load(serialised);
       return { serialised, restored };
     });

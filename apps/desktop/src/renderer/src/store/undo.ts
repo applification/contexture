@@ -23,6 +23,7 @@
  * every validation pass.
  */
 import { create } from 'zustand';
+import { load, save } from '../model/load';
 import type { Schema } from '../model/types';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
@@ -153,4 +154,11 @@ export const useUndoStore = createUndoableContextureStore({ version: '1', types:
 if (typeof window !== 'undefined') {
   (window as unknown as { __contextureUndoStore?: typeof useUndoStore }).__contextureUndoStore =
     useUndoStore;
+  // Playwright's `page.evaluate` can't dynamic-import renderer modules in
+  // production builds (they live under hashed filenames). Expose the
+  // load/save helpers on `window` so e2e specs can exercise the
+  // round-trip without relying on module resolution.
+  (
+    window as unknown as { __contextureModel?: { load: typeof load; save: typeof save } }
+  ).__contextureModel = { load, save };
 }
