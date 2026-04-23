@@ -19,9 +19,9 @@
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as defaultEmitZod } from '@renderer/model/emit-zod';
+import type { Schema } from '@renderer/model/ir';
 import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
 import { load as loadIR, save as saveIR } from '@renderer/model/load';
-import type { Schema } from '@renderer/model/ir';
 
 export const IR_SUFFIX = '.contexture.json';
 export const LAYOUT_SUFFIX = '.contexture.layout.json';

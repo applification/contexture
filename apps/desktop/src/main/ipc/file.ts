@@ -4,16 +4,28 @@
  * recent-files; this file only translates IPC payloads into store
  * calls.
  *
+ * Open paths return a `{ irPath, content, layout, chat, warnings }`
+ * shape: raw IR text (so the renderer keeps ownership of IR parse
+ * error surfacing) alongside the already-parsed sidecars. Save bumps
+ * the recent-files ledger via the store.
+ *
  * Handlers are exported alongside `registerFileIpc` so vitest can
  * drive them directly without booting Electron.
  */
 
+import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatHistory } from '@renderer/model/chat-history';
 import type { Schema } from '@renderer/model/ir';
 import type { Layout } from '@renderer/model/layout';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
-import { createDocumentStore, type DocumentStore } from '../documents/document-store';
+import {
+  CHAT_SUFFIX,
+  createDocumentStore,
+  type DocumentStore,
+  IR_SUFFIX,
+  LAYOUT_SUFFIX,
+} from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 
 // Electron's FileFilter.extensions is a list of bare extensions (no dot,
@@ -34,9 +46,21 @@ export interface HandleSaveInput {
   chat: ChatHistory;
 }
 
-export interface HandleOpenResult {
+export interface OpenWarning {
+  message: string;
+  severity: 'warning' | 'error';
+}
+
+export interface OpenResult {
   irPath: string;
+  /** Raw IR text — the renderer calls `load()` to parse + surface errors. */
   content: string;
+  /** Pre-parsed layout sidecar (defaults if missing/corrupt). */
+  layout: Layout;
+  /** Pre-parsed chat sidecar (defaults if missing/corrupt). */
+  chat: ChatHistory;
+  /** Sidecar warnings (not IR — those come from renderer-side `load()`). */
+  warnings: OpenWarning[];
 }
 
 let store: DocumentStore | null = null;
@@ -63,16 +87,44 @@ export async function handleSave(input: HandleSaveInput): Promise<void> {
 }
 
 /**
- * Read a `.contexture.json` file's raw text from disk.
- *
- * Kept for the preload bridge's `read` hook (which hands raw JSON back
- * to the renderer's `load()`). The renderer uses the full DocumentStore
- * via IPC for opens that should also hydrate sidecars + recents.
+ * Read a `.contexture.json` bundle — raw IR text + parsed layout + parsed
+ * chat. Returns `null` if the IR file no longer exists (used by the
+ * recent-files path to silently prune stale entries).
  */
-export async function handleOpen(irPath: string): Promise<HandleOpenResult> {
-  const { promises: fs } = await import('node:fs');
+export async function handleOpen(irPath: string): Promise<OpenResult | null> {
+  if (!(await nodeFsAdapter.fileExists(irPath))) return null;
   const content = await fs.readFile(irPath, 'utf-8');
-  return { irPath, content };
+
+  const base = irPath.endsWith(IR_SUFFIX) ? irPath.slice(0, -IR_SUFFIX.length) : null;
+  const warnings: OpenWarning[] = [];
+
+  let layout: Layout = { version: '1', positions: {} };
+  if (base) {
+    try {
+      const raw = await fs.readFile(`${base}${LAYOUT_SUFFIX}`, 'utf-8');
+      const { loadLayout } = await import('@renderer/model/layout');
+      const parsed = loadLayout(raw);
+      layout = parsed.layout;
+      for (const msg of parsed.warnings) warnings.push({ message: msg, severity: 'warning' });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+  }
+
+  let chat: ChatHistory = { version: '1', messages: [] };
+  if (base) {
+    try {
+      const raw = await fs.readFile(`${base}${CHAT_SUFFIX}`, 'utf-8');
+      const { loadChatHistory } = await import('@renderer/model/chat-history');
+      const parsed = loadChatHistory(raw);
+      chat = parsed.history;
+      for (const msg of parsed.warnings) warnings.push({ message: msg, severity: 'warning' });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+  }
+
+  return { irPath, content, layout, chat, warnings };
 }
 
 /**
@@ -88,11 +140,6 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     return handleOpen(result.filePaths[0]);
-    // `open` via the DocumentStore would also bump recents, but the
-    // renderer's `file:open-dialog` path only returns raw content and
-    // lets the renderer call `load()` itself (keeping parse errors in
-    // the UI). We bump recents separately in `file:save` /
-    // `file:open-recent`.
   });
 
   ipcMain.handle('file:save-as-dialog', async () => {
@@ -128,8 +175,6 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
   });
 
   ipcMain.handle('file:open-recent', async (_evt, filePath: string) => {
-    const exists = await nodeFsAdapter.fileExists(filePath);
-    if (!exists) return null;
     return handleOpen(filePath);
   });
 }

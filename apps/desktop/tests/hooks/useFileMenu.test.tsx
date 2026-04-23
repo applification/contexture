@@ -159,6 +159,61 @@ describe('useFileMenu', () => {
     expect(useDocumentStore.getState().filePath).toBe('/tmp/new.contexture.json');
   });
 
+  it('handleOpen hydrates layout + chat from the bundle and passes them through onBundleLoaded', async () => {
+    const bridge = mockFileBridge();
+    bridge.openDialog.mockResolvedValueOnce({
+      irPath: '/tmp/x.contexture.json',
+      content: JSON.stringify({ version: '1', types: [] }),
+      layout: { version: '1', positions: { Plot: { x: 10, y: 20 } } },
+      chat: {
+        version: '1',
+        messages: [{ id: 'm1', role: 'user', content: 'hi', createdAt: 1 }],
+        sessionId: 'sess-42',
+      },
+      warnings: [],
+    });
+    const onBundleLoaded = vi.fn();
+    const { result } = renderHook(() =>
+      useFileMenu({
+        onBundleLoaded,
+      }),
+    );
+    await act(async () => {
+      await result.current.handleOpen();
+    });
+    expect(onBundleLoaded).toHaveBeenCalledWith({
+      layout: { version: '1', positions: { Plot: { x: 10, y: 20 } } },
+      chat: expect.objectContaining({ sessionId: 'sess-42' }),
+    });
+  });
+
+  it('handleSave pulls the current layout + chat via the injected getters', async () => {
+    const bridge = mockFileBridge();
+    useDocumentStore.getState().setFilePath('/tmp/x.contexture.json');
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    const { result } = renderHook(() =>
+      useFileMenu({
+        getLayout: () => ({ version: '1', positions: { Plot: { x: 5, y: 6 } } }),
+        getChat: () => ({
+          version: '1',
+          messages: [{ id: 'm', role: 'user', content: 'yo', createdAt: 1 }],
+        }),
+      }),
+    );
+    await act(async () => {
+      await result.current.handleSave();
+    });
+    expect(bridge.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        layout: { version: '1', positions: { Plot: { x: 5, y: 6 } } },
+        chat: expect.objectContaining({ messages: [expect.objectContaining({ content: 'yo' })] }),
+      }),
+    );
+  });
+
   it('handleOpenPath opens via the recent-files channel', async () => {
     const bridge = mockFileBridge();
     bridge.openRecent.mockResolvedValueOnce({

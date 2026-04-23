@@ -16,8 +16,8 @@
 import { createDocumentStore, type DocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import type { ChatHistory } from '@renderer/model/chat-history';
-import type { Layout } from '@renderer/model/layout';
 import type { Schema } from '@renderer/model/ir';
+import type { Layout } from '@renderer/model/layout';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';
