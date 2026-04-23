@@ -12,6 +12,7 @@
  */
 
 import type { EvalMode } from '@renderer/chat/eval-prompt';
+import { type RunWithRetryOptions, readClassification, runWithRetry } from './claude-errors';
 
 export interface EvalSdkMessage {
   type: 'assistant' | 'tool_input' | 'result' | 'error';
@@ -58,10 +59,21 @@ export const EVAL_ERROR = 'eval:error' as const;
 export class EvalDriver {
   readonly #query: EvalQueryFn;
   readonly #transport: EvalTransport;
+  readonly #retryOptions: Pick<RunWithRetryOptions, 'captureException' | 'sleep' | 'random'>;
 
-  constructor(deps: { query: EvalQueryFn; transport: EvalTransport }) {
+  constructor(deps: {
+    query: EvalQueryFn;
+    transport: EvalTransport;
+    /**
+     * Retry-wrapper overrides — same shape as the chat driver. Tests
+     * inject a fake sleep + Sentry spy; production wires the real
+     * `Sentry.captureException`.
+     */
+    retryOptions?: Pick<RunWithRetryOptions, 'captureException' | 'sleep' | 'random'>;
+  }) {
     this.#query = deps.query;
     this.#transport = deps.transport;
+    this.#retryOptions = deps.retryOptions ?? {};
   }
 
   async generate(args: EvalGenerateArgs): Promise<EvalGenerateResult> {
@@ -74,23 +86,38 @@ export class EvalDriver {
     let sample: unknown;
     let text = '';
     try {
-      for await (const msg of this.#query({ prompt, systemPrompt, rootJsonSchema })) {
-        if (msg.type === 'assistant' && typeof msg.text === 'string') {
-          text += msg.text;
-          this.#transport.send(EVAL_ASSISTANT, { text: msg.text });
-        } else if (msg.type === 'tool_input') {
-          sample = msg.sample;
-          this.#transport.send(EVAL_SAMPLE, { sample });
-        } else if (msg.type === 'result') {
-          this.#transport.send(EVAL_RESULT, { ok: true });
-        } else if (msg.type === 'error') {
-          const message = msg.message ?? 'Unknown eval error';
-          this.#transport.send(EVAL_ERROR, { message });
-          throw new Error(message);
-        }
-      }
+      // Wrap the SDK stream in the shared retry/classifier. Eval has
+      // no mutation to roll back — `cancel` simply drops the draft
+      // sample. `isCommitted` flips on the first tool_input so we never
+      // replay after a sample has landed.
+      let committed = false;
+      await runWithRetry(
+        async () => {
+          for await (const msg of this.#query({ prompt, systemPrompt, rootJsonSchema })) {
+            if (msg.type === 'assistant' && typeof msg.text === 'string') {
+              committed = true;
+              text += msg.text;
+              this.#transport.send(EVAL_ASSISTANT, { text: msg.text });
+            } else if (msg.type === 'tool_input') {
+              committed = true;
+              sample = msg.sample;
+              this.#transport.send(EVAL_SAMPLE, { sample });
+            } else if (msg.type === 'result') {
+              this.#transport.send(EVAL_RESULT, { ok: true });
+            } else if (msg.type === 'error') {
+              const message = msg.message ?? 'Unknown eval error';
+              throw new Error(message);
+            }
+          }
+        },
+        {
+          ...this.#retryOptions,
+          phase: 'eval',
+          isCommitted: () => committed,
+        },
+      );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const { message } = readClassification(err);
       this.#transport.send(EVAL_ERROR, { message });
       throw err;
     }
