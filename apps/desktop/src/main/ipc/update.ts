@@ -74,7 +74,7 @@ export function registerUpdateIpc(mainWindow: BrowserWindow): void {
   });
 
   ipcMain.handle('update:open-releases', () => {
-    shell.openExternal('https://github.com/DaveHudson/Ontograph/releases');
+    shell.openExternal('https://github.com/applification/contexture/releases');
   });
 
   ipcMain.handle('update:get-state', () => state);

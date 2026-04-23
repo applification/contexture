@@ -1,113 +1,67 @@
-export interface AnnotationProperty {
-  uri: string;
-  label?: string;
-  comment?: string;
-  subPropertyOf: string[];
-}
+/**
+ * Contexture IR shape (v1) — the single source of truth for the schema model.
+ *
+ * Spec: `plans/pivot.md` §IR shape (v1).
+ *
+ * The runtime validator lives in `./ir-schema.ts`; the two files must stay in
+ * sync. Prefer adding new kinds here first, then extending the Zod meta-schema.
+ */
 
-export interface OntologyMetadata {
-  iri: string;
-  versionIRI?: string;
-  imports: string[];
-  annotations: { property: string; value: string; datatype?: string }[];
-}
+export type Schema = {
+  version: '1';
+  types: TypeDef[];
+  imports?: ImportDecl[];
+  metadata?: { name?: string; description?: string };
+};
 
-export interface Ontology {
-  prefixes: Map<string, string>;
-  classes: Map<string, OntologyClass>;
-  objectProperties: Map<string, ObjectProperty>;
-  datatypeProperties: Map<string, DatatypeProperty>;
-  individuals: Map<string, Individual>;
-  annotationProperties: Map<string, AnnotationProperty>;
-  ontologyMetadata?: OntologyMetadata;
-}
+export type ImportDecl =
+  | { kind: 'stdlib'; path: `@contexture/${string}`; alias: string }
+  | { kind: 'relative'; path: string; alias: string };
 
-export type RestrictionType =
-  | 'someValuesFrom'
-  | 'allValuesFrom'
-  | 'hasValue'
-  | 'minCardinality'
-  | 'maxCardinality'
-  | 'exactCardinality';
+export type TypeDef =
+  | { kind: 'object'; name: string; description?: string; fields: FieldDef[] }
+  | {
+      kind: 'enum';
+      name: string;
+      description?: string;
+      values: Array<{ value: string; description?: string }>;
+    }
+  | {
+      kind: 'discriminatedUnion';
+      name: string;
+      description?: string;
+      discriminator: string;
+      variants: string[];
+    }
+  | {
+      kind: 'raw';
+      name: string;
+      description?: string;
+      zod: string;
+      jsonSchema: object;
+      import?: { from: string; name: string };
+    };
 
-export interface Restriction {
-  onProperty: string;
-  type: RestrictionType;
-  value: string;
-}
+export type FieldDef = {
+  name: string;
+  description?: string;
+  type: FieldType;
+  optional?: boolean;
+  nullable?: boolean;
+  default?: unknown;
+};
 
-export type ClassExpression =
-  | { kind: 'named'; uri: string }
-  | { kind: 'union'; operands: ClassExpression[] }
-  | { kind: 'intersection'; operands: ClassExpression[] }
-  | { kind: 'complement'; operand: ClassExpression }
-  | { kind: 'unknown'; reason: string };
-
-export interface ClassExpressionAssertion {
-  source: 'equivalentClass' | 'subClassOf';
-  expression: ClassExpression;
-}
-
-export interface OntologyClass {
-  uri: string;
-  label?: string;
-  comment?: string;
-  subClassOf: string[];
-  disjointWith: string[];
-  restrictions?: Restriction[];
-  classExpressions?: ClassExpressionAssertion[];
-}
-
-export type OWLCharacteristic =
-  | 'transitive'
-  | 'symmetric'
-  | 'reflexive'
-  | 'functional'
-  | 'inverseFunctional';
-
-export interface ObjectProperty {
-  uri: string;
-  label?: string;
-  comment?: string;
-  domain: string[];
-  range: string[];
-  minCardinality?: number;
-  maxCardinality?: number;
-  inverseOf?: string;
-  characteristics: OWLCharacteristic[];
-}
-
-export interface DatatypeProperty {
-  uri: string;
-  label?: string;
-  comment?: string;
-  domain: string[];
-  range: string;
-  minCardinality?: number;
-  maxCardinality?: number;
-}
-
-export interface Individual {
-  uri: string;
-  label?: string;
-  comment?: string;
-  types: string[];
-  objectPropertyAssertions: { property: string; target: string }[];
-  dataPropertyAssertions: { property: string; value: string; datatype?: string }[];
-}
-
-export function createEmptyOntology(): Ontology {
-  return {
-    prefixes: new Map([
-      ['owl', 'http://www.w3.org/2002/07/owl#'],
-      ['rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'],
-      ['rdfs', 'http://www.w3.org/2000/01/rdf-schema#'],
-      ['xsd', 'http://www.w3.org/2001/XMLSchema#'],
-    ]),
-    classes: new Map(),
-    objectProperties: new Map(),
-    datatypeProperties: new Map(),
-    individuals: new Map(),
-    annotationProperties: new Map(),
-  };
-}
+export type FieldType =
+  | {
+      kind: 'string';
+      min?: number;
+      max?: number;
+      regex?: string;
+      format?: 'email' | 'url' | 'uuid' | 'datetime';
+    }
+  | { kind: 'number'; min?: number; max?: number; int?: boolean }
+  | { kind: 'boolean' }
+  | { kind: 'date' }
+  | { kind: 'literal'; value: string | number | boolean }
+  | { kind: 'ref'; typeName: string }
+  | { kind: 'array'; element: FieldType; min?: number; max?: number };

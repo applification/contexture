@@ -8,6 +8,11 @@ export default defineConfig({
     include: ['tests/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
     setupFiles: ['tests/setup.ts'],
+    poolOptions: {
+      forks: {
+        execArgv: ['--no-experimental-webstorage'],
+      },
+    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

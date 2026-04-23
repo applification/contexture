@@ -9,9 +9,8 @@ syncShellEnvironment();
 
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
-import { registerClaudeIPC } from './ipc/claude';
-import { registerEvalIPC } from './ipc/eval';
-import { registerFileIPC } from './ipc/file';
+import { registerClaudeIpc } from './ipc/claude';
+import { registerFileIpc } from './ipc/file';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
 
@@ -48,7 +47,7 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-app.setName('Ontograph');
+app.setName('Contexture');
 
 // Enable CDP for e2e testing when E2E=1
 if (process.env.E2E === '1') {
@@ -57,7 +56,7 @@ if (process.env.E2E === '1') {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.applification.ontograph');
+  electronApp.setAppUserModelId('com.applification.contexture');
 
   if (is.dev && process.platform === 'darwin') {
     const icon = nativeImage.createFromPath(join(__dirname, '../../build/icon.icns'));
@@ -68,13 +67,11 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  registerFileIPC();
-  registerClaudeIPC();
-  registerEvalIPC();
-
   const mainWindow = createWindow();
   Menu.setApplicationMenu(createMenu(mainWindow));
   registerUpdateIpc(mainWindow);
+  registerFileIpc(mainWindow);
+  registerClaudeIpc(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

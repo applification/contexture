@@ -1,33 +1,37 @@
-import { useOntologyStore } from '@renderer/store/ontology';
+/**
+ * Canvas search bar — focuses a type by name.
+ *
+ * Contexture IRs only have `TypeDef`s (objects / enums / discriminated
+ * unions / raw) — no OWL classes, individuals, object/datatype
+ * properties. So the search surface is simpler than the pre-pivot
+ * `GraphSearchBar`: we match against `TypeDef.name` and
+ * `TypeDef.description`. Results route via `useUIStore.setFocusNode`
+ * which `GraphCanvas` watches to recentre the view.
+ *
+ * Keybindings mirror the pre-pivot app: Cmd/Ctrl+F focuses the input;
+ * ↑/↓ navigate; Enter picks; Escape clears.
+ */
+
 import { useUIStore } from '@renderer/store/ui';
+import { useUndoStore } from '@renderer/store/undo';
 import { Search, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 interface Result {
-  id: string;
-  label: string;
-  matchType?: string;
-}
-
-function localName(uri: string): string {
-  const hash = uri.lastIndexOf('#');
-  const slash = uri.lastIndexOf('/');
-  const idx = Math.max(hash, slash);
-  return idx >= 0 ? uri.substring(idx + 1) : uri;
+  name: string;
+  matchType: 'name' | 'description';
 }
 
 export function GraphSearchBar(): React.JSX.Element {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Result[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const setFocusNode = useUIStore((s) => s.setFocusNode);
-  const ontology = useOntologyStore((s) => s.ontology);
-  const classes = ontology.classes;
+  const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
 
-  // Cmd+F / Ctrl+F to focus
+  // Cmd/Ctrl+F focuses the input.
   useEffect(() => {
     function handler(e: KeyboardEvent): void {
       if (e.key === 'f' && (e.metaKey || e.ctrlKey)) {
@@ -40,58 +44,26 @@ export function GraphSearchBar(): React.JSX.Element {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // Search against ontology store
-  useEffect(() => {
+  const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
-
+    if (!q) return [];
     const matches: Result[] = [];
-    for (const cls of classes.values()) {
-      const label = cls.label || localName(cls.uri);
-      if (label.toLowerCase().includes(q)) {
-        matches.push({ id: cls.uri, label, matchType: 'label' });
-      } else if (cls.uri.toLowerCase().includes(q)) {
-        matches.push({ id: cls.uri, label: `${label} (URI)`, matchType: 'uri' });
-      } else if (cls.comment?.toLowerCase().includes(q)) {
-        matches.push({ id: cls.uri, label: `${label} (comment)`, matchType: 'comment' });
+    for (const t of schema.types) {
+      if (t.name.toLowerCase().includes(q)) {
+        matches.push({ name: t.name, matchType: 'name' });
+      } else if (t.description?.toLowerCase().includes(q)) {
+        matches.push({ name: t.name, matchType: 'description' });
       }
     }
-    // Search individuals
-    for (const ind of ontology.individuals.values()) {
-      const label = ind.label || localName(ind.uri);
-      if (label.toLowerCase().includes(q)) {
-        matches.push({ id: ind.uri, label: `${label} ◆`, matchType: 'label' });
-      } else if (ind.uri.toLowerCase().includes(q)) {
-        matches.push({ id: ind.uri, label: `${label} ◆ (URI)`, matchType: 'uri' });
-      } else if (ind.comment?.toLowerCase().includes(q)) {
-        matches.push({ id: ind.uri, label: `${label} ◆ (comment)`, matchType: 'comment' });
-      }
-    }
-    // Also search object properties (match shows domain class)
-    for (const prop of ontology.objectProperties.values()) {
-      const propLabel = prop.label || localName(prop.uri);
-      if (propLabel.toLowerCase().includes(q) || prop.uri.toLowerCase().includes(q)) {
-        const domainUri = prop.domain[0];
-        if (domainUri && !matches.some((m) => m.id === domainUri)) {
-          const domainLabel = classes.get(domainUri)?.label || localName(domainUri);
-          matches.push({
-            id: domainUri,
-            label: `${domainLabel} (via ${propLabel})`,
-            matchType: 'property',
-          });
-        }
-      }
-    }
-    setResults(matches.slice(0, 10));
-    setActiveIndex(0);
-    setOpen(matches.length > 0);
-  }, [query, classes, ontology.objectProperties.values, ontology.individuals.values]);
+    return matches.slice(0, 10);
+  }, [query, schema]);
 
-  // Click outside to close
+  useEffect(() => {
+    setActiveIndex(0);
+    setOpen(results.length > 0);
+  }, [results]);
+
+  // Click outside closes the dropdown.
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent): void {
@@ -103,13 +75,13 @@ export function GraphSearchBar(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  function selectNode(id: string): void {
-    setFocusNode(id);
+  function pick(name: string): void {
+    setFocusNode(name);
     setQuery('');
     setOpen(false);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent): void {
+  function onKeyDown(e: React.KeyboardEvent): void {
     if (e.key === 'Escape') {
       setQuery('');
       setOpen(false);
@@ -123,7 +95,7 @@ export function GraphSearchBar(): React.JSX.Element {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      selectNode(results[activeIndex].id);
+      pick(results[activeIndex].name);
     }
   }
 
@@ -139,9 +111,10 @@ export function GraphSearchBar(): React.JSX.Element {
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search label, URI, comment…"
+          onKeyDown={onKeyDown}
+          placeholder="Search types…"
           className="flex-1 min-w-0 bg-transparent text-xs outline-none text-foreground placeholder:text-muted-foreground/50"
+          aria-label="Search types"
         />
         {query && (
           <button
@@ -151,6 +124,7 @@ export function GraphSearchBar(): React.JSX.Element {
               setOpen(false);
             }}
             className="text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
           >
             <X size={12} />
           </button>
@@ -162,16 +136,19 @@ export function GraphSearchBar(): React.JSX.Element {
           {results.map((r, i) => (
             <button
               type="button"
-              key={r.id}
+              key={r.name}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectNode(r.id)}
+              onClick={() => pick(r.name)}
               className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                 i === activeIndex
                   ? 'bg-secondary text-foreground'
                   : 'text-foreground hover:bg-secondary/60'
               }`}
             >
-              {r.label}
+              {r.name}
+              {r.matchType === 'description' && (
+                <span className="text-muted-foreground/60 ml-1.5">(in description)</span>
+              )}
             </button>
           ))}
         </div>

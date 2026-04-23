@@ -53,39 +53,39 @@ function GithubIcon({ className }: { className?: string }) {
 const features = [
   {
     icon: GitGraph,
-    title: 'Visual Graph Editor',
+    title: 'Visual schema editor',
     description:
-      'See your ontology as a living, interactive graph. Drag nodes, draw connections, and explore complex hierarchies on an intuitive canvas.',
+      'See every type as a node, every field as a sub-row, every ref as an edge. Drag, select, and refine your schema on an interactive canvas.',
   },
   {
     icon: Brain,
-    title: 'AI-First Creation',
+    title: 'Chat-driven authoring',
     description:
-      'Build ontologies through conversation with an AI that understands OWL semantics. From natural language to formal ontology in minutes.',
+      'Describe a domain and Claude edits the schema via a small op vocabulary. Every turn animates on the graph so you can follow what changed.',
   },
   {
     icon: Network,
-    title: 'Built for the AI Stack',
+    title: 'Zod + JSON Schema outputs',
     description:
-      'Create ontologies that plug into RAG pipelines, context graphs, and agent architectures. The missing tool between your data and your AI agents.',
+      '`.contexture.json` is the source of truth; `.schema.ts` and `.schema.json` are emitted alongside and git-checked for downstream products to import.',
   },
   {
     icon: Zap,
-    title: 'AI-Powered Validation',
+    title: 'Eval panel',
     description:
-      'AI-powered quality scoring catches gaps and inconsistencies as you build. Coverage, consistency, and completeness analysis in real time.',
+      'Generate sample data — realistic, minimal, edge-case, or adversarial — against any root type. Zod-validate the output and save fixtures.',
   },
   {
     icon: Shield,
-    title: 'Standards-First',
+    title: 'Curated stdlib',
     description:
-      'Full OWL/RDF/Turtle support with zero vendor lock-in. Import existing ontologies, export to any format.',
+      'Email, URL, UUID, Address, Money, PhoneE164 — 19 types across 5 namespaces, published as `@contexture/runtime` for your generated code to import.',
   },
   {
     icon: Layers,
-    title: 'Open Source & Free',
+    title: 'Open source & free',
     description:
-      'MIT licensed and free forever. Built in the open by engineers who believe knowledge infrastructure should be accessible to everyone.',
+      'MIT licensed and free forever. Built in the open by engineers who believe schema tooling should be accessible to everyone.',
   },
 ];
 
@@ -97,7 +97,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between">
           <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <LogoMark className="size-6" />
-            Ontograph
+            Contexture
           </span>
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">
@@ -109,7 +109,7 @@ export default function Home() {
             <TrackedLink
               event="github_click"
               properties={{ location: 'nav' }}
-              href="https://github.com/DaveHudson/Ontograph"
+              href="https://github.com/applification/contexture"
               className="hover:text-foreground transition-colors flex items-center gap-1.5"
             >
               <GithubIcon className="size-4" />
@@ -142,20 +142,20 @@ export default function Home() {
 
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-accent font-medium mb-6 tracking-widest uppercase">
-            The AI-native ontology editor
+            Visual Zod schema editor with LLM support
           </p>
           <h1 className="animate-fade-in-up-delay-1 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
-            Build the knowledge layer{' '}
+            Design the schemas that power{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-              your AI agents need.
+              your LLM pipelines.
             </span>
           </h1>
           <p className="animate-fade-in-up-delay-2 text-lg text-accent font-medium mb-3">
-            Where knowledge takes shape.
+            Where schemas take shape.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Ontograph pairs a visual graph editor with AI that understands OWL — so you can create
-            production-ready ontologies through natural language.
+            Contexture pairs a visual graph editor with Claude — chat to describe a domain, watch
+            the graph assemble, and emit Zod + JSON Schema your products can import directly.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <TrackedLink
@@ -169,7 +169,7 @@ export default function Home() {
             <TrackedLink
               event="github_click"
               properties={{ location: 'hero' }}
-              href="https://github.com/DaveHudson/Ontograph"
+              href="https://github.com/applification/contexture"
               className="inline-flex items-center justify-center gap-2 border border-border w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
             >
               <GithubIcon className="size-4" />
@@ -188,7 +188,7 @@ export default function Home() {
               <ThemeImage
                 srcLight="/images/hero-graph-light.png"
                 srcDark="/images/hero-graph.png"
-                alt="Ontograph visual graph editor showing a People ontology with Person, Employee, Manager and Organisation classes connected by subClassOf and object property edges"
+                alt="Contexture visual schema editor showing connected types on a graph canvas with field-level ref edges"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -211,12 +211,11 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-12 sm:mb-20">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              The ontology editor built for the AI era
+              The schema editor built for LLM pipelines
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Create ontologies that ground your AI — not guesswork. Built for AI Product Engineers,
-              knowledge architects, and anyone building the next generation of intelligent
-              applications.
+              Design the closed-world schemas your structured-output prompts depend on. Built for
+              engineers shipping products with Claude, GPT, and other LLM APIs.
             </p>
           </div>
 
@@ -242,7 +241,7 @@ export default function Home() {
             <ThemeImage
               srcLight="/images/graph-detail-light.png"
               srcDark="/images/graph-detail.png"
-              alt="Ontograph showing the graph editor with a selected Person node and its properties panel displaying class details, datatype properties, and relationships"
+              alt="Contexture showing the graph editor with a selected type and its detail panel editing field constraints"
               width={1600}
               height={1200}
               className="w-full h-auto"
@@ -265,13 +264,13 @@ export default function Home() {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-5">
               Describe your domain.{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-                Watch your ontology emerge.
+                Watch your schema emerge.
               </span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Create the structured knowledge that powers reliable AI — through conversation, not
-              configuration. The AI understands OWL semantics and can suggest refinements, find
-              inconsistencies, and help you think through your domain model.
+              Build schemas through conversation, not configuration. Claude edits via a small op
+              vocabulary — add_type, add_field, set_discriminator, rename — so every turn is an
+              atomic change you can undo or refine.
             </p>
           </div>
 
@@ -281,18 +280,18 @@ export default function Home() {
               <ThemeImage
                 srcLight="/images/ai-validation-light.png"
                 srcDark="/images/ai-validation.png"
-                alt="AI validation panel scoring an ontology at 78 out of 100 with coverage analysis and improvement suggestions"
+                alt="Eval panel generating sample data against a selected root type with Zod validation passing"
                 width={478}
                 height={1145}
                 className="w-full h-auto"
               />
             </div>
             <div className="sm:col-span-3 space-y-6">
-              <h3 className="text-2xl font-bold tracking-tight">AI-powered quality scoring</h3>
+              <h3 className="text-2xl font-bold tracking-tight">Eval your schema with real data</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Get instant feedback on your ontology&apos;s quality. The validation engine scores
-                coverage, consistency, and completeness — then suggests specific improvements you
-                can queue for automated refinement.
+                Pick a root type, pick a generation mode, and get a JSON sample that — by
+                construction — parses against your schema. Test realism, edge cases, or adversarial
+                input before you ship the prompt.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -300,7 +299,7 @@ export default function Home() {
                     <Zap className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Coverage analysis across all domain areas
+                    Four modes: realistic, minimal, edge-case, adversarial
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -308,7 +307,7 @@ export default function Home() {
                     <Shield className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Consistency checks for vocabulary and class links
+                    Post-generation Zod validation with field-level errors
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -316,7 +315,7 @@ export default function Home() {
                     <Brain className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Actionable suggestions to improve your model
+                    Save fixtures alongside the schema for test reuse
                   </span>
                 </div>
               </div>
@@ -329,13 +328,13 @@ export default function Home() {
               You:
             </div>
             <div className="text-foreground mb-6">
-              Create an ontology for a university with students, courses, and professors. Students
-              enroll in courses, professors teach courses.
+              Add a Harvest type for my allotment schema with a date, quantity (kg), and a ref to
+              the Crop it came from.
             </div>
             <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">Claude:</div>
             <div className="text-muted-foreground">
-              I&apos;ll create the class hierarchy and object properties. Adding Person as a
-              superclass of Student and Professor, with enrolledIn and teaches relationships...
+              add_type Harvest (object) · add_field Harvest.date (date) · add_field
+              Harvest.quantityKg (number, min=0) · add_field Harvest.crop (ref → Crop)
             </div>
           </div>
         </div>
@@ -348,40 +347,40 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              Your AI agents are only as smart as the knowledge behind them
+              Structured output is only as good as the schema behind it
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Ontograph lets you build, visualize, and validate the structured knowledge layer that
-              makes AI reliable.
+              Contexture lets you design, visualise, and evaluate the closed-world schemas your LLM
+              pipelines parse against.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-8">
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                RAG Pipelines
+                Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ontology-powered RAG delivers more precise retrieval than unstructured vector
-                search. Build the knowledge graph that gives your AI the context it needs.
+                Emit Zod at build time; your prompt runner hands the same schema to Claude or OpenAI
+                for typed, validated responses. Parse failures become compile-time errors.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                AI Agents
+                Data ingestion
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Ground your AI agents in verified, typed knowledge. Eliminate hallucination and
-                enable explainability with formal ontology structures.
+                Shape what Claude extracts from PDFs, emails, or transcripts. The IR ships in the
+                prompt so every tool call targets a known, named type.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                Context Graphs
+                Shared models
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Create the structured context layer that powers intelligent applications. Export to
-                OWL/RDF and plug directly into your AI stack.
+                Reference types across projects with relative imports or pull from the curated
+                `@contexture/runtime` stdlib. One schema, many products.
               </p>
             </div>
           </div>
@@ -400,7 +399,7 @@ export default function Home() {
             Open source & free
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-            Start building your knowledge layer
+            Start designing your schemas
           </h2>
           <p className="text-muted-foreground mb-10">
             Free and open source. Available for macOS, Windows, and Linux.
@@ -426,20 +425,20 @@ export default function Home() {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-2">
             <LogoMark className="size-4" />
-            Ontograph
+            Contexture
           </span>
           <div className="flex items-center gap-6">
             <a href="/brand" className="hover:text-foreground transition-colors">
               Brand
             </a>
             <a
-              href="https://github.com/DaveHudson/Ontograph"
+              href="https://github.com/applification/contexture"
               className="hover:text-foreground transition-colors"
             >
               GitHub
             </a>
             <a
-              href="https://github.com/DaveHudson/Ontograph/releases"
+              href="https://github.com/applification/contexture/releases"
               className="hover:text-foreground transition-colors"
             >
               Changelog

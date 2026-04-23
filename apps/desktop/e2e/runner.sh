@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ontograph Desktop E2E Test Runner
+# Contexture Desktop E2E Test Runner
 # Launches Electron with CDP, runs all e2e suites, then tears down.
 #
 # Usage:
@@ -93,7 +93,7 @@ run_suite() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"
-echo "  Ontograph Desktop E2E  (CDP :$CDP_PORT)"
+echo "  Contexture Desktop E2E  (CDP :$CDP_PORT)"
 echo "═══════════════════════════════════════════"
 echo ""
 

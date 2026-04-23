@@ -1,0 +1,72 @@
+{
+  "version": "1",
+  "metadata": {
+    "name": "common",
+    "description": "General-purpose stdlib primitives."
+  },
+  "types": [
+    {
+      "kind": "raw",
+      "name": "Email",
+      "description": "Email address.",
+      "zod": "z.string().email()",
+      "jsonSchema": { "type": "string", "format": "email" }
+    },
+    {
+      "kind": "raw",
+      "name": "URL",
+      "description": "Absolute URL.",
+      "zod": "z.string().url()",
+      "jsonSchema": { "type": "string", "format": "uri" }
+    },
+    {
+      "kind": "raw",
+      "name": "UUID",
+      "description": "UUID of any version.",
+      "zod": "z.string().uuid()",
+      "jsonSchema": { "type": "string", "format": "uuid" }
+    },
+    {
+      "kind": "raw",
+      "name": "ISODate",
+      "description": "Calendar date, YYYY-MM-DD.",
+      "zod": "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)",
+      "jsonSchema": { "type": "string", "format": "date" }
+    },
+    {
+      "kind": "raw",
+      "name": "ISODateTime",
+      "description": "RFC 3339 timestamp with required timezone offset.",
+      "zod": "z.string().datetime({ offset: true })",
+      "jsonSchema": { "type": "string", "format": "date-time" }
+    },
+    {
+      "kind": "raw",
+      "name": "Slug",
+      "description": "URL-safe slug.",
+      "zod": "z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)",
+      "jsonSchema": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+    },
+    {
+      "kind": "raw",
+      "name": "NonEmptyString",
+      "description": "String with at least one character.",
+      "zod": "z.string().min(1)",
+      "jsonSchema": { "type": "string", "minLength": 1 }
+    },
+    {
+      "kind": "raw",
+      "name": "PositiveInt",
+      "description": "Positive integer (>= 1).",
+      "zod": "z.number().int().positive()",
+      "jsonSchema": { "type": "integer", "exclusiveMinimum": 0 }
+    },
+    {
+      "kind": "raw",
+      "name": "PositiveNumber",
+      "description": "Positive number (strictly > 0).",
+      "zod": "z.number().positive()",
+      "jsonSchema": { "type": "number", "exclusiveMinimum": 0 }
+    }
+  ]
+}

@@ -7,9 +7,9 @@ const TokenBlock = dynamic(() => import('./token-block').then((m) => ({ default:
 });
 
 export const metadata: Metadata = {
-  title: 'Brand — Ontograph',
+  title: 'Brand — Contexture',
   description:
-    'Ontograph brand identity guidelines: logo, colors, typography, voice, and components.',
+    'Contexture brand identity guidelines: logo, colors, typography, voice, and components.',
 };
 
 /* ------------------------------------------------------------------ */
@@ -149,7 +149,7 @@ export default function BrandPage() {
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <LogoMark className="size-6" />
-            Ontograph
+            Contexture
           </a>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">Brand Identity</span>
@@ -165,11 +165,11 @@ export default function BrandPage() {
             Brand Guidelines
           </p>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
-            Ontograph Brand Identity
+            Contexture Brand Identity
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl leading-relaxed">
-            The visual and verbal identity standards for Ontograph. Use these guidelines to maintain
-            consistency across all touchpoints — from marketing to product UI.
+            The visual and verbal identity standards for Contexture. Use these guidelines to
+            maintain consistency across all touchpoints — from marketing to product UI.
           </p>
           <nav className="mt-10 flex flex-wrap gap-3 text-sm">
             {['Logo', 'Colors', 'Typography', 'Voice', 'Components', 'Motion'].map((s) => (
@@ -189,9 +189,8 @@ export default function BrandPage() {
         {/* -------------------------------------------------------- */}
         <Section id="logo" title="Logo">
           <p className="text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-            The Ontograph mark represents three connected nodes in a triangle — the fundamental
-            ontology structure of subject-predicate-object triples. It should never be filled,
-            rotated, or modified with effects.
+            The Contexture mark represents three connected nodes in a triangle — the smallest graph
+            that has shape. It should never be filled, rotated, or modified with effects.
           </p>
 
           <div className="grid sm:grid-cols-3 gap-6 mb-10">
@@ -200,7 +199,9 @@ export default function BrandPage() {
               <LogoMark className="size-16" variant="color" />
               <div className="flex items-center gap-2">
                 <LogoMark className="size-6" variant="color" />
-                <span className="text-lg font-semibold text-[oklch(0.93_0.01_270)]">Ontograph</span>
+                <span className="text-lg font-semibold text-[oklch(0.93_0.01_270)]">
+                  Contexture
+                </span>
               </div>
               <span className="text-xs text-muted-foreground">Full color — dark background</span>
             </div>
@@ -209,7 +210,7 @@ export default function BrandPage() {
               <LogoMark className="size-16" variant="mono-light" />
               <div className="flex items-center gap-2">
                 <LogoMark className="size-6" variant="mono-light" />
-                <span className="text-lg font-semibold text-black">Ontograph</span>
+                <span className="text-lg font-semibold text-black">Contexture</span>
               </div>
               <span className="text-xs text-gray-500">Monochrome — light background</span>
             </div>
@@ -218,7 +219,7 @@ export default function BrandPage() {
               <LogoMark className="size-16" variant="mono-dark" />
               <div className="flex items-center gap-2">
                 <LogoMark className="size-6" variant="mono-dark" />
-                <span className="text-lg font-semibold text-white">Ontograph</span>
+                <span className="text-lg font-semibold text-white">Contexture</span>
               </div>
               <span className="text-xs text-gray-400">Monochrome — dark background</span>
             </div>
@@ -230,8 +231,8 @@ export default function BrandPage() {
             </h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                Always title-case: <strong className="text-foreground">Ontograph</strong>, never
-                "ontograph" or "ONTOGRAPH".
+                Always title-case: <strong className="text-foreground">Contexture</strong>, never
+                "contexture" or "CONTEXTURE".
               </li>
               <li>
                 Minimum clear space around the mark: equal to the diameter of one node circle.
@@ -307,7 +308,7 @@ export default function BrandPage() {
         <Section id="typography" title="Typography">
           <p className="text-muted-foreground mb-8 max-w-2xl leading-relaxed">
             Geist provides a geometric, modern character with excellent readability at all sizes.
-            The monospace variant handles OWL URIs and Turtle code snippets.
+            The monospace variant handles schema identifiers and generated Zod code snippets.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-6 mb-10">
@@ -315,13 +316,13 @@ export default function BrandPage() {
               font="font-sans"
               name="Geist Sans"
               weights="100 — 900 (variable)"
-              example="Build the knowledge layer your AI agents need."
+              example="Design the schemas that power your LLM pipelines."
             />
             <TypeSpecimen
               font="font-mono"
               name="Geist Mono"
               weights="100 — 900 (variable)"
-              example="owl:Class rdf:type rdfs:Resource"
+              example="z.object({ email: z.string().email() })"
             />
           </div>
 
@@ -363,7 +364,7 @@ export default function BrandPage() {
         {/* -------------------------------------------------------- */}
         <Section id="voice" title="Voice & Tone">
           <p className="text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-            Ontograph speaks to engineers who ship products — precise, confident, and approachable.
+            Contexture speaks to engineers who ship products — precise, confident, and approachable.
             Never academic, never dismissive.
           </p>
 
@@ -373,15 +374,15 @@ export default function BrandPage() {
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>
                   <strong className="text-foreground">Precise</strong> — Use correct terminology
-                  (ontology, OWL, RDF) without being academic.
+                  (Zod, JSON Schema, discriminated union) without being academic.
                 </li>
                 <li>
                   <strong className="text-foreground">Confident</strong> — State what we do
                   directly, no hedging.
                 </li>
                 <li>
-                  <strong className="text-foreground">Approachable</strong> — Make ontology
-                  engineering feel accessible.
+                  <strong className="text-foreground">Approachable</strong> — Make schema design
+                  feel accessible.
                 </li>
                 <li>
                   <strong className="text-foreground">Builder-oriented</strong> — Speak to people
@@ -407,28 +408,28 @@ export default function BrandPage() {
               Key phrases
             </h3>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-2 text-sm">
-              <p className="text-foreground">&ldquo;Where knowledge takes shape.&rdquo;</p>
+              <p className="text-foreground">&ldquo;Where schemas take shape.&rdquo;</p>
               <p className="text-foreground">
-                &ldquo;Build the knowledge layer your AI agents need.&rdquo;
+                &ldquo;Design the schemas that power your LLM pipelines.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;From natural language to formal ontology in minutes.&rdquo;
+                &ldquo;From natural language to typed Zod in minutes.&rdquo;
               </p>
-              <p className="text-foreground">&ldquo;See your ontology as a living graph.&rdquo;</p>
+              <p className="text-foreground">&ldquo;See your schema as a living graph.&rdquo;</p>
               <p className="text-foreground">
-                &ldquo;The ontology editor built for the AI era.&rdquo;
-              </p>
-              <p className="text-foreground">
-                &ldquo;Full OWL/RDF/Turtle support — no vendor lock-in.&rdquo;
+                &ldquo;The schema editor built for LLM pipelines.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;Create ontologies that ground your AI — not guesswork.&rdquo;
+                &ldquo;Zod + JSON Schema emitted side-by-side — no runtime lock-in.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;AI-powered validation scores your ontology as you build.&rdquo;
+                &ldquo;Closed-world schemas for structured output you can trust.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;The missing tool between your data and your AI agents.&rdquo;
+                &ldquo;Eval your schema with realistic data before you ship the prompt.&rdquo;
+              </p>
+              <p className="text-foreground">
+                &ldquo;One schema, many products — import the generated Zod directly.&rdquo;
               </p>
             </div>
           </div>
@@ -504,8 +505,8 @@ export default function BrandPage() {
               <div className="text-muted-foreground/70 text-xs uppercase tracking-wide mb-2">
                 Terminal block
               </div>
-              <p className="text-muted-foreground">$ ontograph export --format turtle</p>
-              <p className="text-accent">Exported 42 classes, 18 properties</p>
+              <p className="text-muted-foreground">$ contexture emit --schema allotment</p>
+              <p className="text-accent">Wrote allotment.schema.ts (12 types)</p>
             </div>
           </div>
 
@@ -637,17 +638,17 @@ export default function BrandPage() {
         <div className="max-w-5xl mx-auto flex items-center justify-between text-sm text-muted-foreground">
           <a href="/" className="flex items-center gap-2 hover:text-foreground transition-colors">
             <LogoMark className="size-4" />
-            Ontograph
+            Contexture
           </a>
           <div className="flex items-center gap-6">
             <a
-              href="https://github.com/DaveHudson/Ontograph"
+              href="https://github.com/applification/contexture"
               className="hover:text-foreground transition-colors"
             >
               GitHub
             </a>
             <a
-              href="https://github.com/DaveHudson/Ontograph/releases"
+              href="https://github.com/applification/contexture/releases"
               className="hover:text-foreground transition-colors"
             >
               Changelog

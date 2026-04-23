@@ -1,101 +1,100 @@
-import { ElectronAPI } from '@electron-toolkit/preload';
+import type { ElectronAPI } from '@electron-toolkit/preload';
 
-export interface UpdateState {
-  status: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
-  version?: string;
-  progress?: number;
-  error?: string;
+type Unsubscribe = () => void;
+
+/**
+ * Legacy `window.api` surface — carried over from the pre-pivot app so
+ * hooks like `useLayoutSidecar`, `useChatSidecar`, and `UpdateBanner`
+ * typecheck. The methods are wired to real IPC where implemented and
+ * stubbed out in the test setup file (`tests/setup.ts`). New renderer
+ * code should reach for `window.contexture.*` instead.
+ */
+export type UpdateState =
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'available'; version?: string }
+  | { status: 'downloading'; version?: string; progress?: number }
+  | { status: 'ready'; version?: string }
+  | { status: 'error'; message?: string };
+
+export interface LegacyAPI {
+  readFileSilent: (path: string) => Promise<string | null>;
+  saveFile: (path: string, contents: string) => Promise<unknown>;
+  openFile?: () => Promise<unknown>;
+  saveFileAs?: () => Promise<unknown>;
+  onMenuFileOpen?: (listener: (path: string) => void) => Unsubscribe;
+  onMenuFileSave?: (listener: () => void) => Unsubscribe;
+  onMenuFileSaveAs?: (listener: () => void) => Unsubscribe;
+
+  // Auto-update
+  getUpdateState: () => Promise<UpdateState>;
+  onUpdateState: (listener: (state: UpdateState) => void) => Unsubscribe;
+  checkForUpdate: () => Promise<unknown>;
+  downloadUpdate: () => Promise<unknown>;
+  installUpdate: () => void;
+  openReleasesPage: () => void;
+
+  // Legacy Claude assistant subscription (ImprovementHUD)
+  onClaudeAssistantText: (listener: (text: string) => void) => Unsubscribe;
+  onClaudeResult: (listener: (result?: unknown) => void) => Unsubscribe;
+  onClaudeError: (listener: (err?: unknown) => void) => Unsubscribe;
+}
+
+export interface ContextureChatAPI {
+  send: (message: string) => Promise<{ ok: boolean; error?: string }>;
+  setIR: (ir: unknown) => void;
+  detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>;
+  setAuth: (
+    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
+  ) => Promise<{ ok: boolean; error?: string }>;
+  setModelOptions: (opts: {
+    model?: string;
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+  }) => Promise<{ ok: boolean }>;
+  abort: () => Promise<{ ok: boolean; error?: string }>;
+  onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
+  onToolUse: (listener: (payload: { name: string; input: unknown }) => void) => Unsubscribe;
+  onResult: (listener: (payload: { ok: boolean; error?: string }) => void) => Unsubscribe;
+  onError: (listener: (payload: { message: string }) => void) => Unsubscribe;
+  /** Auth failure subscription — renderer surfaces re-auth CTA. */
+  onAuthRequired: (listener: (payload: { message: string }) => void) => Unsubscribe;
+  onTurnBegin: (listener: () => void) => Unsubscribe;
+  onTurnCommit: (listener: () => void) => Unsubscribe;
+  onTurnRollback: (listener: () => void) => Unsubscribe;
+  replyOp: (id: string, result: unknown) => void;
+  onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) => Unsubscribe;
+  onSession: (listener: (payload: { sessionId: string }) => void) => Unsubscribe;
+  setSessionId: (sessionId: string) => Promise<{ ok: boolean }>;
+  clearSession: () => Promise<{ ok: boolean }>;
+}
+
+export interface ContextureFileAPI {
+  openDialog: () => Promise<{ irPath: string; content: string } | null>;
+  saveAsDialog: () => Promise<string | null>;
+  save: (payload: {
+    irPath: string;
+    schema: unknown;
+    layout: unknown;
+    chat: unknown;
+  }) => Promise<void>;
+  read: (irPath: string) => Promise<{ irPath: string; content: string }>;
+  getRecentFiles: () => Promise<string[]>;
+  openRecent: (filePath: string) => Promise<{ irPath: string; content: string } | null>;
+  onMenuNew: (listener: () => void) => Unsubscribe;
+  onMenuOpen: (listener: () => void) => Unsubscribe;
+  onMenuSave: (listener: () => void) => Unsubscribe;
+  onMenuSaveAs: (listener: () => void) => Unsubscribe;
+}
+
+export interface ContextureAPI {
+  chat: ContextureChatAPI;
+  file: ContextureFileAPI;
 }
 
 declare global {
   interface Window {
     electron: ElectronAPI;
-    api: {
-      // File operations
-      openFile: () => Promise<{ filePath: string; content: string } | null>;
-      saveFile: (filePath: string, content: string) => Promise<boolean>;
-      saveFileAs: (content: string) => Promise<string | null>;
-      saveFileAsDialog: () => Promise<string | null>;
-      readFileSilent: (filePath: string) => Promise<string | null>;
-      getRecentFiles: () => Promise<string[]>;
-      openRecentFile: (filePath: string) => Promise<{ filePath: string; content: string } | null>;
-
-      // Menu events
-      onMenuFileNew: (callback: () => void) => () => void;
-      onMenuFileOpen: (callback: () => void) => () => void;
-      onMenuFileSave: (callback: () => void) => () => void;
-      onMenuFileSaveAs: (callback: () => void) => () => void;
-
-      // Claude operations
-      detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>;
-      sendMessage: (
-        message: string,
-        auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string },
-        modelOptions?: { model?: string; thinkingBudgetTokens?: number },
-      ) => Promise<void>;
-      abortClaude: () => Promise<void>;
-      resetSession: () => Promise<void>;
-
-      // Claude events
-      onClaudeAssistantText: (callback: (text: string) => void) => () => void;
-      onClaudeToolUse: (callback: (toolName: string, input: unknown) => void) => () => void;
-      onClaudeResult: (callback: (result: string, cost: number) => void) => () => void;
-      onClaudeError: (callback: (error: string) => void) => () => void;
-
-      // Claude tool callbacks
-      onClaudeGetOntology: (callback: () => void) => () => void;
-      onClaudeLoadOntology: (callback: (turtle: string) => void) => () => void;
-      onClaudeAddClass: (
-        callback: (args: {
-          uri: string;
-          label?: string;
-          comment?: string;
-          subClassOf?: string[];
-        }) => void,
-      ) => () => void;
-      onClaudeAddObjectProperty: (
-        callback: (args: {
-          uri: string;
-          label?: string;
-          comment?: string;
-          domain: string[];
-          range: string[];
-        }) => void,
-      ) => () => void;
-      onClaudeAddDatatypeProperty: (
-        callback: (args: { uri: string; label?: string; domain: string[]; range: string }) => void,
-      ) => () => void;
-      onClaudeModifyClass: (
-        callback: (uri: string, changes: Record<string, unknown>) => void,
-      ) => () => void;
-      onClaudeRemoveElement: (callback: (uri: string, type: string) => void) => () => void;
-      onClaudeValidate: (callback: () => void) => () => void;
-
-      // Eval operations
-      runEval: (payload: {
-        turtle: string;
-        domain: string;
-        intendedUse: string;
-        auth: { mode: 'api-key'; key: string } | { mode: 'max' };
-        model: string;
-        effort: string;
-      }) => Promise<void>;
-      abortEval: () => Promise<void>;
-      onEvalText: (callback: (text: string) => void) => () => void;
-      onEvalResult: (callback: (reportJson: string) => void) => () => void;
-      onEvalError: (callback: (error: string) => void) => () => void;
-
-      // Respond to main process
-      respondOntology: (turtle: string) => void;
-      respondValidation: (errors: string) => void;
-
-      // Update operations
-      checkForUpdate: () => Promise<void>;
-      downloadUpdate: () => Promise<void>;
-      installUpdate: () => void;
-      openReleasesPage: () => void;
-      getUpdateState: () => Promise<UpdateState>;
-      onUpdateState: (callback: (state: UpdateState) => void) => () => void;
-    };
+    contexture: ContextureAPI;
+    api: LegacyAPI;
   }
 }

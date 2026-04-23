@@ -1,3 +1,14 @@
+/**
+ * Top toolbar — traffic-light drag region, canvas search, Claude auth
+ * popover, theme toggle, sidebar-visibility toggle.
+ *
+ * The Claude popover lets the user flip between Max (Claude CLI / OAuth)
+ * and raw API-key modes. Auth settings round-trip through the preload
+ * surface and live in localStorage (`useClaude`) so they survive
+ * restarts; the main process re-reads them per SDK `query()` call.
+ */
+
+import { useClaude } from '@renderer/chat/useClaude';
 import { useUIStore } from '@renderer/store/ui';
 import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +16,6 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useClaude } from '../chat/useClaude';
 import { GraphSearchBar } from './GraphSearchBar';
 
 export function Toolbar(): React.JSX.Element {
@@ -13,21 +23,18 @@ export function Toolbar(): React.JSX.Element {
   const toggleTheme = useUIStore((s) => s.toggleTheme);
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-
   const { authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady } = useClaude();
 
   return (
     <div
       className="h-10 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-1 shrink-0 app-drag-region relative z-50"
+      // Leave ≈78px on the left so macOS traffic lights have room.
       style={{ paddingLeft: 78, paddingRight: 12 }}
     >
-      {/* macOS traffic lights occupy ~78px */}
-
       <div className="flex-1 flex justify-center">
         <GraphSearchBar />
       </div>
 
-      {/* Theme toggle */}
       <Button
         variant="ghost"
         size="icon"
@@ -38,13 +45,13 @@ export function Toolbar(): React.JSX.Element {
         {theme === 'dark' ? <Sun /> : <Moon />}
       </Button>
 
-      {/* Claude auth */}
       <Popover>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
             className="h-8 px-2 gap-1.5 text-muted-foreground hover:bg-icon-btn-hover"
             title="Claude settings"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <Bot className="size-4" />
             <span
@@ -52,6 +59,7 @@ export function Toolbar(): React.JSX.Element {
                 'size-1.5 rounded-full',
                 isReady ? 'bg-success' : 'bg-muted-foreground/40',
               )}
+              title={isReady ? 'Claude ready' : 'Claude not configured'}
             />
             <ChevronDown className="size-3" />
           </Button>
@@ -103,7 +111,6 @@ export function Toolbar(): React.JSX.Element {
 
       <Separator orientation="vertical" className="h-5 mx-1" />
 
-      {/* Sidebar toggle */}
       <Button
         variant="ghost"
         size="icon"

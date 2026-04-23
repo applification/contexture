@@ -1,0 +1,39 @@
+{
+  "name": "@contexture/runtime",
+  "version": "0.14.0",
+  "description": "Contexture runtime — curated Zod types consumed by generated schema modules.",
+  "license": "MIT",
+  "author": "Applification Ltd",
+  "homepage": "https://github.com/applification/contexture",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/applification/contexture.git",
+    "directory": "packages/runtime"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    "./common": "./src/common.ts",
+    "./identity": "./src/identity.ts",
+    "./place": "./src/place.ts",
+    "./money": "./src/money.ts",
+    "./contact": "./src/contact.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@contexture/stdlib": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "zod": "^4.3.6"
+  }
+}

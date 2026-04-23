@@ -1,128 +1,192 @@
+/**
+ * Preload bridge — `window.contexture` is the new curated surface, and
+ * `window.api` carries legacy methods the pre-pivot renderer still uses
+ * (UpdateBanner, useLayoutSidecar, useChatSidecar). Everything goes
+ * through one allowlist of IPC channels so there's a single place to
+ * audit main-side handlers.
+ *
+ * Each method either:
+ *   - invokes a main-side handler (`ipcRenderer.invoke`) and returns a
+ *     promise, or
+ *   - subscribes to a main-side event stream (`ipcRenderer.on`) and
+ *     returns an unsubscribe function.
+ *
+ * Renderer code should never touch `ipcRenderer` directly.
+ */
+import { promises as fs } from 'node:fs';
 import { electronAPI } from '@electron-toolkit/preload';
 import { contextBridge, ipcRenderer } from 'electron';
 
-type Callback<T extends unknown[] = []> = (...args: T) => void;
+type Unsubscribe = () => void;
 
-export type UpdateState = {
-  status: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
-  version?: string;
-  progress?: number;
-  error?: string;
-};
-
-function onChannel<T extends unknown[]>(channel: string, callback: Callback<T>): () => void {
-  const handler = (_event: unknown, ...args: unknown[]): void => callback(...(args as T));
+function subscribe(channel: string, listener: (payload: unknown) => void): Unsubscribe {
+  const handler = (_evt: unknown, payload: unknown) => listener(payload);
   ipcRenderer.on(channel, handler);
-  return () => ipcRenderer.removeListener(channel, handler);
+  return () => {
+    ipcRenderer.removeListener(channel, handler);
+  };
 }
 
-const api = {
-  // File operations
-  openFile: (): Promise<{ filePath: string; content: string } | null> =>
-    ipcRenderer.invoke('file:open'),
-  saveFile: (filePath: string, content: string): Promise<boolean> =>
-    ipcRenderer.invoke('file:save', filePath, content),
-  saveFileAs: (content: string): Promise<string | null> =>
-    ipcRenderer.invoke('file:save-as', content),
-  saveFileAsDialog: (): Promise<string | null> => ipcRenderer.invoke('file:save-as-dialog'),
-  readFileSilent: (filePath: string): Promise<string | null> =>
-    ipcRenderer.invoke('file:read-silent', filePath),
-  getRecentFiles: (): Promise<string[]> => ipcRenderer.invoke('file:recent-files'),
-  openRecentFile: (filePath: string): Promise<{ filePath: string; content: string } | null> =>
-    ipcRenderer.invoke('file:open-recent', filePath),
+const chat = {
+  send: (message: string) =>
+    ipcRenderer.invoke('chat:send', message) as Promise<{ ok: boolean; error?: string }>,
+  setIR: (ir: unknown) => ipcRenderer.send('claude:turn-start-ir', ir),
+  /** Is the `claude` CLI binary on PATH? Used by the auth popover. */
+  detectClaudeCli: () =>
+    ipcRenderer.invoke('claude:detect-cli') as Promise<{
+      installed: boolean;
+      path: string | null;
+    }>,
+  /** Swap between Max (CLI / OAuth) and api-key auth. */
+  setAuth: (
+    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
+  ): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('claude:set-auth', auth) as Promise<{ ok: boolean; error?: string }>,
+  /** Update the model + thinking-effort used by the next SDK query. */
+  setModelOptions: (opts: {
+    model?: string;
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+  }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('claude:set-model-options', opts) as Promise<{ ok: boolean }>,
+  /** Interrupt the in-flight query (stop button). */
+  abort: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('chat:abort') as Promise<{ ok: boolean; error?: string }>,
+  onAssistant: (listener: (payload: { text: string }) => void) =>
+    subscribe('chat:assistant', listener as (p: unknown) => void),
+  onToolUse: (listener: (payload: { name: string; input: unknown }) => void) =>
+    subscribe('chat:tool-use', listener as (p: unknown) => void),
+  onResult: (listener: (payload: { ok: boolean; error?: string }) => void) =>
+    subscribe('chat:result', listener as (p: unknown) => void),
+  onError: (listener: (payload: { message: string }) => void) =>
+    subscribe('chat:error', listener as (p: unknown) => void),
+  /**
+   * Emitted when the SDK reports an authentication failure (401 /
+   * expired Claude Max token / missing API key). The renderer surfaces
+   * a re-auth CTA rather than a generic error bubble.
+   */
+  onAuthRequired: (listener: (payload: { message: string }) => void) =>
+    subscribe('chat:auth-required', listener as (p: unknown) => void),
+  onTurnBegin: (listener: () => void) => subscribe('turn:begin', listener),
+  onTurnCommit: (listener: () => void) => subscribe('turn:commit', listener),
+  onTurnRollback: (listener: () => void) => subscribe('turn:rollback', listener),
+  replyOp: (id: string, result: unknown) => ipcRenderer.send('claude:op-reply', { id, result }),
+  onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) =>
+    subscribe('claude:op-request', listener as (p: unknown) => void),
+  /**
+   * Stream of Agent SDK session ids — emitted from main on every SDK
+   * message that carries one. The renderer persists the last-seen id
+   * to the chat sidecar so follow-up turns can `resume` it.
+   */
+  onSession: (listener: (payload: { sessionId: string }) => void) =>
+    subscribe('chat:session', listener as (p: unknown) => void),
+  /** Restore a persisted sessionId into main (on sidecar hydrate). */
+  setSessionId: (sessionId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('chat:set-session-id', sessionId) as Promise<{ ok: boolean }>,
+  /** Forget the current sessionId (start a fresh conversation). */
+  clearSession: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('chat:clear-session') as Promise<{ ok: boolean }>,
+};
 
-  // Menu events
-  onMenuFileNew: (callback: () => void) => onChannel('menu:file-new', callback),
-  onMenuFileOpen: (callback: () => void) => onChannel('menu:file-open', callback),
-  onMenuFileSave: (callback: () => void) => onChannel('menu:file-save', callback),
-  onMenuFileSaveAs: (callback: () => void) => onChannel('menu:file-save-as', callback),
+const file = {
+  /** Show the OS open dialog and return the file path + raw contents. */
+  openDialog: () =>
+    ipcRenderer.invoke('file:open-dialog') as Promise<{
+      irPath: string;
+      content: string;
+    } | null>,
+  /** Show the OS save-as dialog and return the chosen path. */
+  saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
+  /** Write the five-file bundle atomically under `irPath`. */
+  save: (payload: {
+    irPath: string;
+    schema: unknown;
+    layout: unknown;
+    chat: unknown;
+  }): Promise<void> => ipcRenderer.invoke('file:save', payload) as Promise<void>,
+  /** Read a `.contexture.json` by absolute path (no dialog). */
+  read: (irPath: string) =>
+    ipcRenderer.invoke('file:read', irPath) as Promise<{ irPath: string; content: string }>,
+  /** List of most-recently-opened paths (most-recent first). */
+  getRecentFiles: () => ipcRenderer.invoke('file:recent-files') as Promise<string[]>,
+  /** Open a path from the recent-files list; returns null if it's gone. */
+  openRecent: (filePath: string) =>
+    ipcRenderer.invoke('file:open-recent', filePath) as Promise<{
+      irPath: string;
+      content: string;
+    } | null>,
+  /** Menu-bar -> renderer subscriptions. */
+  onMenuNew: (listener: () => void) =>
+    subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
+  onMenuOpen: (listener: () => void) =>
+    subscribe('menu:file-open', (() => listener()) as (p: unknown) => void),
+  onMenuSave: (listener: () => void) =>
+    subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
+  onMenuSaveAs: (listener: () => void) =>
+    subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
+};
 
-  // Claude operations
-  detectClaudeCli: (): Promise<{ installed: boolean; path: string | null }> =>
-    ipcRenderer.invoke('claude:detect-cli'),
-  sendMessage: (
-    message: string,
-    auth: { mode: 'api-key'; key: string } | { mode: 'max'; binaryPath?: string },
-    modelOptions?: { model?: string; thinkingBudgetTokens?: number },
-  ): Promise<void> => ipcRenderer.invoke('claude:send-message', message, auth, modelOptions),
-  abortClaude: (): Promise<void> => ipcRenderer.invoke('claude:abort'),
-  resetSession: (): Promise<void> => ipcRenderer.invoke('claude:reset-session'),
+const contexture = { chat, file };
 
-  // Claude events from main → renderer
-  onClaudeAssistantText: (callback: Callback<[string]>) =>
-    onChannel('claude:assistant-text', callback),
-  onClaudeToolUse: (callback: Callback<[string, unknown]>) =>
-    onChannel('claude:tool-use', callback),
-  onClaudeResult: (callback: Callback<[string, number]>) => onChannel('claude:result', callback),
-  onClaudeError: (callback: Callback<[string]>) => onChannel('claude:error', callback),
-
-  // Claude tool callbacks (main process requesting data from renderer)
-  onClaudeGetOntology: (callback: () => void) => onChannel('claude:get-ontology', callback),
-  onClaudeLoadOntology: (callback: Callback<[string]>) =>
-    onChannel('claude:load-ontology', callback),
-  onClaudeAddClass: (
-    callback: Callback<[{ uri: string; label?: string; comment?: string; subClassOf?: string[] }]>,
-  ) => onChannel('claude:add-class', callback),
-  onClaudeAddObjectProperty: (
-    callback: Callback<
-      [{ uri: string; label?: string; comment?: string; domain: string[]; range: string[] }]
-    >,
-  ) => onChannel('claude:add-object-property', callback),
-  onClaudeAddDatatypeProperty: (
-    callback: Callback<[{ uri: string; label?: string; domain: string[]; range: string }]>,
-  ) => onChannel('claude:add-datatype-property', callback),
-  onClaudeModifyClass: (callback: Callback<[string, Record<string, unknown>]>) =>
-    onChannel('claude:modify-class', callback),
-  onClaudeRemoveElement: (callback: Callback<[string, string]>) =>
-    onChannel('claude:remove-element', callback),
-  onClaudeValidate: (callback: () => void) => onChannel('claude:validate', callback),
-
-  // Eval operations
-  runEval: (payload: {
-    turtle: string;
-    domain: string;
-    intendedUse: string;
-    auth: { mode: 'api-key'; key: string } | { mode: 'max' };
-    model: string;
-    effort: string;
-  }): Promise<void> => ipcRenderer.invoke('eval:run', payload),
-  abortEval: (): Promise<void> => ipcRenderer.invoke('eval:abort'),
-  onEvalText: (callback: Callback<[string]>) => onChannel('eval:text', callback),
-  onEvalResult: (callback: Callback<[string]>) => onChannel('eval:result', callback),
-  onEvalError: (callback: Callback<[string]>) => onChannel('eval:error', callback),
-
-  // Respond to main process requests
-  respondOntology: (turtle: string): void => {
-    ipcRenderer.invoke('claude:ontology-response', { turtle });
+/**
+ * Legacy surface. Sidecar reads/writes use the preload process's
+ * Node `fs` directly — the files live next to the open document and
+ * don't need a main-side dialog. Update + menu handlers route through
+ * the existing `update:*` / `file:*` IPC channels.
+ */
+const legacyApi = {
+  readFileSilent: async (path: string): Promise<string | null> => {
+    try {
+      return await fs.readFile(path, 'utf-8');
+    } catch {
+      return null;
+    }
   },
-  respondValidation: (errors: string): void => {
-    ipcRenderer.invoke('claude:validation-response', errors);
+  saveFile: async (path: string, contents: string): Promise<void> => {
+    await fs.writeFile(path, contents, 'utf-8');
+  },
+  openFile: () => ipcRenderer.invoke('file:open-dialog'),
+  saveFileAs: () => ipcRenderer.invoke('file:save-as-dialog'),
+  onMenuFileOpen: (listener: (path: string) => void) =>
+    subscribe('menu:file-open', listener as (p: unknown) => void),
+  onMenuFileSave: (listener: () => void) =>
+    subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
+  onMenuFileSaveAs: (listener: () => void) =>
+    subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
+
+  getUpdateState: () => ipcRenderer.invoke('update:get-state'),
+  onUpdateState: (listener: (state: unknown) => void) => subscribe('update:state', listener),
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => {
+    void ipcRenderer.invoke('update:install');
+  },
+  openReleasesPage: () => {
+    void ipcRenderer.invoke('update:open-releases');
   },
 
-  // Update operations
-  checkForUpdate: (): Promise<void> => ipcRenderer.invoke('update:check'),
-  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),
-  installUpdate: (): void => {
-    ipcRenderer.invoke('update:install');
-  },
-  openReleasesPage: (): void => {
-    ipcRenderer.invoke('update:open-releases');
-  },
-  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke('update:get-state'),
-  onUpdateState: (callback: (state: UpdateState) => void): (() => void) =>
-    onChannel<[UpdateState]>('update:state', callback),
+  // Legacy assistant channels kept as no-ops so `ImprovementHUD` won't
+  // crash on import — the pre-pivot UI lands in the bin when the new
+  // App shell fully replaces it.
+  onClaudeAssistantText:
+    (_listener: (text: string) => void): Unsubscribe =>
+    () =>
+      undefined,
+  onClaudeResult:
+    (_listener: (r?: unknown) => void): Unsubscribe =>
+    () =>
+      undefined,
+  onClaudeError:
+    (_listener: (e?: unknown) => void): Unsubscribe =>
+    () =>
+      undefined,
 };
 
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
-    contextBridge.exposeInMainWorld('api', api);
-  } catch (error) {
-    console.error(error);
+    contextBridge.exposeInMainWorld('contexture', contexture);
+    contextBridge.exposeInMainWorld('api', legacyApi);
+  } catch (err) {
+    console.error(err);
   }
-} else {
-  // @ts-expect-error
-  window.electron = electronAPI;
-  // @ts-expect-error
-  window.api = api;
 }

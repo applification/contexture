@@ -1,387 +1,443 @@
+/**
+ * Electron wiring for the Agent SDK chat session.
+ *
+ * This module is intentionally thin: it assembles the pieces defined
+ * elsewhere (`ops/`, `claude-bridge.ts`) against the real `ipcMain` +
+ * `mainWindow.webContents` + the Agent SDK's MCP server, and exposes
+ * `registerClaudeIpc` to the main entrypoint. All interesting logic
+ * lives in the pure modules, which have their own tests.
+ */
+
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
-import { BrowserWindow, ipcMain } from 'electron';
-import { z } from 'zod/v4';
+import type { Schema } from '@renderer/model/types';
+import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
+import * as Sentry from '@sentry/electron/main';
+import { app, type BrowserWindow, ipcMain } from 'electron';
+import { z } from 'zod';
+import { createOpTools, type OpToolDescriptor } from '../ops';
+import { ChatDriver, type DriverQueryFn, type DriverSdkMessage } from './chat-driver';
+import { ChatTurnController, type TurnTransport } from './chat-turn';
+import {
+  type BridgeTransport,
+  type ForwardOpFn,
+  makeIpcForwardOp,
+  TurnContext,
+} from './claude-bridge';
+import { ChatCancelledError } from './claude-errors';
+import { invokeOpHandler } from './op-tool-bridge';
 
 const execFileAsync = promisify(execFile);
 
-interface AuthConfig {
-  mode: 'api-key' | 'max';
-  key?: string;
-  binaryPath?: string;
-}
-
+/**
+ * Look for a `claude` binary on PATH. Used by the auth popover to
+ * tell the user whether Max mode is viable; the Agent SDK shells out
+ * to the CLI when no `ANTHROPIC_API_KEY` is set, so the same detection
+ * predicts whether a turn will succeed.
+ */
+/**
+ * Cached absolute path to the `claude` CLI binary, populated by
+ * `detectClaudeCli()` the first time the renderer probes. The Agent SDK
+ * needs the absolute path via `pathToClaudeCodeExecutable` because
+ * packaged Electron apps (and sometimes dev) don't inherit a PATH that
+ * sees things like `~/.local/bin/claude`.
+ */
 let detectedClaudePath: string | null = null;
-
-export function getDetectedClaudePath(): string | null {
-  return detectedClaudePath;
-}
 
 async function detectClaudeCli(): Promise<{ installed: boolean; path: string | null }> {
   try {
-    const { stdout } = await execFileAsync(process.platform === 'win32' ? 'where' : 'which', [
-      'claude',
-    ]);
-    const path = stdout.trim().split('\n')[0];
-    return { installed: true, path };
+    const cmd = process.platform === 'win32' ? 'where' : 'which';
+    const { stdout } = await execFileAsync(cmd, ['claude']);
+    const path = stdout.trim().split('\n')[0] ?? null;
+    if (path) detectedClaudePath = path;
+    return { installed: path !== null && path.length > 0, path };
   } catch {
     return { installed: false, path: null };
   }
 }
 
-interface OntologyState {
-  turtle: string;
-}
+/**
+ * Current chat auth — set by the renderer via `chat:set-auth` and read
+ * at the start of each `query()` call. `max` mode leaves env alone and
+ * the SDK will shell out to the Claude CLI (via `pathToClaudeCodeExecutable`);
+ * `api-key` mode injects `ANTHROPIC_API_KEY` into the SDK's env for that
+ * turn.
+ */
+type ChatAuth = { mode: 'max' } | { mode: 'api-key'; key: string };
+let currentAuth: ChatAuth = { mode: 'max' };
 
-let currentAbort: AbortController | null = null;
+type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
+type ThinkingBudget = 'auto' | 'low' | 'med' | 'high';
+const THINKING_TOKENS: Record<ThinkingBudget, number | undefined> = {
+  auto: undefined,
+  low: 2048,
+  med: 8192,
+  high: 16000,
+};
+let currentModel: ModelId = 'claude-sonnet-4-6';
+let currentThinkingBudget: ThinkingBudget = 'auto';
 
-function getMainWindow(): BrowserWindow | null {
-  return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null;
-}
+/**
+ * Handle on the in-flight `query()` iterator so `chat:abort` can
+ * interrupt it. `null` while nothing is running.
+ */
+let currentQuery: { interrupt(): Promise<void> } | null = null;
 
-function sendToRenderer(channel: string, ...args: unknown[]): void {
-  const win = getMainWindow();
-  if (win) win.webContents.send(channel, ...args);
-}
+/**
+ * Flag set by `chat:abort` to signal cancellation to the in-flight
+ * sdkQuery generator. Cleared at the start of every turn. The Agent
+ * SDK's `interrupt()` stops the iterator cleanly (not via throw), so
+ * we need our own signal to raise `ChatCancelledError` after the loop
+ * exits — that's what drives `turn:rollback`.
+ */
+let cancelRequested = false;
 
-// Define ontology manipulation tools
-const getCurrentOntology = tool(
-  'get_current_ontology',
-  'Get the current ontology as Turtle (.ttl) format. Call this before making modifications to understand the current state.',
-  {},
-  async () => {
-    return new Promise((resolve) => {
-      const win = getMainWindow();
-      if (!win) {
-        resolve({
-          content: [{ type: 'text' as const, text: 'No window available' }],
-          isError: true,
-        });
-        return;
-      }
-      ipcMain.handleOnce('claude:ontology-response', (_event, state: OntologyState) => {
-        resolve({ content: [{ type: 'text' as const, text: state.turtle }] });
-      });
-      win.webContents.send('claude:get-ontology');
-    });
-  },
-);
+/**
+ * Last-seen Agent SDK session id for the active chat. Populated by
+ * `sdkQuery` from every SDK message that carries one; passed as
+ * `resume` on subsequent turns so the SDK threads prior history.
+ * Cleared on explicit "new conversation" requests and pre-populated
+ * from the sidecar via `chat:set-session-id` on file open.
+ */
+let currentSessionId: string | undefined;
 
-const generateOntology = tool(
-  'generate_ontology',
-  'Replace the entire ontology with new Turtle content. Use this for initial generation or wholesale replacement. The Turtle must be valid and include all necessary prefix declarations.',
-  { turtle: z.string().describe('Complete ontology in Turtle (.ttl) format') },
-  async (args) => {
-    sendToRenderer('claude:load-ontology', args.turtle);
-    return { content: [{ type: 'text' as const, text: 'Ontology loaded successfully' }] };
-  },
-);
-
-const addClass = tool(
-  'add_class',
-  'Add a new OWL class to the ontology',
-  {
-    uri: z.string().describe('Full URI for the class (e.g. http://example.org/ontology#Person)'),
-    label: z.string().optional().describe('Human-readable label'),
-    comment: z.string().optional().describe('Description of the class'),
-    subClassOf: z.array(z.string()).optional().describe('URIs of parent classes'),
-  },
-  async (args) => {
-    sendToRenderer('claude:add-class', args);
-    return { content: [{ type: 'text' as const, text: `Class ${args.uri} added` }] };
-  },
-);
-
-const addObjectProperty = tool(
-  'add_object_property',
-  'Add a new OWL object property (relationship between classes)',
-  {
-    uri: z.string().describe('Full URI for the property'),
-    label: z.string().optional().describe('Human-readable label'),
-    comment: z.string().optional().describe('Description'),
-    domain: z.array(z.string()).describe('URIs of domain classes'),
-    range: z.array(z.string()).describe('URIs of range classes'),
-  },
-  async (args) => {
-    sendToRenderer('claude:add-object-property', args);
-    return { content: [{ type: 'text' as const, text: `Object property ${args.uri} added` }] };
-  },
-);
-
-const addDatatypeProperty = tool(
-  'add_datatype_property',
-  'Add a new OWL datatype property (attribute of a class)',
-  {
-    uri: z.string().describe('Full URI for the property'),
-    label: z.string().optional().describe('Human-readable label'),
-    domain: z.array(z.string()).describe('URIs of domain classes'),
-    range: z.string().describe('XSD datatype URI (e.g. http://www.w3.org/2001/XMLSchema#string)'),
-  },
-  async (args) => {
-    sendToRenderer('claude:add-datatype-property', args);
-    return { content: [{ type: 'text' as const, text: `Datatype property ${args.uri} added` }] };
-  },
-);
-
-const modifyClass = tool(
-  'modify_class',
-  'Modify an existing class (update label, comment, or subClassOf)',
-  {
-    uri: z.string().describe('URI of the class to modify'),
-    label: z.string().optional().describe('New label'),
-    comment: z.string().optional().describe('New comment'),
-    subClassOf: z.array(z.string()).optional().describe('Replace subClassOf list'),
-  },
-  async (args) => {
-    const { uri, ...changes } = args;
-    sendToRenderer('claude:modify-class', uri, changes);
-    return { content: [{ type: 'text' as const, text: `Class ${uri} modified` }] };
-  },
-);
-
-const removeElement = tool(
-  'remove_element',
-  'Remove a class or property from the ontology by URI',
-  {
-    uri: z.string().describe('URI of the element to remove'),
-    type: z.enum(['class', 'objectProperty', 'datatypeProperty']).describe('Type of element'),
-  },
-  async (args) => {
-    sendToRenderer('claude:remove-element', args.uri, args.type);
-    return { content: [{ type: 'text' as const, text: `${args.type} ${args.uri} removed` }] };
-  },
-);
-
-const validateOntology = tool(
-  'validate_ontology',
-  'Run validation on the current ontology and return any errors or warnings',
-  {},
-  async () => {
-    return new Promise((resolve) => {
-      const win = getMainWindow();
-      if (!win) {
-        resolve({
-          content: [{ type: 'text' as const, text: 'No window available' }],
-          isError: true,
-        });
-        return;
-      }
-      ipcMain.handleOnce('claude:validation-response', (_event, errors: string) => {
-        resolve({ content: [{ type: 'text' as const, text: errors }] });
-      });
-      win.webContents.send('claude:validate');
-    });
-  },
-);
-
-const ontographServer = createSdkMcpServer({
-  name: 'ontograph',
-  version: '0.1.0',
-  tools: [
-    getCurrentOntology,
-    generateOntology,
-    addClass,
-    addObjectProperty,
-    addDatatypeProperty,
-    modifyClass,
-    removeElement,
-    validateOntology,
-  ],
-});
-
-const SYSTEM_PROMPT = `You are an ontology engineering assistant integrated into Ontograph, a visual OWL ontology editor. You help users create, modify, and refine OWL ontologies.
-
-Key guidelines:
-- When creating ontologies, use a consistent namespace prefix (e.g. http://example.org/ontology#)
-- Always include rdfs:label for all classes and properties
-- Add rdfs:comment to describe the purpose of each element
-- Use standard XSD datatypes for datatype properties (xsd:string, xsd:integer, xsd:boolean, xsd:date, xsd:dateTime, xsd:float, xsd:decimal, xsd:anyURI)
-- Create meaningful object properties to connect classes
-- Consider subclass hierarchies to organize classes
-- Keep ontologies focused and practical for knowledge graph extraction
-
-When the user asks you to create an ontology:
-1. First call get_current_ontology to see what exists
-2. Use generate_ontology for initial creation (provide complete valid Turtle)
-3. Use granular tools (add_class, add_object_property, etc.) for modifications
-
-Always include necessary prefix declarations in generated Turtle:
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .`;
-
-const ALL_TOOLS = [
-  'mcp__ontograph__get_current_ontology',
-  'mcp__ontograph__generate_ontology',
-  'mcp__ontograph__add_class',
-  'mcp__ontograph__add_object_property',
-  'mcp__ontograph__add_datatype_property',
-  'mcp__ontograph__modify_class',
-  'mcp__ontograph__remove_element',
-  'mcp__ontograph__validate_ontology',
+/**
+ * Built-in Claude Code tools we never want the schema-editor agent to
+ * reach for. Listed explicitly (vs. `tools: []`) because the latter
+ * would also strip the default system prompt infrastructure that
+ * auto-loads plugin skills. Mirrors the pre-pivot main-branch list.
+ */
+const DISALLOWED_BUILTINS = [
+  'Read',
+  'Edit',
+  'Write',
+  'Bash',
+  'Glob',
+  'Grep',
+  'Agent',
+  'NotebookEdit',
+  'WebFetch',
+  'WebSearch',
 ];
 
-export function registerClaudeIPC(): void {
-  let sessionId: string | undefined;
+export interface ClaudeIpc {
+  forwardOp: ForwardOpFn;
+  turnContext: TurnContext;
+  /** The assembled SDK MCP server with all 13 op tools bound. */
+  mcpServer: ReturnType<typeof createSdkMcpServer>;
+  /**
+   * Wraps a chat turn's op-dispatch body in `turn:begin` / `turn:commit`
+   * (or `turn:rollback` on failure). The Agent-SDK driver calls
+   * `turnController.run(async () => { for await (const msg of query(...)) … })`
+   * once per user turn.
+   */
+  turnController: ChatTurnController;
+  /** Chat driver orchestrating Agent-SDK `query()` per user message. */
+  chatDriver: ChatDriver;
+}
 
-  // Detect Claude CLI on startup and expose result to renderer
-  detectClaudeCli().then((result) => {
-    detectedClaudePath = result.path;
-  });
-
-  ipcMain.handle('claude:detect-cli', async () => {
-    if (detectedClaudePath) return { installed: true, path: detectedClaudePath };
-    const result = await detectClaudeCli();
-    detectedClaudePath = result.path;
-    return result;
-  });
-
-  ipcMain.handle(
-    'claude:send-message',
-    async (
-      _event,
-      message: string,
-      auth: AuthConfig,
-      modelOptions?: { model?: string; thinkingBudgetTokens?: number },
-    ) => {
-      // Abort any previous query
-      if (currentAbort) {
-        currentAbort.abort();
-      }
-      currentAbort = new AbortController();
-
-      const MAX_RETRIES = 3;
-      let attempt = 0;
-
-      while (attempt < MAX_RETRIES) {
-        attempt++;
-        try {
-          const authOptions =
-            auth.mode === 'api-key' && auth.key
-              ? { env: { ...process.env, ANTHROPIC_API_KEY: auth.key } }
-              : {
-                  pathToClaudeCodeExecutable: auth.binaryPath || detectedClaudePath || 'claude',
-                  env: process.env,
-                };
-
-          const options: Record<string, unknown> = {
-            mcpServers: { ontograph: ontographServer },
-            allowedTools: ALL_TOOLS,
-            disallowedTools: [
-              'Read',
-              'Edit',
-              'Write',
-              'Bash',
-              'Glob',
-              'Grep',
-              'Agent',
-              'NotebookEdit',
-              'WebFetch',
-              'WebSearch',
-            ],
-            systemPrompt: SYSTEM_PROMPT,
-            maxTurns: 20,
-            abortController: currentAbort,
-            persistSession: true,
-            ...(sessionId ? { resume: sessionId } : {}),
-            ...(modelOptions?.model ? { model: modelOptions.model } : {}),
-            ...(modelOptions?.thinkingBudgetTokens
-              ? { thinkingBudgetTokens: modelOptions.thinkingBudgetTokens }
-              : {}),
-            ...authOptions,
-          };
-
-          for await (const msg of query({ prompt: message, options: options as never })) {
-            if (msg.type === 'system' && msg.subtype === 'init') {
-              sessionId = msg.session_id;
-            }
-
-            if (msg.type === 'assistant') {
-              const textBlocks = msg.message.content.filter(
-                (b: { type: string }) => b.type === 'text',
-              );
-              const text = textBlocks.map((b: { text: string }) => b.text).join('');
-              if (text) {
-                sendToRenderer('claude:assistant-text', text);
-              }
-
-              const toolBlocks = msg.message.content.filter(
-                (b: { type: string }) => b.type === 'tool_use',
-              );
-              for (const tb of toolBlocks) {
-                sendToRenderer(
-                  'claude:tool-use',
-                  (tb as { name: string }).name,
-                  (tb as { input: unknown }).input,
-                );
-              }
-            }
-
-            if (msg.type === 'result') {
-              if (msg.subtype === 'success') {
-                sendToRenderer('claude:result', msg.result, msg.total_cost_usd);
-              } else {
-                sendToRenderer('claude:error', msg.errors?.join(', ') || 'Unknown error');
-              }
-            }
-          }
-          break; // Success — exit retry loop
-        } catch (err: unknown) {
-          if ((err as Error).name === 'AbortError') {
-            break; // User cancelled — don't retry
-          }
-
-          const errMsg = (err as Error).message || '';
-          const isRetryable =
-            /rate.limit|429|overloaded|timeout|ETIMEDOUT|ECONNRESET|503|529/i.test(errMsg);
-
-          if (isRetryable && attempt < MAX_RETRIES) {
-            const delaySec = 2 ** attempt;
-            sendToRenderer(
-              'claude:assistant-text',
-              `\n\n*Rate limited — retrying in ${delaySec}s (attempt ${attempt}/${MAX_RETRIES})...*`,
-            );
-            await new Promise((r) => setTimeout(r, delaySec * 1000));
-            continue;
-          }
-
-          // Format user-friendly error
-          let userMessage: string;
-          if (/rate.limit|429/i.test(errMsg)) {
-            userMessage = 'Rate limited by the API. Please wait a moment and try again.';
-          } else if (/overloaded|503|529/i.test(errMsg)) {
-            userMessage = 'Claude is currently overloaded. Please try again in a few minutes.';
-          } else if (/timeout|ETIMEDOUT/i.test(errMsg)) {
-            userMessage = 'Request timed out. Check your network connection and try again.';
-          } else if (/ECONNRESET|ECONNREFUSED|fetch failed/i.test(errMsg)) {
-            userMessage = 'Network error. Check your internet connection.';
-          } else if (/401|unauthorized|invalid.*key/i.test(errMsg)) {
-            userMessage = 'Authentication failed. Please check your API key.';
-          } else {
-            userMessage = errMsg || 'Failed to communicate with Claude';
-          }
-
-          sendToRenderer('claude:error', userMessage);
-          break;
-        } finally {
-          if (attempt >= MAX_RETRIES || !currentAbort) {
-            currentAbort = null;
-          }
-        }
-      }
+export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
+  const transport: BridgeTransport = {
+    send: (id, payload) => {
+      mainWindow.webContents.send('claude:op-request', { id, op: payload });
     },
-  );
+  };
 
-  ipcMain.handle('claude:abort', () => {
-    if (currentAbort) {
-      currentAbort.abort();
-      currentAbort = null;
+  ipcMain.on('claude:op-reply', (_evt, message: { id: string; result: unknown }) => {
+    transport.onReply?.(message.id, message.result);
+  });
+
+  const forwardOp = makeIpcForwardOp(transport);
+  const turnContext = new TurnContext();
+
+  ipcMain.on('claude:turn-start-ir', (_evt, ir: Schema) => {
+    turnContext.pushIR(ir);
+  });
+
+  const descriptors = createOpTools(forwardOp);
+  const mcpServer = createSdkMcpServer({
+    name: 'contexture-ops',
+    version: '1.0.0',
+    tools: descriptors.map(toSdkTool),
+  });
+  // Pre-approved tool names fed to `allowedTools` on every query.
+  // Format matches how the SDK surfaces MCP tools to the model:
+  // `mcp__<server-name>__<tool-name>`.
+  const MCP_OP_TOOL_NAMES = descriptors.map((d) => `mcp__contexture-ops__${d.name}`);
+
+  const turnTransport: TurnTransport = {
+    send: (channel, payload) => {
+      mainWindow.webContents.send(channel, payload);
+    },
+  };
+  const turnController = new ChatTurnController(turnTransport);
+
+  const skillsPluginPath = resolveSkillsPluginPath();
+
+  const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPromptAppend, resume }) {
+    // Clear any stale cancel flag at the start of each SDK query.
+    // `chat:abort` will flip it back mid-stream when the user hits Stop.
+    cancelRequested = false;
+    // Project the current auth into the SDK options. Max mode points
+    // the SDK at the cached absolute binary path (the SDK spawns that
+    // binary to authenticate against the user's OAuth session);
+    // api-key mode overrides the env var for the spawned SDK process.
+    const env: Record<string, string> | undefined =
+      currentAuth.mode === 'api-key' && currentAuth.key
+        ? { ANTHROPIC_API_KEY: currentAuth.key }
+        : undefined;
+    const iterator = query({
+      prompt,
+      options: {
+        // Preset + append: keeps Claude Code's default system prompt
+        // (which auto-loads plugin skills on topic match) and layers
+        // our op vocabulary / stdlib / tool-use imperatives on top.
+        systemPrompt: {
+          type: 'preset',
+          preset: 'claude_code',
+          append: systemPromptAppend,
+        },
+        // Pre-approve our MCP ops by namespaced name so the default
+        // permission system doesn't prompt the user on every tool call.
+        // This is the pattern that worked on the pre-pivot main branch.
+        allowedTools: MCP_OP_TOOL_NAMES,
+        // Block the built-in filesystem / shell tools — only our MCP
+        // ops should be callable. Plugin skills are a plugin-level
+        // feature, unaffected by this list.
+        disallowedTools: DISALLOWED_BUILTINS,
+        model: currentModel,
+        ...(THINKING_TOKENS[currentThinkingBudget] !== undefined
+          ? { maxThinkingTokens: THINKING_TOKENS[currentThinkingBudget] }
+          : {}),
+        mcpServers: { 'contexture-ops': mcpServer },
+        pathToClaudeCodeExecutable: detectedClaudePath ?? 'claude',
+        ...(skillsPluginPath ? { plugins: [{ type: 'local', path: skillsPluginPath }] } : {}),
+        ...(resume ? { resume } : {}),
+        ...(env ? { env } : {}),
+      },
+    });
+    currentQuery = iterator;
+    try {
+      for await (const msg of iterator) {
+        const sessionMsg = extractSessionMessage(msg);
+        if (sessionMsg) {
+          currentSessionId = sessionMsg.sessionId;
+          yield sessionMsg;
+        }
+        const mapped = mapSdkMessage(msg);
+        if (mapped) yield mapped;
+      }
+      // `interrupt()` unwinds the iterator cleanly (no throw); raise
+      // ChatCancelledError so `turnController.run` fires `turn:rollback`
+      // and any ops applied during this turn are reverted as one undo
+      // step (issue #74 user story 16).
+      if (cancelRequested) {
+        throw new ChatCancelledError();
+      }
+    } finally {
+      if (currentQuery === iterator) currentQuery = null;
+    }
+  };
+
+  const chatDriver = new ChatDriver({
+    query: sdkQuery,
+    transport: {
+      send: (channel, payload) => mainWindow.webContents.send(channel, payload),
+    },
+    turnController,
+    getCurrentIR: () => turnContext.current(),
+    stdlibRegistry: SYSTEM_PROMPT_STDLIB,
+    getResumeSessionId: () => currentSessionId,
+    retryOptions: {
+      captureException: (err, extra) => {
+        Sentry.captureException(err, { extra });
+      },
+    },
+  });
+
+  ipcMain.handle('chat:send', async (_evt, userMessage: string) => {
+    try {
+      await chatDriver.send(userMessage);
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
     }
   });
 
-  ipcMain.handle('claude:reset-session', () => {
-    sessionId = undefined;
+  // Probe PATH once at startup so the SDK has an absolute binary path
+  // ready for the first chat turn, even if the renderer never opens
+  // the auth popover.
+  detectClaudeCli().catch(() => undefined);
+
+  ipcMain.handle('claude:detect-cli', async () => {
+    // Short-circuit on a previous successful probe — the binary doesn't
+    // move between launches, so re-running `which` per renderer mount
+    // is wasted work.
+    if (detectedClaudePath) return { installed: true, path: detectedClaudePath };
+    return detectClaudeCli();
   });
+
+  ipcMain.handle('claude:set-auth', (_evt, payload: ChatAuth) => {
+    // Shallow-validate the incoming payload — anything else we just
+    // reject rather than silently falling back.
+    if (payload?.mode === 'max') {
+      currentAuth = { mode: 'max' };
+      return { ok: true };
+    }
+    if (payload?.mode === 'api-key' && typeof payload.key === 'string') {
+      currentAuth = { mode: 'api-key', key: payload.key };
+      return { ok: true };
+    }
+    return { ok: false, error: 'invalid auth payload' };
+  });
+
+  ipcMain.handle(
+    'claude:set-model-options',
+    (_evt, payload: { model?: ModelId; thinkingBudget?: ThinkingBudget }) => {
+      if (payload?.model) currentModel = payload.model;
+      if (payload?.thinkingBudget) currentThinkingBudget = payload.thinkingBudget;
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle('chat:set-session-id', (_evt, sessionId: unknown) => {
+    // Renderer calls this on sidecar hydrate to restore the prior chat's
+    // SDK session. Only accept strings; anything else is silently
+    // ignored (the sidecar could have been hand-edited).
+    if (typeof sessionId === 'string' && sessionId.length > 0) {
+      currentSessionId = sessionId;
+      return { ok: true };
+    }
+    return { ok: false };
+  });
+
+  ipcMain.handle('chat:clear-session', () => {
+    // Explicit "new conversation" — forgets the resume id so the next
+    // turn starts a fresh SDK session. Does not clear the on-disk
+    // transcript (that's the renderer's concern).
+    currentSessionId = undefined;
+    return { ok: true };
+  });
+
+  ipcMain.handle('chat:abort', async () => {
+    const q = currentQuery;
+    if (!q) return { ok: false, error: 'no active query' };
+    // Flip the flag first so the sdkQuery generator raises
+    // ChatCancelledError after `interrupt()` unwinds the iterator.
+    // Without this the iterator stops cleanly and the turn commits
+    // whatever ops landed before Stop was pressed.
+    cancelRequested = true;
+    try {
+      await q.interrupt();
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+  });
+
+  return { forwardOp, turnContext, mcpServer, turnController, chatDriver };
 }
+
+/**
+ * Pull the session id out of the SDK's `system/init` message — that's
+ * the one we want to hand back as `resume` on subsequent turns. Later
+ * messages echo a session id too, but the init value is the canonical
+ * "this conversation's id" per the main-branch pattern that proved
+ * resume works.
+ */
+function extractSessionMessage(
+  msg: unknown,
+): Extract<DriverSdkMessage, { type: 'session' }> | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const m = msg as { type?: unknown; subtype?: unknown; session_id?: unknown };
+  if (m.type !== 'system' || m.subtype !== 'init') return null;
+  const sid = m.session_id;
+  if (typeof sid === 'string' && sid.length > 0) {
+    return { type: 'session', sessionId: sid };
+  }
+  return null;
+}
+
+/**
+ * Squeeze the SDK's wide message union down to the `DriverSdkMessage`
+ * shape. Only `assistant`, `user` tool-use blocks, and `result` are
+ * forwarded to the renderer — intermediate status / stream / hook
+ * messages are dropped to keep the chat transcript clean.
+ */
+function mapSdkMessage(msg: unknown): DriverSdkMessage | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const m = msg as { type: string; message?: { content?: unknown } };
+  if (m.type === 'assistant') {
+    const content = Array.isArray(m.message?.content) ? m.message?.content : [];
+    const textParts = content
+      .filter(
+        (p): p is { type: 'text'; text: string } =>
+          !!p &&
+          typeof p === 'object' &&
+          (p as { type?: unknown }).type === 'text' &&
+          typeof (p as { text?: unknown }).text === 'string',
+      )
+      .map((p) => p.text);
+    const toolUseParts = content.filter(
+      (p): p is { type: 'tool_use'; name: string; input: unknown } =>
+        !!p && typeof p === 'object' && (p as { type?: unknown }).type === 'tool_use',
+    );
+    if (textParts.length > 0) {
+      return { type: 'assistant', text: textParts.join('') };
+    }
+    if (toolUseParts.length > 0) {
+      return {
+        type: 'tool_use',
+        name: toolUseParts[0].name,
+        input: toolUseParts[0].input,
+      };
+    }
+    return null;
+  }
+  if (m.type === 'result') {
+    const rm = m as { type: 'result'; subtype?: string; is_error?: boolean; result?: string };
+    return {
+      type: 'result',
+      ok: rm.subtype === 'success' && rm.is_error !== true,
+      error: rm.is_error ? rm.result : undefined,
+    };
+  }
+  return null;
+}
+
+/**
+ * Locate the bundled skills plugin directory.
+ *
+ * In production the directory ships under `process.resourcesPath/skills`
+ * via `electron-builder`'s `extraResources` entry. In dev we fall back
+ * to the in-tree copy so `electron-vite dev` works without a packaged
+ * build. Returns `null` when neither exists so the SDK query runs
+ * without plugins instead of blowing up at session start.
+ */
+function resolveSkillsPluginPath(): string | null {
+  const candidates = [
+    join(process.resourcesPath ?? '', 'skills'),
+    join(app.getAppPath(), 'resources', 'skills'),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && existsSync(join(candidate, '.claude-plugin', 'plugin.json'))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function toSdkTool(descriptor: OpToolDescriptor) {
+  return tool(descriptor.name, descriptor.description, descriptor.inputSchema, (args) =>
+    invokeOpHandler(descriptor.handler, args as Record<string, unknown>),
+  );
+}
+
+// Keep Zod in the surface area so downstream importers can build
+// matching schemas without separately importing it.
+export { z };

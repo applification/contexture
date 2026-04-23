@@ -1,0 +1,25 @@
+{
+  "name": "@contexture/stdlib",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Internal curated Zod stdlib for Contexture. Not published — the public surface is @contexture/runtime.",
+  "type": "module",
+  "exports": {
+    "./common": "./src/common.ts",
+    "./identity": "./src/identity.ts",
+    "./place": "./src/place.ts",
+    "./money": "./src/money.ts",
+    "./contact": "./src/contact.ts",
+    "./ir/*": "./src/*.contexture.json",
+    "./registry": "./src/registry.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

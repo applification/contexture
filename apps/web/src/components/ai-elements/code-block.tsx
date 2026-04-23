@@ -366,10 +366,17 @@ export const CodeBlockContent = ({
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
 
-  // Synchronous cache lookup — avoids setState in effect for cached results
+  // Track hydration — SSR and first client render must emit identical HTML,
+  // so defer any highlighted output until after mount.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  // Synchronous cache lookup — only consulted post-hydration
   const syncTokens = useMemo(
-    () => highlightCode(code, language) ?? rawTokens,
-    [code, language, rawTokens],
+    () => (hydrated ? (highlightCode(code, language) ?? rawTokens) : rawTokens),
+    [code, language, rawTokens, hydrated],
   );
 
   // Async highlighting result (populated after shiki loads)
@@ -383,6 +390,9 @@ export const CodeBlockContent = ({
   }
 
   useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     let cancelled = false;
 
     highlightCode(code, language, (result) => {
@@ -394,9 +404,9 @@ export const CodeBlockContent = ({
     return () => {
       cancelled = true;
     };
-  }, [code, language]);
+  }, [code, language, hydrated]);
 
-  const tokenized = asyncTokens ?? syncTokens;
+  const tokenized = hydrated ? (asyncTokens ?? syncTokens) : rawTokens;
 
   return (
     <div className="relative overflow-auto">

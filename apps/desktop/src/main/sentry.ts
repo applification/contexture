@@ -7,7 +7,7 @@ export function initSentryMain(): void {
 
   Sentry.init({
     dsn,
-    release: `ontograph@${app.getVersion()}`,
+    release: `contexture@${app.getVersion()}`,
     environment: app.isPackaged ? 'production' : 'development',
     enabled: app.isPackaged,
   });

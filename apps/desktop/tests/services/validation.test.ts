@@ -1,490 +1,319 @@
-import type { Ontology } from '@renderer/model/types';
-import { createEmptyOntology } from '@renderer/model/types';
-import { validateOntology } from '@renderer/services/validation';
+import type { Schema } from '@renderer/model/types';
+import { validate } from '@renderer/services/validation';
 import { describe, expect, it } from 'vitest';
 
-const EX = 'http://example.org/';
-const XSD = 'http://www.w3.org/2001/XMLSchema#';
-
-function makeOntology(fn: (o: Ontology) => void): Ontology {
-  const o = createEmptyOntology();
-  fn(o);
-  return o;
-}
-
-describe('validateOntology', () => {
-  it('returns no errors for empty ontology', () => {
-    expect(validateOntology(createEmptyOntology())).toEqual([]);
+describe('validate', () => {
+  it('returns no errors for an empty v1 schema (rule 1: structural already enforced by loader)', () => {
+    const errs = validate({ version: '1', types: [] });
+    expect(errs).toEqual([]);
   });
 
-  it('returns no errors for valid ontology', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.datatypeProperties.set(`${EX}name`, {
-        uri: `${EX}name`,
-        label: 'name',
-        domain: [`${EX}Person`],
-        range: `${XSD}string`,
-      });
+  // Rule 3: no duplicate type names
+  it('rule 3: flags duplicate type names at the second occurrence', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'User', fields: [] },
+        { kind: 'object', name: 'User', fields: [] },
+      ],
+    };
+    const errs = validate(schema);
+    const dup = errs.find((e) => e.code === 'dup_type_name');
+    expect(dup).toEqual({
+      code: 'dup_type_name',
+      path: 'types.1',
+      message: 'Duplicate type name "User".',
     });
-    const errors = validateOntology(o);
-    expect(errors.filter((e) => e.severity === 'error')).toEqual([]);
   });
 
-  it('detects missing subClassOf target', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Employee`, {
-        uri: `${EX}Employee`,
-        label: 'Employee',
-        subClassOf: [`${EX}NonExistent`],
-        disjointWith: [],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.severity === 'error' && e.message.includes('does not exist'))).toBe(
-      true,
-    );
+  // Rule 2: ref.typeName must resolve
+  it('rule 2: bare ref to a local type name resolves', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Post', fields: [] },
+        {
+          kind: 'object',
+          name: 'Comment',
+          fields: [{ name: 'on', type: { kind: 'ref', typeName: 'Post' } }],
+        },
+      ],
+    };
+    expect(validate(schema).some((e) => e.code === 'unresolved_ref')).toBe(false);
   });
 
-  it('detects circular inheritance', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}A`, {
-        uri: `${EX}A`,
-        label: 'A',
-        subClassOf: [`${EX}B`],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}B`, {
-        uri: `${EX}B`,
-        label: 'B',
-        subClassOf: [`${EX}A`],
-        disjointWith: [],
-      });
+  it('rule 2: flags an unknown bare ref with the field path', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Comment',
+          fields: [{ name: 'on', type: { kind: 'ref', typeName: 'Post' } }],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'unresolved_ref');
+    expect(err).toEqual({
+      code: 'unresolved_ref',
+      path: 'types.0.fields.0.type',
+      message: 'Unresolved ref "Post".',
     });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.message === 'Circular inheritance detected')).toBe(true);
   });
 
-  it('detects missing domain class on object property', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}worksFor`, {
-        uri: `${EX}worksFor`,
-        label: 'works for',
-        domain: [`${EX}NonExistent`],
-        range: [`${EX}Person`],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.severity === 'error' && e.message.includes('Domain class'))).toBe(
-      true,
-    );
+  it('rule 2: qualified ref resolves when its alias is in imports', () => {
+    const schema: Schema = {
+      version: '1',
+      imports: [{ kind: 'stdlib', path: '@contexture/common', alias: 'common' }],
+      types: [
+        {
+          kind: 'object',
+          name: 'Contact',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    };
+    expect(validate(schema).some((e) => e.code === 'unresolved_ref')).toBe(false);
   });
 
-  it('detects missing range class on object property', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}worksFor`, {
-        uri: `${EX}worksFor`,
-        label: 'works for',
-        domain: [`${EX}Person`],
-        range: [`${EX}NonExistent`],
-      });
+  it('rule 2: qualified ref fails when no matching alias exists', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Contact',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'unresolved_ref');
+    expect(err).toEqual({
+      code: 'unresolved_ref',
+      path: 'types.0.fields.0.type',
+      message: 'Unresolved ref "common.Email".',
     });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.severity === 'error' && e.message.includes('Range class'))).toBe(
-      true,
-    );
   });
 
-  it('warns on class with no label', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Thing`, {
-        uri: `${EX}Thing`,
-        subClassOf: [],
-        disjointWith: [],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.severity === 'warning' && e.message.includes('no label'))).toBe(
-      true,
-    );
+  it('rule 2: flags unresolved ref inside an array element', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Bag',
+          fields: [
+            {
+              name: 'items',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'Missing' } },
+            },
+          ],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'unresolved_ref');
+    expect(err?.path).toBe('types.0.fields.0.type.element');
   });
 
-  it('warns on property with no domain', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}knows`, {
-        uri: `${EX}knows`,
-        label: 'knows',
-        domain: [],
-        range: [`${EX}Person`],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(errors.some((e) => e.severity === 'warning' && e.message.includes('no domain'))).toBe(
-      true,
-    );
+  // Rule 4: discriminatedUnion constraints
+  it('rule 4: accepts a discriminatedUnion whose variants are objects with the discriminator', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Click',
+          fields: [
+            { name: 'type', type: { kind: 'literal', value: 'click' } },
+            { name: 'x', type: { kind: 'number' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Hover',
+          fields: [
+            { name: 'type', type: { kind: 'literal', value: 'hover' } },
+            { name: 'target', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Click', 'Hover'],
+        },
+      ],
+    };
+    const errs = validate(schema).filter((e) => e.code.startsWith('discriminator_'));
+    expect(errs).toEqual([]);
   });
 
-  it('detects missing inverse property', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}A`, {
-        uri: `${EX}A`,
-        label: 'A',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}rel`, {
-        uri: `${EX}rel`,
-        label: 'rel',
-        domain: [`${EX}A`],
-        range: [`${EX}A`],
-        inverseOf: `${EX}nonExistentProp`,
-      });
+  it('rule 4: flags a discriminatedUnion variant that does not exist', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Click'],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'discriminator_variant_not_found');
+    expect(err).toEqual({
+      code: 'discriminator_variant_not_found',
+      path: 'types.0.variants.0',
+      message: 'Discriminated union variant "Click" is not defined.',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some((e) => e.severity === 'error' && e.message.includes('Inverse property')),
-    ).toBe(true);
-  });
-});
-
-describe('validateOntology — individuals', () => {
-  it('returns no errors for valid individual', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.individuals.set(`${EX}john`, {
-        uri: `${EX}john`,
-        label: 'John',
-        types: [`${EX}Person`],
-        objectPropertyAssertions: [],
-        dataPropertyAssertions: [],
-      });
-    });
-    const errors = validateOntology(o).filter((e) => e.elementType === 'individual');
-    expect(errors).toEqual([]);
   });
 
-  it('warns on individual with no type assertion', () => {
-    const o = makeOntology((o) => {
-      o.individuals.set(`${EX}orphan`, {
-        uri: `${EX}orphan`,
-        label: 'Orphan',
-        types: [],
-        objectPropertyAssertions: [],
-        dataPropertyAssertions: [],
-      });
+  it('rule 4: flags a variant that is not an object type', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'enum', name: 'Color', values: [{ value: 'red' }] },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Color'],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'discriminator_variant_not_object');
+    expect(err).toEqual({
+      code: 'discriminator_variant_not_object',
+      path: 'types.1.variants.0',
+      message: 'Discriminated union variant "Color" must be an object type.',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementType === 'individual' &&
-          e.severity === 'warning' &&
-          e.message.includes('no type assertion'),
-      ),
-    ).toBe(true);
   });
 
-  it('warns on individual with dangling type reference', () => {
-    const o = makeOntology((o) => {
-      o.individuals.set(`${EX}thing`, {
-        uri: `${EX}thing`,
-        label: 'Thing',
-        types: [`${EX}NonExistentClass`],
-        objectPropertyAssertions: [],
-        dataPropertyAssertions: [],
-      });
+  it('rule 4: flags a variant object missing the discriminator field', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Click',
+          fields: [{ name: 'x', type: { kind: 'number' } }],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Click'],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'discriminator_missing_on_variant');
+    expect(err).toEqual({
+      code: 'discriminator_missing_on_variant',
+      path: 'types.1.variants.0',
+      message: 'Variant "Click" is missing discriminator field "type".',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementType === 'individual' &&
-          e.severity === 'warning' &&
-          e.message.includes('does not exist'),
-      ),
-    ).toBe(true);
   });
 
-  it('warns on individual with no label', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.individuals.set(`${EX}noLabel`, {
-        uri: `${EX}noLabel`,
-        types: [`${EX}Person`],
-        objectPropertyAssertions: [],
-        dataPropertyAssertions: [],
-      });
+  // Rule 5: enum constraints
+  it('rule 5: flags an enum with no values', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [] }],
+    };
+    const err = validate(schema).find((e) => e.code === 'enum_empty');
+    expect(err).toEqual({
+      code: 'enum_empty',
+      path: 'types.0.values',
+      message: 'Enum "Role" must have at least one value.',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementType === 'individual' &&
-          e.severity === 'warning' &&
-          e.message.includes('no label'),
-      ),
-    ).toBe(true);
-  });
-});
-
-describe('validateOntology — OWL consistency checks', () => {
-  it('detects self-disjoint class', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Paradox`, {
-        uri: `${EX}Paradox`,
-        label: 'Paradox',
-        subClassOf: [],
-        disjointWith: [`${EX}Paradox`],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(
-      errors.some((e) => e.severity === 'error' && e.message.includes('disjoint with itself')),
-    ).toBe(true);
   });
 
-  it('detects subclass-disjoint conflict (A subClassOf B AND A disjointWith B)', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Animal`, {
-        uri: `${EX}Animal`,
-        label: 'Animal',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}Plant`, {
-        uri: `${EX}Plant`,
-        label: 'Plant',
-        subClassOf: [`${EX}Animal`],
-        disjointWith: [`${EX}Animal`],
-      });
+  it('rule 5: flags duplicate enum values', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'Role',
+          values: [{ value: 'admin' }, { value: 'member' }, { value: 'admin' }],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'enum_duplicate_value');
+    expect(err).toEqual({
+      code: 'enum_duplicate_value',
+      path: 'types.0.values.2',
+      message: 'Duplicate enum value "admin" in "Role".',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementUri === `${EX}Plant` &&
-          e.severity === 'error' &&
-          e.message.includes('subclass and disjoint'),
-      ),
-    ).toBe(true);
   });
 
-  it('detects subclass-disjoint conflict when disjointness is stated on the parent', () => {
-    const o = makeOntology((o) => {
-      // Animal disjointWith Plant, but Plant subClassOf Animal — conflict detected via symmetry
-      o.classes.set(`${EX}Animal`, {
-        uri: `${EX}Animal`,
-        label: 'Animal',
-        subClassOf: [],
-        disjointWith: [`${EX}Plant`],
-      });
-      o.classes.set(`${EX}Plant`, {
-        uri: `${EX}Plant`,
-        label: 'Plant',
-        subClassOf: [`${EX}Animal`],
-        disjointWith: [],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementUri === `${EX}Plant` &&
-          e.severity === 'error' &&
-          e.message.includes('subclass and disjoint'),
-      ),
-    ).toBe(true);
+  it('rule 5: accepts a non-empty enum with unique values', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'Role',
+          values: [{ value: 'admin' }, { value: 'member' }],
+        },
+      ],
+    };
+    expect(validate(schema).some((e) => e.code.startsWith('enum_'))).toBe(false);
   });
 
-  it('detects class inheriting from mutually disjoint ancestors', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Cat`, {
-        uri: `${EX}Cat`,
-        label: 'Cat',
-        subClassOf: [],
-        disjointWith: [`${EX}Dog`],
-      });
-      o.classes.set(`${EX}Dog`, {
-        uri: `${EX}Dog`,
-        label: 'Dog',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      // CatDog inherits from both Cat and Dog which are disjoint → unsatisfiable
-      o.classes.set(`${EX}CatDog`, {
-        uri: `${EX}CatDog`,
-        label: 'CatDog',
-        subClassOf: [`${EX}Cat`, `${EX}Dog`],
-        disjointWith: [],
-      });
+  // Rule 6: unique import aliases
+  it('rule 6: flags duplicate import aliases', () => {
+    const schema: Schema = {
+      version: '1',
+      imports: [
+        { kind: 'stdlib', path: '@contexture/common', alias: 'lib' },
+        { kind: 'relative', path: './other.contexture.json', alias: 'lib' },
+      ],
+      types: [],
+    };
+    const err = validate(schema).find((e) => e.code === 'dup_import_alias');
+    expect(err).toEqual({
+      code: 'dup_import_alias',
+      path: 'imports.1',
+      message: 'Duplicate import alias "lib".',
     });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementUri === `${EX}CatDog` &&
-          e.severity === 'error' &&
-          e.message.includes('mutually disjoint'),
-      ),
-    ).toBe(true);
   });
 
-  it('detects unsatisfiable class via transitive ancestor disjointness', () => {
-    const o = makeOntology((o) => {
-      // A disjointWith B
-      // C subClassOf A
-      // D subClassOf B
-      // E subClassOf C AND D  →  E inherits from disjoint ancestors A and B
-      o.classes.set(`${EX}A`, {
-        uri: `${EX}A`,
-        label: 'A',
-        subClassOf: [],
-        disjointWith: [`${EX}B`],
-      });
-      o.classes.set(`${EX}B`, {
-        uri: `${EX}B`,
-        label: 'B',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}C`, {
-        uri: `${EX}C`,
-        label: 'C',
-        subClassOf: [`${EX}A`],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}D`, {
-        uri: `${EX}D`,
-        label: 'D',
-        subClassOf: [`${EX}B`],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}E`, {
-        uri: `${EX}E`,
-        label: 'E',
-        subClassOf: [`${EX}C`, `${EX}D`],
-        disjointWith: [],
-      });
-    });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementUri === `${EX}E` &&
-          e.severity === 'error' &&
-          e.message.includes('mutually disjoint'),
-      ),
-    ).toBe(true);
+  it('rule 6: accepts unique aliases', () => {
+    const schema: Schema = {
+      version: '1',
+      imports: [
+        { kind: 'stdlib', path: '@contexture/common', alias: 'common' },
+        { kind: 'stdlib', path: '@contexture/identity', alias: 'identity' },
+      ],
+      types: [],
+    };
+    expect(validate(schema).some((e) => e.code === 'dup_import_alias')).toBe(false);
   });
 
-  it('does not flag valid multiple inheritance without disjointness', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Living`, {
-        uri: `${EX}Living`,
-        label: 'Living',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}Aquatic`, {
-        uri: `${EX}Aquatic`,
-        label: 'Aquatic',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.classes.set(`${EX}Fish`, {
-        uri: `${EX}Fish`,
-        label: 'Fish',
-        subClassOf: [`${EX}Living`, `${EX}Aquatic`],
-        disjointWith: [],
-      });
-    });
-    const errors = validateOntology(o).filter(
-      (e) => e.severity === 'error' && e.elementUri === `${EX}Fish`,
-    );
-    expect(errors).toEqual([]);
+  // Rule 7: Zod emit compiles (sandboxed eval wired up in #83).
+  it('rule 7: does not fail for schemas that would emit valid Zod (stub pending #83)', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'User',
+          fields: [{ name: 'email', type: { kind: 'string', format: 'email' } }],
+        },
+      ],
+    };
+    expect(validate(schema).some((e) => e.code === 'zod_compile_failed')).toBe(false);
   });
 
-  it('detects functional property with minCardinality > 1', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}hasMother`, {
-        uri: `${EX}hasMother`,
-        label: 'has mother',
-        domain: [`${EX}Person`],
-        range: [`${EX}Person`],
-        characteristics: ['functional'],
-        minCardinality: 2,
-      });
-    });
-    const errors = validateOntology(o);
-    expect(
-      errors.some(
-        (e) =>
-          e.elementUri === `${EX}hasMother` &&
-          e.severity === 'error' &&
-          e.message.includes('Functional property'),
-      ),
-    ).toBe(true);
-  });
-
-  it('does not flag functional property with minCardinality of 1', () => {
-    const o = makeOntology((o) => {
-      o.classes.set(`${EX}Person`, {
-        uri: `${EX}Person`,
-        label: 'Person',
-        subClassOf: [],
-        disjointWith: [],
-      });
-      o.objectProperties.set(`${EX}hasMother`, {
-        uri: `${EX}hasMother`,
-        label: 'has mother',
-        domain: [`${EX}Person`],
-        range: [`${EX}Person`],
-        characteristics: ['functional'],
-        minCardinality: 1,
-      });
-    });
-    const errors = validateOntology(o).filter(
-      (e) => e.severity === 'error' && e.elementUri === `${EX}hasMother`,
-    );
-    expect(errors).toEqual([]);
+  it('rule 3: accepts distinct type names', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'User', fields: [] },
+        { kind: 'object', name: 'Post', fields: [] },
+      ],
+    };
+    expect(validate(schema).some((e) => e.code === 'dup_type_name')).toBe(false);
   });
 });

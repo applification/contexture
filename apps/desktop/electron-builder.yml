@@ -1,5 +1,5 @@
-appId: com.applification.ontograph
-productName: Ontograph
+appId: com.applification.contexture
+productName: Contexture
 directories:
   buildResources: build
 files:
@@ -11,8 +11,22 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+extraResources:
+  # Stdlib IR sidecars — read at app startup so qualified refs
+  # (e.g. `common.Email`) resolve without depending on the published
+  # @contexture/runtime package.
+  - from: ../../packages/stdlib/src
+    to: stdlib
+    filter:
+      - '*.contexture.json'
+  # Contexture skills plugin — Agent SDK loads these at session start.
+  - from: resources/skills
+    to: skills
+    filter:
+      - '.claude-plugin/**'
+      - 'skills/**'
 win:
-  executableName: Ontograph
+  executableName: Contexture
   icon: build/icon.ico
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
@@ -23,7 +37,7 @@ mac:
   icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSDocumentsFolderUsageDescription: Ontograph needs access to open and save ontology files.
+    - NSDocumentsFolderUsageDescription: Contexture needs access to open and save schema files.
   notarize: true
   target:
     - dmg
@@ -44,6 +58,6 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: DaveHudson
-  repo: Ontograph
+  owner: applification
+  repo: contexture
   releaseType: release

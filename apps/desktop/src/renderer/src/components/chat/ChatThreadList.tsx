@@ -1,13 +1,22 @@
+/**
+ * `ChatThreadList` — thread picker surface for the chat panel.
+ *
+ * Ported from the pre-pivot (main) branch. Each entry shows the
+ * thread title (first user message or "New chat"), relative timestamp,
+ * and message count. The active thread is marked with a dot; hovering
+ * reveals a delete button with a confirm-step to avoid accidental
+ * loss.
+ */
+
+import type { ChatThread } from '@renderer/chat/useChatThreads';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { ChatThread } from './useChatHistory';
 
 function formatDate(ts: number): string {
   const date = new Date(ts);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const diff = Date.now() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
@@ -15,7 +24,7 @@ function formatDate(ts: number): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-interface ChatThreadListProps {
+export interface ChatThreadListProps {
   threads: ChatThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
@@ -41,9 +50,9 @@ export function ChatThreadList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto" data-testid="chat-thread-list">
       {threads.map((thread) => {
-        const messageCount = thread.messages.filter((m) => m.role !== 'tool').length;
+        const messageCount = thread.messages.filter((m) => m.role !== 'system').length;
         const isActive = thread.id === activeThreadId;
 
         return (

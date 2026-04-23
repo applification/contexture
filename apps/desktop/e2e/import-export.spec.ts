@@ -1,19 +1,18 @@
+/**
+ * Import / export round-trip against `.contexture.json` only.
+ *
+ * Loads the bundled allotment sample (as the import leg — a real-world
+ * IR), exercises the loader + validator in the renderer, serialises
+ * the live IR back through `save()`, and asserts a structural
+ * round-trip. The file-dialog IPC is driven by
+ * `tests/main/file-ipc.test.ts` / `tests/main/save-bundle.test.ts`;
+ * here we just prove the end-to-end shape survives the round-trip the
+ * UI would perform on save / reopen.
+ */
 import { expect, test } from '@playwright/test';
 import { launchElectron } from './electron-launch';
 
-const SAMPLE_TTL = `@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix ex: <http://example.org/test#> .
-
-ex:Widget a owl:Class ;
-    rdfs:label "Widget" ;
-    rdfs:comment "A test widget class" .
-
-ex:Gadget a owl:Class ;
-    rdfs:label "Gadget" ;
-    rdfs:subClassOf ex:Widget .`;
-
-test.describe('Import / Export', () => {
+test.describe('Import / export round-trip', () => {
   let electronApp: Awaited<ReturnType<typeof launchElectron>>;
   let page: Awaited<ReturnType<typeof electronApp.firstWindow>>;
 
@@ -21,44 +20,37 @@ test.describe('Import / Export', () => {
     electronApp = await launchElectron();
     page = await electronApp.firstWindow();
     await page.waitForLoadState('domcontentloaded');
-
-    // Load sample ontology if empty state is showing
-    const loadBtn = page.getByText('Load sample ontology');
-    if (await loadBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await loadBtn.click();
-      await expect(page.getByText('Person')).toBeVisible({ timeout: 15_000 });
-    }
   });
 
   test.afterAll(async () => {
     await electronApp?.close();
   });
 
-  test('sample ontology classes are visible', async () => {
-    await expect(page.getByText('Person')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Organisation')).toBeVisible({ timeout: 5_000 });
-  });
+  test('round-trips the allotment sample through load + save', async () => {
+    await page.getByRole('button', { name: /load allotment sample/i }).click();
+    await expect(page.locator('[data-testid="type-node"]').first()).toBeVisible({
+      timeout: 10_000,
+    });
 
-  test('Turtle content can be written to and read from clipboard', async () => {
-    // Verifies the Electron clipboard API is functional — a prerequisite for
-    // any TTL import workflow that uses clipboard as the transfer mechanism.
-    await electronApp.evaluate(({ clipboard }, ttl) => {
-      clipboard.writeText(ttl);
-    }, SAMPLE_TTL);
+    const roundTrip = await page.evaluate(async () => {
+      // `load` / `save` are exposed on `window.__contextureModel` by
+      // `store/undo.ts` — dynamic `import()` can't resolve renderer
+      // modules in production builds (hashed filenames).
+      const win = window as unknown as {
+        __contextureUndoStore: { getState: () => { schema: unknown } };
+        __contextureModel: {
+          load: (raw: string) => { schema: unknown };
+          save: (schema: unknown) => string;
+        };
+      };
+      const { load, save } = win.__contextureModel;
+      const current = win.__contextureUndoStore.getState().schema;
+      const serialised = save(current);
+      const { schema: restored } = load(serialised);
+      return { serialised, restored };
+    });
 
-    const written = await electronApp.evaluate(({ clipboard }) => clipboard.readText());
-    expect(written).toContain('Widget');
-    expect(written).toContain('Gadget');
-  });
-
-  test('Save As shortcut is reachable', async () => {
-    // Trigger Cmd/Ctrl+Shift+S — verifies the menu accelerator is registered.
-    // A native file dialog may appear; we dismiss it immediately.
-    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
-    await page.keyboard.press(`${modifier}+Shift+S`);
-    // Dismiss any dialog that might open
-    await page.keyboard.press('Escape');
-    // No assertion — we just verify the shortcut doesn't crash the app
-    await expect(page.locator('body')).toBeVisible();
+    expect(roundTrip.serialised).toContain('"version": "1"');
+    expect(roundTrip.restored).toBeTruthy();
   });
 });

@@ -7,7 +7,7 @@
 @source "../../**/*.{ts,tsx}";
 
 :root {
-  /* Ontograph Brand Colors — Light mode */
+  /* Contexture Brand Colors — Light mode */
   --background: oklch(0.98 0.005 270);
   --foreground: oklch(0.13 0.03 270);
   --card: oklch(1 0 0);

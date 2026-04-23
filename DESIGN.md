@@ -1,14 +1,14 @@
-# Ontograph Design System
+# Contexture Design System
 
-> AI-readable design system specification for Ontograph — the AI-native ontology editor.
+> AI-readable design system specification for Contexture — the visual Zod schema editor with LLM support.
 > Derived from existing Figma design system, shadcn/ui components, and production code.
 
 ## Brand
 
-- **Product:** Ontograph — visual ontology editor with AI-powered creation and validation
-- **Tagline:** "Where knowledge takes shape."
+- **Product:** Contexture — visual Zod schema editor that pairs a graph canvas with LLM-driven edits
+- **Tagline:** "Where schemas take shape."
 - **Voice:** Precise, confident, approachable, builder-oriented. Never academic, never dismissive.
-- **Logo:** Three connected nodes in a triangle (subject-predicate-object triple). Always title-case: "Ontograph".
+- **Logo:** Three connected nodes in a triangle. Always title-case: "Contexture".
 - **Default theme:** Dark — the graph canvas renders best on dark backgrounds.
 
 ## Color Tokens

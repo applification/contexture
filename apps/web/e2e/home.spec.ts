@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Home page', () => {
   test('loads and displays hero section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Build the knowledge layer');
+    await expect(page.locator('h1')).toContainText('Design the schemas that power');
     await expect(page.locator('nav')).toBeVisible();
   });
 
@@ -17,7 +17,7 @@ test.describe('Home page', () => {
     await page.goto('/');
     const features = page.locator('#features');
     await expect(features).toBeVisible();
-    await expect(features.locator('h2')).toContainText('ontology editor built for the AI era');
+    await expect(features.locator('h2')).toContainText('schema editor built for LLM pipelines');
   });
 
   test('download section has CTA link', async ({ page }) => {
@@ -37,6 +37,8 @@ test.describe('Home page', () => {
     await page.goto('/');
     const footer = page.locator('footer');
     await expect(footer.locator('a[href="/brand"]')).toBeVisible();
-    await expect(footer.locator('a[href="https://github.com/DaveHudson/Ontograph"]')).toBeVisible();
+    await expect(
+      footer.locator('a[href="https://github.com/applification/contexture"]'),
+    ).toBeVisible();
   });
 });

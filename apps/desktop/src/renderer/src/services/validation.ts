@@ -1,302 +1,208 @@
-import type { Ontology } from '../model/types';
+/**
+ * Semantic validators for the IR.
+ *
+ * The Zod meta-schema (`model/ir-schema.ts`) enforces structural correctness
+ * at load time. This module layers the 7 semantic rules on top:
+ *
+ * 1. Structural parse (enforced by the loader; not re-checked here).
+ * 2. Every `ref.typeName` resolves — local type OR `alias.Name` with a
+ *    matching import alias.
+ * 3. No duplicate type names within a file.
+ * 4. Discriminated unions — every variant must reference a local `object`
+ *    type whose fields include the discriminator.
+ * 5. Enums — non-empty `values`, no duplicate values.
+ * 6. Imports — every alias unique. (Cycles are the loader's concern.)
+ * 7. Emitted Zod compiles — deferred sandboxed eval, wired up alongside
+ *    the Zod emitter in #83.
+ *
+ * Each returned `ValidationError` carries a stable `code` and a dotted
+ * `path` so the UI can map the message back to the offending field.
+ */
+import type { FieldType, Schema } from '../model/types';
+import type { StdlibRegistry } from './stdlib-registry';
 
 export interface ValidationError {
-  severity: 'error' | 'warning';
+  code: string;
+  path: string;
   message: string;
-  elementUri: string;
-  elementType: 'class' | 'objectProperty' | 'datatypeProperty' | 'individual';
 }
 
-export function validateOntology(ontology: Ontology): ValidationError[] {
+export interface ValidateOptions {
+  /**
+   * Optional stdlib registry used by Rule 2 to resolve qualified refs
+   * (`<namespace>.<TypeName>`) against bundled stdlib namespaces when
+   * no matching `add_import` has been declared. Callers that want
+   * strict import-only resolution (historical behaviour) pass nothing.
+   */
+  stdlib?: StdlibRegistry;
+}
+
+export function validate(schema: Schema, options: ValidateOptions = {}): ValidationError[] {
+  if (!schema || schema.version !== '1') return [];
   const errors: ValidationError[] = [];
-
-  // Check classes
-  for (const cls of ontology.classes.values()) {
-    // SubClassOf references must exist
-    for (const parentUri of cls.subClassOf) {
-      if (!ontology.classes.has(parentUri)) {
-        errors.push({
-          severity: 'error',
-          message: `Subclass parent "${localName(parentUri)}" does not exist`,
-          elementUri: cls.uri,
-          elementType: 'class',
-        });
-      }
-    }
-
-    // Circular subClassOf detection
-    if (hasCircularInheritance(cls.uri, ontology)) {
-      errors.push({
-        severity: 'error',
-        message: 'Circular inheritance detected',
-        elementUri: cls.uri,
-        elementType: 'class',
-      });
-    }
-
-    // DisjointWith references must exist
-    for (const djUri of cls.disjointWith) {
-      if (!ontology.classes.has(djUri)) {
-        errors.push({
-          severity: 'warning',
-          message: `Disjoint class "${localName(djUri)}" does not exist`,
-          elementUri: cls.uri,
-          elementType: 'class',
-        });
-      }
-    }
-
-    // Class with no label
-    if (!cls.label) {
-      errors.push({
-        severity: 'warning',
-        message: 'Class has no label',
-        elementUri: cls.uri,
-        elementType: 'class',
-      });
-    }
-  }
-
-  // Check object properties
-  for (const prop of ontology.objectProperties.values()) {
-    // Domain must reference existing classes
-    for (const domainUri of prop.domain) {
-      if (!ontology.classes.has(domainUri)) {
-        errors.push({
-          severity: 'error',
-          message: `Domain class "${localName(domainUri)}" does not exist`,
-          elementUri: prop.uri,
-          elementType: 'objectProperty',
-        });
-      }
-    }
-
-    // Range must reference existing classes
-    for (const rangeUri of prop.range) {
-      if (!ontology.classes.has(rangeUri)) {
-        errors.push({
-          severity: 'error',
-          message: `Range class "${localName(rangeUri)}" does not exist`,
-          elementUri: prop.uri,
-          elementType: 'objectProperty',
-        });
-      }
-    }
-
-    // Property with no domain or range
-    if (prop.domain.length === 0) {
-      errors.push({
-        severity: 'warning',
-        message: 'Object property has no domain',
-        elementUri: prop.uri,
-        elementType: 'objectProperty',
-      });
-    }
-    if (prop.range.length === 0) {
-      errors.push({
-        severity: 'warning',
-        message: 'Object property has no range',
-        elementUri: prop.uri,
-        elementType: 'objectProperty',
-      });
-    }
-
-    // InverseOf must reference existing property
-    if (prop.inverseOf && !ontology.objectProperties.has(prop.inverseOf)) {
-      errors.push({
-        severity: 'error',
-        message: `Inverse property "${localName(prop.inverseOf)}" does not exist`,
-        elementUri: prop.uri,
-        elementType: 'objectProperty',
-      });
-    }
-  }
-
-  // Check individuals
-  for (const ind of ontology.individuals.values()) {
-    // Type assertions should reference existing classes
-    for (const typeUri of ind.types) {
-      if (!ontology.classes.has(typeUri)) {
-        errors.push({
-          severity: 'warning',
-          message: `Type class "${localName(typeUri)}" does not exist`,
-          elementUri: ind.uri,
-          elementType: 'individual',
-        });
-      }
-    }
-
-    // Individual with no type assertion
-    if (ind.types.length === 0) {
-      errors.push({
-        severity: 'warning',
-        message: 'Individual has no type assertion',
-        elementUri: ind.uri,
-        elementType: 'individual',
-      });
-    }
-
-    // Individual with no label
-    if (!ind.label) {
-      errors.push({
-        severity: 'warning',
-        message: 'Individual has no label',
-        elementUri: ind.uri,
-        elementType: 'individual',
-      });
-    }
-  }
-
-  // Check datatype properties
-  for (const prop of ontology.datatypeProperties.values()) {
-    for (const domainUri of prop.domain) {
-      if (!ontology.classes.has(domainUri)) {
-        errors.push({
-          severity: 'error',
-          message: `Domain class "${localName(domainUri)}" does not exist`,
-          elementUri: prop.uri,
-          elementType: 'datatypeProperty',
-        });
-      }
-    }
-
-    if (prop.domain.length === 0) {
-      errors.push({
-        severity: 'warning',
-        message: 'Datatype property has no domain',
-        elementUri: prop.uri,
-        elementType: 'datatypeProperty',
-      });
-    }
-  }
-
-  // OWL consistency checks (semantic contradictions)
-  errors.push(...checkOWLConsistency(ontology));
-
+  errors.push(...checkDuplicateTypeNames(schema));
+  errors.push(...checkRefsResolve(schema, options.stdlib));
+  errors.push(...checkDiscriminatedUnions(schema));
+  errors.push(...checkEnums(schema));
+  errors.push(...checkImportAliases(schema));
+  errors.push(...checkEmittedZodCompiles(schema));
   return errors;
 }
 
 /**
- * Detects semantic contradictions that make classes logically unsatisfiable:
- * 1. Self-disjoint: A disjointWith A
- * 2. Subclass-disjoint conflict: A subClassOf B AND A disjointWith B
- * 3. Multiple inheritance from mutually disjoint ancestors: A subClassOf B, A subClassOf C, B disjointWith C
- * 4. Functional property with minCardinality > 1
+ * Rule 7: emitted Zod source must compile cleanly. The production
+ * implementation will render the schema to Zod via the emitter (#83) and
+ * evaluate the source in a sandboxed worker (#83 wires the worker; #82
+ * only registers the hook). Until that lands this is a no-op so callers
+ * can rely on the final rule slot being present.
  */
-function checkOWLConsistency(ontology: Ontology): ValidationError[] {
+function checkEmittedZodCompiles(_schema: Schema): ValidationError[] {
+  // TODO(#83): emit Zod for `_schema`, eval in sandboxed worker,
+  // surface `zod_compile_failed` with the offending type path.
+  return [];
+}
+
+function checkImportAliases(schema: Schema): ValidationError[] {
   const errors: ValidationError[] = [];
-
-  // Build a symmetric index of disjoint pairs for O(1) lookup
-  const disjointPairs = new Set<string>();
-  for (const cls of ontology.classes.values()) {
-    for (const djUri of cls.disjointWith) {
-      disjointPairs.add([cls.uri, djUri].sort().join('\0'));
-    }
-  }
-  const isDisjoint = (a: string, b: string): boolean => disjointPairs.has([a, b].sort().join('\0'));
-
-  // Collect all transitive ancestors for a class (BFS, cycle-safe)
-  const getAncestors = (uri: string): string[] => {
-    const visited = new Set<string>();
-    const queue = [...(ontology.classes.get(uri)?.subClassOf ?? [])];
-    while (queue.length > 0) {
-      const cur = queue.shift();
-      if (cur === undefined || visited.has(cur)) continue;
-      visited.add(cur);
-      const curCls = ontology.classes.get(cur);
-      if (curCls) {
-        for (const parent of curCls.subClassOf) {
-          if (!visited.has(parent)) queue.push(parent);
-        }
-      }
-    }
-    return [...visited];
-  };
-
-  for (const cls of ontology.classes.values()) {
-    // Check 1: self-disjoint
-    if (cls.disjointWith.includes(cls.uri)) {
+  const seen = new Set<string>();
+  (schema.imports ?? []).forEach((imp, i) => {
+    if (seen.has(imp.alias)) {
       errors.push({
-        severity: 'error',
-        message: 'Class is declared disjoint with itself (unsatisfiable)',
-        elementUri: cls.uri,
-        elementType: 'class',
+        code: 'dup_import_alias',
+        path: `imports.${i}`,
+        message: `Duplicate import alias "${imp.alias}".`,
       });
+    } else {
+      seen.add(imp.alias);
     }
-
-    // Check 2: subclass of a class it is also disjoint with
-    for (const parentUri of cls.subClassOf) {
-      if (isDisjoint(cls.uri, parentUri)) {
-        errors.push({
-          severity: 'error',
-          message: `Class is both a subclass and disjoint with "${localName(parentUri)}" (unsatisfiable)`,
-          elementUri: cls.uri,
-          elementType: 'class',
-        });
-      }
-    }
-
-    // Check 3: inherits from two mutually disjoint ancestors
-    const ancestors = getAncestors(cls.uri);
-    let foundAncestorConflict = false;
-    for (let i = 0; i < ancestors.length && !foundAncestorConflict; i++) {
-      for (let j = i + 1; j < ancestors.length && !foundAncestorConflict; j++) {
-        if (isDisjoint(ancestors[i], ancestors[j])) {
-          errors.push({
-            severity: 'error',
-            message: `Class inherits from mutually disjoint classes "${localName(ancestors[i])}" and "${localName(ancestors[j])}" (unsatisfiable)`,
-            elementUri: cls.uri,
-            elementType: 'class',
-          });
-          foundAncestorConflict = true;
-        }
-      }
-    }
-  }
-
-  // Check 4: functional property with minCardinality > 1
-  for (const prop of ontology.objectProperties.values()) {
-    if (
-      prop.characteristics?.includes('functional') &&
-      prop.minCardinality !== undefined &&
-      prop.minCardinality > 1
-    ) {
-      errors.push({
-        severity: 'error',
-        message: `Functional property has minCardinality ${prop.minCardinality}, contradicting the max-1 functional restriction`,
-        elementUri: prop.uri,
-        elementType: 'objectProperty',
-      });
-    }
-  }
-
+  });
   return errors;
 }
 
-function hasCircularInheritance(startUri: string, ontology: Ontology): boolean {
-  const visited = new Set<string>();
-  let current = [startUri];
-
-  while (current.length > 0) {
-    const next: string[] = [];
-    for (const uri of current) {
-      const cls = ontology.classes.get(uri);
-      if (!cls) continue;
-      for (const parentUri of cls.subClassOf) {
-        if (parentUri === startUri) return true;
-        if (!visited.has(parentUri)) {
-          visited.add(parentUri);
-          next.push(parentUri);
-        }
-      }
+function checkEnums(schema: Schema): ValidationError[] {
+  const errors: ValidationError[] = [];
+  schema.types.forEach((type, ti) => {
+    if (type.kind !== 'enum') return;
+    if (type.values.length === 0) {
+      errors.push({
+        code: 'enum_empty',
+        path: `types.${ti}.values`,
+        message: `Enum "${type.name}" must have at least one value.`,
+      });
+      return;
     }
-    current = next;
-  }
-
-  return false;
+    const seen = new Set<string>();
+    type.values.forEach((v, vi) => {
+      if (seen.has(v.value)) {
+        errors.push({
+          code: 'enum_duplicate_value',
+          path: `types.${ti}.values.${vi}`,
+          message: `Duplicate enum value "${v.value}" in "${type.name}".`,
+        });
+      } else {
+        seen.add(v.value);
+      }
+    });
+  });
+  return errors;
 }
 
-function localName(uri: string): string {
-  const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
-  return idx >= 0 ? uri.substring(idx + 1) : uri;
+function checkDiscriminatedUnions(schema: Schema): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const byName = new Map(schema.types.map((t) => [t.name, t]));
+
+  schema.types.forEach((type, ti) => {
+    if (type.kind !== 'discriminatedUnion') return;
+    type.variants.forEach((variantName, vi) => {
+      const path = `types.${ti}.variants.${vi}`;
+      const variant = byName.get(variantName);
+      if (!variant) {
+        errors.push({
+          code: 'discriminator_variant_not_found',
+          path,
+          message: `Discriminated union variant "${variantName}" is not defined.`,
+        });
+        return;
+      }
+      if (variant.kind !== 'object') {
+        errors.push({
+          code: 'discriminator_variant_not_object',
+          path,
+          message: `Discriminated union variant "${variantName}" must be an object type.`,
+        });
+        return;
+      }
+      if (!variant.fields.some((f) => f.name === type.discriminator)) {
+        errors.push({
+          code: 'discriminator_missing_on_variant',
+          path,
+          message: `Variant "${variantName}" is missing discriminator field "${type.discriminator}".`,
+        });
+      }
+    });
+  });
+  return errors;
+}
+
+function checkRefsResolve(schema: Schema, stdlib?: StdlibRegistry): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const localNames = new Set(schema.types.map((t) => t.name));
+  const aliases = new Set((schema.imports ?? []).map((i) => i.alias));
+
+  const walkField = (t: FieldType, path: string) => {
+    if (t.kind === 'ref') {
+      if (!resolves(t.typeName, localNames, aliases, stdlib)) {
+        errors.push({
+          code: 'unresolved_ref',
+          path,
+          message: `Unresolved ref "${t.typeName}".`,
+        });
+      }
+    } else if (t.kind === 'array') {
+      walkField(t.element, `${path}.element`);
+    }
+  };
+
+  schema.types.forEach((type, ti) => {
+    if (type.kind !== 'object') return;
+    type.fields.forEach((f, fi) => {
+      walkField(f.type, `types.${ti}.fields.${fi}.type`);
+    });
+  });
+  return errors;
+}
+
+function resolves(
+  typeName: string,
+  locals: Set<string>,
+  aliases: Set<string>,
+  stdlib?: StdlibRegistry,
+): boolean {
+  const dot = typeName.indexOf('.');
+  if (dot === -1) return locals.has(typeName);
+  const ns = typeName.slice(0, dot);
+  const name = typeName.slice(dot + 1);
+  // An explicit `add_import` alias satisfies the ref without looking
+  // inside the target module (matches legacy behaviour). A bundled
+  // stdlib namespace satisfies it by name lookup — that's what
+  // `common.Email` without an explicit import relies on.
+  if (aliases.has(ns)) return true;
+  return stdlib?.hasType(ns, name) ?? false;
+}
+
+function checkDuplicateTypeNames(schema: Schema): ValidationError[] {
+  const errors: ValidationError[] = [];
+  const seen = new Set<string>();
+  schema.types.forEach((type, i) => {
+    if (seen.has(type.name)) {
+      errors.push({
+        code: 'dup_type_name',
+        path: `types.${i}`,
+        message: `Duplicate type name "${type.name}".`,
+      });
+    } else {
+      seen.add(type.name);
+    }
+  });
+  return errors;
 }

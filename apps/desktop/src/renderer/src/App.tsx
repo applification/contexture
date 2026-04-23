@@ -1,35 +1,43 @@
-import {
-  ChevronDown,
-  CircleAlert,
-  Clock,
-  MousePointer2,
-  SlidersHorizontal,
-  TriangleAlert,
-} from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+/**
+ * Contexture app shell.
+ *
+ * Layout (mirrors the pre-pivot app, minus OWL-only surfaces):
+ *
+ *   ┌───────────────────────── Toolbar ─────────────────────────┐
+ *   ├──────────────────────────────────────────┬────────────────┤
+ *   │                                          │ SidePanel      │
+ *   │             GraphCanvas                  │  (Detail /     │
+ *   │                                          │   Chat /       │
+ *   │                                          │   Eval)        │
+ *   │                                          │  + ActivityBar │
+ *   ├──────────────────────────── StatusBar ───┴────────────────┤
+ *   └───────────────────────────────────────────────────────────┘
+ *
+ * Canvas and side panel sit inside a `ResizablePanelGroup` so the
+ * split is drag-adjustable and the side panel can collapse when
+ * `useUIStore.sidebarVisible` is false (toggled by the Toolbar's
+ * sidebar button).
+ */
+
+import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
+import { evalRootCandidates } from './chat/eval-prompt';
+import { useClaudeEval } from './chat/useClaudeEval';
+import { useClaudeSchemaChat } from './chat/useClaudeSchemaChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
+import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
-import { GraphCanvas } from './components/graph/GraphCanvas';
-import { ImprovementHUD } from './components/hud/ImprovementHUD';
-import { MetricsPanel } from './components/metrics/MetricsPanel';
+import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
+import { SchemaPanel } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { Button } from './components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './components/ui/dialog';
 import {
   Empty,
   EmptyDescription,
@@ -39,232 +47,164 @@ import {
 } from './components/ui/empty';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
-import { getAdapterForFilePath } from './model/formats';
-import peopleTtl from './samples/people.ttl?raw';
-import { validateOntology } from './services/validation';
-import { useHistoryStore } from './store/history';
-import { useOntologyStore } from './store/ontology';
+import { useFileMenu } from './hooks/useFileMenu';
+import { emit as emitJsonSchema } from './model/emit-json-schema';
+import { emit as emitZod } from './model/emit-zod';
+import allotment from './samples/allotment.contexture.json' with { type: 'json' };
+import { STDLIB_REGISTRY } from './services/stdlib-registry';
+import { validate } from './services/validation';
+import { useDocumentStore } from './store/document';
 import { useUIStore } from './store/ui';
+import { useUndoStore } from './store/undo';
 
-function App(): React.JSX.Element {
-  const ontology = useOntologyStore((s) => s.ontology);
-  const loadFromFile = useOntologyStore((s) => s.loadFromFile);
-  const loadFromTurtle = useOntologyStore((s) => s.loadFromTurtle);
-  const serializeForFilePath = useOntologyStore((s) => s.serializeForFilePath);
-  const setFilePath = useOntologyStore((s) => s.setFilePath);
-  const markClean = useOntologyStore((s) => s.markClean);
-  const isDirty = useOntologyStore((s) => s.isDirty);
-  const importWarnings = useOntologyStore((s) => s.importWarnings);
-  const clearImportWarnings = useOntologyStore((s) => s.clearImportWarnings);
-  const resetOntology = useOntologyStore((s) => s.reset);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const selectedEdgeId = useUIStore((s) => s.selectedEdgeId);
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  const setSelectedEdge = useUIStore((s) => s.setSelectedEdge);
-  const removeClass = useOntologyStore((s) => s.removeClass);
-  const undo = useHistoryStore((s) => s.undo);
-  const canUndo = useHistoryStore((s) => s.canUndo);
+export default function App(): React.JSX.Element {
+  const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
+  const hasSchema = schema.types.length > 0;
 
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [showSaveWarning, setShowSaveWarning] = useState(false);
-  const pendingSaveRef = useRef<'save' | 'saveAs' | null>(null);
+  const [positions, setPositions] = useState<Record<string, CanvasPosition>>({});
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
-  const [showFormatUnknown, setShowFormatUnknown] = useState(false);
-  const [showConversionWarning, setShowConversionWarning] = useState(false);
-  const pendingConversionActionRef = useRef<(() => Promise<void>) | null>(null);
-
-  const handleOpen = useCallback(async () => {
-    const result = await window.api.openFile();
-    if (result) {
-      try {
-        await loadFromFile(result.content, result.filePath);
-      } catch (e) {
-        if (e instanceof Error && e.message === 'FORMAT_UNKNOWN') {
-          setShowFormatUnknown(true);
-        } else {
-          throw e;
-        }
-      }
-    }
-  }, [loadFromFile]);
-
-  const checkConversionWarning = useCallback(
-    (targetPath: string, actualSave: () => Promise<void>): boolean => {
-      const { importWarnings: warnings, sourceFormat: srcFmt } = useOntologyStore.getState();
-      if (warnings.length > 0 && srcFmt) {
-        const targetAdapter = getAdapterForFilePath(targetPath);
-        if (targetAdapter && targetAdapter.mimeType !== srcFmt) {
-          pendingConversionActionRef.current = actualSave;
-          setShowConversionWarning(true);
-          return true;
-        }
-      }
-      return false;
-    },
-    [],
-  );
-
-  const doSave = useCallback(async () => {
-    const currentPath = useOntologyStore.getState().filePath;
-    if (currentPath && !currentPath.startsWith('sample://') && !currentPath.startsWith('Sample:')) {
-      const actualSave = async (): Promise<void> => {
-        const content = await serializeForFilePath(currentPath);
-        await window.api.saveFile(currentPath, content);
-        markClean();
-      };
-      if (!checkConversionWarning(currentPath, actualSave)) await actualSave();
-    } else {
-      const newPath = await window.api.saveFileAsDialog();
-      if (newPath) {
-        const actualSave = async (): Promise<void> => {
-          const content = await serializeForFilePath(newPath);
-          await window.api.saveFile(newPath, content);
-          setFilePath(newPath);
-          markClean();
-        };
-        if (!checkConversionWarning(newPath, actualSave)) await actualSave();
-      }
-    }
-  }, [serializeForFilePath, setFilePath, markClean, checkConversionWarning]);
-
-  const doSaveAs = useCallback(async () => {
-    const newPath = await window.api.saveFileAsDialog();
-    if (newPath) {
-      const actualSave = async (): Promise<void> => {
-        const content = await serializeForFilePath(newPath);
-        await window.api.saveFile(newPath, content);
-        setFilePath(newPath);
-        markClean();
-      };
-      if (!checkConversionWarning(newPath, actualSave)) await actualSave();
-    }
-  }, [serializeForFilePath, setFilePath, markClean, checkConversionWarning]);
-
-  const handleSave = useCallback(async () => {
-    const errors = validateOntology(useOntologyStore.getState().ontology);
-    const errorCount = errors.filter((e) => e.severity === 'error').length;
-    if (errorCount > 0) {
-      pendingSaveRef.current = 'save';
-      setShowSaveWarning(true);
-      return;
-    }
-    await doSave();
-  }, [doSave]);
-
-  const handleSaveAs = useCallback(async () => {
-    const errors = validateOntology(useOntologyStore.getState().ontology);
-    const errorCount = errors.filter((e) => e.severity === 'error').length;
-    if (errorCount > 0) {
-      pendingSaveRef.current = 'saveAs';
-      setShowSaveWarning(true);
-      return;
-    }
-    await doSaveAs();
-  }, [doSaveAs]);
-
-  const handleForceSave = useCallback(async () => {
-    setShowSaveWarning(false);
-    if (pendingSaveRef.current === 'saveAs') {
-      await doSaveAs();
-    } else {
-      await doSave();
-    }
-    pendingSaveRef.current = null;
-  }, [doSave, doSaveAs]);
-
-  const handleNew = useCallback(() => {
-    if (isDirty) {
-      setShowNewDialog(true);
-    } else {
-      resetOntology();
-    }
-  }, [isDirty, resetOntology]);
-
-  // Menu events
-  useEffect(() => {
-    const cleanups = [
-      window.api.onMenuFileNew(handleNew),
-      window.api.onMenuFileOpen(handleOpen),
-      window.api.onMenuFileSave(handleSave),
-      window.api.onMenuFileSaveAs(handleSaveAs),
-    ];
-    return () => {
-      for (const fn of cleanups) fn();
-    };
-  }, [handleNew, handleOpen, handleSave, handleSaveAs]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent): void {
-      const target = e.target as HTMLElement;
-      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-
-      if (e.key === 'Escape') {
-        setSelectedNode(null);
-        setSelectedEdge(null);
-      }
-
-      if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey && !inInput && canUndo) {
-        e.preventDefault();
-        undo();
-      }
-
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && !inInput) {
-        e.preventDefault();
-        removeClass(selectedNodeId);
-        setSelectedNode(null);
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, setSelectedNode, setSelectedEdge, removeClass, undo, canUndo]);
-
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
+  const activeTab = useUIStore((s) => s.sidebarTab);
+  const setActiveTab = useUIStore((s) => s.setSidebarTab);
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
 
+  // Drive the collapse/expand imperative API from the UI-store flag so
+  // the Toolbar's sidebar button toggles the same thing as a user drag
+  // to the collapse threshold.
   useEffect(() => {
-    if (sidebarVisible) {
-      sidebarRef.current?.expand();
-    } else {
-      sidebarRef.current?.collapse();
-    }
+    if (sidebarVisible) sidebarRef.current?.expand();
+    else sidebarRef.current?.collapse();
   }, [sidebarVisible]);
 
-  const activeTab = useUIStore((s) => s.sidebarTab);
-  const setActiveTab = useUIStore((s) => s.setSidebarTab);
-
-  // Load recent files on mount and after opens
+  // Global keyboard shortcuts — forwarded from the document so they
+  // work regardless of canvas focus. Inputs / textareas get a pass so
+  // we don't intercept typing.
   useEffect(() => {
-    window.api
-      .getRecentFiles()
-      .then(setRecentFiles)
-      .catch(() => {});
+    function onKey(ev: KeyboardEvent): void {
+      const target = ev.target as HTMLElement | null;
+      const inInput =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      if (ev.key === 'Escape') {
+        useUIStore.getState().setSelectedNode(null);
+        useUIStore.getState().setSelectedEdge(null);
+        return;
+      }
+
+      if (inInput) return;
+
+      const mod = ev.metaKey || ev.ctrlKey;
+      if (mod && (ev.key === 'z' || ev.key === 'Z')) {
+        ev.preventDefault();
+        if (ev.shiftKey) useUndoStore.getState().redo();
+        else useUndoStore.getState().undo();
+        return;
+      }
+      if (mod && (ev.key === 'y' || ev.key === 'Y')) {
+        ev.preventDefault();
+        useUndoStore.getState().redo();
+        return;
+      }
+
+      if (ev.key === 'Delete' || ev.key === 'Backspace') {
+        const selected = useUIStore.getState().selectedNodeId;
+        if (!selected) return;
+        ev.preventDefault();
+        const result = useUndoStore.getState().apply({ kind: 'delete_type', name: selected });
+        if ('schema' in result) useUIStore.getState().setSelectedNode(null);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const handleOpenRecent = useCallback(
-    async (filePath: string) => {
-      const result = await window.api.openRecentFile(filePath);
-      if (result) {
-        try {
-          await loadFromFile(result.content, result.filePath);
-        } catch (e) {
-          if (e instanceof Error && e.message === 'FORMAT_UNKNOWN') {
-            setShowFormatUnknown(true);
-          } else {
-            throw e;
-          }
-        }
-      }
-    },
-    [loadFromFile],
-  );
+  const loadSample = useCallback(() => {
+    useUndoStore
+      .getState()
+      .apply({ kind: 'replace_schema', schema: allotment as unknown as never });
+  }, []);
 
-  const hasContent = ontology.classes.size > 0;
-  const hasSelection = selectedNodeId !== null || selectedEdgeId !== null;
+  const chat = useClaudeSchemaChat({
+    api:
+      typeof window !== 'undefined' && window.contexture?.chat
+        ? window.contexture.chat
+        : noopChatApi(),
+  });
+
+  const fileMenu = useFileMenu();
+
+  // Pull the recent-files list when the empty state might need it and
+  // again whenever the file-path changes (a successful open/save
+  // bumps the list).
+  useEffect(() => {
+    const api = window.contexture?.file;
+    if (!api) return;
+    let cancelled = false;
+    api
+      .getRecentFiles()
+      .then((list) => {
+        if (!cancelled) setRecentFiles(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ev = useClaudeEval({
+    api: {
+      generate: async () => ({ sample: {} }),
+      saveFixture: async () => '',
+    },
+    ir: schema,
+    getRootJsonSchema: (rootTypeName) => emitJsonSchema(schema, rootTypeName),
+    validate: ({ rootTypeName }) => {
+      const errors = validate(schema, { stdlib: STDLIB_REGISTRY });
+      return errors.length === 0
+        ? { ok: true }
+        : {
+            ok: false,
+            errors: errors.map((e) => ({
+              path: e.path,
+              message: `${rootTypeName}: ${e.message}`,
+            })),
+          };
+    },
+  });
+
+  const rootCandidates = useMemo(() => evalRootCandidates(schema), [schema]);
+  const hasSelection = selectedNodeId !== null;
+
+  // Emit Zod source for the SchemaPanel. Only runs while the Schema
+  // tab is active so we don't burn cycles on every IR change when
+  // the user is looking at Chat / Eval / Properties. Wrapped in
+  // try/catch so a malformed intermediate state (e.g. during a
+  // multi-op chat turn) surfaces as an in-panel error rather than
+  // crashing the sidebar.
+  const filePath = useDocumentStore((s) => s.filePath);
+  const zodEmission = useMemo((): { source: string; error: string | null } => {
+    if (activeTab !== 'schema') return { source: '', error: null };
+    try {
+      return { source: emitZod(schema, filePath ?? '<unsaved>.contexture.json'), error: null };
+    } catch (e) {
+      return { source: '', error: e instanceof Error ? e.message : String(e) };
+    }
+  }, [activeTab, schema, filePath]);
+
+  // Filename shown in the SchemaPanel header: the document's basename
+  // with the IR suffix swapped for `.schema.ts`. Falls back to a
+  // generic label before the document is saved.
+  const schemaFileName = useMemo(() => {
+    if (filePath === null) return 'schema.ts';
+    const base = filePath.split(/[\\/]/).pop() ?? filePath;
+    return base.replace(/\.contexture\.json$/i, '.schema.ts');
+  }, [filePath]);
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <UpdateBanner />
       <Toolbar />
 
@@ -273,89 +213,41 @@ function App(): React.JSX.Element {
         className="flex-1 overflow-hidden"
         id="main-layout"
       >
-        {/* Graph Canvas */}
         <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%">
           <div className="relative w-full h-full">
-            {/* Graph controls overlay — top left */}
-            <div className="absolute top-2 left-2 z-10">
-              <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    className="h-8 px-2 gap-1.5 shadow-sm"
-                    title="Graph filters"
-                  >
-                    <SlidersHorizontal className="size-4" />
-                    <ChevronDown className="size-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-0 w-72" align="start">
-                  <AnimatePresence>
-                    {showGraphControls && (
-                      <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
-                    )}
-                  </AnimatePresence>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {hasContent ? (
-              <GraphCanvas />
-            ) : (
-              <div
-                className="relative w-full h-full flex items-center justify-center"
-                style={{ background: 'var(--graph-bg)' }}
-              >
-                <GraphBackground />
-                <div className="relative z-10 text-center text-muted-foreground max-w-sm">
-                  <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">
-                    Ontograph
-                  </h1>
-                  <p className="text-xs text-muted-foreground/70 mb-3">
-                    Where knowledge takes shape
-                  </p>
-                  <p className="text-sm mb-4">
-                    Open an ontology (.ttl, .rdf, .owl, .jsonld) or start chatting with Claude to
-                    create one
-                  </p>
-                  <Button onClick={() => loadFromTurtle(peopleTtl, 'Sample: people.ttl')}>
-                    Load sample ontology
-                  </Button>
-
-                  {recentFiles.length > 0 && (
-                    <div className="mt-6 text-left">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
-                        <Clock className="size-3" />
-                        <span>Recent files</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {recentFiles.slice(0, 5).map((fp) => (
-                          <button
-                            type="button"
-                            key={fp}
-                            onClick={() => handleOpenRecent(fp)}
-                            className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
-                            title={fp}
-                          >
-                            {fp.split('/').pop()}
-                            <span className="text-muted-foreground/50 ml-1.5">
-                              {fp.split('/').slice(0, -1).join('/')}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+            {hasSchema && (
+              <div className="absolute top-2 left-2 z-10">
+                <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      className="h-8 px-2 gap-1.5 shadow-sm"
+                      title="Graph controls"
+                    >
+                      <SlidersHorizontal className="size-4" />
+                      <ChevronDown className="size-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-0 w-72" align="start">
+                    <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
-            <ImprovementHUD />
+            {hasSchema ? (
+              <GraphCanvas positions={positions} onPositionsChange={setPositions} />
+            ) : (
+              <EmptyState
+                onLoadSample={loadSample}
+                recentFiles={recentFiles}
+                onOpenRecent={fileMenu.handleOpenPath}
+              />
+            )}
           </div>
         </ResizablePanel>
 
         <ResizableHandle />
 
-        {/* Sidebar */}
         <ResizablePanel
           id="sidebar-panel"
           defaultSize="30%"
@@ -366,11 +258,10 @@ function App(): React.JSX.Element {
           panelRef={sidebarRef}
         >
           <div className="flex h-full bg-background">
-            {/* Panel content */}
             <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               <div className={activeTab !== 'properties' ? 'hidden' : 'flex-1 overflow-y-auto'}>
                 {hasSelection ? (
-                  <DetailPanel />
+                  <DetailPanel selection={{ typeName: selectedNodeId ?? undefined }} />
                 ) : (
                   <Empty className="border-0 p-4">
                     <EmptyHeader>
@@ -379,180 +270,118 @@ function App(): React.JSX.Element {
                       </EmptyMedia>
                       <EmptyTitle className="text-sm font-medium">No selection</EmptyTitle>
                       <EmptyDescription className="text-xs">
-                        Select a node or edge to view and edit its properties.
+                        Select a type on the canvas to view and edit its properties.
                       </EmptyDescription>
                     </EmptyHeader>
                   </Empty>
                 )}
               </div>
               <div className={activeTab !== 'chat' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <ChatPanel />
+                <ChatPanel chat={chat} />
+              </div>
+              <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <SchemaPanel
+                  zodSource={zodEmission.source}
+                  isEmpty={!hasSchema}
+                  error={zodEmission.error}
+                  onCopy={copyToClipboard}
+                  schemaFileName={schemaFileName}
+                />
               </div>
               <div className={activeTab !== 'eval' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <EvalPanel />
-              </div>
-              <div className={activeTab !== 'metrics' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <MetricsPanel />
+                <EvalPanel eval={ev} rootCandidates={rootCandidates} onCopy={copyToClipboard} />
               </div>
             </div>
-
-            {/* Activity bar */}
             <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
 
       <StatusBar />
-
-      <Dialog
-        open={importWarnings.length > 0}
-        onOpenChange={(open) => {
-          if (!open) clearImportWarnings();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import warnings</DialogTitle>
-            <DialogDescription>
-              The file was loaded but some issues were detected.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
-            {importWarnings.map((w) => (
-              <div key={w.message} className="flex items-start gap-2">
-                {w.severity === 'error' ? (
-                  <CircleAlert className="size-4 shrink-0 mt-0.5 text-destructive" />
-                ) : (
-                  <TriangleAlert className="size-4 shrink-0 mt-0.5 text-warning" />
-                )}
-                <span>{w.message}</span>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button onClick={clearImportWarnings}>OK</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showSaveWarning} onOpenChange={setShowSaveWarning}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save with errors?</DialogTitle>
-            <DialogDescription>
-              This ontology has validation errors. Saving may produce an invalid file.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowSaveWarning(false);
-                pendingSaveRef.current = null;
-              }}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleForceSave}>
-              Save anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showFormatUnknown} onOpenChange={setShowFormatUnknown}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cannot determine format</DialogTitle>
-            <DialogDescription>
-              The file format could not be detected from its extension or content. Please ensure the
-              file is a valid Turtle, RDF/XML, or JSON-LD ontology.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowFormatUnknown(false)}>OK</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showConversionWarning} onOpenChange={setShowConversionWarning}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Format conversion warning</DialogTitle>
-            <DialogDescription>
-              The following constructs could not be fully represented when the file was parsed and
-              will not be preserved in the exported file:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 max-h-48 overflow-y-auto text-sm">
-            {importWarnings.map((w) => (
-              <div key={w.message} className="flex items-start gap-2">
-                <TriangleAlert className="size-4 shrink-0 mt-0.5 text-warning" />
-                <span>{w.message}</span>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowConversionWarning(false);
-                pendingConversionActionRef.current = null;
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                setShowConversionWarning(false);
-                if (pendingConversionActionRef.current) {
-                  await pendingConversionActionRef.current();
-                  pendingConversionActionRef.current = null;
-                }
-              }}
-            >
-              Save anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Unsaved changes</DialogTitle>
-            <DialogDescription>
-              You have unsaved changes. What would you like to do?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                await handleSave();
-                resetOntology();
-                setShowNewDialog(false);
-              }}
-            >
-              Save & New
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                resetOntology();
-                setShowNewDialog(false);
-              }}
-            >
-              Discard
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
     </div>
   );
 }
 
-export default App;
+function EmptyState({
+  onLoadSample,
+  recentFiles,
+  onOpenRecent,
+}: {
+  onLoadSample: () => void;
+  recentFiles: string[];
+  onOpenRecent: (path: string) => void;
+}): React.JSX.Element {
+  return (
+    <div
+      className="relative w-full h-full flex items-center justify-center overflow-hidden"
+      style={{ background: 'var(--graph-bg)' }}
+    >
+      <GraphBackground />
+      <div className="relative z-10 text-center text-muted-foreground max-w-sm">
+        <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
+        <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>
+        <p className="text-sm mb-4">
+          Open a <code className="text-xs">.contexture.json</code> file or start chatting with
+          Claude to create one.
+        </p>
+        <Button onClick={onLoadSample}>Load allotment sample</Button>
+
+        {recentFiles.length > 0 && (
+          <div className="mt-6 text-left">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
+              <Clock className="size-3" />
+              <span>Recent files</span>
+            </div>
+            <div className="space-y-0.5">
+              {recentFiles.slice(0, 5).map((fp) => (
+                <button
+                  type="button"
+                  key={fp}
+                  onClick={() => onOpenRecent(fp)}
+                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
+                  title={fp}
+                >
+                  {fp.split('/').pop()}
+                  <span className="text-muted-foreground/50 ml-1.5">
+                    {fp.split('/').slice(0, -1).join('/')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function copyToClipboard(text: string): void {
+  if (typeof navigator === 'undefined') return;
+  navigator.clipboard?.writeText(text).catch(() => undefined);
+}
+
+function noopChatApi() {
+  const unsub = () => undefined;
+  return {
+    send: async () => ({ ok: false, error: 'chat unavailable (no preload bridge)' }),
+    setIR: () => undefined,
+    detectClaudeCli: async () => ({ installed: false, path: null }),
+    setAuth: async () => ({ ok: false, error: 'chat unavailable' }),
+    setModelOptions: async () => ({ ok: false }),
+    abort: async () => ({ ok: false, error: 'chat unavailable' }),
+    replyOp: () => undefined,
+    onAssistant: () => unsub,
+    onToolUse: () => unsub,
+    onResult: () => unsub,
+    onError: () => unsub,
+    onAuthRequired: () => unsub,
+    onTurnBegin: () => unsub,
+    onTurnCommit: () => unsub,
+    onTurnRollback: () => unsub,
+    onOpRequest: () => unsub,
+    onSession: () => unsub,
+    setSessionId: async () => ({ ok: false }),
+    clearSession: async () => ({ ok: false }),
+  };
+}
