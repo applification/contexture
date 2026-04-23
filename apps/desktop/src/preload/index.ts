@@ -59,6 +59,13 @@ const chat = {
     subscribe('chat:result', listener as (p: unknown) => void),
   onError: (listener: (payload: { message: string }) => void) =>
     subscribe('chat:error', listener as (p: unknown) => void),
+  /**
+   * Emitted when the SDK reports an authentication failure (401 /
+   * expired Claude Max token / missing API key). The renderer surfaces
+   * a re-auth CTA rather than a generic error bubble.
+   */
+  onAuthRequired: (listener: (payload: { message: string }) => void) =>
+    subscribe('chat:auth-required', listener as (p: unknown) => void),
   onTurnBegin: (listener: () => void) => subscribe('turn:begin', listener),
   onTurnCommit: (listener: () => void) => subscribe('turn:commit', listener),
   onTurnRollback: (listener: () => void) => subscribe('turn:rollback', listener),

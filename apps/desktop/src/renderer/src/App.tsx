@@ -365,6 +365,7 @@ function noopChatApi() {
     onToolUse: () => unsub,
     onResult: () => unsub,
     onError: () => unsub,
+    onAuthRequired: () => unsub,
     onTurnBegin: () => unsub,
     onTurnCommit: () => unsub,
     onTurnRollback: () => unsub,

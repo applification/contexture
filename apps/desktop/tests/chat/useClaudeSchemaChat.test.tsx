@@ -22,6 +22,7 @@ function makeApi() {
     toolUse: new Set<Listener<{ name: string; input: unknown }>>(),
     result: new Set<Listener<{ ok: boolean; error?: string }>>(),
     error: new Set<Listener<{ message: string }>>(),
+    authRequired: new Set<Listener<{ message: string }>>(),
     turnBegin: new Set<() => void>(),
     turnCommit: new Set<() => void>(),
     turnRollback: new Set<() => void>(),
@@ -59,6 +60,10 @@ function makeApi() {
       listeners.error.add(l);
       return () => listeners.error.delete(l);
     },
+    onAuthRequired: (l) => {
+      listeners.authRequired.add(l);
+      return () => listeners.authRequired.delete(l);
+    },
     onTurnBegin: (l) => {
       listeners.turnBegin.add(l);
       return () => listeners.turnBegin.delete(l);
@@ -95,6 +100,11 @@ function makeApi() {
     },
     error: (p: { message: string }) => {
       listeners.error.forEach((l) => {
+        l(p);
+      });
+    },
+    authRequired: (p: { message: string }) => {
+      listeners.authRequired.forEach((l) => {
         l(p);
       });
     },
@@ -229,6 +239,63 @@ describe('useClaudeSchemaChat', () => {
     act(() => useUndoStore.getState().undo());
     // Both ops reverse as one step.
     expect(useUndoStore.getState().schema.types).toEqual([]);
+  });
+
+  it('liveAssistant updates per assistant chunk (rAF-throttled) and flushes on result', async () => {
+    // Flush every rAF synchronously so the test observes the setState
+    // without waiting for the next browser frame.
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    try {
+      const { api, emit } = makeApi();
+      const { result } = renderHook(() => useClaudeSchemaChat({ api }));
+
+      await act(async () => {
+        await result.current.send('hi');
+      });
+      act(() => {
+        emit.assistant({ text: 'Hel' });
+      });
+      expect(result.current.liveAssistant).toBe('Hel');
+      act(() => {
+        emit.assistant({ text: 'lo' });
+      });
+      expect(result.current.liveAssistant).toBe('Hello');
+
+      act(() => {
+        emit.result({ ok: true });
+      });
+      expect(result.current.liveAssistant).toBe('');
+      // The buffered text lands as a committed assistant message.
+      const assistantMessages = result.current.messages.filter((m) => m.role === 'assistant');
+      expect(assistantMessages.map((m) => m.content)).toEqual(['Hello']);
+    } finally {
+      rafSpy.mockRestore();
+    }
+  });
+
+  it('authRequired event raises a dedicated flag and is dismissable', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useClaudeSchemaChat({ api }));
+    await act(async () => {
+      await result.current.send('x');
+    });
+    act(() => emit.authRequired({ message: '401' }));
+
+    expect(result.current.authRequired).toBe(true);
+    // No generic assistant error bubble — that channel is reserved for
+    // non-auth failures.
+    const hasErrorBubble = result.current.messages.some(
+      (m) => m.role === 'assistant' && m.content.startsWith('Error:'),
+    );
+    expect(hasErrorBubble).toBe(false);
+
+    act(() => result.current.clearAuthRequired());
+    expect(result.current.authRequired).toBe(false);
   });
 
   it('hydrate replaces the transcript', () => {

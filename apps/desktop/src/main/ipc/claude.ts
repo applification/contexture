@@ -15,6 +15,7 @@ import { promisify } from 'node:util';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
 import type { Schema } from '@renderer/model/types';
 import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
+import * as Sentry from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
 import { createOpTools, type OpToolDescriptor } from '../ops';
@@ -26,6 +27,8 @@ import {
   makeIpcForwardOp,
   TurnContext,
 } from './claude-bridge';
+import { ChatCancelledError } from './claude-errors';
+import { invokeOpHandler } from './op-tool-bridge';
 
 const execFileAsync = promisify(execFile);
 
@@ -82,6 +85,15 @@ let currentThinkingBudget: ThinkingBudget = 'auto';
  * interrupt it. `null` while nothing is running.
  */
 let currentQuery: { interrupt(): Promise<void> } | null = null;
+
+/**
+ * Flag set by `chat:abort` to signal cancellation to the in-flight
+ * sdkQuery generator. Cleared at the start of every turn. The Agent
+ * SDK's `interrupt()` stops the iterator cleanly (not via throw), so
+ * we need our own signal to raise `ChatCancelledError` after the loop
+ * exits — that's what drives `turn:rollback`.
+ */
+let cancelRequested = false;
 
 /**
  * Last-seen Agent SDK session id for the active chat. Populated by
@@ -166,6 +178,9 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   const skillsPluginPath = resolveSkillsPluginPath();
 
   const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPromptAppend, resume }) {
+    // Clear any stale cancel flag at the start of each SDK query.
+    // `chat:abort` will flip it back mid-stream when the user hits Stop.
+    cancelRequested = false;
     // Project the current auth into the SDK options. Max mode points
     // the SDK at the cached absolute binary path (the SDK spawns that
     // binary to authenticate against the user's OAuth session);
@@ -215,6 +230,13 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
         const mapped = mapSdkMessage(msg);
         if (mapped) yield mapped;
       }
+      // `interrupt()` unwinds the iterator cleanly (no throw); raise
+      // ChatCancelledError so `turnController.run` fires `turn:rollback`
+      // and any ops applied during this turn are reverted as one undo
+      // step (issue #74 user story 16).
+      if (cancelRequested) {
+        throw new ChatCancelledError();
+      }
     } finally {
       if (currentQuery === iterator) currentQuery = null;
     }
@@ -229,6 +251,11 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     getCurrentIR: () => turnContext.current(),
     stdlibRegistry: SYSTEM_PROMPT_STDLIB,
     getResumeSessionId: () => currentSessionId,
+    retryOptions: {
+      captureException: (err, extra) => {
+        Sentry.captureException(err, { extra });
+      },
+    },
   });
 
   ipcMain.handle('chat:send', async (_evt, userMessage: string) => {
@@ -299,6 +326,11 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   ipcMain.handle('chat:abort', async () => {
     const q = currentQuery;
     if (!q) return { ok: false, error: 'no active query' };
+    // Flip the flag first so the sdkQuery generator raises
+    // ChatCancelledError after `interrupt()` unwinds the iterator.
+    // Without this the iterator stops cleanly and the turn commits
+    // whatever ops landed before Stop was pressed.
+    cancelRequested = true;
     try {
       await q.interrupt();
       return { ok: true };
@@ -401,12 +433,9 @@ function resolveSkillsPluginPath(): string | null {
 }
 
 function toSdkTool(descriptor: OpToolDescriptor) {
-  return tool(descriptor.name, descriptor.description, descriptor.inputSchema, async (args) => {
-    const result = await descriptor.handler(args as Record<string, unknown>);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result) }],
-    };
-  });
+  return tool(descriptor.name, descriptor.description, descriptor.inputSchema, (args) =>
+    invokeOpHandler(descriptor.handler, args as Record<string, unknown>),
+  );
 }
 
 // Keep Zod in the surface area so downstream importers can build

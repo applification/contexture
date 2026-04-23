@@ -57,7 +57,16 @@ export interface ChatPanelProps {
 }
 
 export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
-  const { messages, isStreaming, send, clear, hydrate } = chat;
+  const {
+    messages,
+    isStreaming,
+    liveAssistant,
+    authRequired,
+    clearAuthRequired,
+    send,
+    clear,
+    hydrate,
+  } = chat;
   const { authMode, isReady, model, setModel, thinkingBudget, setThinkingBudget } = useClaude();
 
   const filePath = useDocumentStore((s) => s.filePath);
@@ -316,10 +325,33 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           {messages.map((m) => (
             <MessageBubble key={m.id} message={m} />
           ))}
+          {isStreaming && liveAssistant.trim().length > 0 && (
+            <div
+              className="text-sm text-foreground max-w-[95%] leading-relaxed"
+              data-testid="chat-message-streaming"
+            >
+              <Streamdown plugins={{ code }}>{liveAssistant}</Streamdown>
+            </div>
+          )}
           {isStreaming && (
             <div className="flex gap-1 items-center text-xs text-muted-foreground">
               <span className="animate-pulse">●</span>
               <span>Claude is thinking…</span>
+            </div>
+          )}
+          {authRequired && (
+            <div
+              className="text-xs text-destructive bg-destructive/5 border border-destructive/30 rounded px-2 py-1.5 flex items-center justify-between gap-2"
+              data-testid="chat-auth-required"
+            >
+              <span>Authentication required. Check the auth popover in the toolbar.</span>
+              <button
+                type="button"
+                className="underline hover:opacity-80"
+                onClick={clearAuthRequired}
+              >
+                Dismiss
+              </button>
             </div>
           )}
           <div ref={messagesEndRef} />

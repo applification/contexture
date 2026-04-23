@@ -15,6 +15,9 @@ function makeChat(overrides: Partial<ClaudeSchemaChatState> = {}): ClaudeSchemaC
   return {
     messages: [],
     isStreaming: false,
+    liveAssistant: '',
+    authRequired: false,
+    clearAuthRequired: vi.fn(),
     send: vi.fn().mockResolvedValue(undefined),
     hydrate: vi.fn(),
     clear: vi.fn(),

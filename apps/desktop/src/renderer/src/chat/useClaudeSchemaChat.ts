@@ -29,6 +29,17 @@ import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 export interface ClaudeSchemaChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
+  /**
+   * In-progress assistant text for the current turn. Updated live as
+   * chunks arrive (rAF-throttled) so the UI can render a provisional
+   * streaming bubble; flushed into `messages` when the turn ends.
+   * Empty string when no turn is in flight.
+   */
+  liveAssistant: string;
+  /** True when an auth failure has been surfaced on the current turn. */
+  authRequired: boolean;
+  /** Clear the auth-required flag (e.g. when re-auth succeeds). */
+  clearAuthRequired: () => void;
   send: (text: string) => Promise<void>;
   /** Replace the visible history (used when loading a sidecar file). */
   hydrate: (messages: ChatMessage[]) => void;
@@ -57,12 +68,52 @@ export function useClaudeSchemaChat({
 }: UseClaudeSchemaChatOptions): ClaudeSchemaChatState {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setStreaming] = useState(false);
+  const [liveAssistant, setLiveAssistant] = useState<string>('');
+  const [authRequired, setAuthRequired] = useState(false);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const persistenceEnabled = useUIStore((s) => s.chatHistoryPersistence);
 
   // `assistantBufferRef` aggregates assistant text chunks across a turn
   // so the UI sees one final message, not a chunk per websocket frame.
   const assistantBufferRef = useRef<string>('');
+  // Coalesce high-frequency chunk arrivals into one React render per
+  // animation frame. Without this, a burst of small chunks re-renders
+  // the provisional bubble dozens of times per second unnecessarily.
+  const rafHandleRef = useRef<number | null>(null);
+
+  const flushLiveAssistant = useCallback(() => {
+    rafHandleRef.current = null;
+    setLiveAssistant(assistantBufferRef.current);
+  }, []);
+
+  const scheduleLiveFlush = useCallback(() => {
+    if (rafHandleRef.current !== null) return;
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (cb: FrameRequestCallback) =>
+            setTimeout(() => cb(performance.now()), 16) as unknown as number;
+    // Mark "scheduled" before calling raf so a synchronous mock-raf
+    // (tests) sees it null during the callback but can still dedupe
+    // if the callback fires a nested schedule.
+    rafHandleRef.current = -1;
+    const handle = raf(flushLiveAssistant);
+    // If the raf fired synchronously, the callback already reset ref
+    // to null — don't clobber it with the post-call handle.
+    if (rafHandleRef.current === -1) {
+      rafHandleRef.current = handle;
+    }
+  }, [flushLiveAssistant]);
+
+  const cancelLiveFlush = useCallback(() => {
+    if (rafHandleRef.current === null) return;
+    const caf =
+      typeof cancelAnimationFrame === 'function'
+        ? cancelAnimationFrame
+        : (id: number) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>);
+    caf(rafHandleRef.current);
+    rafHandleRef.current = null;
+  }, []);
 
   const appendMessage = useCallback(
     (message: ChatMessage) => {
@@ -84,8 +135,9 @@ export function useClaudeSchemaChat({
   useEffect(() => {
     return api.onAssistant(({ text }) => {
       assistantBufferRef.current += text;
+      scheduleLiveFlush();
     });
-  }, [api]);
+  }, [api, scheduleLiveFlush]);
 
   // Wire tool-use as a compact status line.
   useEffect(() => {
@@ -99,20 +151,39 @@ export function useClaudeSchemaChat({
   // Wire turn end — flush the buffer, stop streaming.
   useEffect(() => {
     return api.onResult(() => {
+      cancelLiveFlush();
       const buffered = assistantBufferRef.current.trim();
       assistantBufferRef.current = '';
+      setLiveAssistant('');
       if (buffered) appendMessage(mkMessage('assistant', buffered));
       setStreaming(false);
     });
-  }, [api, appendMessage]);
+  }, [api, appendMessage, cancelLiveFlush]);
 
   useEffect(() => {
     return api.onError(({ message }) => {
+      cancelLiveFlush();
       assistantBufferRef.current = '';
+      setLiveAssistant('');
       appendMessage(mkMessage('assistant', `Error: ${message}`));
       setStreaming(false);
     });
-  }, [api, appendMessage]);
+  }, [api, appendMessage, cancelLiveFlush]);
+
+  // Auth-required surface — the classifier mapped the error to a
+  // separate class so the UI can prompt re-auth instead of a generic
+  // error bubble.
+  useEffect(() => {
+    const onAuth = api.onAuthRequired;
+    if (!onAuth) return;
+    return onAuth(() => {
+      cancelLiveFlush();
+      assistantBufferRef.current = '';
+      setLiveAssistant('');
+      setAuthRequired(true);
+      setStreaming(false);
+    });
+  }, [api, cancelLiveFlush]);
 
   // Bind turn lifecycle to the undoable store so the whole turn is one
   // undo step regardless of how many ops the SDK emits.
@@ -134,6 +205,9 @@ export function useClaudeSchemaChat({
       if (!trimmed || isStreaming) return;
       appendMessage(mkMessage('user', trimmed));
       setStreaming(true);
+      setLiveAssistant('');
+      assistantBufferRef.current = '';
+      setAuthRequired(false);
       api.setIR(schema);
       await api.send(trimmed);
     },
@@ -141,7 +215,22 @@ export function useClaudeSchemaChat({
   );
 
   const hydrate = useCallback((next: ChatMessage[]) => setMessages(next), []);
-  const clear = useCallback(() => setMessages([]), []);
+  const clear = useCallback(() => {
+    setMessages([]);
+    cancelLiveFlush();
+    assistantBufferRef.current = '';
+    setLiveAssistant('');
+  }, [cancelLiveFlush]);
+  const clearAuthRequired = useCallback(() => setAuthRequired(false), []);
 
-  return { messages, isStreaming, send, hydrate, clear };
+  return {
+    messages,
+    isStreaming,
+    liveAssistant,
+    authRequired,
+    clearAuthRequired,
+    send,
+    hydrate,
+    clear,
+  };
 }

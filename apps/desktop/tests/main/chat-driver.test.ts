@@ -15,6 +15,7 @@
  */
 import {
   CHAT_ASSISTANT,
+  CHAT_AUTH_REQUIRED,
   CHAT_ERROR,
   CHAT_RESULT,
   CHAT_SESSION,
@@ -24,6 +25,7 @@ import {
   type DriverTransport,
 } from '@main/ipc/chat-driver';
 import { ChatTurnController } from '@main/ipc/chat-turn';
+import { ChatCancelledError } from '@main/ipc/claude-errors';
 import type { Schema } from '@renderer/model/types';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -180,6 +182,157 @@ describe('ChatDriver', () => {
 
     const input = query.mock.calls[0][0];
     expect(input.prompt).toContain('"types": []');
+  });
+
+  it('routes an auth error to chat:auth-required (not chat:error)', async () => {
+    const { transport: turnTransport, sent: turnSent } = fakeTransport();
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({
+      send: (channel, payload) => turnTransport.send(channel, payload),
+    });
+
+    const query: DriverQueryFn = async function* () {
+      yield { type: 'assistant', text: 'starting' };
+      throw new Error('401 Unauthorized');
+    };
+
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+    });
+
+    await expect(driver.send('hi')).rejects.toThrow('401');
+
+    // Turn still rolls back (the auth failure ended the turn).
+    expect(turnSent.map((s) => s.channel)).toEqual(['turn:begin', 'turn:rollback']);
+    // Auth goes on the dedicated channel.
+    const channels = driverSent.map((s) => s.channel);
+    expect(channels).toContain(CHAT_AUTH_REQUIRED);
+    expect(channels).not.toContain(CHAT_ERROR);
+  });
+
+  it('routes a validation error to chat:error with the message', async () => {
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({ send: () => undefined });
+
+    const query: DriverQueryFn = async function* () {
+      yield { type: 'assistant', text: 'starting' };
+      throw new Error('ZodError: invalid payload');
+    };
+
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+    });
+
+    await expect(driver.send('hi')).rejects.toThrow('ZodError');
+    const errEvent = driverSent.find((s) => s.channel === CHAT_ERROR);
+    expect(errEvent).toBeDefined();
+    expect((errEvent?.payload as { message: string }).message).toContain('ZodError');
+  });
+
+  it('cancel errors are silent (no chat:error, no chat:auth-required) but still roll back', async () => {
+    const { transport: turnTransport, sent: turnSent } = fakeTransport();
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({
+      send: (channel, payload) => turnTransport.send(channel, payload),
+    });
+
+    const query: DriverQueryFn = async function* () {
+      yield { type: 'assistant', text: 'starting' };
+      throw new ChatCancelledError();
+    };
+
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+    });
+
+    await expect(driver.send('hi')).rejects.toThrow('cancelled');
+    expect(turnSent.map((s) => s.channel)).toEqual(['turn:begin', 'turn:rollback']);
+    const channels = driverSent.map((s) => s.channel);
+    expect(channels).not.toContain(CHAT_ERROR);
+    expect(channels).not.toContain(CHAT_AUTH_REQUIRED);
+  });
+
+  it('retries a transient error before any output is committed', async () => {
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({ send: () => undefined });
+
+    let attempts = 0;
+    const query: DriverQueryFn = async function* () {
+      attempts += 1;
+      if (attempts < 3) throw new Error('ECONNRESET');
+      yield { type: 'assistant', text: 'hi' };
+      yield { type: 'result', ok: true };
+    };
+
+    const captureException = vi.fn();
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+      retryOptions: {
+        captureException,
+        sleep: async () => {},
+        random: () => 0.5,
+      },
+    });
+
+    await driver.send('hi');
+
+    expect(attempts).toBe(3);
+    expect(driverSent.map((s) => s.channel)).toEqual([CHAT_ASSISTANT, CHAT_RESULT]);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('stops retrying once output has been committed (would replay tool calls)', async () => {
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({ send: () => undefined });
+
+    let attempts = 0;
+    const query: DriverQueryFn = async function* () {
+      attempts += 1;
+      yield { type: 'assistant', text: 'partial' };
+      // Throws mid-stream — retry is unsafe at this point.
+      throw new Error('ECONNRESET');
+    };
+
+    const captureException = vi.fn();
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+      retryOptions: {
+        captureException,
+        sleep: async () => {},
+        random: () => 0.5,
+      },
+    });
+
+    await expect(driver.send('hi')).rejects.toThrow('ECONNRESET');
+    expect(attempts).toBe(1);
+    // Transient-after-commit isn't captured (it's still transient; the
+    // user will naturally retry).
+    expect(driverSent.map((s) => s.channel)).toContain(CHAT_ERROR);
   });
 
   it('passes resume when getResumeSessionId returns a value; omits it otherwise', async () => {

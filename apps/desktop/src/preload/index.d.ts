@@ -56,6 +56,8 @@ export interface ContextureChatAPI {
   onToolUse: (listener: (payload: { name: string; input: unknown }) => void) => Unsubscribe;
   onResult: (listener: (payload: { ok: boolean; error?: string }) => void) => Unsubscribe;
   onError: (listener: (payload: { message: string }) => void) => Unsubscribe;
+  /** Auth failure subscription — renderer surfaces re-auth CTA. */
+  onAuthRequired: (listener: (payload: { message: string }) => void) => Unsubscribe;
   onTurnBegin: (listener: () => void) => Unsubscribe;
   onTurnCommit: (listener: () => void) => Unsubscribe;
   onTurnRollback: (listener: () => void) => Unsubscribe;
