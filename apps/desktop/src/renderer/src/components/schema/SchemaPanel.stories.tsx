@@ -44,6 +44,7 @@ export const Populated: Story = {
     zodSource: SAMPLE_SOURCE,
     isEmpty: false,
     error: null,
+    schemaFileName: 'allotment.schema.ts',
   },
 };
 

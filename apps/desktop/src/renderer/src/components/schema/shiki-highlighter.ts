@@ -23,7 +23,7 @@ export function getHighlighter(): Promise<HighlighterCore> {
       const [ts, light, dark] = await Promise.all([
         import('shiki/langs/typescript.mjs'),
         import('shiki/themes/github-light.mjs'),
-        import('shiki/themes/github-dark-dimmed.mjs'),
+        import('shiki/themes/github-dark.mjs'),
       ]);
       return createHighlighterCore({
         themes: [light.default, dark.default],
@@ -42,5 +42,5 @@ export function getHighlighter(): Promise<HighlighterCore> {
  */
 export const SHIKI_THEMES = {
   light: 'github-light',
-  dark: 'github-dark-dimmed',
+  dark: 'github-dark',
 } as const;

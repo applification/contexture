@@ -194,6 +194,15 @@ export default function App(): React.JSX.Element {
     }
   }, [activeTab, schema, filePath]);
 
+  // Filename shown in the SchemaPanel header: the document's basename
+  // with the IR suffix swapped for `.schema.ts`. Falls back to a
+  // generic label before the document is saved.
+  const schemaFileName = useMemo(() => {
+    if (filePath === null) return 'schema.ts';
+    const base = filePath.split(/[\\/]/).pop() ?? filePath;
+    return base.replace(/\.contexture\.json$/i, '.schema.ts');
+  }, [filePath]);
+
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <UpdateBanner />
@@ -276,6 +285,7 @@ export default function App(): React.JSX.Element {
                   isEmpty={!hasSchema}
                   error={zodEmission.error}
                   onCopy={copyToClipboard}
+                  schemaFileName={schemaFileName}
                 />
               </div>
               <div className={activeTab !== 'eval' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>

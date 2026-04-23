@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // <pre> fallback. We still exercise the effect's code path.
 vi.mock('@renderer/components/schema/shiki-highlighter', () => ({
   getHighlighter: () => new Promise(() => undefined),
-  SHIKI_THEMES: { light: 'github-light', dark: 'github-dark-dimmed' },
+  SHIKI_THEMES: { light: 'github-light', dark: 'github-dark' },
 }));
 
 afterEach(() => {
@@ -69,5 +69,45 @@ describe('SchemaPanel', () => {
     render(<SchemaPanel zodSource="" isEmpty={true} error="shouldnt render" onCopy={vi.fn()} />);
     expect(screen.getByText(/no schema yet/i)).toBeInTheDocument();
     expect(screen.queryByTestId('schema-error')).not.toBeInTheDocument();
+  });
+
+  it('shows the supplied filename in the header and a default when none is given', () => {
+    const source = 'export const A = 1;\n';
+    const { rerender } = render(
+      <SchemaPanel
+        zodSource={source}
+        isEmpty={false}
+        error={null}
+        schemaFileName="allotment.schema.ts"
+      />,
+    );
+    expect(screen.getByTestId('schema-filename').textContent).toContain('allotment.schema.ts');
+
+    rerender(<SchemaPanel zodSource={source} isEmpty={false} error={null} />);
+    expect(screen.getByTestId('schema-filename').textContent).toContain('schema.ts');
+  });
+
+  it('steps the code font size up and down and disables at the bounds', () => {
+    const source = 'export const A = 1;\n';
+    render(<SchemaPanel zodSource={source} isEmpty={false} error={null} />);
+    const code = screen.getByTestId('schema-code') as HTMLElement;
+    const decrease = screen.getByTestId('schema-font-decrease');
+    const increase = screen.getByTestId('schema-font-increase');
+
+    // Default is the middle of the ladder — both buttons enabled, 13px applied inline.
+    expect(code.style.fontSize).toBe('13px');
+    expect(decrease).not.toBeDisabled();
+    expect(increase).not.toBeDisabled();
+
+    // Shrink to the floor (11px) — two clicks from 13 → 12 → 11.
+    fireEvent.click(decrease);
+    fireEvent.click(decrease);
+    expect(code.style.fontSize).toBe('11px');
+    expect(decrease).toBeDisabled();
+
+    // Grow to the ceiling (20px) — ladder is [11,12,13,14,16,18,20].
+    for (let i = 0; i < 6; i++) fireEvent.click(increase);
+    expect(code.style.fontSize).toBe('20px');
+    expect(increase).toBeDisabled();
   });
 });
