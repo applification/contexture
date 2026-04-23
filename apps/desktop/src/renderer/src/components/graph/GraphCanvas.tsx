@@ -26,7 +26,6 @@ import {
   Background,
   Controls,
   type Edge,
-  MiniMap,
   type Node,
   type NodeChange,
   type OnNodesChange,
@@ -43,6 +42,7 @@ import type { Op } from '../../store/ops';
 import { useUIStore } from '../../store/ui';
 import { useUndoStore } from '../../store/undo';
 import { RefEdge } from './edges/RefEdge';
+import { GraphLegend } from './GraphLegend';
 import {
   type ConnectPayload,
   handleConnect,
@@ -88,6 +88,8 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const setAdjacency = useUIStore((s) => s.setAdjacency);
   const setSidebarTab = useUIStore((s) => s.setSidebarTab);
   const setSidebarVisible = useUIStore((s) => s.setSidebarVisible);
+  const focusNodeId = useUIStore((s) => s.focusNodeId);
+  const setFocusNode = useUIStore((s) => s.setFocusNode);
 
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(
     () => buildGraph({ schema, positions }),
@@ -130,7 +132,7 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
 
   // ELK once the nodes have measured DOM dimensions.
   const { runLayout } = useELKLayout();
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter } = useReactFlow();
   const nodesInitialized = useNodesInitialized({ includeHiddenNodes: false });
   const graphLayout = useUIStore((s) => s.graphLayout);
   const graphLayoutRef = useRef(graphLayout);
@@ -199,6 +201,25 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
       document.removeEventListener('graph:fitview', onFitView);
     };
   }, [runLayoutNow, fitView]);
+
+  // Search → centre the matched node and select it. `setFocusNode` is
+  // the trigger; we consume the value (by clearing it) so repeated
+  // picks of the same name still re-centre.
+  useEffect(() => {
+    if (!focusNodeId) return;
+    const node = nodesRef.current.find((n) => n.id === focusNodeId);
+    if (!node) {
+      setFocusNode(null);
+      return;
+    }
+    const width = node.measured?.width ?? node.width ?? 180;
+    const height = node.measured?.height ?? node.height ?? 60;
+    const cx = node.position.x + width / 2;
+    const cy = node.position.y + height / 2;
+    setCenter(cx, cy, { zoom: 1.1, duration: 400 });
+    setSelectedNode(focusNodeId);
+    setFocusNode(null);
+  }, [focusNodeId, setCenter, setSelectedNode, setFocusNode]);
 
   // Selection → adjacency dimming.
   useEffect(() => {
@@ -323,26 +344,15 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
           const data = edge.data as RefEdgeData | undefined;
           if (data) setSelectedNode(data.sourceType);
         }}
-        proOptions={{ hideAttribution: true }}
         minZoom={0.1}
         maxZoom={2.5}
+        attributionPosition="bottom-left"
       >
-        <Background gap={24} size={1} />
+        {/* Subtle dot grid — gap + tiny size + themed colour so the
+            pattern reads as texture not noise on both light and dark. */}
+        <Background gap={28} size={0.8} color="var(--graph-dot)" />
         <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor={(node) => {
-            if (node.id === selectedNodeId) return 'var(--graph-node-selected)';
-            return 'var(--graph-node-class, var(--primary))';
-          }}
-          maskColor="oklch(0 0 0 / 0.45)"
-          style={{
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-          }}
-        />
+        <GraphLegend />
       </ReactFlow>
     </section>
   );

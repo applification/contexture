@@ -2,7 +2,10 @@
  * ChatPanel — the Claude chat surface.
  *
  * Mirrors the pre-pivot layout:
- *   - Header with a "New chat" button that clears the transcript.
+ *   - Header with a thread-list toggle, thread title, and New-chat
+ *     button.
+ *   - Thread list (when toggled) scoped to the currently-open schema
+ *     file, with switch + delete actions.
  *   - Empty state (BotMessageSquare) when there are no messages, with
  *     auth-aware copy ("Not connected" if the toolbar popover hasn't
  *     been configured).
@@ -12,23 +15,22 @@
  *   - Prompt input as a single rounded card: textarea + Model select +
  *     Effort (thinking budget) select + Send / Stop button.
  *
- * The chat itself (messages + streaming state + IR push + op dispatch)
- * lives in `useClaudeSchemaChat`. Auth + model + effort live in
- * `useClaude`. The panel just stitches them together.
- *
- * Thread list, file-context badge, and selection-aware context
- * injection from the pre-pivot ChatPanel aren't ported yet — those
- * depend on IR-side plumbing we don't have (e.g. chat threads keyed by
- * schema file, node-selection → context string). Slice Chat v2 can
- * layer them on top.
+ * Threads live in localStorage (see `useChatThreads`). Each carries
+ * its own Agent SDK `sessionId`; switching threads pushes that id
+ * into main so follow-up turns resume that thread's prior context.
+ * The chat itself (messages + streaming state + IR push + op
+ * dispatch) lives in `useClaudeSchemaChat`. Auth + model + effort
+ * live in `useClaude`. The panel stitches them together.
  */
 
+import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { type ModelId, type ThinkingBudget, useClaude } from '@renderer/chat/useClaude';
 import type { ClaudeSchemaChatState } from '@renderer/chat/useClaudeSchemaChat';
 import type { ChatMessage } from '@renderer/model/chat-history';
+import { useDocumentStore } from '@renderer/store/document';
 import { code } from '@streamdown/code';
-import { ArrowUp, BotMessageSquare, Square, SquarePen } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUp, BotMessageSquare, List, Square, SquarePen } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,18 +50,107 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { ChatThreadList } from './ChatThreadList';
 
 export interface ChatPanelProps {
   chat: ClaudeSchemaChatState;
 }
 
 export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
-  const { messages, isStreaming, send, clear } = chat;
+  const { messages, isStreaming, send, clear, hydrate } = chat;
   const { authMode, isReady, model, setModel, thinkingBudget, setThinkingBudget } = useClaude();
+
+  const filePath = useDocumentStore((s) => s.filePath);
+  const history = useChatThreads();
 
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Track previous filePath so file-change and initial-mount paths
+  // behave differently.
+  const prevFilePathRef = useRef<string | null | undefined>(undefined);
+  // Snapshot the last-persisted messages so we don't re-write the
+  // active thread for no reason (hydrate from a switch would otherwise
+  // trigger a spurious update).
+  const prevMessagesRef = useRef<ChatMessage[] | null>(null);
+
+  // Restore the active thread's messages on first mount.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once at mount
+  useEffect(() => {
+    const thread = history.getActiveThread();
+    if (thread && thread.messages.length > 0) {
+      hydrate(thread.messages);
+      // Push the stored session id into main so the next turn resumes
+      // this thread's prior SDK context.
+      if (thread.sessionId) {
+        void window.contexture?.chat?.setSessionId?.(thread.sessionId);
+      } else {
+        void window.contexture?.chat?.clearSession?.();
+      }
+    }
+    prevMessagesRef.current = thread?.messages ?? [];
+  }, []);
+
+  // On schema-file change, switch to the most recent thread for that
+  // file — or clear the transcript and the SDK session if this file
+  // has no prior threads yet.
+  useEffect(() => {
+    if (prevFilePathRef.current === undefined) {
+      // First render — handled by the restore effect above.
+      prevFilePathRef.current = filePath;
+      return;
+    }
+    if (prevFilePathRef.current === filePath) return;
+    prevFilePathRef.current = filePath;
+
+    const fileThreads = history.threadsForFile(filePath);
+    if (fileThreads.length > 0) {
+      const latest = fileThreads[0];
+      history.switchThread(latest.id);
+      hydrate(latest.messages);
+      prevMessagesRef.current = latest.messages;
+      if (latest.sessionId) {
+        void window.contexture?.chat?.setSessionId?.(latest.sessionId);
+      } else {
+        void window.contexture?.chat?.clearSession?.();
+      }
+    } else {
+      history.setActiveThreadId(null);
+      clear();
+      prevMessagesRef.current = [];
+      void window.contexture?.chat?.clearSession?.();
+    }
+  }, [filePath, history, hydrate, clear]);
+
+  // Persist messages into the active thread whenever they change.
+  useEffect(() => {
+    if (!history.activeThreadId) return;
+    if (messages === prevMessagesRef.current) return;
+    if (messages.length === 0) return;
+    history.updateThreadMessages(history.activeThreadId, messages);
+    prevMessagesRef.current = messages;
+  }, [messages, history.activeThreadId, history.updateThreadMessages]);
+
+  // Auto-create a thread on the first appended message if none active.
+  useEffect(() => {
+    if (!history.activeThreadId && messages.length > 0) {
+      const id = history.createThread(model, filePath);
+      history.updateThreadMessages(id, messages);
+      prevMessagesRef.current = messages;
+    }
+  }, [messages, history, model, filePath]);
+
+  // Stamp the active thread with the SDK session id as it streams in.
+  useEffect(() => {
+    const api = window.contexture?.chat;
+    if (!api?.onSession) return;
+    return api.onSession(({ sessionId }) => {
+      if (!sessionId) return;
+      const id = history.activeThreadId;
+      if (id) history.updateThreadSessionId(id, sessionId);
+    });
+  }, [history.activeThreadId, history.updateThreadSessionId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the message list changes; biome can't see `messages` is the intended trigger
   useEffect(() => {
@@ -75,13 +166,70 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, []);
 
+  const fileThreads = useMemo(
+    () => history.threadsForFile(filePath),
+    [history.threadsForFile, filePath],
+  );
+
+  const activeThread = history.getActiveThread();
+  const headerTitle =
+    activeThread && activeThread.title !== 'New chat' ? activeThread.title : 'Claude';
+
   const handleNewChat = useCallback(() => {
+    // Don't save empty threads — recycle an already-empty one instead
+    // of piling up "New chat" placeholders.
+    if (history.activeThreadId && messages.length === 0) {
+      history.deleteThread(history.activeThreadId);
+    }
+    history.createThread(model, filePath);
     clear();
     setInput('');
-    // The server-side Agent SDK session is ephemeral per `query()` call,
-    // so there's nothing extra to reset here — clearing the transcript
-    // is enough.
-  }, [clear]);
+    prevMessagesRef.current = [];
+    // Drop main's resume id so the SDK starts a brand-new session on
+    // the next turn.
+    void window.contexture?.chat?.clearSession?.();
+    history.setShowThreadList(false);
+  }, [history, messages.length, model, filePath, clear]);
+
+  const handleSwitchThread = useCallback(
+    (id: string) => {
+      const thread = history.threads.find((t) => t.id === id);
+      if (!thread) return;
+      history.switchThread(id);
+      hydrate(thread.messages);
+      prevMessagesRef.current = thread.messages;
+      if (thread.sessionId) {
+        void window.contexture?.chat?.setSessionId?.(thread.sessionId);
+      } else {
+        void window.contexture?.chat?.clearSession?.();
+      }
+    },
+    [history, hydrate],
+  );
+
+  const handleDeleteThread = useCallback(
+    (id: string) => {
+      const wasActive = id === history.activeThreadId;
+      history.deleteThread(id);
+      if (!wasActive) return;
+      // Pick the next most-recent thread for the same file; fall back
+      // to an empty transcript + cleared session if none remain.
+      const remaining = history.threadsForFile(filePath).filter((t) => t.id !== id);
+      if (remaining.length > 0) {
+        const next = remaining[0];
+        hydrate(next.messages);
+        history.setActiveThreadId(next.id);
+        prevMessagesRef.current = next.messages;
+        if (next.sessionId) void window.contexture?.chat?.setSessionId?.(next.sessionId);
+        else void window.contexture?.chat?.clearSession?.();
+      } else {
+        clear();
+        prevMessagesRef.current = [];
+        void window.contexture?.chat?.clearSession?.();
+      }
+    },
+    [history, filePath, hydrate, clear],
+  );
 
   const handleSubmit = useCallback(
     async (ev?: React.FormEvent) => {
@@ -111,8 +259,18 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="chat-panel">
       <div className="px-3 py-2 border-b border-border flex items-center gap-2">
-        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">
-          Claude
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 shrink-0"
+          onClick={() => history.setShowThreadList(!history.showThreadList)}
+          title={history.showThreadList ? 'Hide chat history' : 'Show chat history'}
+          data-testid="chat-history-toggle"
+        >
+          <List className="size-3.5" />
+        </Button>
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate flex-1">
+          {history.showThreadList ? 'Chat History' : headerTitle}
         </h2>
         <Button
           variant="ghost"
@@ -125,39 +283,48 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="chat-transcript">
-        {messages.length === 0 && (
-          <Empty className="border-0 p-4">
-            <EmptyHeader>
-              {isReady && (
-                <EmptyMedia variant="icon">
-                  <BotMessageSquare />
-                </EmptyMedia>
-              )}
-              <EmptyTitle className="text-sm font-medium">
-                {isReady ? 'Start a conversation' : 'Not connected'}
-              </EmptyTitle>
-              <EmptyDescription className="text-xs">
-                {isReady
-                  ? 'Describe the schema you want — "add a Plot type with a name and location" — and Claude will build it on the canvas.'
-                  : authMode === 'max'
-                    ? 'Claude CLI not detected. Configure in toolbar.'
-                    : 'Set your API key in the toolbar to start chatting.'}
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
-        {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
-        ))}
-        {isStreaming && (
-          <div className="flex gap-1 items-center text-xs text-muted-foreground">
-            <span className="animate-pulse">●</span>
-            <span>Claude is thinking…</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+      {history.showThreadList ? (
+        <ChatThreadList
+          threads={fileThreads}
+          activeThreadId={history.activeThreadId}
+          onSelect={handleSwitchThread}
+          onDelete={handleDeleteThread}
+        />
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="chat-transcript">
+          {messages.length === 0 && (
+            <Empty className="border-0 p-4">
+              <EmptyHeader>
+                {isReady && (
+                  <EmptyMedia variant="icon">
+                    <BotMessageSquare />
+                  </EmptyMedia>
+                )}
+                <EmptyTitle className="text-sm font-medium">
+                  {isReady ? 'Start a conversation' : 'Not connected'}
+                </EmptyTitle>
+                <EmptyDescription className="text-xs">
+                  {isReady
+                    ? 'Describe the schema you want — "add a Plot type with a name and location" — and Claude will build it on the canvas.'
+                    : authMode === 'max'
+                      ? 'Claude CLI not detected. Configure in toolbar.'
+                      : 'Set your API key in the toolbar to start chatting.'}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {messages.map((m) => (
+            <MessageBubble key={m.id} message={m} />
+          ))}
+          {isStreaming && (
+            <div className="flex gap-1 items-center text-xs text-muted-foreground">
+              <span className="animate-pulse">●</span>
+              <span>Claude is thinking…</span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="p-3 border-t border-border">
         <div

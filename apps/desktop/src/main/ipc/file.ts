@@ -22,9 +22,15 @@ import type { Schema } from '@renderer/model/types';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import { type BuildSaveBundleInput, buildSaveBundle, writeBundleAtomic } from '../save-bundle';
 
+// Electron's FileFilter.extensions is a list of bare extensions (no dot,
+// no multi-segment values). The double-extension `.contexture.json` is
+// handled via defaultPath; the filter just limits the browser to `.json`
+// files so the user sees only candidates. A multi-segment extension
+// here silently falls back to OS defaults (which is why Save was
+// surfacing a stale `.ttl` on some systems).
 export const CONTEXTURE_OPEN_FILTER: FileFilter = {
   name: 'Contexture Schema',
-  extensions: ['contexture.json'],
+  extensions: ['json'],
 };
 
 export const CONTEXTURE_SAVE_FILTER: FileFilter = CONTEXTURE_OPEN_FILTER;

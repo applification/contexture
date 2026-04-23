@@ -54,6 +54,13 @@
   --graph-edge-disjoint: oklch(0.60 0.12 15);
   --graph-edge-subclass: oklch(0.50 0.02 270);
   --graph-edge-restriction: oklch(0.65 0.15 280);
+  /* Zod-era edge tokens. `ref` is the default relationship edge;
+     `import` is the dashed cross-boundary (stdlib / cross-project) edge. */
+  --graph-edge-ref: oklch(0.65 0.12 280);
+  --graph-edge-import: oklch(0.55 0.04 240);
+  /* Background dot colour — deliberately subdued so the grid reads as
+     texture, not noise. */
+  --graph-dot: oklch(0.55 0.02 270 / 0.18);
   --characteristic-badge-bg: oklch(0.65 0.12 280 / 0.15);
   --characteristic-badge-border: oklch(0.65 0.12 280 / 0.50);
   --characteristic-badge-text: oklch(0.45 0.12 280);
@@ -106,6 +113,11 @@
   --graph-edge-disjoint: oklch(0.65 0.12 15);
   --graph-edge-subclass: oklch(0.65 0.015 270);
   --graph-edge-restriction: oklch(0.65 0.15 280);
+  /* Zod-era edge tokens (dark). */
+  --graph-edge-ref: oklch(0.65 0.08 280);
+  --graph-edge-import: oklch(0.7 0.04 240);
+  /* Subdued dot grid on dark canvases too. */
+  --graph-dot: oklch(0.7 0.02 270 / 0.14);
   --characteristic-badge-bg: oklch(0.65 0.12 280 / 0.15);
   --characteristic-badge-border: oklch(0.65 0.12 280 / 0.50);
   --characteristic-badge-text: oklch(0.75 0.12 280);
@@ -166,6 +178,34 @@
 
 .dark .react-flow__attribution a {
   color: oklch(0.8 0 0) !important;
+}
+
+/* Zoom / fit controls (bottom-left). React Flow ships a default
+   off-white palette that's invisible on our dark canvas. Theme through
+   the CSS variables so both modes stay legible. The `!important` on
+   bottom nudges them above the attribution pill (which also sits
+   bottom-left) without duplicating positioning logic in JS. */
+.react-flow__controls {
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  bottom: 28px !important;
+}
+.react-flow__controls-button {
+  background: var(--card);
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+  width: 24px;
+  height: 24px;
+}
+.react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+.react-flow__controls-button:hover {
+  background: var(--secondary);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
 }
 
 /* Override React Flow's grab cursor on nodes — keep grabbing while dragging */

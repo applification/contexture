@@ -90,10 +90,32 @@ export function StatusBar(): React.JSX.Element {
       )}
     >
       <TooltipProvider delayDuration={300}>
+        {/* Save-state dot — amber while the document has unsaved edits,
+            green once clean. Mirrors the pre-pivot status bar so the
+            save indicator sits in the same spot users already scan. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex items-center gap-1.5">
+              <Circle
+                className={cn(
+                  'size-2 shrink-0 transition-colors duration-200',
+                  isDirty ? 'fill-warning text-warning' : 'fill-success/70 text-success/70',
+                )}
+              />
+              <span>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="text-xs">
+              {isDirty ? 'You have unsaved changes — press ⌘S to save' : 'All changes saved'}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="truncate max-w-[40vw]">
-              {filePath ? `${filePath.split('/').pop()}${isDirty ? ' •' : ''}` : 'Untitled'}
+              {filePath ? filePath.split('/').pop() : 'Untitled'}
             </span>
           </TooltipTrigger>
           {filePath && <TooltipContent>{filePath}</TooltipContent>}
