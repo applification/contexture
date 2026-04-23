@@ -61,6 +61,9 @@ export interface ContextureChatAPI {
   onTurnRollback: (listener: () => void) => Unsubscribe;
   replyOp: (id: string, result: unknown) => void;
   onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) => Unsubscribe;
+  onSession: (listener: (payload: { sessionId: string }) => void) => Unsubscribe;
+  setSessionId: (sessionId: string) => Promise<{ ok: boolean }>;
+  clearSession: () => Promise<{ ok: boolean }>;
 }
 
 export interface ContextureFileAPI {

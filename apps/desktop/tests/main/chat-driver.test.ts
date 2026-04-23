@@ -3,10 +3,12 @@
  *
  * Proves the driver:
  *   - wraps the turn in `turn:begin` / `turn:commit`,
- *   - streams assistant / tool-use / result messages to the renderer,
+ *   - streams assistant / tool-use / result / session messages,
  *   - sends `turn:rollback` and a `chat:error` when the SDK stream
  *     throws mid-flight,
- *   - passes the current IR into the system prompt.
+ *   - embeds the current IR in the user-message prefix each turn,
+ *   - passes `resume` to the query function when a prior sessionId
+ *     is known and omits it otherwise.
  *
  * No Electron, no SDK — the transport, query function, and turn
  * controller are all test doubles.
@@ -15,6 +17,7 @@ import {
   CHAT_ASSISTANT,
   CHAT_ERROR,
   CHAT_RESULT,
+  CHAT_SESSION,
   CHAT_TOOL_USE,
   ChatDriver,
   type DriverQueryFn,
@@ -58,6 +61,7 @@ describe('ChatDriver', () => {
       turnController,
       getCurrentIR: () => emptyIR,
       stdlibRegistry,
+      getResumeSessionId: () => undefined,
     });
 
     await driver.send('add a Plot type');
@@ -67,6 +71,32 @@ describe('ChatDriver', () => {
     expect(driverSent[0].payload).toEqual({ text: 'hello' });
     expect(driverSent[1].payload).toEqual({ name: 'add_type', input: { name: 'Plot' } });
     expect(driverSent[2].payload).toEqual({ ok: true, error: undefined });
+  });
+
+  it('forwards session-id messages to the renderer via chat:session', async () => {
+    const { transport: driverTransport, sent: driverSent } = fakeTransport();
+    const turnController = new ChatTurnController({ send: () => undefined });
+
+    const query: DriverQueryFn = async function* () {
+      yield { type: 'session', sessionId: 'sess-abc' };
+      yield { type: 'assistant', text: 'ok' };
+      yield { type: 'result', ok: true };
+    };
+
+    const driver = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+    });
+
+    await driver.send('hi');
+
+    const session = driverSent.find((s) => s.channel === CHAT_SESSION);
+    expect(session).toBeDefined();
+    expect(session?.payload).toEqual({ sessionId: 'sess-abc' });
   });
 
   it('rolls back the turn and emits chat:error when the stream throws', async () => {
@@ -87,6 +117,7 @@ describe('ChatDriver', () => {
       turnController,
       getCurrentIR: () => emptyIR,
       stdlibRegistry,
+      getResumeSessionId: () => undefined,
     });
 
     await expect(driver.send('hi')).rejects.toThrow('network died');
@@ -96,7 +127,7 @@ describe('ChatDriver', () => {
     expect((driverSent[1].payload as { message: string }).message).toBe('network died');
   });
 
-  it('builds the system prompt from the current IR each turn', async () => {
+  it('builds the user-message prefix with the current IR each turn', async () => {
     const { transport: driverTransport } = fakeTransport();
     const turnController = new ChatTurnController({ send: () => undefined });
     const query = vi.fn<DriverQueryFn>(async function* () {
@@ -113,15 +144,20 @@ describe('ChatDriver', () => {
       turnController,
       getCurrentIR: () => ir,
       stdlibRegistry,
+      getResumeSessionId: () => undefined,
     });
 
     await driver.send('hello');
 
     expect(query).toHaveBeenCalledTimes(1);
     const input = query.mock.calls[0][0];
-    expect(input.prompt).toBe('hello');
-    // System prompt should embed the IR so Claude sees the current schema.
-    expect(input.systemPrompt).toContain('"name": "Plot"');
+    // Prompt wraps the IR in <current_ir> and appends the user text.
+    expect(input.prompt).toContain('<current_ir>');
+    expect(input.prompt).toContain('"name": "Plot"');
+    expect(input.prompt).toContain('</current_ir>');
+    expect(input.prompt).toContain('hello');
+    // Append body (skills + ops + stdlib) is passed separately.
+    expect(input.systemPromptAppend).toContain('add_type');
   });
 
   it('falls back to an empty IR if the current IR is null', async () => {
@@ -137,11 +173,43 @@ describe('ChatDriver', () => {
       turnController,
       getCurrentIR: () => null,
       stdlibRegistry,
+      getResumeSessionId: () => undefined,
     });
 
     await driver.send('hi');
 
     const input = query.mock.calls[0][0];
-    expect(input.systemPrompt).toContain('"types": []');
+    expect(input.prompt).toContain('"types": []');
+  });
+
+  it('passes resume when getResumeSessionId returns a value; omits it otherwise', async () => {
+    const { transport: driverTransport } = fakeTransport();
+    const turnController = new ChatTurnController({ send: () => undefined });
+    const query = vi.fn<DriverQueryFn>(async function* () {
+      yield { type: 'result', ok: true };
+    });
+
+    const withResume = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => 'sess-123',
+    });
+    await withResume.send('first');
+    expect(query.mock.calls[0][0].resume).toBe('sess-123');
+
+    query.mockClear();
+    const withoutResume = new ChatDriver({
+      query,
+      transport: driverTransport,
+      turnController,
+      getCurrentIR: () => emptyIR,
+      stdlibRegistry,
+      getResumeSessionId: () => undefined,
+    });
+    await withoutResume.send('first');
+    expect(query.mock.calls[0][0].resume).toBeUndefined();
   });
 });

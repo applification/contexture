@@ -1,22 +1,24 @@
 /**
  * System prompt builder — pure.
  *
- * Given the current IR and the stdlib registry, assembles the system
- * prompt handed to Claude on every chat turn. The output is deterministic:
- * same inputs → same bytes, with stdlib entries sorted by
- * `namespace.name` so reordering in the registry doesn't churn the
- * cache key. No I/O, no date stamps, no model references.
+ * Emits the *append* body handed to the Agent SDK on every chat turn
+ * via `{ type: 'preset', preset: 'claude_code', append }`. Using the
+ * preset keeps the SDK's default framing intact so plugin-loaded skills
+ * (`model-domain`, `use-stdlib`, `generate-sample`) auto-trigger on
+ * description match. A raw-string systemPrompt would replace that
+ * framing and silently disable skill loading.
  *
  * Contents, in order:
- *   1. Static role/mission header.
+ *   1. Imperative role/mission header — push tool use; forbid prose
+ *      schemas; name the available skills.
  *   2. Op vocabulary — every op name with a one-line shape summary.
  *   3. Stdlib enumeration — `namespace.Name — description`, alphabetised.
- *   4. The full current IR as pretty-printed JSON (Claude parses it
- *      directly; no digest guard in v1, see `plans/pivot.md`).
  *
- * The 100 KB digest guard is deferred to v2: for v1 we always send the
- * full IR. Large-IR handling will slot in here as an input-size check
- * plus an alternative assembly path.
+ * The current IR is NOT in the system prompt: it's injected into each
+ * user message via `buildUserMessage` so that `resume`-based sessions
+ * (which re-use the original system prompt) still see the latest
+ * schema. Same inputs → same bytes, with stdlib entries sorted so
+ * registry reordering doesn't churn the cache key.
  */
 
 import type { Schema } from '../model/types';
@@ -34,12 +36,11 @@ export interface StdlibRegistry {
   entries: StdlibEntry[];
 }
 
-export interface BuildSystemPromptInput {
-  ir: Schema;
+export interface BuildSystemPromptAppendInput {
   stdlibRegistry: StdlibRegistry;
 }
 
-export function buildSystemPrompt(input: BuildSystemPromptInput): string {
+export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): string {
   return [
     HEADER.trim(),
     '',
@@ -51,23 +52,54 @@ export function buildSystemPrompt(input: BuildSystemPromptInput): string {
     '',
     renderStdlib(input.stdlibRegistry),
     '',
-    '## Current IR',
-    '',
-    '```json',
+  ].join('\n');
+}
+
+export interface BuildUserMessageInput {
+  ir: Schema;
+  userMessage: string;
+}
+
+/**
+ * Wraps the user's message with a `<current_ir>` block carrying the
+ * latest IR snapshot. Called per turn so that even when `resume` is
+ * used (and the SDK replays the original system prompt) Claude always
+ * sees the current schema.
+ */
+export function buildUserMessage(input: BuildUserMessageInput): string {
+  return [
+    '<current_ir>',
     JSON.stringify(input.ir, null, 2),
-    '```',
+    '</current_ir>',
     '',
+    input.userMessage,
   ].join('\n');
 }
 
 const HEADER = `
-You are Contexture, an AI assistant that edits a Zod schema for the user.
-The user's schema is modelled as an intermediate representation (IR) of
-\`TypeDef\`s (object, enum, discriminatedUnion, raw) and fields. You edit
-the schema exclusively through the op vocabulary listed below; every op
-you call is applied to the IR and its effect is visible on the canvas.
-Prefer surgical ops over \`replace_schema\` — the bulk rewrite is an
-escape hatch, not a default.
+You are Contexture, an AI assistant that edits a Zod schema IR for the
+user. The schema is modelled as \`TypeDef\`s (object, enum,
+discriminatedUnion, raw) and fields, shown live on a canvas.
+
+**You edit the schema exclusively by calling the op tools listed
+below.** When the user asks for a schema, type, field, enum, union, or
+any change — call tools. Do **not** respond with TypeScript or Zod
+code in prose: the user will not see it applied, and the canvas will
+not update. If no tool fits, say so briefly and ask for clarification;
+never fake the edit with text.
+
+The current IR is supplied at the top of each user message inside a
+\`<current_ir>\` block — parse it directly to understand the existing
+schema before proposing edits. Prefer surgical ops over
+\`replace_schema\`; the bulk rewrite is an escape hatch, not a default.
+
+Skills are available and auto-load on topic match:
+- \`model-domain\` — use when the user asks to model a new domain from
+  scratch. Walks entities, relationships, enums, constraints, stdlib.
+- \`use-stdlib\` — use when a field could reuse a curated stdlib type
+  (Email, URL, UUID, Address, Money, PhoneE164, …).
+- \`generate-sample\` — use when the user asks for sample / fixture /
+  example data for a type.
 `;
 
 interface OpSpec {

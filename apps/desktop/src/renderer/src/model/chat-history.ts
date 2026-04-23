@@ -21,6 +21,13 @@ export interface ChatMessage {
 export interface ChatHistory {
   version: '1';
   messages: ChatMessage[];
+  /**
+   * Agent SDK session id for this chat. Present after the first turn;
+   * restored on app reopen so follow-up turns pass `resume: sessionId`
+   * and the SDK threads prior conversation context. Additive field —
+   * absence is OK; invalid types are discarded.
+   */
+  sessionId?: string;
 }
 
 export interface LoadChatHistoryResult {
@@ -67,7 +74,15 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
   }
 
   const messages = sanitiseMessages(obj.messages);
-  return { history: { version: CHAT_HISTORY_VERSION, messages }, warnings: [] };
+  const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId : undefined;
+  return {
+    history: {
+      version: CHAT_HISTORY_VERSION,
+      messages,
+      ...(sessionId ? { sessionId } : {}),
+    },
+    warnings: [],
+  };
 }
 
 export function saveChatHistory(history: ChatHistory): string {

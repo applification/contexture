@@ -2,20 +2,33 @@
  * Chat driver — orchestrates one chat turn end-to-end on the main side.
  *
  * Per user message it:
- *   1. Asks the renderer for the current IR (`turnContext` already holds
- *      it from the most recent `claude:turn-start-ir` push).
- *   2. Builds the system prompt via `buildSystemPrompt` (#95).
- *   3. Opens a `ChatTurnController` envelope so every op the SDK emits
+ *   1. Pulls the current IR from `getCurrentIR()` (pushed in via
+ *      `claude:turn-start-ir` from the renderer before the turn).
+ *   2. Builds the system-prompt *append* body via
+ *      `buildSystemPromptAppend` — the append is handed to the Agent SDK
+ *      alongside `{ type: 'preset', preset: 'claude_code' }` so bundled
+ *      skills auto-load.
+ *   3. Wraps the user's message with the current IR via
+ *      `buildUserMessage` — the IR rides in the user turn (not the
+ *      system prompt) so `resume`-based sessions still see the latest
+ *      schema even though the session's original system prompt is
+ *      replayed.
+ *   4. Passes `resume` to the SDK when `getResumeSessionId()` returns a
+ *      sessionId (set on every prior turn's last-seen id).
+ *   5. Opens a `ChatTurnController` envelope so every op the SDK emits
  *      collapses into a single renderer-side undo entry.
- *   4. Streams SDK assistant text + tool-use to the renderer via
- *      `emitEvent`, which is a transport injected by the caller (in
- *      production: `mainWindow.webContents.send`).
+ *   6. Streams SDK assistant text / tool-use / result / session to the
+ *      renderer via `emitEvent`.
  *
  * The `query` function is injected so unit tests can feed a canned
  * async iterator without booting the Agent SDK or the MCP server.
  */
 
-import { buildSystemPrompt, type StdlibRegistry } from '@renderer/chat/system-prompt';
+import {
+  buildSystemPromptAppend,
+  buildUserMessage,
+  type StdlibRegistry,
+} from '@renderer/chat/system-prompt';
 import type { Schema } from '@renderer/model/types';
 import type { ChatTurnController } from './chat-turn';
 
@@ -23,11 +36,13 @@ import type { ChatTurnController } from './chat-turn';
 export type DriverSdkMessage =
   | { type: 'assistant'; text: string }
   | { type: 'tool_use'; name: string; input: unknown }
-  | { type: 'result'; ok: boolean; error?: string };
+  | { type: 'result'; ok: boolean; error?: string }
+  | { type: 'session'; sessionId: string };
 
 export type DriverQueryFn = (input: {
   prompt: string;
-  systemPrompt: string;
+  systemPromptAppend: string;
+  resume?: string;
 }) => AsyncIterable<DriverSdkMessage>;
 
 export interface DriverTransport {
@@ -41,12 +56,19 @@ export interface ChatDriverDeps {
   turnController: ChatTurnController;
   getCurrentIR: () => Schema | null;
   stdlibRegistry: StdlibRegistry;
+  /**
+   * Returns the last-seen Agent SDK session id, or undefined on the
+   * first turn / after an explicit clear. Re-evaluated per turn, so the
+   * driver always uses the freshest id.
+   */
+  getResumeSessionId: () => string | undefined;
 }
 
 export const CHAT_ASSISTANT = 'chat:assistant' as const;
 export const CHAT_TOOL_USE = 'chat:tool-use' as const;
 export const CHAT_RESULT = 'chat:result' as const;
 export const CHAT_ERROR = 'chat:error' as const;
+export const CHAT_SESSION = 'chat:session' as const;
 
 export class ChatDriver {
   readonly #deps: ChatDriverDeps;
@@ -61,25 +83,29 @@ export class ChatDriver {
    * `turn:rollback` in that case).
    */
   async send(userMessage: string): Promise<void> {
-    const { query, transport, turnController, getCurrentIR, stdlibRegistry } = this.#deps;
+    const { query, transport, turnController, getCurrentIR, stdlibRegistry, getResumeSessionId } =
+      this.#deps;
 
-    const ir = getCurrentIR();
-    const systemPrompt = ir
-      ? buildSystemPrompt({ ir, stdlibRegistry })
-      : buildSystemPrompt({
-          ir: { version: '1', types: [] },
-          stdlibRegistry,
-        });
+    const ir = getCurrentIR() ?? { version: '1', types: [] };
+    const systemPromptAppend = buildSystemPromptAppend({ stdlibRegistry });
+    const prompt = buildUserMessage({ ir, userMessage });
+    const resume = getResumeSessionId();
 
     await turnController.run(async () => {
       try {
-        for await (const msg of query({ prompt: userMessage, systemPrompt })) {
+        for await (const msg of query({
+          prompt,
+          systemPromptAppend,
+          ...(resume ? { resume } : {}),
+        })) {
           if (msg.type === 'assistant') {
             transport.send(CHAT_ASSISTANT, { text: msg.text });
           } else if (msg.type === 'tool_use') {
             transport.send(CHAT_TOOL_USE, { name: msg.name, input: msg.input });
           } else if (msg.type === 'result') {
             transport.send(CHAT_RESULT, { ok: msg.ok, error: msg.error });
+          } else if (msg.type === 'session') {
+            transport.send(CHAT_SESSION, { sessionId: msg.sessionId });
           }
         }
       } catch (err) {

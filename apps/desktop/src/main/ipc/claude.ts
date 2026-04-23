@@ -83,6 +83,34 @@ let currentThinkingBudget: ThinkingBudget = 'auto';
  */
 let currentQuery: { interrupt(): Promise<void> } | null = null;
 
+/**
+ * Last-seen Agent SDK session id for the active chat. Populated by
+ * `sdkQuery` from every SDK message that carries one; passed as
+ * `resume` on subsequent turns so the SDK threads prior history.
+ * Cleared on explicit "new conversation" requests and pre-populated
+ * from the sidecar via `chat:set-session-id` on file open.
+ */
+let currentSessionId: string | undefined;
+
+/**
+ * Built-in Claude Code tools we never want the schema-editor agent to
+ * reach for. Listed explicitly (vs. `tools: []`) because the latter
+ * would also strip the default system prompt infrastructure that
+ * auto-loads plugin skills. Mirrors the pre-pivot main-branch list.
+ */
+const DISALLOWED_BUILTINS = [
+  'Read',
+  'Edit',
+  'Write',
+  'Bash',
+  'Glob',
+  'Grep',
+  'Agent',
+  'NotebookEdit',
+  'WebFetch',
+  'WebSearch',
+];
+
 export interface ClaudeIpc {
   forwardOp: ForwardOpFn;
   turnContext: TurnContext;
@@ -123,6 +151,10 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     version: '1.0.0',
     tools: descriptors.map(toSdkTool),
   });
+  // Pre-approved tool names fed to `allowedTools` on every query.
+  // Format matches how the SDK surfaces MCP tools to the model:
+  // `mcp__<server-name>__<tool-name>`.
+  const MCP_OP_TOOL_NAMES = descriptors.map((d) => `mcp__contexture-ops__${d.name}`);
 
   const turnTransport: TurnTransport = {
     send: (channel, payload) => {
@@ -133,7 +165,7 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
 
   const skillsPluginPath = resolveSkillsPluginPath();
 
-  const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPrompt }) {
+  const sdkQuery: DriverQueryFn = async function* ({ prompt, systemPromptAppend, resume }) {
     // Project the current auth into the SDK options. Max mode points
     // the SDK at the cached absolute binary path (the SDK spawns that
     // binary to authenticate against the user's OAuth session);
@@ -145,7 +177,22 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     const iterator = query({
       prompt,
       options: {
-        systemPrompt,
+        // Preset + append: keeps Claude Code's default system prompt
+        // (which auto-loads plugin skills on topic match) and layers
+        // our op vocabulary / stdlib / tool-use imperatives on top.
+        systemPrompt: {
+          type: 'preset',
+          preset: 'claude_code',
+          append: systemPromptAppend,
+        },
+        // Pre-approve our MCP ops by namespaced name so the default
+        // permission system doesn't prompt the user on every tool call.
+        // This is the pattern that worked on the pre-pivot main branch.
+        allowedTools: MCP_OP_TOOL_NAMES,
+        // Block the built-in filesystem / shell tools — only our MCP
+        // ops should be callable. Plugin skills are a plugin-level
+        // feature, unaffected by this list.
+        disallowedTools: DISALLOWED_BUILTINS,
         model: currentModel,
         ...(THINKING_TOKENS[currentThinkingBudget] !== undefined
           ? { maxThinkingTokens: THINKING_TOKENS[currentThinkingBudget] }
@@ -153,12 +200,18 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
         mcpServers: { 'contexture-ops': mcpServer },
         pathToClaudeCodeExecutable: detectedClaudePath ?? 'claude',
         ...(skillsPluginPath ? { plugins: [{ type: 'local', path: skillsPluginPath }] } : {}),
+        ...(resume ? { resume } : {}),
         ...(env ? { env } : {}),
       },
     });
     currentQuery = iterator;
     try {
       for await (const msg of iterator) {
+        const sessionMsg = extractSessionMessage(msg);
+        if (sessionMsg) {
+          currentSessionId = sessionMsg.sessionId;
+          yield sessionMsg;
+        }
         const mapped = mapSdkMessage(msg);
         if (mapped) yield mapped;
       }
@@ -175,6 +228,7 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     turnController,
     getCurrentIR: () => turnContext.current(),
     stdlibRegistry: SYSTEM_PROMPT_STDLIB,
+    getResumeSessionId: () => currentSessionId,
   });
 
   ipcMain.handle('chat:send', async (_evt, userMessage: string) => {
@@ -223,6 +277,25 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     },
   );
 
+  ipcMain.handle('chat:set-session-id', (_evt, sessionId: unknown) => {
+    // Renderer calls this on sidecar hydrate to restore the prior chat's
+    // SDK session. Only accept strings; anything else is silently
+    // ignored (the sidecar could have been hand-edited).
+    if (typeof sessionId === 'string' && sessionId.length > 0) {
+      currentSessionId = sessionId;
+      return { ok: true };
+    }
+    return { ok: false };
+  });
+
+  ipcMain.handle('chat:clear-session', () => {
+    // Explicit "new conversation" — forgets the resume id so the next
+    // turn starts a fresh SDK session. Does not clear the on-disk
+    // transcript (that's the renderer's concern).
+    currentSessionId = undefined;
+    return { ok: true };
+  });
+
   ipcMain.handle('chat:abort', async () => {
     const q = currentQuery;
     if (!q) return { ok: false, error: 'no active query' };
@@ -236,6 +309,26 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   });
 
   return { forwardOp, turnContext, mcpServer, turnController, chatDriver };
+}
+
+/**
+ * Pull the session id out of the SDK's `system/init` message — that's
+ * the one we want to hand back as `resume` on subsequent turns. Later
+ * messages echo a session id too, but the init value is the canonical
+ * "this conversation's id" per the main-branch pattern that proved
+ * resume works.
+ */
+function extractSessionMessage(
+  msg: unknown,
+): Extract<DriverSdkMessage, { type: 'session' }> | null {
+  if (!msg || typeof msg !== 'object') return null;
+  const m = msg as { type?: unknown; subtype?: unknown; session_id?: unknown };
+  if (m.type !== 'system' || m.subtype !== 'init') return null;
+  const sid = m.session_id;
+  if (typeof sid === 'string' && sid.length > 0) {
+    return { type: 'session', sessionId: sid };
+  }
+  return null;
 }
 
 /**

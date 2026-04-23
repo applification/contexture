@@ -65,6 +65,19 @@ const chat = {
   replyOp: (id: string, result: unknown) => ipcRenderer.send('claude:op-reply', { id, result }),
   onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) =>
     subscribe('claude:op-request', listener as (p: unknown) => void),
+  /**
+   * Stream of Agent SDK session ids — emitted from main on every SDK
+   * message that carries one. The renderer persists the last-seen id
+   * to the chat sidecar so follow-up turns can `resume` it.
+   */
+  onSession: (listener: (payload: { sessionId: string }) => void) =>
+    subscribe('chat:session', listener as (p: unknown) => void),
+  /** Restore a persisted sessionId into main (on sidecar hydrate). */
+  setSessionId: (sessionId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('chat:set-session-id', sessionId) as Promise<{ ok: boolean }>,
+  /** Forget the current sessionId (start a fresh conversation). */
+  clearSession: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('chat:clear-session') as Promise<{ ok: boolean }>,
 };
 
 const file = {

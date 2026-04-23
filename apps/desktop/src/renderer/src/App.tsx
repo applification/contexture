@@ -342,5 +342,8 @@ function noopChatApi() {
     onTurnCommit: () => unsub,
     onTurnRollback: () => unsub,
     onOpRequest: () => unsub,
+    onSession: () => unsub,
+    setSessionId: async () => ({ ok: false }),
+    clearSession: async () => ({ ok: false }),
   };
 }
