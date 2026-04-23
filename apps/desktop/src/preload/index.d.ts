@@ -68,8 +68,37 @@ export interface ContextureChatAPI {
   clearSession: () => Promise<{ ok: boolean }>;
 }
 
+export interface OpenWarning {
+  message: string;
+  severity: 'warning' | 'error';
+}
+
+export interface OpenedDocument {
+  irPath: string;
+  /** Raw IR text — parsed by the renderer's `load()` for error surfacing. */
+  content: string;
+  /** Pre-parsed layout sidecar (defaults if missing/corrupt). */
+  layout: { version: '1'; positions: Record<string, { x: number; y: number }> } & Record<
+    string,
+    unknown
+  >;
+  /** Pre-parsed chat sidecar (defaults if missing/corrupt). */
+  chat: {
+    version: '1';
+    messages: Array<{
+      id: string;
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      createdAt: number;
+    }>;
+    sessionId?: string;
+  };
+  /** Sidecar warnings (not IR — those come from renderer-side `load()`). */
+  warnings: OpenWarning[];
+}
+
 export interface ContextureFileAPI {
-  openDialog: () => Promise<{ irPath: string; content: string } | null>;
+  openDialog: () => Promise<OpenedDocument | null>;
   saveAsDialog: () => Promise<string | null>;
   save: (payload: {
     irPath: string;
@@ -77,9 +106,9 @@ export interface ContextureFileAPI {
     layout: unknown;
     chat: unknown;
   }) => Promise<void>;
-  read: (irPath: string) => Promise<{ irPath: string; content: string }>;
+  read: (irPath: string) => Promise<OpenedDocument | null>;
   getRecentFiles: () => Promise<string[]>;
-  openRecent: (filePath: string) => Promise<{ irPath: string; content: string } | null>;
+  openRecent: (filePath: string) => Promise<OpenedDocument | null>;
   onMenuNew: (listener: () => void) => Unsubscribe;
   onMenuOpen: (listener: () => void) => Unsubscribe;
   onMenuSave: (listener: () => void) => Unsubscribe;

@@ -134,7 +134,33 @@ export default function App(): React.JSX.Element {
         : noopChatApi(),
   });
 
-  const fileMenu = useFileMenu();
+  // Track positions + chat in refs so `useFileMenu` getters can read
+  // the live values on save without re-subscribing on every change.
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  const chatMessagesRef = useRef(chat.messages);
+  chatMessagesRef.current = chat.messages;
+  const chatHydrateRef = useRef(chat.hydrate);
+  chatHydrateRef.current = chat.hydrate;
+
+  const fileMenu = useFileMenu({
+    getLayout: () => ({ version: '1', positions: positionsRef.current }),
+    getChat: () => ({ version: '1', messages: chatMessagesRef.current }),
+    onBundleLoaded: ({ layout, chat: loadedChat }) => {
+      setPositions(layout.positions);
+      chatHydrateRef.current(loadedChat.messages);
+      if (loadedChat.sessionId) {
+        void window.contexture?.chat.setSessionId(loadedChat.sessionId);
+      } else {
+        void window.contexture?.chat.clearSession();
+      }
+    },
+    onNew: () => {
+      setPositions({});
+      chatHydrateRef.current([]);
+      void window.contexture?.chat.clearSession();
+    },
+  });
 
   // Pull the recent-files list when the empty state might need it and
   // again whenever the file-path changes (a successful open/save

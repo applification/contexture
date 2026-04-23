@@ -87,13 +87,13 @@ const chat = {
     ipcRenderer.invoke('chat:clear-session') as Promise<{ ok: boolean }>,
 };
 
+// Open results carry the full bundle (IR raw text + parsed sidecars).
+// The `.d.ts` declares the canonical `OpenedDocument` shape; here we
+// pass the IPC value through unchanged — the renderer sees the typed
+// version via `window.contexture.file.*`.
 const file = {
-  /** Show the OS open dialog and return the file path + raw contents. */
-  openDialog: () =>
-    ipcRenderer.invoke('file:open-dialog') as Promise<{
-      irPath: string;
-      content: string;
-    } | null>,
+  /** Show the OS open dialog and return the bundle + raw IR. */
+  openDialog: () => ipcRenderer.invoke('file:open-dialog'),
   /** Show the OS save-as dialog and return the chosen path. */
   saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
   /** Write the five-file bundle atomically under `irPath`. */
@@ -103,17 +103,12 @@ const file = {
     layout: unknown;
     chat: unknown;
   }): Promise<void> => ipcRenderer.invoke('file:save', payload) as Promise<void>,
-  /** Read a `.contexture.json` by absolute path (no dialog). */
-  read: (irPath: string) =>
-    ipcRenderer.invoke('file:read', irPath) as Promise<{ irPath: string; content: string }>,
+  /** Read a `.contexture.json` bundle by absolute path (no dialog). */
+  read: (irPath: string) => ipcRenderer.invoke('file:read', irPath),
   /** List of most-recently-opened paths (most-recent first). */
   getRecentFiles: () => ipcRenderer.invoke('file:recent-files') as Promise<string[]>,
   /** Open a path from the recent-files list; returns null if it's gone. */
-  openRecent: (filePath: string) =>
-    ipcRenderer.invoke('file:open-recent', filePath) as Promise<{
-      irPath: string;
-      content: string;
-    } | null>,
+  openRecent: (filePath: string) => ipcRenderer.invoke('file:open-recent', filePath),
   /** Menu-bar -> renderer subscriptions. */
   onMenuNew: (listener: () => void) =>
     subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
