@@ -1,4 +1,4 @@
-import { IRSchema } from '@renderer/model/ir-schema';
+import { IRSchema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 describe('IRSchema', () => {

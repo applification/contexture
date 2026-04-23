@@ -3,7 +3,7 @@
  * and the right op dispatches on blur/change.
  */
 import { TypeDetail } from '@renderer/components/detail/TypeDetail';
-import type { TypeDef } from '@renderer/model/types';
+import type { TypeDef } from '@renderer/model/ir';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

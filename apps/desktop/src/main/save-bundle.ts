@@ -19,9 +19,9 @@ import { promises as fs } from 'node:fs';
 import { type ChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as emitZod } from '@renderer/model/emit-zod';
+import type { Schema } from '@renderer/model/ir';
 import { type Layout, saveLayout } from '@renderer/model/layout';
 import { save as saveIR } from '@renderer/model/load';
-import type { Schema } from '@renderer/model/types';
 
 export const IR_SUFFIX = '.contexture.json';
 export const LAYOUT_SUFFIX = '.contexture.layout.json';

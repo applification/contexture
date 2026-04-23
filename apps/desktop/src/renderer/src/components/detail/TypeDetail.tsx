@@ -12,7 +12,7 @@
  * direct edits interleave cleanly with chat-driven ops. Edits fire on
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
-import type { TypeDef } from '../../model/types';
+import type { TypeDef } from '../../model/ir';
 import type { Op } from '../../store/ops';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';

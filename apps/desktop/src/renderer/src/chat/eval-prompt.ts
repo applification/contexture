@@ -15,7 +15,7 @@
  *      the parse contract and as the `emit_sample` tool's input schema.
  */
 
-import type { Schema } from '../model/types';
+import type { Schema } from '../model/ir';
 
 export type EvalMode = 'realistic' | 'minimal' | 'edge-case' | 'adversarial';
 

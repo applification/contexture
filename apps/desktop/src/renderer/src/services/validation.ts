@@ -1,7 +1,7 @@
 /**
  * Semantic validators for the IR.
  *
- * The Zod meta-schema (`model/ir-schema.ts`) enforces structural correctness
+ * The Zod meta-schema (`model/ir.ts`) enforces structural correctness
  * at load time. This module layers the 7 semantic rules on top:
  *
  * 1. Structural parse (enforced by the loader; not re-checked here).
@@ -18,7 +18,7 @@
  * Each returned `ValidationError` carries a stable `code` and a dotted
  * `path` so the UI can map the message back to the offending field.
  */
-import type { FieldType, Schema } from '../model/types';
+import type { FieldType, Schema } from '../model/ir';
 import type { StdlibRegistry } from './stdlib-registry';
 
 export interface ValidationError {

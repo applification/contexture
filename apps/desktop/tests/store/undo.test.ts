@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { createUndoableContextureStore } from '@renderer/store/undo';
 import { describe, expect, it } from 'vitest';
 

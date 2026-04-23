@@ -10,7 +10,7 @@
 
 import { IR_BY_NAMESPACE, NAMESPACES } from '@contexture/stdlib/registry';
 import { emit } from '@renderer/model/emit-zod';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 for (const ns of NAMESPACES) {

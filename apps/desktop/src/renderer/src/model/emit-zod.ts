@@ -18,7 +18,7 @@
  * Rule 7 of the semantic validator (`services/validation.ts`) will ultimately
  * sandbox-eval this output to catch emit regressions.
  */
-import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './types';
+import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
 
 export function emit(schema: Schema, sourcePath: string): string {
   const ctx = buildContext(schema);

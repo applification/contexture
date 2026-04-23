@@ -21,7 +21,7 @@
  * registry reordering doesn't churn the cache key.
  */
 
-import type { Schema } from '../model/types';
+import type { Schema } from '../model/ir';
 
 export interface StdlibEntry {
   /** Namespace path, e.g. `'common'` or `'place'`. */

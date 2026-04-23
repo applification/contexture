@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import type { Schema } from '../model/types';
+import type { Schema } from '../model/ir';
 import { buildEvalPrompt, type EvalMode } from './eval-prompt';
 
 export interface EvalAPI {

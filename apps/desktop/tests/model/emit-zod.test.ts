@@ -1,5 +1,5 @@
 import { emit } from '@renderer/model/emit-zod';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 describe('emit (Zod)', () => {

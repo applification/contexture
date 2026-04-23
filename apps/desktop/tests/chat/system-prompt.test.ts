@@ -3,7 +3,7 @@ import {
   buildUserMessage,
   type StdlibRegistry,
 } from '@renderer/chat/system-prompt';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 const EMPTY_STDLIB: StdlibRegistry = { entries: [] };

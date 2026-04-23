@@ -20,7 +20,7 @@
  * The emitter is intentionally total and pure; semantic concerns (unresolved
  * refs, duplicate names, …) belong to `services/validation.ts`.
  */
-import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './types';
+import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
 
 const DRAFT = 'https://json-schema.org/draft/2020-12/schema';
 

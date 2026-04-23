@@ -91,7 +91,7 @@ describe('load', () => {
   });
 
   it('round-trips a non-trivial v1 schema through save/load', () => {
-    const original: import('@renderer/model/types').Schema = {
+    const original: import('@renderer/model/ir').Schema = {
       version: '1',
       metadata: { name: 'Blog', description: 'Demo' },
       imports: [{ kind: 'stdlib', path: '@contexture/common', alias: 'common' }],
