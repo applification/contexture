@@ -9,7 +9,7 @@
  */
 import { DetailPanel } from '@renderer/components/detail/DetailPanel';
 import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

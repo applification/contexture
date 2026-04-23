@@ -11,7 +11,7 @@
  * deliberately dumb lets the transactional layer wrap it cleanly.
  */
 import { create } from 'zustand';
-import type { Schema } from '../model/types';
+import type { Schema } from '../model/ir';
 import { type ApplyResult, apply, type Op } from './ops';
 
 export interface ContextureState {

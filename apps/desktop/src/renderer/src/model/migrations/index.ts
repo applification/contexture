@@ -23,7 +23,7 @@ export interface Migration {
   warning?: string;
 }
 
-/** The current IR version. Keep in sync with `IRSchema` (`./ir-schema.ts`). */
+/** The current IR version. Keep in sync with `IRSchema` (`../ir.ts`). */
 export const CURRENT_VERSION = '1';
 
 /**

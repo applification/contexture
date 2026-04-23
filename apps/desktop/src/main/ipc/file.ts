@@ -17,8 +17,8 @@
 import { existsSync, promises as fs, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatHistory } from '@renderer/model/chat-history';
+import type { Schema } from '@renderer/model/ir';
 import type { Layout } from '@renderer/model/layout';
-import type { Schema } from '@renderer/model/types';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import { type BuildSaveBundleInput, buildSaveBundle, writeBundleAtomic } from '../save-bundle';
 

@@ -15,7 +15,7 @@
  * `raw` shape means extending that allowlist. This avoids the risk of
  * eval'ing arbitrary strings inside the test.
  */
-import type { FieldDef, FieldType, Schema, TypeDef } from '@renderer/model/types';
+import type { FieldDef, FieldType, Schema, TypeDef } from '@renderer/model/ir';
 import { z } from 'zod';
 
 type ZodSchema = z.ZodType;

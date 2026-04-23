@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
 import * as Sentry from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';

@@ -18,8 +18,9 @@
  *     stay in `services/validation.ts` so the UI can surface them with
  *     field-level paths after the replacement lands.
  */
-import { IRSchema } from '../model/ir-schema';
-import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from '../model/types';
+
+import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from '../model/ir';
+import { IRSchema } from '../model/ir';
 
 export type Op =
   | { kind: 'add_type'; type: TypeDef }

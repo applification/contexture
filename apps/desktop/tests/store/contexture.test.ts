@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { createContextureStore } from '@renderer/store/contexture';
 import { describe, expect, it } from 'vitest';
 

@@ -10,7 +10,7 @@
  * Every edit dispatches `update_field` through the shared op vocabulary;
  * nothing here mutates the store directly.
  */
-import type { FieldDef, FieldType } from '../../model/types';
+import type { FieldDef, FieldType } from '../../model/ir';
 import type { Op } from '../../store/ops';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';

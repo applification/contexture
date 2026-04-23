@@ -6,7 +6,7 @@
  * `common.Email`-style refs as resolved without requiring an explicit
  * `add_import` in the IR.
  */
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { buildStdlibRegistry, STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { validate } from '@renderer/services/validation';
 import { describe, expect, it } from 'vitest';

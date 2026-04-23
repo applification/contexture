@@ -1,7 +1,7 @@
 import { buildSaveBundle } from '@main/save-bundle';
 import { DEFAULT_CHAT_HISTORY } from '@renderer/model/chat-history';
+import type { Schema } from '@renderer/model/ir';
 import { DEFAULT_LAYOUT } from '@renderer/model/layout';
-import type { Schema } from '@renderer/model/types';
 import { describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';

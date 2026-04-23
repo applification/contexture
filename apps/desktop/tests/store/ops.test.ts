@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { apply } from '@renderer/store/ops';
 import { describe, expect, it } from 'vitest';
 

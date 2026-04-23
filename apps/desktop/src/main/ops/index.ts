@@ -23,7 +23,7 @@
  * for the Agent SDK via its `tool()` factory at IPC registration time.
  */
 
-import { IRSchema, IRSchemaObject } from '@renderer/model/ir-schema';
+import { IRSchema, IRSchemaObject } from '@renderer/model/ir';
 import type { ApplyResult, Op } from '@renderer/store/ops';
 import { type ZodTypeAny, z } from 'zod';
 
@@ -49,7 +49,7 @@ export interface OpToolDescriptor {
 // whole expression to the hand-written `FieldType` so downstream
 // z.infer callers (FieldDefSchema, update_field's patch) see the right
 // discriminated-union type instead of `unknown`.
-const FieldTypeSchema: z.ZodType<import('@renderer/model/types').FieldType> = z.lazy(() =>
+const FieldTypeSchema: z.ZodType<import('@renderer/model/ir').FieldType> = z.lazy(() =>
   z.union([
     z.object({
       kind: z.literal('string'),

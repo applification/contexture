@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CONTEXTURE_OPEN_FILTER, CONTEXTURE_SAVE_FILTER, handleSave } from '@main/ipc/file';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('file IPC open/save filters', () => {

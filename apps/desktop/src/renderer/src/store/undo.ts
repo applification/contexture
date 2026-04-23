@@ -23,8 +23,8 @@
  * every validation pass.
  */
 import { create } from 'zustand';
+import type { Schema } from '../model/ir';
 import { load, save } from '../model/load';
-import type { Schema } from '../model/types';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
 export interface UndoableState {

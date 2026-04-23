@@ -9,9 +9,10 @@
  * `save(schema)` is the canonical pretty-printed counterpart, so
  * `load(save(x))` round-trips structurally.
  */
-import { IRSchema } from './ir-schema';
+
+import type { Schema } from './ir';
+import { IRSchema } from './ir';
 import { type Migration, migrations, runMigrations } from './migrations';
-import type { Schema } from './types';
 
 export interface LoadResult {
   schema: Schema;

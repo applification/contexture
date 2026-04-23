@@ -9,7 +9,7 @@ import {
   menuForType,
   nextTypeName,
 } from '@renderer/components/graph/interactions';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 const empty: Schema = { version: '1', types: [] };

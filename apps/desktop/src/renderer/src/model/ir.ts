@@ -1,14 +1,17 @@
 /**
- * Zod meta-schema for the Contexture IR (v1).
+ * Contexture IR shape (v1) — single source of truth.
+ *
+ * The Zod meta-schema below is authoritative. TypeScript types are derived
+ * via `z.infer<>`, so adding a new `TypeDef` kind or `FieldType` requires a
+ * single edit instead of synchronized changes across two files.
+ *
+ * Spec: `plans/pivot.md` §IR shape (v1).
  *
  * `IRSchema.parse(x)` returns a typed `Schema` or throws `ZodError` with
  * path-addressable issues. Used by the loader, `replace_schema`, and the
  * ops applier to gate any input before it reaches the live store.
- *
- * Spec and TS types: `./types.ts` and `plans/pivot.md` §IR shape (v1).
  */
 import { z } from 'zod';
-import type { FieldType, Schema } from './types';
 
 const StringFieldTypeSchema = z.object({
   kind: z.literal('string'),
@@ -38,7 +41,24 @@ const RefFieldTypeSchema = z.object({
   typeName: z.string().min(1),
 });
 
-const FieldTypeSchema: z.ZodType<FieldType> = z.lazy(() =>
+// Recursive discriminated union: `array.element` refers back to `FieldType`.
+// The explicit `z.ZodType<FieldType>` annotation breaks the circularity for
+// TypeScript; the `FieldType` itself is inferred further down.
+export type FieldType =
+  | z.infer<typeof StringFieldTypeSchema>
+  | z.infer<typeof NumberFieldTypeSchema>
+  | z.infer<typeof BooleanFieldTypeSchema>
+  | z.infer<typeof DateFieldTypeSchema>
+  | z.infer<typeof LiteralFieldTypeSchema>
+  | z.infer<typeof RefFieldTypeSchema>
+  | {
+      kind: 'array';
+      element: FieldType;
+      min?: number;
+      max?: number;
+    };
+
+export const FieldTypeSchema: z.ZodType<FieldType> = z.lazy(() =>
   z.discriminatedUnion('kind', [
     StringFieldTypeSchema,
     NumberFieldTypeSchema,
@@ -57,7 +77,7 @@ const ArrayFieldTypeSchema = z.object({
   max: z.number().int().nonnegative().optional(),
 });
 
-const FieldDefSchema = z.object({
+export const FieldDefSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   type: FieldTypeSchema,
@@ -65,6 +85,8 @@ const FieldDefSchema = z.object({
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
 });
+
+export type FieldDef = z.infer<typeof FieldDefSchema>;
 
 const ObjectTypeDefSchema = z.object({
   kind: z.literal('object'),
@@ -107,12 +129,14 @@ const RawTypeDefSchema = z.object({
     .optional(),
 });
 
-const TypeDefSchema = z.discriminatedUnion('kind', [
+export const TypeDefSchema = z.discriminatedUnion('kind', [
   ObjectTypeDefSchema,
   EnumTypeDefSchema,
   DiscriminatedUnionTypeDefSchema,
   RawTypeDefSchema,
 ]);
+
+export type TypeDef = z.infer<typeof TypeDefSchema>;
 
 const StdlibImportSchema = z.object({
   kind: z.literal('stdlib'),
@@ -128,24 +152,34 @@ const RelativeImportSchema = z.object({
 
 const ImportDeclSchema = z.discriminatedUnion('kind', [StdlibImportSchema, RelativeImportSchema]);
 
+// `ImportDecl.kind === 'stdlib'`'s template-literal `path` (`@contexture/${string}`)
+// is narrower than what Zod infers (a plain string enforced by regex). The regex
+// enforces the same invariant, so we keep the narrower hand-written type here.
+export type ImportDecl =
+  | { kind: 'stdlib'; path: `@contexture/${string}`; alias: string }
+  | { kind: 'relative'; path: string; alias: string };
+
 const MetadataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
 });
 
-// The only structural gap between the inferred Zod output and `Schema` is the
-// template-literal path on `ImportDecl.kind === 'stdlib'`: Zod reports it as
-// `string`, while `Schema` narrows it to `@contexture/${string}`. The runtime
-// regex enforces the same invariant, so the cast is sound.
 // Raw object schema — exposes `.shape` for callers that need to pick
 // a specific field's schema (`src/main/ops/index.ts` narrows to
 // `types.element` and `imports.element`). The public `IRSchema` is cast
-// to the hand-written `Schema` so `parse()` returns the right type.
+// to the `Schema` type so `parse()` returns the narrowed `ImportDecl`.
 export const IRSchemaObject = z.object({
   version: z.literal('1'),
   types: z.array(TypeDefSchema),
   imports: z.array(ImportDeclSchema).optional(),
   metadata: MetadataSchema.optional(),
 });
+
+export type Schema = {
+  version: '1';
+  types: TypeDef[];
+  imports?: ImportDecl[];
+  metadata?: { name?: string; description?: string };
+};
 
 export const IRSchema = IRSchemaObject as unknown as z.ZodType<Schema>;

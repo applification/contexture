@@ -1,5 +1,5 @@
 import { useUndoHotkeys } from '@renderer/hooks/useUndoHotkeys';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { createUndoableContextureStore } from '@renderer/store/undo';
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';

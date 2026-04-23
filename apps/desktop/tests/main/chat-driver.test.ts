@@ -26,7 +26,7 @@ import {
 } from '@main/ipc/chat-driver';
 import { ChatTurnController } from '@main/ipc/chat-turn';
 import { ChatCancelledError } from '@main/ipc/claude-errors';
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it, vi } from 'vitest';
 
 function fakeTransport(): {

@@ -14,7 +14,7 @@
  * the host can flip the node into rename mode — there's no "rename"
  * op until the text actually changes.
  */
-import type { Schema, TypeDef } from '../../model/types';
+import type { Schema, TypeDef } from '../../model/ir';
 import type { Op } from '../../store/ops';
 
 /** Selection shape passed from the UI store. */

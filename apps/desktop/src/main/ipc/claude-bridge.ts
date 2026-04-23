@@ -17,7 +17,7 @@
  * on top of these primitives and is intentionally kept thin.
  */
 
-import type { Schema } from '@renderer/model/types';
+import type { Schema } from '@renderer/model/ir';
 import type { ApplyResult, Op } from '@renderer/store/ops';
 
 export interface BridgeTransport {
