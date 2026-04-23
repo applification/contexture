@@ -16,7 +16,7 @@
  * imperative refs) means the popover doesn't need to know where the
  * canvas is mounted.
  */
-import { useUIStore } from '@renderer/store/ui';
+import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { Maximize2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -26,9 +26,9 @@ interface Props {
 }
 
 export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
-  const graphLayout = useUIStore((s) => s.graphLayout);
-  const setGraphLayout = useUIStore((s) => s.setGraphLayout);
-  const resetGraphControls = useUIStore((s) => s.resetGraphControls);
+  const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
+  const setGraphLayout = useGraphLayoutStore((s) => s.setGraphLayout);
+  const resetGraphControls = useGraphLayoutStore((s) => s.resetToDefaults);
 
   function handleRelayout(): void {
     document.dispatchEvent(new CustomEvent('graph:relayout'));

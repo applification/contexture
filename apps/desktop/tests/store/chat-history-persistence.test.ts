@@ -1,10 +1,10 @@
-import { useUIStore } from '@renderer/store/ui';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 describe('chat history persistence setting', () => {
   it('defaults to enabled and can be toggled off and back on', () => {
-    const { result } = renderHook(() => useUIStore());
+    const { result } = renderHook(() => useChatComposerStore());
     // Default: on.
     expect(result.current.chatHistoryPersistence).toBe(true);
 

@@ -5,14 +5,14 @@
  * unions / raw) — no OWL classes, individuals, object/datatype
  * properties. So the search surface is simpler than the pre-pivot
  * `GraphSearchBar`: we match against `TypeDef.name` and
- * `TypeDef.description`. Results route via `useUIStore.setFocusNode`
- * which `GraphCanvas` watches to recentre the view.
+ * `TypeDef.description`. Results route via the selection store's
+ * `focus(id)` which `GraphCanvas` watches to recentre the view.
  *
  * Keybindings mirror the pre-pivot app: Cmd/Ctrl+F focuses the input;
  * ↑/↓ navigate; Enter picks; Escape clears.
  */
 
-import { useUIStore } from '@renderer/store/ui';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -28,7 +28,7 @@ export function GraphSearchBar(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const setFocusNode = useUIStore((s) => s.setFocusNode);
+  const focus = useGraphSelectionStore((s) => s.focus);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
 
   // Cmd/Ctrl+F focuses the input.
@@ -76,7 +76,7 @@ export function GraphSearchBar(): React.JSX.Element {
   }, [open]);
 
   function pick(name: string): void {
-    setFocusNode(name);
+    focus(name);
     setQuery('');
     setOpen(false);
   }

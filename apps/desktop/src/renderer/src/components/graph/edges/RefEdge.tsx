@@ -22,7 +22,7 @@ import {
   useInternalNode,
 } from '@xyflow/react';
 import { memo } from 'react';
-import { useUIStore } from '../../../store/ui';
+import { useGraphSelectionStore } from '../../../store/selection';
 import type { RefEdgeData } from '../schema-to-graph';
 import { getFloatingEdgeParams } from './floating-edge-utils';
 
@@ -32,8 +32,8 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const { id, source, target, data, selected } = props;
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const adjacentEdgeIds = useUIStore((s) => s.adjacentEdgeIds);
+  const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const adjacentEdgeIds = useGraphSelectionStore((s) => s.state.adjacency.edgeIds);
 
   if (!sourceNode || !targetNode) return null;
 
@@ -52,7 +52,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   });
 
   const crossBoundary = data?.crossBoundary === true;
-  const isAdjacent = adjacentEdgeIds.includes(id);
+  const isAdjacent = adjacentEdgeIds.has(id);
   // Dim edges that touch neither the selected node nor an adjacent one.
   const isDimmed =
     selectedNodeId !== null &&

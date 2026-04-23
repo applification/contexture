@@ -1,4 +1,4 @@
-import type { SidebarTab } from '@renderer/store/ui';
+import type { SidebarTab } from '@renderer/store/ui-chrome';
 import { ClipboardList, FileBracesCorner, MessageSquare, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

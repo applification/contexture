@@ -38,8 +38,10 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useELKLayout } from '../../hooks/useELKLayout';
+import { useGraphLayoutStore } from '../../store/layout-config';
 import type { Op } from '../../store/ops';
-import { useUIStore } from '../../store/ui';
+import { clickModeFromEvent, useGraphSelectionStore } from '../../store/selection';
+import { useUIChromeStore } from '../../store/ui-chrome';
 import { useUndoStore } from '../../store/undo';
 import { RefEdge } from './edges/RefEdge';
 import { GraphLegend } from './GraphLegend';
@@ -83,13 +85,14 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const undo = useCallback(() => useUndoStore.getState().undo(), []);
   const redo = useCallback(() => useUndoStore.getState().redo(), []);
 
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const setAdjacency = useUIStore((s) => s.setAdjacency);
-  const setSidebarTab = useUIStore((s) => s.setSidebarTab);
-  const setSidebarVisible = useUIStore((s) => s.setSidebarVisible);
-  const focusNodeId = useUIStore((s) => s.focusNodeId);
-  const setFocusNode = useUIStore((s) => s.setFocusNode);
+  const click = useGraphSelectionStore((s) => s.click);
+  const clearNodes = useGraphSelectionStore((s) => s.clearNodes);
+  const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
+  const focusNodeId = useGraphSelectionStore((s) => s.state.focusNodeId);
+  const consumeFocus = useGraphSelectionStore((s) => s.consumeFocus);
+  const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
+  const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(
     () => buildGraph({ schema, positions }),
@@ -134,7 +137,7 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const { runLayout } = useELKLayout();
   const { fitView, setCenter } = useReactFlow();
   const nodesInitialized = useNodesInitialized({ includeHiddenNodes: false });
-  const graphLayout = useUIStore((s) => s.graphLayout);
+  const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const graphLayoutRef = useRef(graphLayout);
   graphLayoutRef.current = graphLayout;
   // Keep refs for callbacks triggered outside React (custom events).
@@ -202,14 +205,14 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
     };
   }, [runLayoutNow, fitView]);
 
-  // Search → centre the matched node and select it. `setFocusNode` is
-  // the trigger; we consume the value (by clearing it) so repeated
-  // picks of the same name still re-centre.
+  // Search → centre the matched node and select it. `focusNodeId` is
+  // the trigger; we consume the value so repeated picks of the same
+  // name still re-centre.
   useEffect(() => {
     if (!focusNodeId) return;
     const node = nodesRef.current.find((n) => n.id === focusNodeId);
     if (!node) {
-      setFocusNode(null);
+      consumeFocus();
       return;
     }
     const width = node.measured?.width ?? node.width ?? 180;
@@ -217,29 +220,29 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
     const cx = node.position.x + width / 2;
     const cy = node.position.y + height / 2;
     setCenter(cx, cy, { zoom: 1.1, duration: 400 });
-    setSelectedNode(focusNodeId);
-    setFocusNode(null);
-  }, [focusNodeId, setCenter, setSelectedNode, setFocusNode]);
+    click(focusNodeId, 'replace');
+    consumeFocus();
+  }, [focusNodeId, setCenter, click, consumeFocus]);
 
-  // Selection → adjacency dimming.
+  // Register an adjacency resolver against the current edges so the
+  // selection store's `click()` can compute dim-sets without reaching
+  // into React Flow directly.
   useEffect(() => {
-    if (!selectedNodeId) {
-      setAdjacency([], []);
-      return;
-    }
-    const neighbourIds = new Set<string>();
-    const edgeIds: string[] = [];
-    for (const e of edges) {
-      if (e.source === selectedNodeId) {
-        neighbourIds.add(e.target);
-        edgeIds.push(e.id);
-      } else if (e.target === selectedNodeId) {
-        neighbourIds.add(e.source);
-        edgeIds.push(e.id);
+    setAdjacencyResolver((nodeId) => {
+      const nodeIds: string[] = [];
+      const edgeIds: string[] = [];
+      for (const e of edges) {
+        if (e.source === nodeId) {
+          nodeIds.push(e.target);
+          edgeIds.push(e.id);
+        } else if (e.target === nodeId) {
+          nodeIds.push(e.source);
+          edgeIds.push(e.id);
+        }
       }
-    }
-    setAdjacency([...neighbourIds], edgeIds);
-  }, [selectedNodeId, edges, setAdjacency]);
+      return { nodeIds, edgeIds };
+    });
+  }, [edges, setAdjacencyResolver]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -293,11 +296,11 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   // sidebar (if collapsed), and flips to the `properties` tab.
   const onNodeDoubleClick: ReactFlowProps['onNodeDoubleClick'] = useCallback(
     (_event, node) => {
-      setSelectedNode(node.id);
+      click(node.id, 'replace');
       setSidebarVisible(true);
       setSidebarTab('properties');
     },
-    [setSelectedNode, setSidebarVisible, setSidebarTab],
+    [click, setSidebarVisible, setSidebarTab],
   );
 
   const onKeyDown = useCallback(
@@ -337,12 +340,14 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
         onNodesChange={onNodesChange}
         onConnect={onConnect}
         onDoubleClick={onPaneDoubleClick}
-        onNodeClick={(_, node) => setSelectedNode(node.id)}
+        onNodeClick={(evt, node) => {
+          click(node.id, clickModeFromEvent(evt));
+        }}
         onNodeDoubleClick={onNodeDoubleClick}
-        onPaneClick={() => setSelectedNode(null)}
+        onPaneClick={() => clearNodes()}
         onEdgeClick={(_, edge) => {
           const data = edge.data as RefEdgeData | undefined;
-          if (data) setSelectedNode(data.sourceType);
+          if (data) click(data.sourceType, 'replace');
         }}
         minZoom={0.1}
         maxZoom={2.5}

@@ -9,7 +9,7 @@
  */
 
 import { useClaude } from '@renderer/chat/useClaude';
-import { useUIStore } from '@renderer/store/ui';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,10 +19,10 @@ import { cn } from '@/lib/utils';
 import { GraphSearchBar } from './GraphSearchBar';
 
 export function Toolbar(): React.JSX.Element {
-  const theme = useUIStore((s) => s.theme);
-  const toggleTheme = useUIStore((s) => s.toggleTheme);
-  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const theme = useUIChromeStore((s) => s.theme);
+  const toggleTheme = useUIChromeStore((s) => s.toggleTheme);
+  const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
+  const toggleSidebar = useUIChromeStore((s) => s.toggleSidebar);
   const { authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady } = useClaude();
 
   return (

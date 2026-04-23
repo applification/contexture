@@ -15,7 +15,7 @@ import { STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { useDocumentStore } from '@renderer/store/document';
-import { useUIStore } from '@renderer/store/ui';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { BarChart3, Circle, CircleAlert, TriangleAlert } from 'lucide-react';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
@@ -27,7 +27,7 @@ export function StatusBar(): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const filePath = useDocumentStore((s) => s.filePath);
   const isDirty = useDocumentStore((s) => s.isDirty);
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
+  const click = useGraphSelectionStore((s) => s.click);
 
   const typeCount = schema.types.length;
   const fieldCount = useMemo(() => {
@@ -72,7 +72,7 @@ export function StatusBar(): React.JSX.Element {
     if (match) {
       const idx = Number(match[1]);
       const t = schema.types[idx];
-      if (t) setSelectedNode(t.name);
+      if (t) click(t.name, 'replace');
     }
     setPopoverOpen(false);
   }
