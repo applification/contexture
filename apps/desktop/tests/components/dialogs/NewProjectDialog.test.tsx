@@ -373,6 +373,82 @@ describe('NewProjectDialog', () => {
     expect(screen.getByTestId('scaffold-success')).toHaveTextContent('/tmp/my-proj');
   });
 
+  it('shows the failure panel with the failed stage label when stage-failed fires', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 3 });
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 3,
+        stderr: 'next-app exited 1',
+        retrySafe: false,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('scaffold-failure')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('scaffold-failure')).toHaveTextContent(/Installing Next\.js/i);
+  });
+
+  it('Try again is disabled when the failed stage is not retry-safe', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 2,
+        stderr: 'boom',
+        retrySafe: false,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('scaffold-failure')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Try again/i })).toBeDisabled();
+  });
+
+  it('Try again is enabled and restarts the scaffolder when the failed stage is retry-safe', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 6,
+        stderr: 'convex hiccup',
+        retrySafe: true,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Try again/i })).not.toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Try again/i }));
+    await waitFor(() => {
+      expect(bridge.scaffoldStart).toHaveBeenCalledTimes(1);
+    });
+    expect(bridge.scaffoldStart).toHaveBeenCalledWith({
+      targetDir: '/tmp/my-proj',
+      projectName: 'my-proj',
+    });
+  });
+
   it('Copy path writes the target path to the clipboard', async () => {
     const bridge = mockFileBridge();
     const writeText = vi.fn(async () => undefined);

@@ -48,6 +48,7 @@ export function NewProjectDialog(): React.JSX.Element {
   const setPreflightError = useNewProjectStore((s) => s.setPreflightError);
   const clearPreflightError = useNewProjectStore((s) => s.clearPreflightError);
   const setPhase = useNewProjectStore((s) => s.setPhase);
+  const setFailure = useNewProjectStore((s) => s.setFailure);
   const markStage = useNewProjectStore((s) => s.markStage);
   const appendLog = useNewProjectStore((s) => s.appendLog);
   const resetProgress = useNewProjectStore((s) => s.resetProgress);
@@ -74,7 +75,7 @@ export function NewProjectDialog(): React.JSX.Element {
           return;
         case 'stage-failed':
           markStage(event.stage, 'failed');
-          setPhase('failed');
+          setFailure({ stage: event.stage, stderr: event.stderr, retrySafe: event.retrySafe });
           appendLog(event.stderr);
           return;
         case 'scaffold-done':
@@ -86,7 +87,7 @@ export function NewProjectDialog(): React.JSX.Element {
           return;
       }
     });
-  }, [setPreflightError, setPhase, markStage, appendLog]);
+  }, [setPreflightError, setPhase, setFailure, markStage, appendLog]);
 
   async function handlePickFolder(): Promise<void> {
     const picked = await window.contexture?.file.pickDirectory();
@@ -101,8 +102,9 @@ export function NewProjectDialog(): React.JSX.Element {
   }
 
   const showSuccess = phase === 'done';
-  const showProgress = phase === 'running' || phase === 'failed';
-  const showForm = !showProgress && !showSuccess;
+  const showFailure = phase === 'failed';
+  const showProgress = phase === 'running';
+  const showForm = !showProgress && !showSuccess && !showFailure;
 
   return (
     <Dialog
@@ -117,14 +119,18 @@ export function NewProjectDialog(): React.JSX.Element {
           <DialogDescription>
             {showSuccess
               ? 'Your project is ready.'
-              : showProgress
-                ? 'Scaffolding your project — this usually takes a minute.'
-                : 'Scaffold a Contexture monorepo under a folder you choose.'}
+              : showFailure
+                ? 'Scaffolding hit a snag.'
+                : showProgress
+                  ? 'Scaffolding your project — this usually takes a minute.'
+                  : 'Scaffold a Contexture monorepo under a folder you choose.'}
           </DialogDescription>
         </DialogHeader>
 
         {showSuccess ? (
           <SuccessView targetPath={targetPath} />
+        ) : showFailure ? (
+          <FailureView onRetry={() => void handleCreate()} />
         ) : showProgress ? (
           <ProgressView />
         ) : (
@@ -250,6 +256,40 @@ function SuccessView({ targetPath }: { targetPath: string }): React.JSX.Element 
         </Button>
         <Button data-testid="scaffold-success-close" onClick={close}>
           Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FailureView({ onRetry }: { onRetry: () => void }): React.JSX.Element {
+  const failure = useNewProjectStore((s) => s.failure);
+  const close = useNewProjectStore((s) => s.close);
+  const stageLabel = failure ? labelForStage(failure.stage) : '';
+  return (
+    <div data-testid="scaffold-failure" className="space-y-3">
+      <div className="flex items-center gap-2 text-sm text-destructive">
+        <span role="img" aria-label="failed">
+          ✗
+        </span>
+        <span>Failed at: {stageLabel}</span>
+      </div>
+      {failure?.stderr && (
+        <pre className="text-xs font-mono bg-muted rounded p-2 max-h-40 overflow-auto whitespace-pre-wrap">
+          {failure.stderr}
+        </pre>
+      )}
+      <p className="text-xs text-muted-foreground">
+        {failure?.retrySafe
+          ? 'This stage is safe to retry against the same folder.'
+          : 'Earlier stages touched the target folder. Delete it and start over to retry.'}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={close}>
+          Close
+        </Button>
+        <Button disabled={!failure?.retrySafe} onClick={onRetry}>
+          Try again
         </Button>
       </div>
     </div>

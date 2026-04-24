@@ -16,6 +16,12 @@ export type NewProjectPhase = 'form' | 'running' | 'done' | 'failed';
 export type StageStatus = 'pending' | 'running' | 'done' | 'failed';
 export type StartingPoint = 'describe' | 'promote';
 
+export interface ScaffoldFailure {
+  stage: number;
+  stderr: string;
+  retrySafe: boolean;
+}
+
 const STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
 export type StageStates = Readonly<Record<number, StageStatus>>;
@@ -34,6 +40,7 @@ interface NewProjectState {
   description: string;
   phase: NewProjectPhase;
   preflightError: PreflightError | null;
+  failure: ScaffoldFailure | null;
   stageStates: StageStates;
   log: string;
   open: () => void;
@@ -45,6 +52,7 @@ interface NewProjectState {
   setPreflightError: (err: PreflightError) => void;
   clearPreflightError: () => void;
   setPhase: (phase: NewProjectPhase) => void;
+  setFailure: (failure: ScaffoldFailure) => void;
   markStage: (stage: number, status: StageStatus) => void;
   appendLog: (chunk: string) => void;
   resetProgress: () => void;
@@ -57,6 +65,7 @@ const INITIAL = {
   description: '',
   phase: 'form' as NewProjectPhase,
   preflightError: null as PreflightError | null,
+  failure: null as ScaffoldFailure | null,
   stageStates: freshStageStates(),
   log: '',
 };
@@ -73,8 +82,10 @@ export const useNewProjectStore = create<NewProjectState>((set) => ({
   setPreflightError: (preflightError) => set({ preflightError, phase: 'form' }),
   clearPreflightError: () => set({ preflightError: null }),
   setPhase: (phase) => set({ phase }),
+  setFailure: (failure) => set({ failure, phase: 'failed' }),
   markStage: (stage, status) =>
     set((s) => ({ stageStates: { ...s.stageStates, [stage]: status } })),
   appendLog: (chunk) => set((s) => ({ log: s.log + chunk })),
-  resetProgress: () => set({ stageStates: freshStageStates(), log: '', preflightError: null }),
+  resetProgress: () =>
+    set({ stageStates: freshStageStates(), log: '', preflightError: null, failure: null }),
 }));
