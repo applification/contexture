@@ -207,7 +207,7 @@ describe('DocumentStore', () => {
       layout: sampleLayout,
       chat: sampleChat,
     });
-    const convexPath = '/work/schema.ts';
+    const convexPath = '/work/convex/schema.ts';
     expect(harness.fs.exists(convexPath)).toBe(true);
     const convex = await harness.fs.readFile(convexPath);
     expect(convex).toContain('@contexture-generated');
@@ -278,13 +278,13 @@ describe('DocumentStore', () => {
       '/proj/packages/schema/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
-    const postPath = '/proj/apps/web/convex/Post.ts';
+    const postPath = '/proj/packages/schema/convex/Post.ts';
     expect(fs.exists(postPath)).toBe(true);
     const contents = await fs.readFile(postPath);
     expect(contents).toContain('@contexture-seeded');
     expect(contents).toContain('ctx.db.query("Post")');
     // Non-table types get no file.
-    expect(fs.exists('/proj/apps/web/convex/Inline.ts')).toBe(false);
+    expect(fs.exists('/proj/packages/schema/convex/Inline.ts')).toBe(false);
   });
 
   it('auto-save never clobbers a user-edited seeded CRUD file', async () => {
@@ -308,7 +308,7 @@ describe('DocumentStore', () => {
       '/proj/packages/schema/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
-    const crudPath = '/proj/apps/web/convex/Post.ts';
+    const crudPath = '/proj/packages/schema/convex/Post.ts';
     // User edits the seeded file.
     const userEdit = '// user took over\nexport const list = () => 42;\n';
     await fs.writeFile(crudPath, userEdit);
@@ -339,10 +339,10 @@ describe('DocumentStore', () => {
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(tableSchema),
       '/proj/packages/schema/.contexture/.keep': '',
-      '/proj/apps/web/convex/Post.ts': userOwned,
+      '/proj/packages/schema/convex/Post.ts': userOwned,
     });
     await store.open(monorepoIrPath);
-    expect(await fs.readFile('/proj/apps/web/convex/Post.ts')).toBe(userOwned);
+    expect(await fs.readFile('/proj/packages/schema/convex/Post.ts')).toBe(userOwned);
   });
 
   it('scratch-mode open does not seed per-table CRUD files', async () => {
@@ -360,8 +360,8 @@ describe('DocumentStore', () => {
     const { store, fs } = setup({ [irPath]: JSON.stringify(tableSchema) });
     await store.open(irPath);
     // Scratch mode has no project root, so no convex tree can be seeded.
-    expect(fs.exists('/apps/web/convex/Post.ts')).toBe(false);
-    expect(fs.exists('/work/apps/web/convex/Post.ts')).toBe(false);
+    expect(fs.exists('/packages/schema/convex/Post.ts')).toBe(false);
+    expect(fs.exists('/work/packages/schema/convex/Post.ts')).toBe(false);
   });
 
   it('scratch-mode open does not write CLAUDE.md', async () => {
@@ -394,7 +394,7 @@ describe('DocumentStore', () => {
         '/work/garden.schema.ts',
         '/work/garden.schema.json',
         '/work/index.ts',
-        '/work/schema.ts',
+        '/work/convex/schema.ts',
       ].sort(),
     );
     for (const hash of Object.values(manifest.files)) {
@@ -432,7 +432,7 @@ describe('DocumentStore', () => {
     const manifest = JSON.parse(
       await fs.readFile('/proj/packages/schema/.contexture/emitted.json'),
     ) as { files: Record<string, string> };
-    expect(Object.keys(manifest.files)).not.toContain('/proj/apps/web/convex/Post.ts');
+    expect(Object.keys(manifest.files)).not.toContain('/proj/packages/schema/convex/Post.ts');
   });
 
   it('scratch-mode save does not write a schema index', async () => {
