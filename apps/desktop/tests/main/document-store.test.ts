@@ -287,6 +287,41 @@ describe('DocumentStore', () => {
     expect(fs.exists('/proj/apps/web/convex/Inline.ts')).toBe(false);
   });
 
+  it('auto-save never clobbers a user-edited seeded CRUD file', async () => {
+    // Seeded CRUD files are @contexture-seeded, not @contexture-generated.
+    // Once seeded, they must survive every subsequent IR save — the user
+    // or coding agent owns them.
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const tableSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(tableSchema),
+      '/proj/packages/schema/.contexture/.keep': '',
+    });
+    await store.open(monorepoIrPath);
+    const crudPath = '/proj/apps/web/convex/Post.ts';
+    // User edits the seeded file.
+    const userEdit = '// user took over\nexport const list = () => 42;\n';
+    await fs.writeFile(crudPath, userEdit);
+    // An IR save goes through.
+    await store.save({
+      irPath: monorepoIrPath,
+      schema: tableSchema,
+      layout: { version: '1', positions: {} },
+      chat: { version: '1', messages: [] },
+    });
+    expect(await fs.readFile(crudPath)).toBe(userEdit);
+  });
+
   it('project-mode open never overwrites an existing per-table CRUD file', async () => {
     const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
     const tableSchema: Schema = {
@@ -365,6 +400,39 @@ describe('DocumentStore', () => {
     for (const hash of Object.values(manifest.files)) {
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
     }
+  });
+
+  it('emitted.json does not track seeded per-table CRUD files', async () => {
+    // Seeded files are not @contexture-generated, so they must not appear
+    // in the drift manifest. A drift check flags regen-on-mismatch;
+    // listing seeded files there would cause them to be regenerated.
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const tableSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(tableSchema),
+      '/proj/packages/schema/.contexture/.keep': '',
+    });
+    await store.open(monorepoIrPath);
+    await store.save({
+      irPath: monorepoIrPath,
+      schema: tableSchema,
+      layout: { version: '1', positions: {} },
+      chat: { version: '1', messages: [] },
+    });
+    const manifest = JSON.parse(
+      await fs.readFile('/proj/packages/schema/.contexture/emitted.json'),
+    ) as { files: Record<string, string> };
+    expect(Object.keys(manifest.files)).not.toContain('/proj/apps/web/convex/Post.ts');
   });
 
   it('scratch-mode save does not write a schema index', async () => {
