@@ -426,6 +426,31 @@ describe('NewProjectDialog', () => {
     expect(screen.getByRole('button', { name: /Try again/i })).toBeDisabled();
   });
 
+  it('Open folder on the failure panel reveals the target folder', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 3,
+        stderr: 'boom',
+        retrySafe: false,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Open folder/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Open folder/i }));
+    await waitFor(() => {
+      expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj');
+    });
+  });
+
   it('Try again is enabled and restarts the scaffolder when the failed stage is retry-safe', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);
@@ -499,6 +524,27 @@ describe('NewProjectDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /Reveal/i }));
     await waitFor(() => {
       expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj');
+    });
+  });
+
+  it('View log on the success panel reveals the scaffold log file', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /View log/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /View log/i }));
+    await waitFor(() => {
+      expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj/.contexture/scaffold.log');
     });
   });
 

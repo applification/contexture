@@ -136,10 +136,11 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
           <SuccessView
             targetPath={targetPath}
             irPath={`${targetPath}/packages/schema/${name}.contexture.json`}
+            logPath={`${targetPath}/.contexture/scaffold.log`}
             onOpenProject={onOpenProject}
           />
         ) : showFailure ? (
-          <FailureView onRetry={() => void handleCreate()} />
+          <FailureView targetPath={targetPath} onRetry={() => void handleCreate()} />
         ) : showProgress ? (
           <ProgressView />
         ) : (
@@ -248,10 +249,12 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
 function SuccessView({
   targetPath,
   irPath,
+  logPath,
   onOpenProject,
 }: {
   targetPath: string;
   irPath: string;
+  logPath: string;
   onOpenProject?: (irPath: string) => void;
 }): React.JSX.Element {
   const close = useNewProjectStore((s) => s.close);
@@ -278,6 +281,9 @@ function SuccessView({
         <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
           Copy path
         </Button>
+        <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(logPath)}>
+          View log
+        </Button>
         <Button data-testid="scaffold-success-close" onClick={handleClose}>
           Close
         </Button>
@@ -286,7 +292,13 @@ function SuccessView({
   );
 }
 
-function FailureView({ onRetry }: { onRetry: () => void }): React.JSX.Element {
+function FailureView({
+  targetPath,
+  onRetry,
+}: {
+  targetPath: string;
+  onRetry: () => void;
+}): React.JSX.Element {
   const failure = useNewProjectStore((s) => s.failure);
   const close = useNewProjectStore((s) => s.close);
   const stageLabel = failure ? labelForStage(failure.stage) : '';
@@ -308,7 +320,10 @@ function FailureView({ onRetry }: { onRetry: () => void }): React.JSX.Element {
           ? 'This stage is safe to retry against the same folder.'
           : 'Earlier stages touched the target folder. Delete it and start over to retry.'}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(targetPath)}>
+          Open folder
+        </Button>
         <Button variant="outline" onClick={close}>
           Close
         </Button>
