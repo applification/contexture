@@ -60,4 +60,13 @@ describe('shellStageSpecFor', () => {
     expect(spec.args).toEqual(['convex@latest', 'dev', '--once', '--configure=new', '--local']);
     expect(spec.cwd).toBe(nextCwd);
   });
+
+  it('stage 9: bun install at the project root to resolve the new workspace dep', () => {
+    const spec = shellStageSpecFor(9, config);
+    expect(spec).toEqual({
+      cmd: 'bun',
+      args: ['install'],
+      cwd: '/work/my-proj',
+    });
+  });
 });

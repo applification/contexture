@@ -4,8 +4,9 @@
  * from the spawn/IO layer lets tests assert "stage 3 calls
  * create-next-app with these exact flags" without shelling out.
  *
- * Only shell-backed stages (1-5) have a spec; stages 6-10 are
- * in-process work (emitters, git, bun install wired separately).
+ * Only shell-backed stages (1-5, 9) have a spec; stages 6-8 and 10
+ * are in-process work (emitters; git init runs through its own spec
+ * trio from `git-init.ts`).
  */
 import type { ScaffoldConfig, StageNumber } from './scaffold-project';
 
@@ -63,6 +64,8 @@ export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): S
         args: ['convex@latest', 'dev', '--once', '--configure=new', '--local'],
         cwd: webDir,
       };
+    case 9:
+      return { cmd: 'bun', args: ['install'], cwd: target };
     default:
       throw new Error(`shellStageSpecFor: stage ${stage} is not a shell-backed stage`);
   }
