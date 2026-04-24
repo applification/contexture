@@ -73,6 +73,10 @@ export interface DocumentStore {
   save(target: SaveInput & { irPath: string }): Promise<void>;
   saveAs(target: SaveInput, newPath: string): Promise<void>;
   recentFiles(): Promise<ReadonlyArray<RecentEntry>>;
+  /** Raw file read — for the IPC layer to return original IR text so the
+   *  renderer owns JSON-parse error surfacing. */
+  readFile(path: string): Promise<string>;
+  fileExists(path: string): Promise<boolean>;
 }
 
 export interface FsAdapter {
@@ -366,5 +370,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       const paths = await readRecents();
       return paths.map((path) => ({ path }));
     },
+    readFile: (path) => fs.readFile(path),
+    fileExists: (path) => fs.fileExists(path),
   };
 }

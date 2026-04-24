@@ -13,18 +13,15 @@
  * drive them directly without booting Electron.
  */
 
-import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatHistory } from '@renderer/model/chat-history';
 import type { Schema } from '@renderer/model/ir';
 import type { Layout } from '@renderer/model/layout';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import {
-  CHAT_SUFFIX,
   createDocumentStore,
+  type DocumentMode,
   type DocumentStore,
-  IR_SUFFIX,
-  LAYOUT_SUFFIX,
 } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 
@@ -53,6 +50,8 @@ export interface OpenWarning {
 
 export interface OpenResult {
   irPath: string;
+  /** `scratch` = bare IR on disk; `project` = `.contexture/` marker present. */
+  mode: DocumentMode;
   /** Raw IR text — the renderer calls `load()` to parse + surface errors. */
   content: string;
   /** Pre-parsed layout sidecar (defaults if missing/corrupt). */
@@ -92,39 +91,22 @@ export async function handleSave(input: HandleSaveInput): Promise<void> {
  * recent-files path to silently prune stale entries).
  */
 export async function handleOpen(irPath: string): Promise<OpenResult | null> {
-  if (!(await nodeFsAdapter.fileExists(irPath))) return null;
-  const content = await fs.readFile(irPath, 'utf-8');
-
-  const base = irPath.endsWith(IR_SUFFIX) ? irPath.slice(0, -IR_SUFFIX.length) : null;
-  const warnings: OpenWarning[] = [];
-
-  let layout: Layout = { version: '1', positions: {} };
-  if (base) {
-    try {
-      const raw = await fs.readFile(`${base}${LAYOUT_SUFFIX}`, 'utf-8');
-      const { loadLayout } = await import('@renderer/model/layout');
-      const parsed = loadLayout(raw);
-      layout = parsed.layout;
-      for (const msg of parsed.warnings) warnings.push({ message: msg, severity: 'warning' });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    }
-  }
-
-  let chat: ChatHistory = { version: '1', messages: [] };
-  if (base) {
-    try {
-      const raw = await fs.readFile(`${base}${CHAT_SUFFIX}`, 'utf-8');
-      const { loadChatHistory } = await import('@renderer/model/chat-history');
-      const parsed = loadChatHistory(raw);
-      chat = parsed.history;
-      for (const msg of parsed.warnings) warnings.push({ message: msg, severity: 'warning' });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    }
-  }
-
-  return { irPath, content, layout, chat, warnings };
+  const s = getStore();
+  if (!(await s.fileExists(irPath))) return null;
+  const content = await s.readFile(irPath);
+  const bundle = await s.open(irPath);
+  const warnings: OpenWarning[] = bundle.warnings.map((w) => ({
+    message: w.message,
+    severity: w.severity,
+  }));
+  return {
+    irPath,
+    mode: bundle.mode,
+    content,
+    layout: bundle.layout,
+    chat: bundle.chat,
+    warnings,
+  };
 }
 
 /**
