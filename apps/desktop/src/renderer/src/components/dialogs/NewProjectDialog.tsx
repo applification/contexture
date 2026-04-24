@@ -301,7 +301,20 @@ function FailureView({
 }): React.JSX.Element {
   const failure = useNewProjectStore((s) => s.failure);
   const close = useNewProjectStore((s) => s.close);
+  const setPhase = useNewProjectStore((s) => s.setPhase);
+  const resetProgress = useNewProjectStore((s) => s.resetProgress);
   const stageLabel = failure ? labelForStage(failure.stage) : '';
+
+  async function handleDelete(): Promise<void> {
+    if (!targetPath) return;
+    const confirmed = window.confirm(
+      `Delete ${targetPath} and start over? This removes everything under that folder.`,
+    );
+    if (!confirmed) return;
+    await window.contexture?.project.deleteDirectory(targetPath);
+    resetProgress();
+    setPhase('form');
+  }
   return (
     <div data-testid="scaffold-failure" className="space-y-3">
       <div className="flex items-center gap-2 text-sm text-destructive">
@@ -323,6 +336,9 @@ function FailureView({
       <div className="flex items-center gap-2 flex-wrap">
         <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(targetPath)}>
           Open folder
+        </Button>
+        <Button variant="outline" onClick={() => void handleDelete()}>
+          Delete and start over
         </Button>
         <Button variant="outline" onClick={close}>
           Close

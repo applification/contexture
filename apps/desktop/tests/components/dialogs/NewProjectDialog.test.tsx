@@ -18,11 +18,13 @@ function mockFileBridge(pickResult: string | null = null): {
   pickDirectory: ReturnType<typeof vi.fn>;
   scaffoldStart: ReturnType<typeof vi.fn>;
   shellReveal: ReturnType<typeof vi.fn>;
+  projectDeleteDir: ReturnType<typeof vi.fn>;
   fireScaffoldEvent: (event: unknown) => void;
 } {
   const pickDirectory = vi.fn(async () => pickResult);
   const scaffoldStart = vi.fn(async () => undefined);
   const shellReveal = vi.fn(async () => undefined);
+  const projectDeleteDir = vi.fn(async () => undefined);
   let captured: ((event: unknown) => void) | null = null;
   (window as unknown as { contexture: unknown }).contexture = {
     chat: {},
@@ -52,11 +54,15 @@ function mockFileBridge(pickResult: string | null = null): {
     shell: {
       reveal: shellReveal,
     },
+    project: {
+      deleteDirectory: projectDeleteDir,
+    },
   };
   return {
     pickDirectory,
     scaffoldStart,
     shellReveal,
+    projectDeleteDir,
     fireScaffoldEvent: (event: unknown) => captured?.(event),
   };
 }
@@ -424,6 +430,63 @@ describe('NewProjectDialog', () => {
       expect(screen.getByTestId('scaffold-failure')).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: /Try again/i })).toBeDisabled();
+  });
+
+  it('Delete and start over removes the target dir and returns to the form', async () => {
+    const bridge = mockFileBridge();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 3,
+        stderr: 'boom',
+        retrySafe: false,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Delete and start over/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Delete and start over/i }));
+    await waitFor(() => {
+      expect(bridge.projectDeleteDir).toHaveBeenCalledWith('/tmp/my-proj');
+    });
+    await waitFor(() => {
+      expect(useNewProjectStore.getState().phase).toBe('form');
+    });
+    expect(useNewProjectStore.getState().failure).toBeNull();
+    confirmSpy.mockRestore();
+  });
+
+  it('Delete and start over is a no-op when the user cancels the confirm', async () => {
+    const bridge = mockFileBridge();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'stage-failed',
+        stage: 3,
+        stderr: 'boom',
+        retrySafe: false,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Delete and start over/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Delete and start over/i }));
+    expect(bridge.projectDeleteDir).not.toHaveBeenCalled();
+    expect(useNewProjectStore.getState().phase).toBe('failed');
+    confirmSpy.mockRestore();
   });
 
   it('Open folder on the failure panel reveals the target folder', async () => {

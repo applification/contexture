@@ -139,7 +139,13 @@ const shell = {
     ipcRenderer.invoke('shell:reveal', path) as Promise<void>,
 };
 
-const contexture = { chat, file, scaffold, shell };
+const project = {
+  /** Recursively delete a directory (used by the New Project "delete and start over" flow). */
+  deleteDirectory: (path: string): Promise<void> =>
+    ipcRenderer.invoke('project:delete-directory', path) as Promise<void>,
+};
+
+const contexture = { chat, file, scaffold, shell, project };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

@@ -147,11 +147,17 @@ export interface ContextureShellAPI {
   reveal: (path: string) => Promise<void>;
 }
 
+export interface ContextureProjectAPI {
+  /** Recursively delete a directory — used by the "delete and start over" flow. */
+  deleteDirectory: (path: string) => Promise<void>;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   file: ContextureFileAPI;
   scaffold: ContextureScaffoldAPI;
   shell: ContextureShellAPI;
+  project: ContextureProjectAPI;
 }
 
 declare global {
