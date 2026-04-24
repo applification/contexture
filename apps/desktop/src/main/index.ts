@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { registerClaudeIpc } from './ipc/claude';
 import { registerFileIpc } from './ipc/file';
+import { registerScaffoldIpc } from './ipc/scaffold';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
 
@@ -71,6 +72,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(createMenu(mainWindow));
   registerUpdateIpc(mainWindow);
   registerFileIpc(mainWindow);
+  registerScaffoldIpc(mainWindow);
   registerClaudeIpc(mainWindow);
 
   app.on('activate', () => {

@@ -188,10 +188,10 @@ export function bundlePathsFor(irPath: string): {
     // Workspace re-export: consumers `import { … } from '@<project>/schema'`
     // and resolve to this barrel rather than a specific `.schema` module.
     schemaIndex: `${dir}/index.ts`,
-    // Convex schema is the headline emitted artefact — `schema.ts`
-    // sits next to the IR so `apps/*` re-export it via
-    // `packages/schema/schema.ts`.
-    convex: `${dir}/schema.ts`,
+    // Convex demands a `convex/` subdir sibling of its callers; the
+    // schema package hosts it so `apps/web` imports the workspace
+    // package rather than owning its own convex folder.
+    convex: `${dir}/convex/schema.ts`,
   };
 }
 
@@ -270,12 +270,13 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
         if (!(await fs.fileExists(claudePath))) {
           await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
         }
-        // Seed one `apps/web/convex/<table>.ts` per table-flagged object.
-        // Written only if missing — these are `@contexture-seeded`, owned
-        // by the user/coding agent from first write on.
+        // Seed one `packages/schema/convex/<table>.ts` per table-flagged
+        // object. Written only if missing — these are `@contexture-seeded`,
+        // owned by the user/coding agent from first write on.
+        const schemaDir = contextureDirFor(irPath).slice(0, -'/.contexture'.length);
         for (const type of schema.types) {
           if (type.kind !== 'object' || type.table !== true) continue;
-          const crudPath = `${root}/apps/web/convex/${type.name}.ts`;
+          const crudPath = `${schemaDir}/convex/${type.name}.ts`;
           if (!(await fs.fileExists(crudPath))) {
             await fs.writeFile(crudPath, emitTableCrud(schema, type.name));
           }

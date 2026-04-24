@@ -16,7 +16,7 @@ describe('emit (CLAUDE.md)', () => {
 
   it('warns against editing the generated Convex schema directly', () => {
     const out = emit('my-blog');
-    expect(out).toMatch(/apps\/web\/convex\/schema\.ts/);
+    expect(out).toMatch(/packages\/schema\/convex\/schema\.ts/);
     expect(out).toMatch(/do not edit|regenerat/i);
   });
 
