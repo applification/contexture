@@ -124,7 +124,16 @@ const file = {
     subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
 };
 
-const contexture = { chat, file };
+const scaffold = {
+  /** Kick off the 10-stage scaffolder; events arrive on `onEvent`. */
+  start: (config: { targetDir: string; projectName: string }) =>
+    ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
+  /** Subscribe to preflight + stage events streamed from main. */
+  onEvent: (listener: (event: unknown) => void) =>
+    subscribe('scaffold:event', listener as (p: unknown) => void),
+};
+
+const contexture = { chat, file, scaffold };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

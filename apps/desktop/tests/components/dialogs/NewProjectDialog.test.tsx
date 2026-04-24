@@ -16,8 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function mockFileBridge(pickResult: string | null = null): {
   pickDirectory: ReturnType<typeof vi.fn>;
+  scaffoldStart: ReturnType<typeof vi.fn>;
+  fireScaffoldEvent: (event: unknown) => void;
 } {
   const pickDirectory = vi.fn(async () => pickResult);
+  const scaffoldStart = vi.fn(async () => undefined);
+  let captured: ((event: unknown) => void) | null = null;
   (window as unknown as { contexture: unknown }).contexture = {
     chat: {},
     file: {
@@ -34,8 +38,21 @@ function mockFileBridge(pickResult: string | null = null): {
       onMenuSaveAs: () => () => undefined,
       onMenuNewProject: () => () => undefined,
     },
+    scaffold: {
+      start: scaffoldStart,
+      onEvent: (listener: (e: unknown) => void) => {
+        captured = listener;
+        return () => {
+          captured = null;
+        };
+      },
+    },
   };
-  return { pickDirectory };
+  return {
+    pickDirectory,
+    scaffoldStart,
+    fireScaffoldEvent: (event: unknown) => captured?.(event),
+  };
 }
 
 beforeEach(() => {
@@ -137,6 +154,62 @@ describe('NewProjectDialog', () => {
       useNewProjectStore.getState().setName('Bad');
     });
     expect(create).toBeDisabled();
+  });
+
+  it('Create invokes scaffold.start with targetDir + projectName', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/Users/me/projects');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    await waitFor(() => {
+      expect(bridge.scaffoldStart).toHaveBeenCalledWith({
+        targetDir: '/Users/me/projects/my-proj',
+        projectName: 'my-proj',
+      });
+    });
+  });
+
+  it('shows an inline preflight error when main reports preflight-failed', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/Users/me/projects');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'preflight-failed', error: { kind: 'missing-bun' } });
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Bun is not installed/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows the target-exists preflight error with the offending path', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/Users/me/projects');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({
+        kind: 'preflight-failed',
+        error: { kind: 'target-exists', path: '/Users/me/projects/my-proj' },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'A folder already exists at /Users/me/projects/my-proj',
+      );
+    });
   });
 
   it('Cancel closes the dialog and resets the form', () => {

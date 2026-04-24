@@ -119,9 +119,32 @@ export interface ContextureFileAPI {
   onMenuSaveAs: (listener: () => void) => Unsubscribe;
 }
 
+export type ScaffoldPreflightError =
+  | { kind: 'missing-bun' }
+  | { kind: 'missing-git' }
+  | { kind: 'missing-node' }
+  | { kind: 'no-network' }
+  | { kind: 'parent-not-writable'; path: string }
+  | { kind: 'target-exists'; path: string }
+  | { kind: 'insufficient-space'; bytesFree: number };
+
+export type ScaffoldEvent =
+  | { kind: 'preflight-failed'; error: ScaffoldPreflightError }
+  | { kind: 'stage-start'; stage: number }
+  | { kind: 'stdout-chunk'; stage: number; chunk: string }
+  | { kind: 'stderr-chunk'; stage: number; chunk: string }
+  | { kind: 'stage-done'; stage: number }
+  | { kind: 'stage-failed'; stage: number; stderr: string; retrySafe: boolean };
+
+export interface ContextureScaffoldAPI {
+  start: (config: { targetDir: string; projectName: string }) => Promise<void>;
+  onEvent: (listener: (event: ScaffoldEvent) => void) => Unsubscribe;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   file: ContextureFileAPI;
+  scaffold: ContextureScaffoldAPI;
 }
 
 declare global {

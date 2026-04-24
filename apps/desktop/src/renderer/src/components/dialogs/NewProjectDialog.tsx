@@ -1,18 +1,17 @@
 /**
- * New Project dialog — form slice.
+ * New Project dialog — form + preflight slice.
  *
- * Collects the name + parent directory and shows the computed target
- * path. Name input live-validates against `validateProjectName`; the
- * Create button unlocks when the name is valid and a parent has been
- * picked. Parent dir uses the OS folder picker through
- * `window.contexture.file.pickDirectory`.
- *
- * Create is intentionally a no-op here; the next slice wires it to the
- * scaffold pre-flight + progress modal.
+ * Collects the name + parent directory, shows the computed target path,
+ * and invokes the scaffolder pre-flight on Create. A failed preflight
+ * renders inline error copy (mapped from the tagged `PreflightError`)
+ * so the user can fix the problem without leaving the dialog. The live
+ * progress UI lands in the next slice.
  */
+import { type PreflightError, preflightErrorCopy } from '@renderer/model/preflight-error-copy';
 import { validateProjectName } from '@renderer/model/validate-project-name';
 import { useNewProjectStore } from '@renderer/store/new-project';
 import { Folder } from 'lucide-react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -32,14 +31,36 @@ export function NewProjectDialog(): React.JSX.Element {
   const parentDir = useNewProjectStore((s) => s.parentDir);
   const setName = useNewProjectStore((s) => s.setName);
   const setParentDir = useNewProjectStore((s) => s.setParentDir);
+  const preflightError = useNewProjectStore((s) => s.preflightError);
+  const setPreflightError = useNewProjectStore((s) => s.setPreflightError);
+  const clearPreflightError = useNewProjectStore((s) => s.clearPreflightError);
+  const setPhase = useNewProjectStore((s) => s.setPhase);
 
   const nameValidation = name === '' ? { ok: true as const } : validateProjectName(name);
   const canCreate = name !== '' && nameValidation.ok && parentDir !== '';
   const targetPath = parentDir && name ? `${parentDir}/${name}` : '';
 
+  useEffect(() => {
+    const scaffold = window.contexture?.scaffold;
+    if (!scaffold) return;
+    return scaffold.onEvent((event) => {
+      if (event.kind === 'preflight-failed') {
+        setPreflightError(event.error as PreflightError);
+      } else if (event.kind === 'stage-start') {
+        setPhase('running');
+      }
+    });
+  }, [setPreflightError, setPhase]);
+
   async function handlePickFolder(): Promise<void> {
     const picked = await window.contexture?.file.pickDirectory();
     if (picked) setParentDir(picked);
+  }
+
+  async function handleCreate(): Promise<void> {
+    if (!targetPath) return;
+    clearPreflightError();
+    await window.contexture?.scaffold.start({ targetDir: targetPath, projectName: name });
   }
 
   return (
@@ -93,13 +114,21 @@ export function NewProjectDialog(): React.JSX.Element {
               <p className="text-xs font-mono text-muted-foreground break-all">{targetPath}</p>
             </div>
           )}
+
+          {preflightError && (
+            <p className="text-sm text-destructive" role="alert">
+              {preflightErrorCopy(preflightError)}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={close}>
             Cancel
           </Button>
-          <Button disabled={!canCreate}>Create</Button>
+          <Button disabled={!canCreate} onClick={() => void handleCreate()}>
+            Create
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
