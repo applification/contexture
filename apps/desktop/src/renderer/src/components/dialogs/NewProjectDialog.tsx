@@ -32,7 +32,12 @@ import { Textarea } from '@/components/ui/textarea';
 
 const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
-export function NewProjectDialog(): React.JSX.Element {
+export interface NewProjectDialogProps {
+  /** Called with the scaffolded IR path when the user dismisses the success panel. */
+  onOpenProject?: (irPath: string) => void;
+}
+
+export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}): React.JSX.Element {
   const isOpen = useNewProjectStore((s) => s.isOpen);
   const close = useNewProjectStore((s) => s.close);
   const phase = useNewProjectStore((s) => s.phase);
@@ -128,7 +133,11 @@ export function NewProjectDialog(): React.JSX.Element {
         </DialogHeader>
 
         {showSuccess ? (
-          <SuccessView targetPath={targetPath} />
+          <SuccessView
+            targetPath={targetPath}
+            irPath={`${targetPath}/packages/schema/${name}.contexture.json`}
+            onOpenProject={onOpenProject}
+          />
         ) : showFailure ? (
           <FailureView onRetry={() => void handleCreate()} />
         ) : showProgress ? (
@@ -236,8 +245,20 @@ export function NewProjectDialog(): React.JSX.Element {
   );
 }
 
-function SuccessView({ targetPath }: { targetPath: string }): React.JSX.Element {
+function SuccessView({
+  targetPath,
+  irPath,
+  onOpenProject,
+}: {
+  targetPath: string;
+  irPath: string;
+  onOpenProject?: (irPath: string) => void;
+}): React.JSX.Element {
   const close = useNewProjectStore((s) => s.close);
+  function handleClose(): void {
+    onOpenProject?.(irPath);
+    close();
+  }
   return (
     <div data-testid="scaffold-success" className="space-y-3">
       <div className="flex items-center gap-2 text-sm">
@@ -254,7 +275,7 @@ function SuccessView({ targetPath }: { targetPath: string }): React.JSX.Element 
         <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
           Copy path
         </Button>
-        <Button data-testid="scaffold-success-close" onClick={close}>
+        <Button data-testid="scaffold-success-close" onClick={handleClose}>
           Close
         </Button>
       </div>

@@ -475,6 +475,29 @@ describe('NewProjectDialog', () => {
     });
   });
 
+  it('Close on the success panel opens the scaffolded IR before closing', async () => {
+    const bridge = mockFileBridge();
+    const onOpenProject = vi.fn();
+    render(<NewProjectDialog onOpenProject={onOpenProject} />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('scaffold-success-close')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('scaffold-success-close'));
+    expect(onOpenProject).toHaveBeenCalledWith(
+      '/tmp/my-proj/packages/schema/my-proj.contexture.json',
+    );
+    expect(useNewProjectStore.getState().isOpen).toBe(false);
+  });
+
   it('Close on the success panel closes and resets the store', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);

@@ -335,7 +335,7 @@ export default function App(): React.JSX.Element {
 
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
-      <NewProjectDialog />
+      <NewProjectDialog onOpenProject={fileMenu.handleOpenPath} />
     </div>
   );
 }
