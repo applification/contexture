@@ -49,6 +49,13 @@ export function createMemFsAdapter(seed: Record<string, string> = {}): MemFsAdap
     async fileExists(path) {
       return files.has(path);
     },
+    async dirExists(path) {
+      const prefix = path.endsWith('/') ? path : `${path}/`;
+      for (const key of files.keys()) {
+        if (key.startsWith(prefix)) return true;
+      }
+      return false;
+    },
 
     exists(path) {
       return files.has(path);

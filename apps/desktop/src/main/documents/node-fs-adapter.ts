@@ -27,4 +27,12 @@ export const nodeFsAdapter: FsAdapter = {
       return false;
     }
   },
+  async dirExists(path) {
+    try {
+      const stat = await fs.stat(path);
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
+  },
 };

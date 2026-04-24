@@ -21,10 +21,18 @@ import type { Layout } from '@renderer/model/layout';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';
-const layoutPath = '/work/garden.contexture.layout.json';
-const chatPath = '/work/garden.contexture.chat.json';
+// In project mode, layout and chat live inside the `.contexture/` marker
+// directory (they're implementation sidecars, not part of the document
+// package API). The old `<name>.contexture.layout.json` naming from the
+// scratch era is no longer used.
+const layoutPath = '/work/.contexture/layout.json';
+const chatPath = '/work/.contexture/chat.json';
 const schemaTsPath = '/work/garden.schema.ts';
 const schemaJsonPath = '/work/garden.schema.json';
+// Old per-IR sidecar paths — kept only so the "no leftovers" regression
+// test can assert they do *not* get created in either mode.
+const legacyLayoutPath = '/work/garden.contexture.layout.json';
+const legacyChatPath = '/work/garden.contexture.chat.json';
 
 const sampleIR: Schema = {
   version: '1',
@@ -50,11 +58,17 @@ function setup(seed: Record<string, string> = {}): Harness {
   return { store, fs };
 }
 
+/** Seed a `.contexture/` marker dir so the store treats the workspace as project mode. */
+const PROJECT_MARKER = { '/work/.contexture/.keep': '' } as const;
+
 describe('DocumentStore', () => {
   let harness: Harness;
 
   beforeEach(() => {
-    harness = setup();
+    // Default harness is project-mode so existing save semantics (5-file
+    // bundle + emitters) continue to apply. Scratch-mode tests opt out by
+    // building their own harness with no .contexture/ marker.
+    harness = setup({ ...PROJECT_MARKER });
   });
 
   it('round-trips: save then open returns the same IR + layout + chat', async () => {
@@ -102,6 +116,7 @@ describe('DocumentStore', () => {
 
   it('open succeeds with warnings when a sidecar is corrupt', async () => {
     const seed = setup({
+      ...PROJECT_MARKER,
       [irPath]: JSON.stringify(sampleIR),
       [layoutPath]: '{not valid json',
       [chatPath]: JSON.stringify(sampleChat),
@@ -167,6 +182,82 @@ describe('DocumentStore', () => {
     expect(harness.fs.exists(chatPath)).toBe(false);
     expect(harness.fs.exists(schemaTsPath)).toBe(false);
     expect(harness.fs.exists(schemaJsonPath)).toBe(false);
+  });
+
+  it("open returns mode:'scratch' when no .contexture/ sibling exists", async () => {
+    const seed = setup({ [irPath]: JSON.stringify(sampleIR) });
+    const bundle = await seed.store.open(irPath);
+    expect(bundle.mode).toBe('scratch');
+  });
+
+  it("open returns mode:'project' when a .contexture/ directory sits next to the IR", async () => {
+    const seed = setup({
+      [irPath]: JSON.stringify(sampleIR),
+      // The mem-fs adapter models dirs by presence of any path under them.
+      '/work/.contexture/emitted.json': '{}',
+    });
+    const bundle = await seed.store.open(irPath);
+    expect(bundle.mode).toBe('project');
+  });
+
+  it('project-mode save writes Convex schema.ts next to the IR with the contexture-generated banner', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    const convexPath = '/work/schema.ts';
+    expect(harness.fs.exists(convexPath)).toBe(true);
+    const convex = await harness.fs.readFile(convexPath);
+    expect(convex).toContain('@contexture-generated');
+    expect(convex).toMatch(/defineSchema\s*\(/);
+  });
+
+  it('project-mode save writes layout + chat into .contexture/, not next to the IR', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    expect(harness.fs.exists('/work/.contexture/layout.json')).toBe(true);
+    expect(harness.fs.exists('/work/.contexture/chat.json')).toBe(true);
+    // The legacy sibling locations must not be populated — they were the
+    // scratch-era layout/chat paths and are no longer used.
+    expect(harness.fs.exists(legacyLayoutPath)).toBe(false);
+    expect(harness.fs.exists(legacyChatPath)).toBe(false);
+  });
+
+  it('scratch-mode save writes only the IR file — no layout/chat/mirrors', async () => {
+    const { store, fs } = setup();
+    await store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    expect(fs.exists(irPath)).toBe(true);
+    expect(fs.exists(layoutPath)).toBe(false);
+    expect(fs.exists(chatPath)).toBe(false);
+    expect(fs.exists(schemaTsPath)).toBe(false);
+    expect(fs.exists(schemaJsonPath)).toBe(false);
+  });
+
+  it('scratch-mode round-trip: reopening returns default layout + empty chat', async () => {
+    const { store } = setup();
+    await store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    const reopened = await store.open(irPath);
+    expect(reopened.mode).toBe('scratch');
+    expect(reopened.schema).toEqual(sampleIR);
+    expect(reopened.layout.positions).toEqual({});
+    expect(reopened.chat.messages).toEqual([]);
+    expect(reopened.warnings).toEqual([]);
   });
 
   it('recentFiles tracks save + open, most-recent first, deduplicated', async () => {
