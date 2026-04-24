@@ -18,6 +18,7 @@
 
 import { createHash } from 'node:crypto';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
+import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
 import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
@@ -94,6 +95,8 @@ export interface DocumentStoreDeps {
   emitJsonSchema?: (schema: Schema) => unknown;
   /** Override for tests — defaults to the real schema-index emitter. */
   emitSchemaIndex?: (baseName: string) => string;
+  /** Override for tests — defaults to the real CLAUDE.md emitter. */
+  emitClaudeMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
   emitConvex?: (schema: Schema) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
@@ -117,6 +120,21 @@ function baseNameFor(irPath: string): string {
   const slash = irPath.lastIndexOf('/');
   const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
   return leaf.slice(0, -IR_SUFFIX.length);
+}
+
+/**
+ * Monorepo project root for IRs sitting at
+ * `<root>/packages/schema/<name>.contexture.json`. Returns `null` for
+ * IRs that don't follow the canonical scaffold layout — those projects
+ * don't get a CLAUDE.md written (there's no unambiguous "root").
+ */
+export function projectRootFor(irPath: string): string | null {
+  const schemaSuffix = '/packages/schema/';
+  const slash = irPath.lastIndexOf('/');
+  if (slash === -1) return null;
+  const dir = irPath.slice(0, slash);
+  if (!dir.endsWith('/packages/schema')) return null;
+  return dir.slice(0, -schemaSuffix.length + 1);
 }
 
 export interface EmittedManifest {
@@ -177,6 +195,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     emitZod = defaultEmitZod,
     emitJsonSchema = defaultEmitJsonSchema,
     emitSchemaIndex = defaultEmitSchemaIndex,
+    emitClaudeMd = defaultEmitClaudeMd,
     emitConvex = defaultEmitConvex,
     onRecentFileAdded,
   } = deps;
@@ -234,6 +253,16 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       for (const msg of chatWarnings) warnings.push({ message: msg, severity: 'warning' });
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+
+    if (mode === 'project') {
+      const root = projectRootFor(irPath);
+      if (root) {
+        const claudePath = `${root}/CLAUDE.md`;
+        if (!(await fs.fileExists(claudePath))) {
+          await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
+        }
+      }
     }
 
     await bumpRecent(irPath);

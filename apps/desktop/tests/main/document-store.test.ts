@@ -228,6 +228,41 @@ describe('DocumentStore', () => {
     expect(source).toContain(`export * from './garden.schema';`);
   });
 
+  it('project-mode open writes CLAUDE.md at the project root if missing, with {{PROJECT_NAME}} substituted', async () => {
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(sampleIR),
+      '/proj/packages/schema/.contexture/.keep': '',
+    });
+    const bundle = await store.open(monorepoIrPath);
+    expect(bundle.mode).toBe('project');
+    expect(fs.exists('/proj/CLAUDE.md')).toBe(true);
+    const claude = await fs.readFile('/proj/CLAUDE.md');
+    expect(claude).toContain('my-app');
+    expect(claude).not.toContain('{{PROJECT_NAME}}');
+  });
+
+  it('project-mode open never overwrites an existing CLAUDE.md', async () => {
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(sampleIR),
+      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/CLAUDE.md': '# user-owned notes\n',
+    });
+    await store.open(monorepoIrPath);
+    const claude = await fs.readFile('/proj/CLAUDE.md');
+    expect(claude).toBe('# user-owned notes\n');
+  });
+
+  it('scratch-mode open does not write CLAUDE.md', async () => {
+    const { store, fs } = setup({ [irPath]: JSON.stringify(sampleIR) });
+    await store.open(irPath);
+    // No standard project root for scratch files — the parent-parent dir
+    // would be `/`, and scratch IR by definition has no project layout
+    // so CLAUDE.md must not appear anywhere.
+    expect(fs.exists('/CLAUDE.md')).toBe(false);
+  });
+
   it('project-mode save writes .contexture/emitted.json with hashes of every @contexture-generated file', async () => {
     await harness.store.save({
       irPath,
