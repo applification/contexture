@@ -86,6 +86,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       data-imported={data.imported ? 'true' : 'false'}
       data-selected={isSelected ? 'true' : 'false'}
       data-adjacent={isAdjacent ? 'true' : 'false'}
+      {...(data.table ? { 'data-table': 'true' } : {})}
       className="contexture-type-node"
       style={{
         minWidth: 180,
@@ -139,17 +140,37 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         >
           {data.typeName}
         </span>
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 500,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            opacity: 0.75,
-          }}
-        >
-          {data.kind === 'discriminatedUnion' ? 'union' : data.kind}
-        </span>
+        {data.table ? (
+          <span
+            data-testid="type-node-table-badge"
+            title="Convex table"
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: 'var(--graph-edge-property)',
+              color: 'var(--graph-node-header-text)',
+              opacity: 0.9,
+            }}
+          >
+            table
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              opacity: 0.75,
+            }}
+          >
+            {data.kind === 'discriminatedUnion' ? 'union' : data.kind}
+          </span>
+        )}
       </div>
 
       {data.fields.length > 0 && (

@@ -96,6 +96,31 @@ describe('TypeNode', () => {
     expect(event.detail).toEqual({ typeName: 'Plot', fieldName: 'name' });
   });
 
+  it('marks table-flagged nodes with data-table="true"', () => {
+    const data: TypeNodeData = {
+      typeName: 'Post',
+      kind: 'object',
+      imported: false,
+      table: true,
+      fields: [],
+    };
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    const node = container.querySelector('[data-testid="type-node"]') as HTMLElement;
+    expect(node.dataset.table).toBe('true');
+  });
+
+  it('does not mark non-table nodes with data-table', () => {
+    const data: TypeNodeData = {
+      typeName: 'Post',
+      kind: 'object',
+      imported: false,
+      fields: [],
+    };
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    const node = container.querySelector('[data-testid="type-node"]') as HTMLElement;
+    expect(node.dataset.table).toBeUndefined();
+  });
+
   it('does not render a field list when there are no fields', () => {
     const data: TypeNodeData = {
       typeName: 'Empty',
