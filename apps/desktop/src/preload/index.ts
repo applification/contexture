@@ -112,6 +112,8 @@ const file = {
   /** Menu-bar -> renderer subscriptions. */
   onMenuNew: (listener: () => void) =>
     subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
+  onMenuNewProject: (listener: () => void) =>
+    subscribe('menu:file-new-project', (() => listener()) as (p: unknown) => void),
   onMenuOpen: (listener: () => void) =>
     subscribe('menu:file-open', (() => listener()) as (p: unknown) => void),
   onMenuSave: (listener: () => void) =>

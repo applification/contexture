@@ -38,6 +38,13 @@ export function createMenuTemplate(mainWindow: BrowserWindow): MenuItemConstruct
           },
         },
         {
+          label: 'New Project…',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: (): void => {
+            mainWindow.webContents.send('menu:file-new-project');
+          },
+        },
+        {
           label: 'Open Contexture File…',
           accelerator: 'CmdOrCtrl+O',
           click: (): void => {

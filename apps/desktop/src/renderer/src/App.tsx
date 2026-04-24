@@ -29,6 +29,7 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
+import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
@@ -48,6 +49,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { useFileMenu } from './hooks/useFileMenu';
+import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
 import { emit as emitZod } from './model/emit-zod';
@@ -143,6 +145,8 @@ export default function App(): React.JSX.Element {
   chatMessagesRef.current = chat.messages;
   const chatHydrateRef = useRef(chat.hydrate);
   chatHydrateRef.current = chat.hydrate;
+
+  useNewProject();
 
   const fileMenu = useFileMenu({
     getLayout: () => ({ version: '1', positions: positionsRef.current }),
@@ -331,6 +335,7 @@ export default function App(): React.JSX.Element {
 
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
+      <NewProjectDialog />
     </div>
   );
 }

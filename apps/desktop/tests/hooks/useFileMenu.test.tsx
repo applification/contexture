@@ -33,6 +33,7 @@ function mockFileBridge(): {
       onMenuOpen: () => () => undefined,
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
+      onMenuNewProject: () => () => undefined,
     },
   };
   return { openDialog, saveAsDialog, save, openRecent, getRecentFiles };

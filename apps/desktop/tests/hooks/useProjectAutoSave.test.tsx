@@ -23,6 +23,7 @@ function mockFileBridge(): { save: ReturnType<typeof vi.fn> } {
       onMenuOpen: () => () => undefined,
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
+      onMenuNewProject: () => () => undefined,
     },
   };
   return { save };

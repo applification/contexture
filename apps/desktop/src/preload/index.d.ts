@@ -112,6 +112,7 @@ export interface ContextureFileAPI {
   getRecentFiles: () => Promise<string[]>;
   openRecent: (filePath: string) => Promise<OpenedDocument | null>;
   onMenuNew: (listener: () => void) => Unsubscribe;
+  onMenuNewProject: (listener: () => void) => Unsubscribe;
   onMenuOpen: (listener: () => void) => Unsubscribe;
   onMenuSave: (listener: () => void) => Unsubscribe;
   onMenuSaveAs: (listener: () => void) => Unsubscribe;
