@@ -2,6 +2,7 @@
 
 exports[`emit (JSON Schema) > snapshot: representative IR covering all 4 TypeDef kinds and all 8 FieldType kinds 1`] = `
 {
+  "$contexture_generated": "@contexture-generated — do not edit by hand. Regenerated on every IR save.",
   "$defs": {
     "Click": {
       "additionalProperties": false,

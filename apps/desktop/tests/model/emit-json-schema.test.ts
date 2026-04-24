@@ -7,8 +7,15 @@ describe('emit (JSON Schema)', () => {
     const out = emit({ version: '1', types: [] });
     expect(out).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $contexture_generated: expect.stringContaining('@contexture-generated'),
       $defs: {},
     });
+  });
+
+  it('carries an @contexture-generated marker on the root for drift detection', () => {
+    const out = emit({ version: '1', types: [] }) as { $contexture_generated?: unknown };
+    expect(typeof out.$contexture_generated).toBe('string');
+    expect(out.$contexture_generated).toContain('@contexture-generated');
   });
 
   it('emits an object TypeDef as an object schema in $defs', () => {
