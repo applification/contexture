@@ -21,5 +21,8 @@ playwright-report/
 # Paperclip agent worktrees and local state
 .paperclip/
 
+# Claude Code scheduled-task runtime artefacts
+.claude/scheduled_tasks.lock
+
 # Sensitive docs migrated to Paperclip issue documents (ONT-49)
 Marketing/
