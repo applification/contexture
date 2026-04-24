@@ -19,7 +19,7 @@
  *     field-level paths after the replacement lands.
  */
 
-import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from '../model/ir';
+import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from '../model/ir';
 import { IRSchema } from '../model/ir';
 
 export type Op =
@@ -35,6 +35,10 @@ export type Op =
   | { kind: 'set_discriminator'; typeName: string; discriminator: string }
   | { kind: 'add_import'; import: ImportDecl }
   | { kind: 'remove_import'; alias: string }
+  | { kind: 'set_table_flag'; typeName: string; table: boolean }
+  | { kind: 'add_index'; typeName: string; index: IndexDef }
+  | { kind: 'remove_index'; typeName: string; name: string }
+  | { kind: 'update_index'; typeName: string; name: string; patch: Partial<IndexDef> }
   | { kind: 'replace_schema'; schema: unknown };
 
 export type ApplyResult = { schema: Schema } | { error: string };
@@ -65,6 +69,14 @@ export function apply(schema: Schema, op: Op): ApplyResult {
       return addImport(schema, op.import);
     case 'remove_import':
       return removeImport(schema, op.alias);
+    case 'set_table_flag':
+      return setTableFlag(schema, op.typeName, op.table);
+    case 'add_index':
+      return addIndex(schema, op.typeName, op.index);
+    case 'remove_index':
+      return removeIndex(schema, op.typeName, op.name);
+    case 'update_index':
+      return updateIndex(schema, op.typeName, op.name, op.patch);
     case 'replace_schema':
       return replaceSchema(op.schema);
     default:
@@ -210,6 +222,71 @@ function reorderFields(schema: Schema, typeName: string, order: string[]): Apply
       next.push(f);
     }
     return { ...t, fields: next };
+  });
+}
+
+// ── tables + indexes ─────────────────────────────────────────────────────
+
+function setTableFlag(schema: Schema, typeName: string, table: boolean): ApplyResult {
+  return withObject(schema, typeName, (t) => ({ ...t, table }));
+}
+
+function addIndex(schema: Schema, typeName: string, index: IndexDef): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    if (index.fields.length === 0) {
+      return { error: `add_index: index "${index.name}" must have at least one field` };
+    }
+    const existing = t.indexes ?? [];
+    if (existing.some((i) => i.name === index.name)) {
+      return { error: `index "${index.name}" already exists on "${typeName}"` };
+    }
+    const fieldNames = new Set(t.fields.map((f) => f.name));
+    for (const f of index.fields) {
+      if (!fieldNames.has(f)) {
+        return { error: `add_index: unknown field "${f}" on "${typeName}"` };
+      }
+    }
+    return { ...t, indexes: [...existing, index] };
+  });
+}
+
+function removeIndex(schema: Schema, typeName: string, name: string): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.indexes ?? [];
+    if (!existing.some((i) => i.name === name)) {
+      return { error: `index "${name}" not found on "${typeName}"` };
+    }
+    return { ...t, indexes: existing.filter((i) => i.name !== name) };
+  });
+}
+
+function updateIndex(
+  schema: Schema,
+  typeName: string,
+  name: string,
+  patch: Partial<IndexDef>,
+): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.indexes ?? [];
+    const idx = existing.findIndex((i) => i.name === name);
+    if (idx === -1) return { error: `index "${name}" not found on "${typeName}"` };
+    const nextName = patch.name ?? existing[idx].name;
+    const nextFields = patch.fields ?? existing[idx].fields;
+    if (nextFields.length === 0) {
+      return { error: `update_index: index "${name}" must have at least one field` };
+    }
+    if (patch.name && patch.name !== name && existing.some((i) => i.name === patch.name)) {
+      return { error: `index "${patch.name}" already exists on "${typeName}"` };
+    }
+    const fieldNames = new Set(t.fields.map((f) => f.name));
+    for (const f of nextFields) {
+      if (!fieldNames.has(f)) {
+        return { error: `update_index: unknown field "${f}" on "${typeName}"` };
+      }
+    }
+    const indexes = [...existing];
+    indexes[idx] = { name: nextName, fields: nextFields };
+    return { ...t, indexes };
   });
 }
 

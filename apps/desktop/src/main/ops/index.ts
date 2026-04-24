@@ -227,6 +227,47 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       ({ alias }) => ({ kind: 'remove_import', alias }),
       forward,
     ),
+    strictTool(
+      'set_table_flag',
+      'Flag or unflag an object type as a Convex table.',
+      { typeName: z.string().min(1), table: z.boolean() },
+      ({ typeName, table }) => ({ kind: 'set_table_flag', typeName, table }),
+      forward,
+    ),
+    strictTool(
+      'add_index',
+      'Add a named index to a table-flagged object type.',
+      {
+        typeName: z.string().min(1),
+        index: z.object({
+          name: z.string().min(1),
+          fields: z.array(z.string().min(1)).min(1),
+        }),
+      },
+      ({ typeName, index }) => ({ kind: 'add_index', typeName, index }),
+      forward,
+    ),
+    strictTool(
+      'remove_index',
+      'Remove an index from an object type by index name.',
+      { typeName: z.string().min(1), name: z.string().min(1) },
+      ({ typeName, name }) => ({ kind: 'remove_index', typeName, name }),
+      forward,
+    ),
+    strictTool(
+      'update_index',
+      'Update an index name and/or fields on an object type.',
+      {
+        typeName: z.string().min(1),
+        name: z.string().min(1),
+        patch: z.object({
+          name: z.string().min(1).optional(),
+          fields: z.array(z.string().min(1)).min(1).optional(),
+        }),
+      },
+      ({ typeName, name, patch }) => ({ kind: 'update_index', typeName, name, patch }),
+      forward,
+    ),
     // --- Type-level (lenient with meta-schema validation) ---
     lenientTool(
       'add_type',

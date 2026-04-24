@@ -88,11 +88,20 @@ export const FieldDefSchema = z.object({
 
 export type FieldDef = z.infer<typeof FieldDefSchema>;
 
+export const IndexDefSchema = z.object({
+  name: z.string().min(1),
+  fields: z.array(z.string().min(1)).min(1),
+});
+
+export type IndexDef = z.infer<typeof IndexDefSchema>;
+
 const ObjectTypeDefSchema = z.object({
   kind: z.literal('object'),
   name: z.string().min(1),
   description: z.string().optional(),
   fields: z.array(FieldDefSchema),
+  table: z.boolean().optional(),
+  indexes: z.array(IndexDefSchema).optional(),
 });
 
 const EnumTypeDefSchema = z.object({
