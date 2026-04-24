@@ -271,6 +271,52 @@ describe('IRSchema', () => {
     expect(path).toContain('types.0.fields.0.type');
   });
 
+  it('accepts an object TypeDef with table:true and indexes', () => {
+    const input = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          indexes: [
+            { name: 'by_author', fields: ['author'] },
+            { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },
+          ],
+          fields: [
+            { name: 'author', type: { kind: 'string' } },
+            { name: 'publishedAt', type: { kind: 'date' } },
+          ],
+        },
+      ],
+    };
+    const parsed = IRSchema.parse(input);
+    const td = parsed.types[0];
+    if (td.kind !== 'object') throw new Error('expected object');
+    expect(td.table).toBe(true);
+    expect(td.indexes).toEqual([
+      { name: 'by_author', fields: ['author'] },
+      { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },
+    ]);
+  });
+
+  it('rejects an index with an empty fields array', () => {
+    const input = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          indexes: [{ name: 'bad', fields: [] }],
+          fields: [{ name: 'author', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const res = IRSchema.safeParse(input);
+    expect(res.success).toBe(false);
+  });
+
   it('accepts an object TypeDef with a string field', () => {
     const input = {
       version: '1',

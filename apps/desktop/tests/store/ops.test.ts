@@ -305,6 +305,175 @@ describe('apply', () => {
     ]);
   });
 
+  // set_table_flag
+  it('set_table_flag: toggles the table flag on an object type', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'Post', fields: [] }],
+    };
+    const s1 = ok(apply(base, { kind: 'set_table_flag', typeName: 'Post', table: true }));
+    const t = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(t.table).toBe(true);
+
+    const s2 = ok(apply(s1, { kind: 'set_table_flag', typeName: 'Post', table: false }));
+    const t2 = s2.types[0] as Extract<(typeof s2.types)[number], { kind: 'object' }>;
+    expect(t2.table).toBe(false);
+
+    const missing = apply(base, { kind: 'set_table_flag', typeName: 'Nope', table: true });
+    expect('error' in missing).toBe(true);
+  });
+
+  it('set_table_flag: errors on non-object types', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }] }],
+    };
+    const res = apply(base, { kind: 'set_table_flag', typeName: 'Role', table: true });
+    expect('error' in res).toBe(true);
+  });
+
+  // add_index
+  it('add_index: appends, rejects duplicate name, unknown field, empty fields', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [
+            { name: 'author', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+        },
+      ],
+    };
+    const s1 = ok(
+      apply(base, {
+        kind: 'add_index',
+        typeName: 'Post',
+        index: { name: 'by_author', fields: ['author'] },
+      }),
+    );
+    const t = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(t.indexes).toEqual([{ name: 'by_author', fields: ['author'] }]);
+
+    const dup = apply(s1, {
+      kind: 'add_index',
+      typeName: 'Post',
+      index: { name: 'by_author', fields: ['title'] },
+    });
+    expect('error' in dup).toBe(true);
+
+    const unknown = apply(base, {
+      kind: 'add_index',
+      typeName: 'Post',
+      index: { name: 'by_x', fields: ['nope'] },
+    });
+    expect('error' in unknown).toBe(true);
+
+    const empty = apply(base, {
+      kind: 'add_index',
+      typeName: 'Post',
+      index: { name: 'empty', fields: [] },
+    });
+    expect('error' in empty).toBe(true);
+  });
+
+  // remove_index
+  it('remove_index: drops by name, errors if missing', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [{ name: 'author', type: { kind: 'string' } }],
+          indexes: [
+            { name: 'by_author', fields: ['author'] },
+            { name: 'by_author2', fields: ['author'] },
+          ],
+        },
+      ],
+    };
+    const s1 = ok(apply(base, { kind: 'remove_index', typeName: 'Post', name: 'by_author' }));
+    const t = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(t.indexes).toEqual([{ name: 'by_author2', fields: ['author'] }]);
+
+    const missing = apply(base, { kind: 'remove_index', typeName: 'Post', name: 'nope' });
+    expect('error' in missing).toBe(true);
+  });
+
+  // update_index
+  it('update_index: patches name and/or fields, rejects conflicts', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [
+            { name: 'author', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+          indexes: [
+            { name: 'by_author', fields: ['author'] },
+            { name: 'by_title', fields: ['title'] },
+          ],
+        },
+      ],
+    };
+
+    const renamed = ok(
+      apply(base, {
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author',
+        patch: { name: 'by_user' },
+      }),
+    );
+    const t = renamed.types[0] as Extract<(typeof renamed.types)[number], { kind: 'object' }>;
+    expect(t.indexes?.[0]).toEqual({ name: 'by_user', fields: ['author'] });
+
+    const fieldsPatched = ok(
+      apply(base, {
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author',
+        patch: { fields: ['author', 'title'] },
+      }),
+    );
+    const t2 = fieldsPatched.types[0] as Extract<
+      (typeof fieldsPatched.types)[number],
+      { kind: 'object' }
+    >;
+    expect(t2.indexes?.[0]).toEqual({ name: 'by_author', fields: ['author', 'title'] });
+
+    const conflict = apply(base, {
+      kind: 'update_index',
+      typeName: 'Post',
+      name: 'by_author',
+      patch: { name: 'by_title' },
+    });
+    expect('error' in conflict).toBe(true);
+
+    const unknown = apply(base, {
+      kind: 'update_index',
+      typeName: 'Post',
+      name: 'by_author',
+      patch: { fields: ['nope'] },
+    });
+    expect('error' in unknown).toBe(true);
+
+    const missing = apply(base, {
+      kind: 'update_index',
+      typeName: 'Post',
+      name: 'nope',
+      patch: { fields: ['author'] },
+    });
+    expect('error' in missing).toBe(true);
+  });
+
   // 13. replace_schema — structural pre-flight
   it('replace_schema: installs a valid IR and rejects a structurally-bad one', () => {
     const next: Schema = {
