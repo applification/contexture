@@ -16,6 +16,7 @@
  * selection prop surface.
  */
 import { useSyncExternalStore } from 'react';
+import { useDocumentStore } from '../../store/document';
 import type { Op } from '../../store/ops';
 import { useUndoStore } from '../../store/undo';
 import type { RefEdgeData } from '../graph/schema-to-graph';
@@ -35,6 +36,7 @@ export interface DetailPanelProps {
 
 export function DetailPanel({ selection }: DetailPanelProps) {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
+  const mode = useDocumentStore((s) => s.mode);
   const dispatch = (op: Op) => {
     useUndoStore.getState().apply(op);
   };
@@ -63,7 +65,7 @@ export function DetailPanel({ selection }: DetailPanelProps) {
     return <FieldDetail typeName={type.name} field={field} dispatch={dispatch} />;
   }
 
-  return <TypeDetail type={type} dispatch={dispatch} />;
+  return <TypeDetail type={type} dispatch={dispatch} mode={mode} />;
 }
 
 function EmptyState({ message }: { message: string }) {
