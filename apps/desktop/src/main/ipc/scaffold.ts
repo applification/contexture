@@ -13,7 +13,9 @@ import { ipcMain } from 'electron';
 import type { FsAdapter } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 import { createCompositeStageRunner } from '../scaffold/composite-runner';
-import type { PreflightError, PreflightResult } from '../scaffold/preflight';
+import { nodePreflightDeps } from '../scaffold/node-preflight-deps';
+import { nodeSpawner } from '../scaffold/node-spawner';
+import { type PreflightError, type PreflightResult, runPreflight } from '../scaffold/preflight';
 import {
   type ScaffoldConfig,
   type StageEvent,
@@ -57,13 +59,9 @@ export function registerScaffoldIpc(mainWindow: BrowserWindow): void {
   ipcMain.handle('scaffold:start', async (_evt, config: ScaffoldConfig) => {
     await handleScaffoldStart(config, {
       fs: nodeFsAdapter,
-      spawner: productionSpawner,
-      preflight: async () => ({ ok: true }),
+      spawner: nodeSpawner,
+      preflight: (c) => runPreflight({ targetDir: c.targetDir }, nodePreflightDeps),
       emit: (ev) => mainWindow.webContents.send('scaffold:event', ev),
     });
   });
 }
-
-const productionSpawner: Spawner = () => {
-  throw new Error('productionSpawner not yet wired — slice 10 wires child_process.spawn');
-};
