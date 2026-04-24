@@ -212,6 +212,76 @@ describe('NewProjectDialog', () => {
     });
   });
 
+  it('switches to the progress view on stage-start and shows all ten stage labels', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Scaffolding monorepo/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Installing dependencies/i)).toBeInTheDocument();
+    expect(screen.getByText(/Seeding initial IR/i)).toBeInTheDocument();
+  });
+
+  it('flips the active row to running and previous rows to done as events arrive', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'stage-done', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 2 });
+    });
+    await waitFor(() => {
+      const row1 = screen.getByTestId('scaffold-stage-1');
+      expect(row1).toHaveAttribute('data-status', 'done');
+    });
+    expect(screen.getByTestId('scaffold-stage-2')).toHaveAttribute('data-status', 'running');
+    expect(screen.getByTestId('scaffold-stage-3')).toHaveAttribute('data-status', 'pending');
+  });
+
+  it('appends stdout/stderr chunks to the streaming log', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+      bridge.fireScaffoldEvent({
+        kind: 'stdout-chunk',
+        stage: 1,
+        chunk: 'creating apps/...\n',
+      });
+      bridge.fireScaffoldEvent({
+        kind: 'stderr-chunk',
+        stage: 1,
+        chunk: 'warn: something\n',
+      });
+    });
+    await waitFor(() => {
+      const log = screen.getByTestId('scaffold-log');
+      expect(log.textContent).toContain('creating apps/...');
+      expect(log.textContent).toContain('warn: something');
+    });
+  });
+
   it('Cancel closes the dialog and resets the form', () => {
     mockFileBridge();
     render(<NewProjectDialog />);
