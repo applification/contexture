@@ -16,6 +16,7 @@
  * wires `NodeFsAdapter`; tests wire `MemFsAdapter`.
  */
 
+import { createHash } from 'node:crypto';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
@@ -31,6 +32,8 @@ export const SCHEMA_JSON_SUFFIX = '.schema.json';
 /** Layout + chat now live inside `.contexture/` as implementation sidecars. */
 export const LAYOUT_FILE = 'layout.json';
 export const CHAT_FILE = 'chat.json';
+/** Hash manifest of every @contexture-generated artefact, used for drift detection. */
+export const EMITTED_FILE = 'emitted.json';
 
 // Legacy sibling-file names — kept exported so `main/ipc/file.ts` can
 // continue to read pre-project-mode documents without hard-breaking a
@@ -116,10 +119,26 @@ function baseNameFor(irPath: string): string {
   return leaf.slice(0, -IR_SUFFIX.length);
 }
 
+export interface EmittedManifest {
+  version: '1';
+  files: Record<string, string>;
+}
+
+function sha256(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function buildManifest(entries: ReadonlyArray<{ path: string; content: string }>): EmittedManifest {
+  const files: Record<string, string> = {};
+  for (const { path, content } of entries) files[path] = sha256(content);
+  return { version: '1', files };
+}
+
 export function bundlePathsFor(irPath: string): {
   ir: string;
   layout: string;
   chat: string;
+  emitted: string;
   schemaTs: string;
   schemaJson: string;
   schemaIndex: string;
@@ -138,6 +157,7 @@ export function bundlePathsFor(irPath: string): {
     // skips sidecars; scratch open tolerates ENOENT and uses defaults).
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
+    emitted: `${ctxDir}/${EMITTED_FILE}`,
     schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
     // Workspace re-export: consumers `import { … } from '@<project>/schema'`
@@ -285,14 +305,24 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     const schemaIndex = emitSchemaIndex(baseName);
     const convexSource = emitConvex(input.schema);
 
-    const files = [
-      { path: paths.ir, content: saveIR(input.schema) },
-      { path: paths.layout, content: saveLayout(input.layout) },
-      { path: paths.chat, content: saveChatHistory(input.chat) },
+    // Pair each emitted artefact with its content hash so we can build
+    // the drift-detection manifest before writing. The IR is the source
+    // of truth, not a generated file, so it does not appear in the
+    // manifest.
+    const emitted: Array<{ path: string; content: string }> = [
       { path: paths.schemaTs, content: schemaTs },
       { path: paths.schemaJson, content: schemaJson },
       { path: paths.schemaIndex, content: schemaIndex },
       { path: paths.convex, content: convexSource },
+    ];
+    const manifest = buildManifest(emitted);
+
+    const files = [
+      { path: paths.ir, content: saveIR(input.schema) },
+      { path: paths.layout, content: saveLayout(input.layout) },
+      { path: paths.chat, content: saveChatHistory(input.chat) },
+      ...emitted,
+      { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
     ];
 
     await writeBundleAtomic(files);

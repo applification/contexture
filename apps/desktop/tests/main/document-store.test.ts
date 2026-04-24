@@ -228,6 +228,35 @@ describe('DocumentStore', () => {
     expect(source).toContain(`export * from './garden.schema';`);
   });
 
+  it('project-mode save writes .contexture/emitted.json with hashes of every @contexture-generated file', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    const manifestPath = '/work/.contexture/emitted.json';
+    expect(harness.fs.exists(manifestPath)).toBe(true);
+    const manifest = JSON.parse(await harness.fs.readFile(manifestPath)) as {
+      version: string;
+      files: Record<string, string>;
+    };
+    expect(manifest.version).toBe('1');
+    // Every emitted artefact has a hash entry; IR itself is not generated
+    // (it's the source of truth) so it is not in the manifest.
+    expect(Object.keys(manifest.files).sort()).toEqual(
+      [
+        '/work/garden.schema.ts',
+        '/work/garden.schema.json',
+        '/work/index.ts',
+        '/work/schema.ts',
+      ].sort(),
+    );
+    for (const hash of Object.values(manifest.files)) {
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    }
+  });
+
   it('scratch-mode save does not write a schema index', async () => {
     const { store, fs } = setup();
     await store.save({
