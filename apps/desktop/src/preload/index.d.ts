@@ -145,6 +145,8 @@ export interface ContextureScaffoldAPI {
 export interface ContextureShellAPI {
   /** Reveal the given path in the OS file manager (Finder / Explorer). */
   reveal: (path: string) => Promise<void>;
+  /** Open a folder or file in VS Code via the `vscode://` URL scheme. */
+  openInEditor: (path: string) => Promise<void>;
 }
 
 export interface ContextureProjectAPI {

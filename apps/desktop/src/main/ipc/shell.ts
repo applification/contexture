@@ -10,4 +10,7 @@ export function registerShellIpc(): void {
   ipcMain.handle('shell:reveal', (_evt, path: string) => {
     shell.showItemInFolder(path);
   });
+  ipcMain.handle('shell:open-in-editor', async (_evt, path: string) => {
+    await shell.openExternal(`vscode://file${path}`);
+  });
 }

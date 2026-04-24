@@ -137,6 +137,9 @@ const shell = {
   /** Reveal a file or folder in the OS file manager (Finder / Explorer). */
   reveal: (path: string): Promise<void> =>
     ipcRenderer.invoke('shell:reveal', path) as Promise<void>,
+  /** Open a folder (or file) in VS Code via the `vscode://` URL scheme. */
+  openInEditor: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:open-in-editor', path) as Promise<void>,
 };
 
 const project = {

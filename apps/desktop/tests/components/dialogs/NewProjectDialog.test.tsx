@@ -18,12 +18,14 @@ function mockFileBridge(pickResult: string | null = null): {
   pickDirectory: ReturnType<typeof vi.fn>;
   scaffoldStart: ReturnType<typeof vi.fn>;
   shellReveal: ReturnType<typeof vi.fn>;
+  shellOpenInEditor: ReturnType<typeof vi.fn>;
   projectDeleteDir: ReturnType<typeof vi.fn>;
   fireScaffoldEvent: (event: unknown) => void;
 } {
   const pickDirectory = vi.fn(async () => pickResult);
   const scaffoldStart = vi.fn(async () => undefined);
   const shellReveal = vi.fn(async () => undefined);
+  const shellOpenInEditor = vi.fn(async () => undefined);
   const projectDeleteDir = vi.fn(async () => undefined);
   let captured: ((event: unknown) => void) | null = null;
   (window as unknown as { contexture: unknown }).contexture = {
@@ -53,6 +55,7 @@ function mockFileBridge(pickResult: string | null = null): {
     },
     shell: {
       reveal: shellReveal,
+      openInEditor: shellOpenInEditor,
     },
     project: {
       deleteDirectory: projectDeleteDir,
@@ -62,6 +65,7 @@ function mockFileBridge(pickResult: string | null = null): {
     pickDirectory,
     scaffoldStart,
     shellReveal,
+    shellOpenInEditor,
     projectDeleteDir,
     fireScaffoldEvent: (event: unknown) => captured?.(event),
   };
@@ -587,6 +591,27 @@ describe('NewProjectDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /Reveal/i }));
     await waitFor(() => {
       expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj');
+    });
+  });
+
+  it('Open in VS Code on the success panel opens the target folder in VS Code', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Open in VS Code/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Open in VS Code/i }));
+    await waitFor(() => {
+      expect(bridge.shellOpenInEditor).toHaveBeenCalledWith('/tmp/my-proj');
     });
   });
 

@@ -278,6 +278,12 @@ function SuccessView({
         <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(targetPath)}>
           Reveal
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => void window.contexture?.shell.openInEditor(targetPath)}
+        >
+          Open in VS Code
+        </Button>
         <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
           Copy path
         </Button>
