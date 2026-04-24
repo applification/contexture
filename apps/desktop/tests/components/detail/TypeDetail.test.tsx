@@ -61,6 +61,153 @@ describe('TypeDetail', () => {
     });
   });
 
+  describe('Convex section (object kind)', () => {
+    const base: TypeDef = {
+      kind: 'object',
+      name: 'Post',
+      fields: [
+        { name: 'author', type: { kind: 'string' } },
+        { name: 'title', type: { kind: 'string' } },
+      ],
+    };
+
+    it('renders the "Use as Convex table" checkbox', () => {
+      setup(base);
+      expect(screen.getByLabelText('Use as Convex table')).toBeInTheDocument();
+    });
+
+    it('dispatches set_table_flag when the checkbox toggles on', () => {
+      const { dispatch } = setup(base);
+      fireEvent.click(screen.getByLabelText('Use as Convex table'));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'set_table_flag',
+        typeName: 'Post',
+        table: true,
+      });
+    });
+
+    it('dispatches set_table_flag:false when toggled off', () => {
+      const { dispatch } = setup({ ...base, table: true });
+      fireEvent.click(screen.getByLabelText('Use as Convex table'));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'set_table_flag',
+        typeName: 'Post',
+        table: false,
+      });
+    });
+
+    it('does not show the indexes editor when the type is not a table', () => {
+      setup(base);
+      expect(screen.queryByText('Indexes')).not.toBeInTheDocument();
+    });
+
+    it('shows the indexes editor and add-index button when table:true', () => {
+      setup({ ...base, table: true });
+      expect(screen.getByText('Indexes')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add index/i })).toBeInTheDocument();
+    });
+
+    it('does not render the Convex section for non-object kinds', () => {
+      setup({
+        kind: 'enum',
+        name: 'Role',
+        values: [{ value: 'admin' }],
+      });
+      expect(screen.queryByLabelText('Use as Convex table')).not.toBeInTheDocument();
+    });
+
+    it('dispatches add_index with a placeholder name when "Add index" is clicked', () => {
+      const { dispatch } = setup({ ...base, table: true });
+      fireEvent.click(screen.getByRole('button', { name: /add index/i }));
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'add_index',
+          typeName: 'Post',
+          index: expect.objectContaining({ fields: [expect.any(String)] }),
+        }),
+      );
+    });
+
+    it('dispatches remove_index when the delete button is clicked', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author', fields: ['author'] }],
+      };
+      const { dispatch } = setup(typeWithIndex);
+      fireEvent.click(screen.getByRole('button', { name: /delete index by_author/i }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_index',
+        typeName: 'Post',
+        name: 'by_author',
+      });
+    });
+
+    it('dispatches update_index when the name input blurs with a new value', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author', fields: ['author'] }],
+      };
+      const { dispatch } = setup(typeWithIndex);
+      const input = screen.getByDisplayValue('by_author') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'by_writer' } });
+      fireEvent.blur(input);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author',
+        patch: { name: 'by_writer' },
+      });
+    });
+
+    it('dispatches update_index when a field checkbox toggles', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author', fields: ['author'] }],
+      };
+      const { dispatch } = setup(typeWithIndex);
+      // The "title" field is not in the index — toggling it on should patch fields.
+      const titleCheckbox = screen.getByLabelText('by_author: title');
+      fireEvent.click(titleCheckbox);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author',
+        patch: { fields: ['author', 'title'] },
+      });
+    });
+
+    it('flags type name starting with "_" as reserved when table:true', () => {
+      setup({ ...base, name: '_Post', table: true });
+      const nameInput = screen.getByLabelText('Name') as HTMLInputElement;
+      expect(nameInput.getAttribute('aria-invalid')).toBe('true');
+      expect(nameInput.title).toMatch(/reserves/i);
+    });
+
+    it('does not flag type name starting with "_" when table:false', () => {
+      setup({ ...base, name: '_Post' });
+      const nameInput = screen.getByLabelText('Name') as HTMLInputElement;
+      expect(nameInput.getAttribute('aria-invalid')).not.toBe('true');
+    });
+
+    it('flags field names starting with "_" in the field summary when table:true', () => {
+      const typeWithReserved: TypeDef = {
+        ...base,
+        table: true,
+        fields: [
+          { name: '_id', type: { kind: 'string' } },
+          { name: 'author', type: { kind: 'string' } },
+        ],
+      };
+      setup(typeWithReserved);
+      const rows = screen.getAllByTestId('object-field-summary');
+      expect(rows[0].getAttribute('data-reserved')).toBe('true');
+      expect(rows[1].getAttribute('data-reserved')).not.toBe('true');
+    });
+  });
+
   describe('enum kind', () => {
     const type: TypeDef = {
       kind: 'enum',
