@@ -254,6 +254,81 @@ describe('DocumentStore', () => {
     expect(claude).toBe('# user-owned notes\n');
   });
 
+  it('project-mode open seeds apps/web/convex/<table>.ts for each table-flagged type when missing', async () => {
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const tableSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+        {
+          // Non-table object should NOT get a CRUD file.
+          kind: 'object',
+          name: 'Inline',
+          fields: [{ name: 'x', type: { kind: 'number' } }],
+        },
+      ],
+    };
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(tableSchema),
+      '/proj/packages/schema/.contexture/.keep': '',
+    });
+    await store.open(monorepoIrPath);
+    const postPath = '/proj/apps/web/convex/Post.ts';
+    expect(fs.exists(postPath)).toBe(true);
+    const contents = await fs.readFile(postPath);
+    expect(contents).toContain('@contexture-seeded');
+    expect(contents).toContain('ctx.db.query("Post")');
+    // Non-table types get no file.
+    expect(fs.exists('/proj/apps/web/convex/Inline.ts')).toBe(false);
+  });
+
+  it('project-mode open never overwrites an existing per-table CRUD file', async () => {
+    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const tableSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const userOwned = '// user-modified CRUD, do not touch\nexport const list = null;\n';
+    const { store, fs } = setup({
+      [monorepoIrPath]: JSON.stringify(tableSchema),
+      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/apps/web/convex/Post.ts': userOwned,
+    });
+    await store.open(monorepoIrPath);
+    expect(await fs.readFile('/proj/apps/web/convex/Post.ts')).toBe(userOwned);
+  });
+
+  it('scratch-mode open does not seed per-table CRUD files', async () => {
+    const tableSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const { store, fs } = setup({ [irPath]: JSON.stringify(tableSchema) });
+    await store.open(irPath);
+    // Scratch mode has no project root, so no convex tree can be seeded.
+    expect(fs.exists('/apps/web/convex/Post.ts')).toBe(false);
+    expect(fs.exists('/work/apps/web/convex/Post.ts')).toBe(false);
+  });
+
   it('scratch-mode open does not write CLAUDE.md', async () => {
     const { store, fs } = setup({ [irPath]: JSON.stringify(sampleIR) });
     await store.open(irPath);

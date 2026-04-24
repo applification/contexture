@@ -22,6 +22,7 @@ import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
 import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
+import { emitTableCrud as defaultEmitTableCrud } from '@renderer/model/emit-table-crud';
 import { emit as defaultEmitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
 import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
@@ -103,6 +104,8 @@ export interface DocumentStoreDeps {
   emitClaudeMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
   emitConvex?: (schema: Schema) => string;
+  /** Override for tests — defaults to the real per-table CRUD emitter. */
+  emitTableCrud?: (schema: Schema, tableName: string) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
   onRecentFileAdded?: (path: string) => void;
 }
@@ -201,6 +204,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     emitSchemaIndex = defaultEmitSchemaIndex,
     emitClaudeMd = defaultEmitClaudeMd,
     emitConvex = defaultEmitConvex,
+    emitTableCrud = defaultEmitTableCrud,
     onRecentFileAdded,
   } = deps;
 
@@ -265,6 +269,16 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
         const claudePath = `${root}/CLAUDE.md`;
         if (!(await fs.fileExists(claudePath))) {
           await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
+        }
+        // Seed one `apps/web/convex/<table>.ts` per table-flagged object.
+        // Written only if missing — these are `@contexture-seeded`, owned
+        // by the user/coding agent from first write on.
+        for (const type of schema.types) {
+          if (type.kind !== 'object' || type.table !== true) continue;
+          const crudPath = `${root}/apps/web/convex/${type.name}.ts`;
+          if (!(await fs.fileExists(crudPath))) {
+            await fs.writeFile(crudPath, emitTableCrud(schema, type.name));
+          }
         }
       }
     }
