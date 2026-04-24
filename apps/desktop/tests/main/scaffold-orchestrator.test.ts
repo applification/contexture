@@ -57,8 +57,18 @@ describe('scaffoldProject', () => {
     const dones = events.filter((e) => e.kind === 'stage-done').map((e) => e.stage);
     expect(starts).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(dones).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(events.at(-1)?.kind).toBe('scaffold-done');
     expect(logWrites).toHaveLength(1);
     expect(logWrites[0].path).toBe('/tmp/p/.contexture/scaffold.log');
+  });
+
+  it('does not emit scaffold-done when a stage fails', async () => {
+    const stream = scaffoldProject(
+      { targetDir: '/tmp/p', projectName: 'p' },
+      { runner: failAtRunner(2), writeLog: async () => undefined },
+    );
+    const events = await collect(stream);
+    expect(events.some((e) => e.kind === 'scaffold-done')).toBe(false);
   });
 
   it('stops at the first failing stage, emits stage-failed, and still writes the log', async () => {

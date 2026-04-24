@@ -336,6 +336,25 @@ describe('NewProjectDialog', () => {
     });
   });
 
+  it('transitions to the success panel when scaffold-done fires', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'stage-done', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(useNewProjectStore.getState().phase).toBe('done');
+    });
+  });
+
   it('Cancel closes the dialog and resets the form', () => {
     mockFileBridge();
     render(<NewProjectDialog />);

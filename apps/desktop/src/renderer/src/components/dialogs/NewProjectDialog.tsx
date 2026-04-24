@@ -77,6 +77,9 @@ export function NewProjectDialog(): React.JSX.Element {
           setPhase('failed');
           appendLog(event.stderr);
           return;
+        case 'scaffold-done':
+          setPhase('done');
+          return;
         case 'stdout-chunk':
         case 'stderr-chunk':
           appendLog(event.chunk);

@@ -29,7 +29,8 @@ export type StageEvent =
   | { kind: 'stdout-chunk'; stage: StageNumber; chunk: string }
   | { kind: 'stderr-chunk'; stage: StageNumber; chunk: string }
   | { kind: 'stage-done'; stage: StageNumber }
-  | { kind: 'stage-failed'; stage: StageNumber; stderr: string; retrySafe: boolean };
+  | { kind: 'stage-failed'; stage: StageNumber; stderr: string; retrySafe: boolean }
+  | { kind: 'scaffold-done' };
 
 /** Yielded by a stage runner during its run — stage number is stamped on by the orchestrator. */
 export type StageChunk =
@@ -89,6 +90,7 @@ export async function* scaffoldProject(
   await deps
     .writeLog(`${config.targetDir}/.contexture/scaffold.log`, formatLog(buffered))
     .catch(() => undefined);
+  yield { kind: 'scaffold-done' };
 }
 
 function formatLog(events: ReadonlyArray<StageEvent>): string {

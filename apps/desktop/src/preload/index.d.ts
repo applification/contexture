@@ -134,7 +134,8 @@ export type ScaffoldEvent =
   | { kind: 'stdout-chunk'; stage: number; chunk: string }
   | { kind: 'stderr-chunk'; stage: number; chunk: string }
   | { kind: 'stage-done'; stage: number }
-  | { kind: 'stage-failed'; stage: number; stderr: string; retrySafe: boolean };
+  | { kind: 'stage-failed'; stage: number; stderr: string; retrySafe: boolean }
+  | { kind: 'scaffold-done' };
 
 export interface ContextureScaffoldAPI {
   start: (config: { targetDir: string; projectName: string }) => Promise<void>;
