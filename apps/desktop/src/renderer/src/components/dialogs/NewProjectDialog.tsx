@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
@@ -39,6 +40,10 @@ export function NewProjectDialog(): React.JSX.Element {
   const parentDir = useNewProjectStore((s) => s.parentDir);
   const setName = useNewProjectStore((s) => s.setName);
   const setParentDir = useNewProjectStore((s) => s.setParentDir);
+  const startingPoint = useNewProjectStore((s) => s.startingPoint);
+  const description = useNewProjectStore((s) => s.description);
+  const setStartingPoint = useNewProjectStore((s) => s.setStartingPoint);
+  const setDescription = useNewProjectStore((s) => s.setDescription);
   const preflightError = useNewProjectStore((s) => s.preflightError);
   const setPreflightError = useNewProjectStore((s) => s.setPreflightError);
   const clearPreflightError = useNewProjectStore((s) => s.clearPreflightError);
@@ -48,7 +53,8 @@ export function NewProjectDialog(): React.JSX.Element {
   const resetProgress = useNewProjectStore((s) => s.resetProgress);
 
   const nameValidation = name === '' ? { ok: true as const } : validateProjectName(name);
-  const canCreate = name !== '' && nameValidation.ok && parentDir !== '';
+  const startingPointValid = startingPoint === 'describe' && description.trim() !== '';
+  const canCreate = name !== '' && nameValidation.ok && parentDir !== '' && startingPointValid;
   const targetPath = parentDir && name ? `${parentDir}/${name}` : '';
 
   useEffect(() => {
@@ -149,6 +155,48 @@ export function NewProjectDialog(): React.JSX.Element {
                 <p className="text-xs font-mono text-muted-foreground break-all">{targetPath}</p>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label>Starting point</Label>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="starting-point"
+                    className="mt-1"
+                    checked={startingPoint === 'describe'}
+                    onChange={() => setStartingPoint('describe')}
+                    aria-label="Describe what you're building"
+                  />
+                  <span>Describe what you're building</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm cursor-not-allowed text-muted-foreground">
+                  <input
+                    type="radio"
+                    name="starting-point"
+                    className="mt-1"
+                    disabled
+                    aria-label="Promote an existing scratch file"
+                  />
+                  <span>
+                    Promote an existing scratch file{' '}
+                    <span className="text-xs">(coming soon — #124)</span>
+                  </span>
+                </label>
+              </div>
+              {startingPoint === 'describe' && (
+                <div className="space-y-1">
+                  <Label htmlFor="new-project-description">Describe your project</Label>
+                  <Textarea
+                    id="new-project-description"
+                    rows={3}
+                    placeholder="A photo-sharing app where users post and like photos…"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
 
             {preflightError && (
               <p className="text-sm text-destructive" role="alert">

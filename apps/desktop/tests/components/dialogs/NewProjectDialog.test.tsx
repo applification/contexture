@@ -128,7 +128,7 @@ describe('NewProjectDialog', () => {
     expect(screen.getByText(/\/Users\/me\/projects\/my-proj/)).toBeInTheDocument();
   });
 
-  it('Create is enabled only when name is valid AND parent is chosen', () => {
+  it('Create is enabled only when name is valid AND parent is chosen AND starting-point is valid', () => {
     mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
@@ -143,13 +143,20 @@ describe('NewProjectDialog', () => {
     });
     expect(create).toBeDisabled();
 
-    // Add parent — now enabled.
+    // Name + parent, no starting point — still disabled.
     act(() => {
       useNewProjectStore.getState().setParentDir('/tmp');
     });
+    expect(create).toBeDisabled();
+
+    // Add describe + description — now enabled.
+    act(() => {
+      useNewProjectStore.getState().setStartingPoint('describe');
+      useNewProjectStore.getState().setDescription('a blog');
+    });
     expect(create).toBeEnabled();
 
-    // Invalid name with parent — disabled again.
+    // Invalid name with everything else — disabled again.
     act(() => {
       useNewProjectStore.getState().setName('Bad');
     });
@@ -163,6 +170,8 @@ describe('NewProjectDialog', () => {
       useNewProjectStore.getState().open();
       useNewProjectStore.getState().setName('my-proj');
       useNewProjectStore.getState().setParentDir('/Users/me/projects');
+      useNewProjectStore.getState().setStartingPoint('describe');
+      useNewProjectStore.getState().setDescription('a blog');
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     await waitFor(() => {
@@ -171,6 +180,51 @@ describe('NewProjectDialog', () => {
         projectName: 'my-proj',
       });
     });
+  });
+
+  it('renders both starting-point radios; promote-scratch is disabled with #124 hint', () => {
+    mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+    });
+    const describe = screen.getByLabelText(/Describe what you're building/i);
+    const promote = screen.getByLabelText(/Promote an existing scratch/i);
+    expect(describe).toBeEnabled();
+    expect(promote).toBeDisabled();
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+  });
+
+  it('Create is disabled until a starting point is chosen (even with name+parent)', () => {
+    mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeDisabled();
+    act(() => {
+      useNewProjectStore.getState().setStartingPoint('describe');
+      useNewProjectStore.getState().setDescription('a blog');
+    });
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeEnabled();
+  });
+
+  it('describe path requires a non-empty description', () => {
+    mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+      useNewProjectStore.getState().setStartingPoint('describe');
+    });
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Describe your project/i), {
+      target: { value: 'a photo app' },
+    });
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeEnabled();
   });
 
   it('shows an inline preflight error when main reports preflight-failed', async () => {

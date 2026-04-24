@@ -14,6 +14,7 @@ import { create } from 'zustand';
 
 export type NewProjectPhase = 'form' | 'running' | 'done' | 'failed';
 export type StageStatus = 'pending' | 'running' | 'done' | 'failed';
+export type StartingPoint = 'describe' | 'promote';
 
 const STAGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 
@@ -29,6 +30,8 @@ interface NewProjectState {
   isOpen: boolean;
   name: string;
   parentDir: string;
+  startingPoint: StartingPoint | null;
+  description: string;
   phase: NewProjectPhase;
   preflightError: PreflightError | null;
   stageStates: StageStates;
@@ -37,6 +40,8 @@ interface NewProjectState {
   close: () => void;
   setName: (name: string) => void;
   setParentDir: (path: string) => void;
+  setStartingPoint: (point: StartingPoint) => void;
+  setDescription: (desc: string) => void;
   setPreflightError: (err: PreflightError) => void;
   clearPreflightError: () => void;
   setPhase: (phase: NewProjectPhase) => void;
@@ -48,6 +53,8 @@ interface NewProjectState {
 const INITIAL = {
   name: '',
   parentDir: '',
+  startingPoint: null as StartingPoint | null,
+  description: '',
   phase: 'form' as NewProjectPhase,
   preflightError: null as PreflightError | null,
   stageStates: freshStageStates(),
@@ -61,6 +68,8 @@ export const useNewProjectStore = create<NewProjectState>((set) => ({
   close: () => set({ isOpen: false, ...INITIAL, stageStates: freshStageStates(), log: '' }),
   setName: (name) => set({ name }),
   setParentDir: (parentDir) => set({ parentDir }),
+  setStartingPoint: (startingPoint) => set({ startingPoint }),
+  setDescription: (description) => set({ description }),
   setPreflightError: (preflightError) => set({ preflightError, phase: 'form' }),
   clearPreflightError: () => set({ preflightError: null }),
   setPhase: (phase) => set({ phase }),
