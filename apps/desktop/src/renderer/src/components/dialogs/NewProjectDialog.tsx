@@ -100,7 +100,9 @@ export function NewProjectDialog(): React.JSX.Element {
     await window.contexture?.scaffold.start({ targetDir: targetPath, projectName: name });
   }
 
-  const showProgress = phase === 'running' || phase === 'failed' || phase === 'done';
+  const showSuccess = phase === 'done';
+  const showProgress = phase === 'running' || phase === 'failed';
+  const showForm = !showProgress && !showSuccess;
 
   return (
     <Dialog
@@ -113,13 +115,17 @@ export function NewProjectDialog(): React.JSX.Element {
         <DialogHeader>
           <DialogTitle>New Project</DialogTitle>
           <DialogDescription>
-            {showProgress
-              ? 'Scaffolding your project — this usually takes a minute.'
-              : 'Scaffold a Contexture monorepo under a folder you choose.'}
+            {showSuccess
+              ? 'Your project is ready.'
+              : showProgress
+                ? 'Scaffolding your project — this usually takes a minute.'
+                : 'Scaffold a Contexture monorepo under a folder you choose.'}
           </DialogDescription>
         </DialogHeader>
 
-        {showProgress ? (
+        {showSuccess ? (
+          <SuccessView targetPath={targetPath} />
+        ) : showProgress ? (
           <ProgressView />
         ) : (
           <div className="space-y-4">
@@ -209,7 +215,7 @@ export function NewProjectDialog(): React.JSX.Element {
           </div>
         )}
 
-        {!showProgress && (
+        {showForm && (
           <DialogFooter>
             <Button variant="outline" onClick={close}>
               Cancel
@@ -221,6 +227,32 @@ export function NewProjectDialog(): React.JSX.Element {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SuccessView({ targetPath }: { targetPath: string }): React.JSX.Element {
+  const close = useNewProjectStore((s) => s.close);
+  return (
+    <div data-testid="scaffold-success" className="space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span role="img" aria-label="success">
+          ✓
+        </span>
+        <span>Project scaffolded successfully.</span>
+      </div>
+      <div className="space-y-1">
+        <Label>Location</Label>
+        <p className="text-xs font-mono text-muted-foreground break-all">{targetPath}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
+          Copy path
+        </Button>
+        <Button data-testid="scaffold-success-close" onClick={close}>
+          Close
+        </Button>
+      </div>
+    </div>
   );
 }
 

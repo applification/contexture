@@ -355,6 +355,71 @@ describe('NewProjectDialog', () => {
     });
   });
 
+  it('shows the success panel with the target path when phase is done', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('scaffold-success')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('scaffold-success')).toHaveTextContent('/tmp/my-proj');
+  });
+
+  it('Copy path writes the target path to the clipboard', async () => {
+    const bridge = mockFileBridge();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Copy path/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Copy path/i }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('/tmp/my-proj');
+    });
+  });
+
+  it('Close on the success panel closes and resets the store', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('scaffold-success-close')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('scaffold-success-close'));
+    expect(useNewProjectStore.getState().isOpen).toBe(false);
+    expect(useNewProjectStore.getState().name).toBe('');
+    expect(useNewProjectStore.getState().phase).toBe('form');
+  });
+
   it('Cancel closes the dialog and resets the form', () => {
     mockFileBridge();
     render(<NewProjectDialog />);
