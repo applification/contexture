@@ -124,6 +124,15 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     return handleOpen(result.filePaths[0]);
   });
 
+  ipcMain.handle('file:pick-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose Parent Folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
   ipcMain.handle('file:save-as-dialog', async () => {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save Contexture File As',

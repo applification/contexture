@@ -102,6 +102,7 @@ export interface OpenedDocument {
 export interface ContextureFileAPI {
   openDialog: () => Promise<OpenedDocument | null>;
   saveAsDialog: () => Promise<string | null>;
+  pickDirectory: () => Promise<string | null>;
   save: (payload: {
     irPath: string;
     schema: unknown;

@@ -96,6 +96,8 @@ const file = {
   openDialog: () => ipcRenderer.invoke('file:open-dialog'),
   /** Show the OS save-as dialog and return the chosen path. */
   saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
+  /** Show a directory picker; returns the selected folder or null if cancelled. */
+  pickDirectory: () => ipcRenderer.invoke('file:pick-directory') as Promise<string | null>,
   /** Write the five-file bundle atomically under `irPath`. */
   save: (payload: {
     irPath: string;

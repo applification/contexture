@@ -29,6 +29,7 @@ function mockFileBridge(): { fire: () => void; unsubscribe: ReturnType<typeof vi
         captured = listener;
         return unsubscribe;
       },
+      pickDirectory: vi.fn(async () => null),
     },
   };
   return {
