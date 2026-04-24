@@ -271,7 +271,10 @@ function SuccessView({
         <Label>Location</Label>
         <p className="text-xs font-mono text-muted-foreground break-all">{targetPath}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(targetPath)}>
+          Reveal
+        </Button>
         <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
           Copy path
         </Button>

@@ -133,7 +133,13 @@ const scaffold = {
     subscribe('scaffold:event', listener as (p: unknown) => void),
 };
 
-const contexture = { chat, file, scaffold };
+const shell = {
+  /** Reveal a file or folder in the OS file manager (Finder / Explorer). */
+  reveal: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:reveal', path) as Promise<void>,
+};
+
+const contexture = { chat, file, scaffold, shell };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

@@ -142,10 +142,16 @@ export interface ContextureScaffoldAPI {
   onEvent: (listener: (event: ScaffoldEvent) => void) => Unsubscribe;
 }
 
+export interface ContextureShellAPI {
+  /** Reveal the given path in the OS file manager (Finder / Explorer). */
+  reveal: (path: string) => Promise<void>;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   file: ContextureFileAPI;
   scaffold: ContextureScaffoldAPI;
+  shell: ContextureShellAPI;
 }
 
 declare global {
