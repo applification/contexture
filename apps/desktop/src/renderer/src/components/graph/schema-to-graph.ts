@@ -31,6 +31,8 @@ export interface TypeNodeData extends Record<string, unknown> {
   description?: string;
   fields: ReadonlyArray<FieldRow>;
   imported: boolean;
+  /** True when the source `ObjectTypeDef` carries `table: true`. */
+  table?: boolean;
 }
 
 export interface FieldRow {
@@ -118,6 +120,7 @@ function localNodeFor(type: TypeDef, position: { x: number; y: number }): Node<T
       description: type.description,
       fields: type.kind === 'object' ? type.fields.map(fieldRow) : [],
       imported: false,
+      table: type.kind === 'object' && type.table === true ? true : undefined,
     },
   };
 }
