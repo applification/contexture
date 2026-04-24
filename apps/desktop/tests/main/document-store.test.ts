@@ -214,6 +214,31 @@ describe('DocumentStore', () => {
     expect(convex).toMatch(/defineSchema\s*\(/);
   });
 
+  it('project-mode save writes a schema index re-export next to the IR', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    const indexPath = '/work/index.ts';
+    expect(harness.fs.exists(indexPath)).toBe(true);
+    const source = await harness.fs.readFile(indexPath);
+    expect(source).toContain('@contexture-generated');
+    expect(source).toContain(`export * from './garden.schema';`);
+  });
+
+  it('scratch-mode save does not write a schema index', async () => {
+    const { store, fs } = setup();
+    await store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    expect(fs.exists('/work/index.ts')).toBe(false);
+  });
+
   it('project-mode save writes layout + chat into .contexture/, not next to the IR', async () => {
     await harness.store.save({
       irPath,

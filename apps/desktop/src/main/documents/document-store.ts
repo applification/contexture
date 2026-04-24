@@ -19,6 +19,7 @@
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
+import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emit as defaultEmitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
 import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
@@ -88,6 +89,8 @@ export interface DocumentStoreDeps {
   emitZod?: (schema: Schema, sourcePath: string) => string;
   /** Override for tests — defaults to the real JSON-schema emitter. */
   emitJsonSchema?: (schema: Schema) => unknown;
+  /** Override for tests — defaults to the real schema-index emitter. */
+  emitSchemaIndex?: (baseName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
   emitConvex?: (schema: Schema) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
@@ -106,12 +109,20 @@ export function contextureDirFor(irPath: string): string {
   return `${dir}/.contexture`;
 }
 
+/** IR file base name — `/work/garden.contexture.json` → `garden`. */
+function baseNameFor(irPath: string): string {
+  const slash = irPath.lastIndexOf('/');
+  const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
+  return leaf.slice(0, -IR_SUFFIX.length);
+}
+
 export function bundlePathsFor(irPath: string): {
   ir: string;
   layout: string;
   chat: string;
   schemaTs: string;
   schemaJson: string;
+  schemaIndex: string;
   convex: string;
 } {
   if (!irPath.endsWith(IR_SUFFIX)) {
@@ -129,6 +140,9 @@ export function bundlePathsFor(irPath: string): {
     chat: `${ctxDir}/${CHAT_FILE}`,
     schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
+    // Workspace re-export: consumers `import { … } from '@<project>/schema'`
+    // and resolve to this barrel rather than a specific `.schema` module.
+    schemaIndex: `${dir}/index.ts`,
     // Convex schema is the headline emitted artefact — `schema.ts`
     // sits next to the IR so `apps/*` re-export it via
     // `packages/schema/schema.ts`.
@@ -142,6 +156,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     recentFilesPath,
     emitZod = defaultEmitZod,
     emitJsonSchema = defaultEmitJsonSchema,
+    emitSchemaIndex = defaultEmitSchemaIndex,
     emitConvex = defaultEmitConvex,
     onRecentFileAdded,
   } = deps;
@@ -266,6 +281,8 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     // abort before any write touches disk.
     const schemaTs = emitZod(input.schema, irPath);
     const schemaJson = JSON.stringify(emitJsonSchema(input.schema), null, 2);
+    const baseName = baseNameFor(irPath);
+    const schemaIndex = emitSchemaIndex(baseName);
     const convexSource = emitConvex(input.schema);
 
     const files = [
@@ -274,6 +291,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       { path: paths.chat, content: saveChatHistory(input.chat) },
       { path: paths.schemaTs, content: schemaTs },
       { path: paths.schemaJson, content: schemaJson },
+      { path: paths.schemaIndex, content: schemaIndex },
       { path: paths.convex, content: convexSource },
     ];
 
