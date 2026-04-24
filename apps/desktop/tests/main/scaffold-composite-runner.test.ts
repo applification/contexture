@@ -49,6 +49,24 @@ describe('createCompositeStageRunner', () => {
     expect(spawnCalls[0].args[0]).toBe('create-turbo@latest');
   });
 
+  it('stage 5: seeds packages/schema anchor + installs convex locally, then spawns convex dev there', async () => {
+    const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
+    for await (const _ of runner.run(5, config)) {
+      // drain
+    }
+    // Anchor written with convex as a dep.
+    const pkg = JSON.parse(await fs.readFile('/work/my-proj/packages/schema/package.json'));
+    expect(pkg.dependencies.convex).toBeDefined();
+    // Two spawns: `bun install` (so convex/server resolves), then convex dev.
+    expect(spawnCalls).toHaveLength(2);
+    expect(spawnCalls[0].cmd).toBe('bun');
+    expect(spawnCalls[0].args).toEqual(['install']);
+    expect(spawnCalls[0].cwd).toBe('/work/my-proj/packages/schema');
+    expect(spawnCalls[1].cmd).toBe('bunx');
+    expect(spawnCalls[1].args[0]).toBe('convex@latest');
+    expect(spawnCalls[1].cwd).toBe('/work/my-proj/packages/schema');
+  });
+
   it('runs stage 6 in-process — writes the schema package tree', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
     for await (const _ of runner.run(6, config)) {

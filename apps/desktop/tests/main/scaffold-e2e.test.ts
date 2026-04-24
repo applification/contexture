@@ -40,9 +40,16 @@ describeOrSkip('scaffold end-to-end (SCAFFOLD_E2E=1)', () => {
           },
         );
 
-        // No preflight failure, no stage failure.
+        // No preflight failure, no stage failure. On failure, surface which
+        // stage tripped and the captured stderr — this is a 15-minute test,
+        // so "expected true to be false" alone is useless.
         expect(events.some((e) => e.kind === 'preflight-failed')).toBe(false);
-        expect(events.some((e) => e.kind === 'stage-failed')).toBe(false);
+        const failed = events.find((e) => e.kind === 'stage-failed');
+        if (failed) {
+          throw new Error(
+            `stage ${failed.stage} failed (retrySafe=${failed.retrySafe}):\n${failed.stderr}`,
+          );
+        }
 
         // Every stage reached stage-done.
         const dones = events.filter((e) => e.kind === 'stage-done').map((e) => e.stage);

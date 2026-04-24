@@ -24,13 +24,13 @@ export interface CompositeRunnerDeps {
   spawner: Spawner;
 }
 
-const SHELL_STAGES: ReadonlySet<StageNumber> = new Set([1, 2, 3, 4, 5, 9]);
+const PURE_SHELL_STAGES: ReadonlySet<StageNumber> = new Set([1, 2, 3, 4, 9]);
 
 export function createCompositeStageRunner(deps: CompositeRunnerDeps): StageRunner {
   const { fs, spawner } = deps;
   return {
     run(stage: StageNumber, config: ScaffoldConfig): AsyncIterable<StageChunk> {
-      if (SHELL_STAGES.has(stage)) {
+      if (PURE_SHELL_STAGES.has(stage)) {
         return spawner(shellStageSpecFor(stage, config));
       }
       return runInProcess(stage, config);
@@ -42,6 +42,35 @@ export function createCompositeStageRunner(deps: CompositeRunnerDeps): StageRunn
     config: ScaffoldConfig,
   ): AsyncIterable<StageChunk> {
     switch (stage) {
+      case 5: {
+        // Convex CLI needs (a) a package.json in cwd, (b) `convex` listed as
+        // a dep to reach the push step, and (c) `convex/server` resolvable
+        // on disk or its config bundler fails. So we write a bare anchor,
+        // install only convex locally, then run `convex dev --once`. Stage 6
+        // rewrites this file with the real schema-package shape later.
+        const schemaDir = `${config.targetDir}/packages/schema`;
+        await fs.writeFile(
+          `${schemaDir}/package.json`,
+          `${JSON.stringify(
+            {
+              name: `@${config.projectName}/schema`,
+              private: true,
+              dependencies: { convex: 'latest' },
+            },
+            null,
+            2,
+          )}\n`,
+        );
+        for await (const chunk of spawner({
+          cmd: 'bun',
+          args: ['install'],
+          cwd: schemaDir,
+        })) {
+          yield chunk;
+        }
+        for await (const chunk of spawner(shellStageSpecFor(5, config))) yield chunk;
+        return;
+      }
       case 6:
         await scaffoldSchemaPackage(config, { fs });
         return;

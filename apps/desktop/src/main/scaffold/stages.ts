@@ -26,6 +26,7 @@ export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): S
   const parent = parentDirOf(config.targetDir);
   const target = config.targetDir;
   const webDir = `${target}/apps/web`;
+  const schemaDir = `${target}/packages/schema`;
   switch (stage) {
     case 1:
       return {
@@ -61,8 +62,16 @@ export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): S
     case 5:
       return {
         cmd: 'bunx',
-        args: ['convex@latest', 'dev', '--once', '--configure=new', '--local'],
-        cwd: webDir,
+        args: [
+          'convex@latest',
+          'dev',
+          '--once',
+          '--configure=new',
+          '--local',
+          '--project',
+          config.projectName,
+        ],
+        cwd: schemaDir,
       };
     case 9:
       return { cmd: 'bun', args: ['install'], cwd: target };

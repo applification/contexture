@@ -30,6 +30,7 @@ function makePackageJson(projectName: string): string {
       type: 'module',
       main: './index.ts',
       types: './index.ts',
+      dependencies: { convex: 'latest' },
     },
     null,
     2,

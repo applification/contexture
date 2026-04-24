@@ -54,11 +54,19 @@ describe('shellStageSpecFor', () => {
     });
   });
 
-  it('stage 5: convex dev one-shot configure, local backend, inside apps/web', () => {
+  it('stage 5: convex dev one-shot configure, local backend, inside packages/schema', () => {
     const spec = shellStageSpecFor(5, config);
     expect(spec.cmd).toBe('bunx');
-    expect(spec.args).toEqual(['convex@latest', 'dev', '--once', '--configure=new', '--local']);
-    expect(spec.cwd).toBe(nextCwd);
+    expect(spec.args).toEqual([
+      'convex@latest',
+      'dev',
+      '--once',
+      '--configure=new',
+      '--local',
+      '--project',
+      'my-proj',
+    ]);
+    expect(spec.cwd).toBe('/work/my-proj/packages/schema');
   });
 
   it('stage 9: bun install at the project root to resolve the new workspace dep', () => {
