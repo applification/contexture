@@ -18,6 +18,14 @@
  */
 import { create } from 'zustand';
 
+/**
+ * `scratch` = bare IR on disk (no `.contexture/` sidecar). Default for
+ * files not produced by the scaffolder.
+ * `project` = `.contexture/` sidecar present. Triggers project-mode
+ * save behaviour (emit bundle, auto-save, CLAUDE.md, …).
+ */
+export type DocumentMode = 'scratch' | 'project';
+
 export interface ImportWarning {
   /** The underlying loader message (migrations, missing sidecar, …). */
   message: string;
@@ -37,6 +45,8 @@ interface DocumentState {
   filePath: string | null;
   /** True when the in-memory IR diverges from the last save. */
   isDirty: boolean;
+  /** Whether the open file sits next to a `.contexture/` sidecar. */
+  mode: DocumentMode;
 
   /** Non-empty while the import-warnings dialog is visible. */
   importWarnings: ImportWarning[];
@@ -46,6 +56,7 @@ interface DocumentState {
   saveWithErrorsPrompt: SaveWithErrorsPrompt | null;
 
   setFilePath: (path: string | null) => void;
+  setMode: (mode: DocumentMode) => void;
   markDirty: () => void;
   markClean: () => void;
 
@@ -62,11 +73,13 @@ interface DocumentState {
 export const useDocumentStore = create<DocumentState>((set) => ({
   filePath: null,
   isDirty: false,
+  mode: 'scratch',
   importWarnings: [],
   unknownFormatPath: null,
   saveWithErrorsPrompt: null,
 
   setFilePath: (filePath) => set({ filePath }),
+  setMode: (mode) => set({ mode }),
   markDirty: () => set({ isDirty: true }),
   markClean: () => set({ isDirty: false }),
 

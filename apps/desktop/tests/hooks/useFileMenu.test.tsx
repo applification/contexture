@@ -214,6 +214,42 @@ describe('useFileMenu', () => {
     );
   });
 
+  it('handleOpen hydrates mode on the document store (scratch)', async () => {
+    const bridge = mockFileBridge();
+    bridge.openDialog.mockResolvedValueOnce({
+      irPath: '/tmp/x.contexture.json',
+      mode: 'scratch',
+      content: JSON.stringify({ version: '1', types: [] }),
+    });
+    const { result } = renderHook(() => useFileMenu());
+    await act(async () => {
+      await result.current.handleOpen();
+    });
+    expect(useDocumentStore.getState().mode).toBe('scratch');
+  });
+
+  it('handleOpen hydrates mode on the document store (project)', async () => {
+    const bridge = mockFileBridge();
+    bridge.openDialog.mockResolvedValueOnce({
+      irPath: '/tmp/x.contexture.json',
+      mode: 'project',
+      content: JSON.stringify({ version: '1', types: [] }),
+    });
+    const { result } = renderHook(() => useFileMenu());
+    await act(async () => {
+      await result.current.handleOpen();
+    });
+    expect(useDocumentStore.getState().mode).toBe('project');
+  });
+
+  it('handleNew resets mode to scratch', () => {
+    mockFileBridge();
+    useDocumentStore.getState().setMode('project');
+    const { result } = renderHook(() => useFileMenu());
+    act(() => result.current.handleNew());
+    expect(useDocumentStore.getState().mode).toBe('scratch');
+  });
+
   it('handleOpenPath opens via the recent-files channel', async () => {
     const bridge = mockFileBridge();
     bridge.openRecent.mockResolvedValueOnce({
