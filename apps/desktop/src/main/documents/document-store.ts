@@ -16,26 +16,42 @@
  * wires `NodeFsAdapter`; tests wire `MemFsAdapter`.
  */
 
+import { createHash } from 'node:crypto';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
+import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
+import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
+import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emit as defaultEmitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
 import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
 import { load as loadIR, save as saveIR } from '@renderer/model/load';
 
 export const IR_SUFFIX = '.contexture.json';
-export const LAYOUT_SUFFIX = '.contexture.layout.json';
-export const CHAT_SUFFIX = '.contexture.chat.json';
 export const SCHEMA_TS_SUFFIX = '.schema.ts';
 export const SCHEMA_JSON_SUFFIX = '.schema.json';
+/** Layout + chat now live inside `.contexture/` as implementation sidecars. */
+export const LAYOUT_FILE = 'layout.json';
+export const CHAT_FILE = 'chat.json';
+/** Hash manifest of every @contexture-generated artefact, used for drift detection. */
+export const EMITTED_FILE = 'emitted.json';
+
+// Legacy sibling-file names — kept exported so `main/ipc/file.ts` can
+// continue to read pre-project-mode documents without hard-breaking a
+// user's scratch round-trip. Project-mode save no longer writes these.
+export const LAYOUT_SUFFIX = '.contexture.layout.json';
+export const CHAT_SUFFIX = '.contexture.chat.json';
 
 export interface LoadWarning {
   message: string;
   severity: 'warning' | 'error';
 }
 
+export type DocumentMode = 'scratch' | 'project';
+
 export interface DocumentBundle {
   irPath: string;
+  mode: DocumentMode;
   schema: Schema;
   layout: Layout;
   chat: ChatHistory;
@@ -57,6 +73,10 @@ export interface DocumentStore {
   save(target: SaveInput & { irPath: string }): Promise<void>;
   saveAs(target: SaveInput, newPath: string): Promise<void>;
   recentFiles(): Promise<ReadonlyArray<RecentEntry>>;
+  /** Raw file read — for the IPC layer to return original IR text so the
+   *  renderer owns JSON-parse error surfacing. */
+  readFile(path: string): Promise<string>;
+  fileExists(path: string): Promise<boolean>;
 }
 
 export interface FsAdapter {
@@ -65,6 +85,8 @@ export interface FsAdapter {
   rename(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
+  /** Directory-presence probe used for project-mode detection. */
+  dirExists(path: string): Promise<boolean>;
 }
 
 export interface DocumentStoreDeps {
@@ -75,29 +97,98 @@ export interface DocumentStoreDeps {
   emitZod?: (schema: Schema, sourcePath: string) => string;
   /** Override for tests — defaults to the real JSON-schema emitter. */
   emitJsonSchema?: (schema: Schema) => unknown;
+  /** Override for tests — defaults to the real schema-index emitter. */
+  emitSchemaIndex?: (baseName: string) => string;
+  /** Override for tests — defaults to the real CLAUDE.md emitter. */
+  emitClaudeMd?: (projectName: string) => string;
+  /** Override for tests — defaults to the real Convex emitter. */
+  emitConvex?: (schema: Schema) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
   onRecentFileAdded?: (path: string) => void;
 }
 
 const MAX_RECENT = 10;
 
+/**
+ * Path to the `.contexture/` marker directory sitting next to the IR.
+ * Project mode is detected by probing this directory on open.
+ */
+export function contextureDirFor(irPath: string): string {
+  const slash = irPath.lastIndexOf('/');
+  const dir = slash === -1 ? '' : irPath.slice(0, slash);
+  return `${dir}/.contexture`;
+}
+
+/** IR file base name — `/work/garden.contexture.json` → `garden`. */
+function baseNameFor(irPath: string): string {
+  const slash = irPath.lastIndexOf('/');
+  const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
+  return leaf.slice(0, -IR_SUFFIX.length);
+}
+
+/**
+ * Monorepo project root for IRs sitting at
+ * `<root>/packages/schema/<name>.contexture.json`. Returns `null` for
+ * IRs that don't follow the canonical scaffold layout — those projects
+ * don't get a CLAUDE.md written (there's no unambiguous "root").
+ */
+export function projectRootFor(irPath: string): string | null {
+  const schemaSuffix = '/packages/schema/';
+  const slash = irPath.lastIndexOf('/');
+  if (slash === -1) return null;
+  const dir = irPath.slice(0, slash);
+  if (!dir.endsWith('/packages/schema')) return null;
+  return dir.slice(0, -schemaSuffix.length + 1);
+}
+
+export interface EmittedManifest {
+  version: '1';
+  files: Record<string, string>;
+}
+
+function sha256(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function buildManifest(entries: ReadonlyArray<{ path: string; content: string }>): EmittedManifest {
+  const files: Record<string, string> = {};
+  for (const { path, content } of entries) files[path] = sha256(content);
+  return { version: '1', files };
+}
+
 export function bundlePathsFor(irPath: string): {
   ir: string;
   layout: string;
   chat: string;
+  emitted: string;
   schemaTs: string;
   schemaJson: string;
+  schemaIndex: string;
+  convex: string;
 } {
   if (!irPath.endsWith(IR_SUFFIX)) {
     throw new Error(`Expected a ${IR_SUFFIX} path, got: ${irPath}`);
   }
   const base = irPath.slice(0, -IR_SUFFIX.length);
+  const ctxDir = contextureDirFor(irPath);
+  const dir = ctxDir.slice(0, -'/.contexture'.length);
   return {
     ir: irPath,
-    layout: `${base}${LAYOUT_SUFFIX}`,
-    chat: `${base}${CHAT_SUFFIX}`,
+    // Layout + chat live inside `.contexture/` in project mode. In
+    // scratch mode these paths are never read or written (scratch save
+    // skips sidecars; scratch open tolerates ENOENT and uses defaults).
+    layout: `${ctxDir}/${LAYOUT_FILE}`,
+    chat: `${ctxDir}/${CHAT_FILE}`,
+    emitted: `${ctxDir}/${EMITTED_FILE}`,
     schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
+    // Workspace re-export: consumers `import { … } from '@<project>/schema'`
+    // and resolve to this barrel rather than a specific `.schema` module.
+    schemaIndex: `${dir}/index.ts`,
+    // Convex schema is the headline emitted artefact — `schema.ts`
+    // sits next to the IR so `apps/*` re-export it via
+    // `packages/schema/schema.ts`.
+    convex: `${dir}/schema.ts`,
   };
 }
 
@@ -107,6 +198,9 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     recentFilesPath,
     emitZod = defaultEmitZod,
     emitJsonSchema = defaultEmitJsonSchema,
+    emitSchemaIndex = defaultEmitSchemaIndex,
+    emitClaudeMd = defaultEmitClaudeMd,
+    emitConvex = defaultEmitConvex,
     onRecentFileAdded,
   } = deps;
 
@@ -137,6 +231,9 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   async function open(irPath: string): Promise<DocumentBundle> {
     const paths = bundlePathsFor(irPath);
     const warnings: LoadWarning[] = [];
+    const mode: DocumentMode = (await fs.dirExists(contextureDirFor(irPath)))
+      ? 'project'
+      : 'scratch';
 
     const irRaw = await fs.readFile(paths.ir);
     const { schema, warnings: irWarnings } = loadIR(irRaw);
@@ -162,8 +259,18 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
 
+    if (mode === 'project') {
+      const root = projectRootFor(irPath);
+      if (root) {
+        const claudePath = `${root}/CLAUDE.md`;
+        if (!(await fs.fileExists(claudePath))) {
+          await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
+        }
+      }
+    }
+
     await bumpRecent(irPath);
-    return { irPath, schema, layout, chat, warnings };
+    return { irPath, mode, schema, layout, chat, warnings };
   }
 
   async function writeBundleAtomic(
@@ -209,17 +316,46 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
   async function saveImpl(irPath: string, input: SaveInput): Promise<void> {
     const paths = bundlePathsFor(irPath);
-    // Emit first — a throwing emitter must abort before any write touches disk.
+    const mode: DocumentMode = (await fs.dirExists(contextureDirFor(irPath)))
+      ? 'project'
+      : 'scratch';
+
+    // Scratch mode: the IR file is the whole document. No sidecars, no
+    // mirrors — users who want persistent layout/chat or generated Convex
+    // artefacts graduate to project mode by running `mkdir .contexture/`
+    // (or, eventually, the New Project flow).
+    if (mode === 'scratch') {
+      await writeBundleAtomic([{ path: paths.ir, content: saveIR(input.schema) }]);
+      await bumpRecent(irPath);
+      return;
+    }
+
+    // Project mode: full bundle. Emit first — a throwing emitter must
+    // abort before any write touches disk.
     const schemaTs = emitZod(input.schema, irPath);
-    const jsonSchemaHeader = `// Generated by Contexture from ${irPath}. Do not edit.\n`;
-    const schemaJson = jsonSchemaHeader + JSON.stringify(emitJsonSchema(input.schema), null, 2);
+    const schemaJson = JSON.stringify(emitJsonSchema(input.schema), null, 2);
+    const baseName = baseNameFor(irPath);
+    const schemaIndex = emitSchemaIndex(baseName);
+    const convexSource = emitConvex(input.schema);
+
+    // Pair each emitted artefact with its content hash so we can build
+    // the drift-detection manifest before writing. The IR is the source
+    // of truth, not a generated file, so it does not appear in the
+    // manifest.
+    const emitted: Array<{ path: string; content: string }> = [
+      { path: paths.schemaTs, content: schemaTs },
+      { path: paths.schemaJson, content: schemaJson },
+      { path: paths.schemaIndex, content: schemaIndex },
+      { path: paths.convex, content: convexSource },
+    ];
+    const manifest = buildManifest(emitted);
 
     const files = [
       { path: paths.ir, content: saveIR(input.schema) },
       { path: paths.layout, content: saveLayout(input.layout) },
       { path: paths.chat, content: saveChatHistory(input.chat) },
-      { path: paths.schemaTs, content: schemaTs },
-      { path: paths.schemaJson, content: schemaJson },
+      ...emitted,
+      { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
     ];
 
     await writeBundleAtomic(files);
@@ -234,5 +370,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       const paths = await readRecents();
       return paths.map((path) => ({ path }));
     },
+    readFile: (path) => fs.readFile(path),
+    fileExists: (path) => fs.fileExists(path),
   };
 }

@@ -13,6 +13,7 @@
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
 import type { IndexDef, TypeDef } from '../../model/ir';
+import type { DocumentMode } from '../../store/document';
 import type { Op } from '../../store/ops';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
@@ -29,9 +30,11 @@ export interface TypeDetailProps {
   type: TypeDef;
   /** Dispatch an op. In production this is `useUndoStore.getState().apply`. */
   dispatch: (op: Op) => void;
+  /** Document mode — `scratch` hides Convex-specific affordances. */
+  mode?: DocumentMode;
 }
 
-export function TypeDetail({ type, dispatch }: TypeDetailProps) {
+export function TypeDetail({ type, dispatch, mode = 'scratch' }: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
 
@@ -46,7 +49,9 @@ export function TypeDetail({ type, dispatch }: TypeDetailProps) {
       <DescriptionField type={type} dispatch={dispatch} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
-      {type.kind === 'object' && <ConvexSection type={type} dispatch={dispatch} />}
+      {type.kind === 'object' && mode === 'project' && (
+        <ConvexSection type={type} dispatch={dispatch} />
+      )}
       {type.kind === 'enum' && <EnumBody type={type} dispatch={dispatch} />}
       {type.kind === 'discriminatedUnion' && (
         <DiscriminatedUnionBody type={type} dispatch={dispatch} />

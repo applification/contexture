@@ -76,6 +76,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
     const doc = useDocumentStore.getState();
     doc.setFilePath(null);
+    doc.setMode('scratch');
     doc.markClean();
   }, []);
 
@@ -83,6 +84,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     (opened: {
       content: string;
       irPath: string;
+      mode?: 'scratch' | 'project';
       layout?: Layout;
       chat?: ChatHistory;
       warnings?: Array<{ message: string; severity: 'warning' | 'error' }>;
@@ -92,6 +94,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
         const { schema, warnings: irWarnings } = load(opened.content);
         useUndoStore.getState().apply({ kind: 'replace_schema', schema });
         doc.setFilePath(opened.irPath);
+        doc.setMode(opened.mode ?? 'scratch');
         doc.markClean();
 
         optionsRef.current.onBundleLoaded?.({

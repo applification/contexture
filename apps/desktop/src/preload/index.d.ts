@@ -75,6 +75,8 @@ export interface OpenWarning {
 
 export interface OpenedDocument {
   irPath: string;
+  /** `scratch` = bare IR on disk; `project` = `.contexture/` sidecar present. */
+  mode: 'scratch' | 'project';
   /** Raw IR text — parsed by the renderer's `load()` for error surfacing. */
   content: string;
   /** Pre-parsed layout sidecar (defaults if missing/corrupt). */
