@@ -20,6 +20,8 @@ export interface ScaffoldConfig {
   apps: AppKind[];
   /** Initial user prompt seeded into chat.json when the project is created. */
   description?: string;
+  /** Absolute path to an existing scratch IR to promote instead of starting from an empty schema. */
+  scratchPath?: string;
 }
 
 /**

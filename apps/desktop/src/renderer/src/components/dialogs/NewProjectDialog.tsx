@@ -15,8 +15,13 @@ import { deriveStages } from '@main/scaffold/scaffold-project';
 import { type PreflightError, preflightErrorCopy } from '@renderer/model/preflight-error-copy';
 import { labelForStage } from '@renderer/model/scaffold-stage-labels';
 import { validateProjectName } from '@renderer/model/validate-project-name';
-import { type AppKind, type StageStatus, useNewProjectStore } from '@renderer/store/new-project';
-import { Folder } from 'lucide-react';
+import {
+  type AppKind,
+  type StageStatus,
+  type StartingPoint,
+  useNewProjectStore,
+} from '@renderer/store/new-project';
+import { FileJson, Folder } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,6 +43,19 @@ const APP_OPTIONS: { kind: AppKind; label: string; description: string }[] = [
   { kind: 'desktop', label: 'Desktop', description: 'Electron Forge' },
 ];
 
+const STARTING_POINTS: { value: StartingPoint; label: string; description: string }[] = [
+  {
+    value: 'new',
+    label: 'Start fresh',
+    description: 'Begin with an empty schema and describe it in the chat.',
+  },
+  {
+    value: 'promote',
+    label: 'Promote scratch file',
+    description: 'Copy an existing .contexture.json into the new project as the initial schema.',
+  },
+];
+
 export interface NewProjectDialogProps {
   /** Called with the scaffolded IR path when the user dismisses the success panel. */
   onOpenProject?: (irPath: string) => void;
@@ -51,10 +69,16 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
   const parentDir = useNewProjectStore((s) => s.parentDir);
   const apps = useNewProjectStore((s) => s.apps);
   const description = useNewProjectStore((s) => s.description);
+  const startingPoint = useNewProjectStore((s) => s.startingPoint);
+  const scratchPath = useNewProjectStore((s) => s.scratchPath);
+  const scratchValidationError = useNewProjectStore((s) => s.scratchValidationError);
   const setName = useNewProjectStore((s) => s.setName);
   const setParentDir = useNewProjectStore((s) => s.setParentDir);
   const toggleApp = useNewProjectStore((s) => s.toggleApp);
   const setDescription = useNewProjectStore((s) => s.setDescription);
+  const setStartingPoint = useNewProjectStore((s) => s.setStartingPoint);
+  const setScratchPath = useNewProjectStore((s) => s.setScratchPath);
+  const setScratchValidationError = useNewProjectStore((s) => s.setScratchValidationError);
   const preflightError = useNewProjectStore((s) => s.preflightError);
   const setPreflightError = useNewProjectStore((s) => s.setPreflightError);
   const clearPreflightError = useNewProjectStore((s) => s.clearPreflightError);
@@ -65,7 +89,13 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
   const resetProgress = useNewProjectStore((s) => s.resetProgress);
 
   const nameValidation = name === '' ? { ok: true as const } : validateProjectName(name);
-  const canCreate = name !== '' && nameValidation.ok && parentDir !== '' && apps.length >= 1;
+  const isPromoting = startingPoint === 'promote';
+  const canCreate =
+    name !== '' &&
+    nameValidation.ok &&
+    parentDir !== '' &&
+    apps.length >= 1 &&
+    (!isPromoting || (scratchPath !== '' && scratchValidationError === null));
   const targetPath = parentDir && name ? `${parentDir}/${name}` : '';
 
   const onOpenProjectRef = useRef(onOpenProject);
@@ -114,6 +144,18 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
     if (picked) setParentDir(picked);
   }
 
+  async function handlePickScratch(): Promise<void> {
+    const picked = await window.contexture?.file.pickContextureFile();
+    if (!picked) return;
+    setScratchPath(picked);
+    setScratchValidationError(null);
+    // Basic filename heuristic — the real validation runs in handleScaffoldStart
+    // on the main side via IRSchema.parse; we just surface it early here.
+    if (!picked.endsWith('.contexture.json')) {
+      setScratchValidationError('File must end in .contexture.json');
+    }
+  }
+
   async function handleCreate(): Promise<void> {
     if (!targetPath) return;
     clearPreflightError();
@@ -122,7 +164,8 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
       targetDir: targetPath,
       projectName: name,
       apps,
-      description: description.trim() || undefined,
+      description: !isPromoting && description.trim() ? description.trim() : undefined,
+      scratchPath: isPromoting && scratchPath ? scratchPath : undefined,
     });
   }
 
@@ -197,7 +240,7 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
                 Convex is always included. Select at least one app layer.
               </p>
               <div className="space-y-2">
-                {APP_OPTIONS.map(({ kind, label, description }) => (
+                {APP_OPTIONS.map(({ kind, label, description: desc }) => (
                   <label
                     key={kind}
                     htmlFor={`app-${kind}`}
@@ -211,7 +254,7 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
                       className="mt-0.5"
                     />
                     <span>
-                      {label} <span className="text-xs text-muted-foreground">({description})</span>
+                      {label} <span className="text-xs text-muted-foreground">({desc})</span>
                     </span>
                   </label>
                 ))}
@@ -222,22 +265,68 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="new-project-description">
-                Initial prompt{' '}
-                <span className="text-xs font-normal text-muted-foreground">(optional)</span>
-              </Label>
-              <Textarea
-                id="new-project-description"
-                rows={3}
-                placeholder="A photo-sharing app where users post and like photos…"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Seeded into the chat when you open the project. Claude will build your schema from
-                this.
-              </p>
+              <Label>Starting point</Label>
+              <div className="space-y-2">
+                {STARTING_POINTS.map(({ value, label, description: desc }) => (
+                  <label
+                    key={value}
+                    htmlFor={`starting-point-${value}`}
+                    className="flex items-start gap-2 text-sm cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      id={`starting-point-${value}`}
+                      name="starting-point"
+                      value={value}
+                      checked={startingPoint === value}
+                      onChange={() => setStartingPoint(value)}
+                      className="mt-0.5 accent-primary"
+                    />
+                    <span>
+                      {label} <span className="text-xs text-muted-foreground">— {desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
+
+            {isPromoting ? (
+              <div className="space-y-2">
+                <Label>Scratch file</Label>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => void handlePickScratch()}>
+                    <FileJson className="size-4" />
+                    Choose .contexture.json…
+                  </Button>
+                  {scratchPath && (
+                    <span className="text-xs font-mono text-muted-foreground truncate">
+                      {scratchPath.split('/').pop()}
+                    </span>
+                  )}
+                </div>
+                {scratchValidationError && (
+                  <p className="text-xs text-destructive">{scratchValidationError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="new-project-description">
+                  Initial prompt{' '}
+                  <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <Textarea
+                  id="new-project-description"
+                  rows={3}
+                  placeholder="A photo-sharing app where users post and like photos…"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Seeded into the chat when you open the project. Claude will build your schema from
+                  this.
+                </p>
+              </div>
+            )}
 
             {preflightError && (
               <p className="text-sm text-destructive" role="alert">

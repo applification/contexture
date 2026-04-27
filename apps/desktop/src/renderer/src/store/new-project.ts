@@ -15,6 +15,7 @@ import { create } from 'zustand';
 export type AppKind = 'web' | 'mobile' | 'desktop';
 export type NewProjectPhase = 'form' | 'running' | 'done' | 'failed';
 export type StageStatus = 'pending' | 'running' | 'done' | 'failed';
+export type StartingPoint = 'new' | 'promote';
 
 export interface ScaffoldFailure {
   stage: number;
@@ -30,6 +31,9 @@ interface NewProjectState {
   parentDir: string;
   apps: AppKind[];
   description: string;
+  startingPoint: StartingPoint;
+  scratchPath: string;
+  scratchValidationError: string | null;
   phase: NewProjectPhase;
   preflightError: PreflightError | null;
   failure: ScaffoldFailure | null;
@@ -41,6 +45,9 @@ interface NewProjectState {
   setParentDir: (path: string) => void;
   toggleApp: (app: AppKind) => void;
   setDescription: (desc: string) => void;
+  setStartingPoint: (sp: StartingPoint) => void;
+  setScratchPath: (path: string) => void;
+  setScratchValidationError: (err: string | null) => void;
   setPreflightError: (err: PreflightError) => void;
   clearPreflightError: () => void;
   setPhase: (phase: NewProjectPhase) => void;
@@ -55,6 +62,9 @@ const INITIAL = {
   parentDir: '',
   apps: ['web'] as AppKind[],
   description: '',
+  startingPoint: 'new' as StartingPoint,
+  scratchPath: '',
+  scratchValidationError: null as string | null,
   phase: 'form' as NewProjectPhase,
   preflightError: null as PreflightError | null,
   failure: null as ScaffoldFailure | null,
@@ -70,6 +80,9 @@ export const useNewProjectStore = create<NewProjectState>((set) => ({
   setName: (name) => set({ name }),
   setParentDir: (parentDir) => set({ parentDir }),
   setDescription: (description) => set({ description }),
+  setStartingPoint: (startingPoint) => set({ startingPoint }),
+  setScratchPath: (scratchPath) => set({ scratchPath }),
+  setScratchValidationError: (scratchValidationError) => set({ scratchValidationError }),
   toggleApp: (app) =>
     set((s) => ({
       apps: s.apps.includes(app) ? s.apps.filter((a) => a !== app) : [...s.apps, app],

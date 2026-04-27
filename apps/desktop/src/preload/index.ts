@@ -98,6 +98,9 @@ const file = {
   saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
   /** Show a directory picker; returns the selected folder or null if cancelled. */
   pickDirectory: () => ipcRenderer.invoke('file:pick-directory') as Promise<string | null>,
+  /** Show a file picker filtered to .contexture.json; returns path or null if cancelled. */
+  pickContextureFile: () =>
+    ipcRenderer.invoke('file:pick-contexture-file') as Promise<string | null>,
   /** Write the five-file bundle atomically under `irPath`. */
   save: (payload: {
     irPath: string;
@@ -131,6 +134,7 @@ const scaffold = {
     projectName: string;
     apps: string[];
     description?: string;
+    scratchPath?: string;
   }) => ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
   /** Subscribe to preflight + stage events streamed from main. */
   onEvent: (listener: (event: unknown) => void) =>

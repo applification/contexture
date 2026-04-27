@@ -82,4 +82,46 @@ describe('scaffoldSchemaPackage', () => {
     const chat = JSON.parse(await fs.readFile(`${schemaDir}/.contexture/chat.json`));
     expect(chat.messages[0].content).toBe('A blog platform');
   });
+
+  it('uses scratch IR content instead of empty schema when scratchPath is provided', async () => {
+    const scratchIr = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+          table: true,
+        },
+      ],
+    };
+    const seededFs = createMemFsAdapter({
+      '/scratch/post.contexture.json': `${JSON.stringify(scratchIr, null, 2)}\n`,
+    });
+    const withScratch = { ...config, scratchPath: '/scratch/post.contexture.json' };
+    await scaffoldSchemaPackage(withScratch, { fs: seededFs });
+
+    const irPath = `${schemaDir}/my-proj.contexture.json`;
+    const written = JSON.parse(await seededFs.readFile(irPath));
+    expect(written.types).toHaveLength(1);
+    expect(written.types[0].name).toBe('Post');
+  });
+
+  it('emits Zod and JSON mirrors from the promoted IR', async () => {
+    const scratchIr = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'User', fields: [{ name: 'email', type: { kind: 'string' } }] },
+      ],
+    };
+    const seededFs = createMemFsAdapter({
+      '/scratch/user.contexture.json': `${JSON.stringify(scratchIr, null, 2)}\n`,
+    });
+    const withScratch = { ...config, scratchPath: '/scratch/user.contexture.json' };
+    await scaffoldSchemaPackage(withScratch, { fs: seededFs });
+
+    const schemaTsPath = `${schemaDir}/my-proj.schema.ts`;
+    const schemaTs = await seededFs.readFile(schemaTsPath);
+    expect(schemaTs).toContain('User');
+  });
 });

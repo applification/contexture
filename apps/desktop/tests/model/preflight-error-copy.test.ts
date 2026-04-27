@@ -29,4 +29,10 @@ describe('preflightErrorCopy', () => {
     const msg = preflightErrorCopy({ kind: 'insufficient-space', bytesFree: 104857600 });
     expect(msg).toMatch(/100 MB/);
   });
+  it('returns a readable message for scratch-unreadable', () => {
+    expect(preflightErrorCopy({ kind: 'scratch-unreadable' })).toMatch(/scratch|read/i);
+  });
+  it('returns a readable message for scratch-invalid-ir', () => {
+    expect(preflightErrorCopy({ kind: 'scratch-invalid-ir' })).toMatch(/valid|Contexture/i);
+  });
 });

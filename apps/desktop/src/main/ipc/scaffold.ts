@@ -7,9 +7,9 @@
  * Kept callback-shaped so tests can drive it without Electron;
  * `registerScaffoldIpc` binds it to `webContents.send`.
  */
+import { IRSchema } from '@renderer/model/ir';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
-
 import type { FsAdapter } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 import { createCompositeStageRunner } from '../scaffold/composite-runner';
@@ -39,6 +39,23 @@ export async function handleScaffoldStart(
   deps: ScaffoldHandlerDeps,
 ): Promise<void> {
   const { fs, spawner, preflight, emit, writeLog } = deps;
+
+  // Validate the scratch IR before running any stages so we can surface
+  // the error inline in the dialog (same preflight-failed channel).
+  if (config.scratchPath) {
+    let raw: string;
+    try {
+      raw = await fs.readFile(config.scratchPath);
+    } catch {
+      emit({ kind: 'preflight-failed', error: { kind: 'scratch-unreadable' } });
+      return;
+    }
+    const parsed = IRSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
+      emit({ kind: 'preflight-failed', error: { kind: 'scratch-invalid-ir' } });
+      return;
+    }
+  }
 
   const preflightResult = await preflight(config);
   if (!preflightResult.ok) {

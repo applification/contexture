@@ -63,4 +63,37 @@ describe('handleScaffoldStart', () => {
     // No stages should have run.
     expect(events.some((e) => e.kind === 'stage-start')).toBe(false);
   });
+
+  it('emits scratch-unreadable preflight-failed when scratchPath does not exist', async () => {
+    const events: Array<{ kind: string; error?: unknown }> = [];
+    await handleScaffoldStart(
+      { ...config, scratchPath: '/nonexistent/scratch.contexture.json' },
+      {
+        fs,
+        spawner: passThroughSpawner(),
+        preflight: alwaysOkPreflight(),
+        emit: (ev) => events.push(ev),
+      },
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('preflight-failed');
+    expect((events[0].error as { kind: string }).kind).toBe('scratch-unreadable');
+  });
+
+  it('emits scratch-invalid-ir preflight-failed when scratchPath content is not valid IR', async () => {
+    fs.writeFile('/work/bad.contexture.json', JSON.stringify({ version: '1', types: 'oops' }));
+    const events: Array<{ kind: string; error?: unknown }> = [];
+    await handleScaffoldStart(
+      { ...config, scratchPath: '/work/bad.contexture.json' },
+      {
+        fs,
+        spawner: passThroughSpawner(),
+        preflight: alwaysOkPreflight(),
+        emit: (ev) => events.push(ev),
+      },
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('preflight-failed');
+    expect((events[0].error as { kind: string }).kind).toBe('scratch-invalid-ir');
+  });
 });
