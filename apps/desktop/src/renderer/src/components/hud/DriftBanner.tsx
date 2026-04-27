@@ -3,17 +3,18 @@
  * view when `apps/web/convex/schema.ts` has been hand-edited outside
  * Contexture (drift detected by the main-process watcher).
  *
- * "Review changes" is disabled in this slice (reconcile modal lands in
- * #126). "Dismiss" hides the banner until the next drift event.
+ * "Review changes" opens the reconcile modal (see #126); "Dismiss"
+ * hides the banner until the next drift event.
  */
 import { AlertTriangle } from 'lucide-react';
 import { useDriftStore } from '../../store/drift';
+import { useReconcileStore } from '../../store/reconcile';
 import { Button } from '../ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export function DriftBanner(): React.JSX.Element | null {
   const isDrifted = useDriftStore((s) => s.isDrifted);
   const dismiss = useDriftStore((s) => s.dismiss);
+  const openReconcile = useReconcileStore((s) => s.open);
 
   if (!isDrifted) return null;
 
@@ -28,24 +29,15 @@ export function DriftBanner(): React.JSX.Element | null {
         <code className="font-mono">packages/schema/convex/schema.ts</code> was modified outside
         Contexture.
       </span>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={-1}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                disabled
-                aria-label="Review changes (coming soon)"
-              >
-                Review changes
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Reconcile modal coming in the next release.</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-6 px-2 text-xs"
+        onClick={openReconcile}
+        aria-label="Review changes"
+      >
+        Review changes
+      </Button>
       <Button
         variant="ghost"
         size="sm"

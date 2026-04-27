@@ -30,6 +30,7 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
+import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
@@ -361,6 +362,7 @@ export default function App(): React.JSX.Element {
 
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
+      <ReconcileModal />
       <NewProjectDialog
         onOpenProject={async (irPath) => {
           // Signal onBundleLoaded to capture a seeded first message.

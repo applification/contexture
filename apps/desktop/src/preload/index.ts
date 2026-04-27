@@ -175,7 +175,24 @@ const drift = {
     subscribe('drift:resolved', (() => listener()) as (p: unknown) => void),
 };
 
-const contexture = { chat, file, scaffold, shell, project, drift };
+const reconcile = {
+  /**
+   * Fire a one-shot Claude query that returns reconcile ops for the
+   * current IR + on-disk Convex source. Used by the reconcile modal
+   * to populate its op checklist.
+   */
+  query: (payload: {
+    irJson: string;
+    convexSource: string;
+  }): Promise<{ ok: boolean; ops?: unknown[]; error?: string }> =>
+    ipcRenderer.invoke('reconcile:query', payload) as Promise<{
+      ok: boolean;
+      ops?: unknown[];
+      error?: string;
+    }>,
+};
+
+const contexture = { chat, file, scaffold, shell, project, drift, reconcile };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

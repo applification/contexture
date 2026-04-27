@@ -340,6 +340,46 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
     }
   });
 
+  // Drift-reconcile one-shot. Fires its own `query()` (no MCP server,
+  // no tools, no resume) so the chat session and its undo transactions
+  // stay completely isolated from the modal's request/response.
+  ipcMain.handle(
+    'reconcile:query',
+    async (_evt, payload: { irJson: string; convexSource: string }) => {
+      try {
+        const env: Record<string, string> | undefined =
+          currentAuth.mode === 'api-key' && currentAuth.key
+            ? { ANTHROPIC_API_KEY: currentAuth.key }
+            : undefined;
+        const iterator = query({
+          prompt: buildReconcileUserTurn(payload.irJson, payload.convexSource),
+          options: {
+            // Raw systemPrompt (not preset+append): the reconcile turn
+            // wants none of Claude Code's default tool/skill framing —
+            // it's a single Q→A round-trip producing JSON.
+            systemPrompt: RECONCILE_SYSTEM_PROMPT,
+            allowedTools: [],
+            disallowedTools: DISALLOWED_BUILTINS,
+            model: currentModel,
+            pathToClaudeCodeExecutable: detectedClaudePath ?? 'claude',
+            ...(env ? { env } : {}),
+          },
+        });
+        let buffered = '';
+        for await (const msg of iterator) {
+          const mapped = mapSdkMessage(msg);
+          if (mapped?.type === 'assistant') buffered += mapped.text;
+        }
+        const parsed = extractOpsArray(buffered);
+        if (!parsed.ok) return { ok: false, error: parsed.error };
+        return { ok: true, ops: parsed.ops };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: message };
+      }
+    },
+  );
+
   return { forwardOp, turnContext, mcpServer, turnController, chatDriver };
 }
 
@@ -436,6 +476,119 @@ function toSdkTool(descriptor: OpToolDescriptor) {
   return tool(descriptor.name, descriptor.description, descriptor.inputSchema, (args) =>
     invokeOpHandler(descriptor.handler, args as Record<string, unknown>),
   );
+}
+
+/**
+ * System prompt for `reconcile:query`. TypeScript-constructed (not a
+ * skill file) per the issue spec — keeps the modal's prompt static,
+ * cacheable, and decoupled from the chat-session prompt builder.
+ *
+ * The op-vocabulary list is duplicated from `system-prompt.ts` rather
+ * than imported because that module lives in the renderer's path
+ * (`@renderer/...`) and we want this file (which runs in the main
+ * process bundle) to keep its imports narrow.
+ */
+const RECONCILE_SYSTEM_PROMPT = `You are a schema reconciliation assistant for Contexture.
+
+The user has a Contexture IR (a JSON description of a Zod schema) and a
+hand-edited \`convex/schema.ts\` file that has diverged from what Contexture
+would emit from that IR. Your job is to return a JSON array of ops that,
+when applied to the IR, would make Contexture emit a \`schema.ts\` as close
+as possible to the hand-edited file.
+
+## Op vocabulary
+
+- \`add_type\` { type: TypeDef }
+- \`update_type\` { name: string; patch: Partial<Omit<TypeDef, 'kind'|'name'>> }
+- \`rename_type\` { from: string; to: string }
+- \`delete_type\` { name: string }
+- \`add_field\` { typeName: string; field: FieldDef; index?: number }
+- \`update_field\` { typeName: string; fieldName: string; patch: Partial<FieldDef> }
+- \`delete_field\` { typeName: string; fieldName: string }
+- \`reorder_fields\` { typeName: string; order: string[] }
+- \`add_variant\` { typeName: string; variant: string }
+- \`set_discriminator\` { typeName: string; discriminator: string }
+- \`add_import\` { import: ImportDecl }
+- \`remove_import\` { alias: string }
+- \`set_table_flag\` { typeName: string; table: boolean }
+- \`add_index\` { typeName: string; index: { name: string; fields: string[] } }
+- \`remove_index\` { typeName: string; name: string }
+- \`update_index\` { typeName: string; name: string; patch: Partial<{ name: string; fields: string[] }> }
+- \`replace_schema\` { schema: Schema }   # escape hatch; full IR
+
+## FieldDef
+
+\`{ name: string; type: FieldType; optional?: boolean; nullable?: boolean; description?: string }\`
+
+## FieldType
+
+\`{ kind: 'string' | 'number' | 'boolean' | 'date' }\` (with optional constraints),
+\`{ kind: 'literal'; value: string|number|boolean }\`,
+\`{ kind: 'ref'; typeName: string }\`,
+\`{ kind: 'array'; element: FieldType; min?: number; max?: number }\`.
+
+## Output format
+
+Return ONLY a JSON array — no prose, no markdown, no code fences.
+Each element of the array MUST have this shape:
+
+\`\`\`
+{
+  "op": <one of the ops above, as JSON with its \`kind\` field>,
+  "label": "<human-readable one-line description>",
+  "lossy": <true if the op may destroy data, false otherwise>
+}
+\`\`\`
+
+Mark \`lossy: true\` for:
+- Deleting a type or field
+- Renaming a field or type (data in the old column is lost unless migrated)
+- Changing a field's type to an incompatible type
+
+If no ops are needed (the IR already produces the hand-edited file), return \`[]\`.
+
+The current IR and the hand-edited \`schema.ts\` are in the user message.`;
+
+function buildReconcileUserTurn(irJson: string, convexSource: string): string {
+  return [
+    '<current_ir>',
+    irJson,
+    '</current_ir>',
+    '',
+    '<convex_source>',
+    convexSource,
+    '</convex_source>',
+    '',
+    'Return the reconcile ops JSON array.',
+  ].join('\n');
+}
+
+/**
+ * Pull the JSON ops array out of an assistant response. The model is
+ * instructed to return only the array, but a stray code fence or
+ * leading sentence shouldn't fail the whole reconcile — match the
+ * outermost \`[…]\` block.
+ */
+function extractOpsArray(
+  text: string,
+): { ok: true; ops: unknown[] } | { ok: false; error: string } {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    return { ok: false, error: 'No JSON array found in response.' };
+  }
+  const slice = text.slice(start, end + 1);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(slice);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `Failed to parse ops JSON: ${message}` };
+  }
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: 'Response did not parse as a JSON array.' };
+  }
+  return { ok: true, ops: parsed };
 }
 
 // Keep Zod in the surface area so downstream importers can build
