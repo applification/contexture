@@ -9,7 +9,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { useDriftStore } from '../../store/drift';
 import { Button } from '../ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export function DriftBanner(): React.JSX.Element | null {
   const isDrifted = useDriftStore((s) => s.isDrifted);
@@ -28,22 +28,24 @@ export function DriftBanner(): React.JSX.Element | null {
         <code className="font-mono">apps/web/convex/schema.ts</code> was modified outside
         Contexture.
       </span>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={-1}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              disabled
-              aria-label="Review changes (coming soon)"
-            >
-              Review changes
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Reconcile modal coming in the next release.</TooltipContent>
-      </Tooltip>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={-1}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled
+                aria-label="Review changes (coming soon)"
+              >
+                Review changes
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reconcile modal coming in the next release.</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Button
         variant="ghost"
         size="sm"
