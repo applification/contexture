@@ -9,8 +9,9 @@
  */
 
 import { useClaude } from '@renderer/chat/useClaude';
+import { useDocumentStore } from '@renderer/store/document';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
-import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
+import { Bot, ChevronDown, Code, Moon, PanelRight, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,6 +25,12 @@ export function Toolbar(): React.JSX.Element {
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const toggleSidebar = useUIChromeStore((s) => s.toggleSidebar);
   const { authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady } = useClaude();
+  const filePath = useDocumentStore((s) => s.filePath);
+  const documentMode = useDocumentStore((s) => s.mode);
+
+  // Project root is two dirs above the IR path (packages/schema/<name>.contexture.json).
+  const projectRoot =
+    filePath && documentMode === 'project' ? filePath.split('/').slice(0, -3).join('/') : null;
 
   return (
     <div
@@ -34,6 +41,19 @@ export function Toolbar(): React.JSX.Element {
       <div className="flex-1 flex justify-center">
         <GraphSearchBar />
       </div>
+
+      {projectRoot && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          title="Open project in VS Code"
+          onClick={() => void window.contexture?.shell.openInEditor(projectRoot)}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <Code className="size-4" />
+        </Button>
+      )}
 
       <Button
         variant="ghost"

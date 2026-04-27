@@ -7,7 +7,7 @@
 import { gitInitStageSpec } from '@main/scaffold/git-init';
 import { describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/my-proj', projectName: 'my-proj' };
+const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
 
 describe('gitInitStageSpec', () => {
   it('runs `git init` then `git add -A` then `git commit` at the project root', () => {

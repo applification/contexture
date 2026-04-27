@@ -16,6 +16,7 @@ import { handleScaffoldStart, type ScaffoldEvent } from '@main/ipc/scaffold';
 import { nodePreflightDeps } from '@main/scaffold/node-preflight-deps';
 import { nodeSpawner } from '@main/scaffold/node-spawner';
 import { runPreflight } from '@main/scaffold/preflight';
+import { deriveStages } from '@main/scaffold/scaffold-project';
 import { describe, expect, it } from 'vitest';
 
 const E2E = process.env.SCAFFOLD_E2E === '1';
@@ -31,7 +32,7 @@ describeOrSkip('scaffold end-to-end (SCAFFOLD_E2E=1)', () => {
       const events: ScaffoldEvent[] = [];
       try {
         await handleScaffoldStart(
-          { targetDir, projectName },
+          { targetDir, projectName, apps: ['web'] },
           {
             fs: nodeFsAdapter,
             spawner: nodeSpawner,
@@ -53,7 +54,7 @@ describeOrSkip('scaffold end-to-end (SCAFFOLD_E2E=1)', () => {
 
         // Every stage reached stage-done.
         const dones = events.filter((e) => e.kind === 'stage-done').map((e) => e.stage);
-        expect(dones).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        expect(dones).toEqual(deriveStages(['web']));
 
         // Key artefacts on disk.
         expect(existsSync(join(targetDir, 'apps/web/package.json'))).toBe(true);

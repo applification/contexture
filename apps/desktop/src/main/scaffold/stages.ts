@@ -1,14 +1,12 @@
 /**
  * Stage command table — pure derivation of what shell command each
- * external-tool stage runs, against what cwd. Keeping this separate
- * from the spawn/IO layer lets tests assert "stage 3 calls
- * create-next-app with these exact flags" without shelling out.
- *
- * Only shell-backed stages (1-5, 9) have a spec; stages 6-8 and 10
- * are in-process work (emitters; git init runs through its own spec
- * trio from `git-init.ts`).
+ * external-tool stage runs, against what cwd. Only shell-backed stages
+ * have a spec; the TurboRepo skeleton (stage 1), Convex init (stage 6),
+ * schema/emit stages (7-9), and LLM seed (11) are in-process.
  */
-import type { ScaffoldConfig, StageNumber } from './scaffold-project';
+
+import type { ScaffoldConfig } from './scaffold-project';
+import { STAGE } from './scaffold-project';
 
 export interface ShellStageSpec {
   cmd: string;
@@ -16,33 +14,12 @@ export interface ShellStageSpec {
   cwd: string;
 }
 
-function parentDirOf(path: string): string {
-  const slash = path.lastIndexOf('/');
-  if (slash <= 0) return '/';
-  return path.slice(0, slash);
-}
-
-export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): ShellStageSpec {
-  const parent = parentDirOf(config.targetDir);
+export function shellStageSpecFor(stage: number, config: ScaffoldConfig): ShellStageSpec {
   const target = config.targetDir;
   const webDir = `${target}/apps/web`;
   const schemaDir = `${target}/packages/schema`;
   switch (stage) {
-    case 1:
-      return {
-        cmd: 'bunx',
-        args: [
-          'create-turbo@latest',
-          config.projectName,
-          '--package-manager',
-          'bun',
-          '--skip-install',
-        ],
-        cwd: parent,
-      };
-    case 2:
-      return { cmd: 'rm', args: ['-rf', 'apps/web'], cwd: target };
-    case 3:
+    case STAGE.WEB_NEXT:
       return {
         cmd: 'bunx',
         args: [
@@ -57,9 +34,27 @@ export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): S
         ],
         cwd: target,
       };
-    case 4:
+    case STAGE.WEB_SHADCN:
       return { cmd: 'bunx', args: ['shadcn@latest', 'init', '--yes'], cwd: webDir };
-    case 5:
+    case STAGE.MOBILE_EXPO:
+      return {
+        cmd: 'bunx',
+        args: [
+          'create-expo-app@latest',
+          'apps/mobile',
+          '--template=default',
+          '--yes',
+          '--no-install',
+        ],
+        cwd: target,
+      };
+    case STAGE.DESKTOP_ELECTRON:
+      return {
+        cmd: 'bunx',
+        args: ['create-electron-app@latest', 'apps/desktop', '--template=vite-typescript'],
+        cwd: target,
+      };
+    case STAGE.CONVEX_INIT:
       return {
         cmd: 'bunx',
         args: [
@@ -73,7 +68,7 @@ export function shellStageSpecFor(stage: StageNumber, config: ScaffoldConfig): S
         ],
         cwd: schemaDir,
       };
-    case 9:
+    case STAGE.BUN_INSTALL:
       return { cmd: 'bun', args: ['install'], cwd: target };
     default:
       throw new Error(`shellStageSpecFor: stage ${stage} is not a shell-backed stage`);

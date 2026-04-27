@@ -31,6 +31,10 @@ describe('app menu', () => {
     expect(findItem(template, ['File', 'New Contexture File'])).toBeDefined();
   });
 
+  it('exposes a "New Project…" entry under File', () => {
+    expect(findItem(template, ['File', 'New Project…'])).toBeDefined();
+  });
+
   it('labels the Open item "Open Contexture File…"', () => {
     expect(findItem(template, ['File', 'Open Contexture File…'])).toBeDefined();
   });

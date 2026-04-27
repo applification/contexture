@@ -33,6 +33,8 @@ function mockFileBridge(): {
       onMenuOpen: () => () => undefined,
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
+      onMenuNewProject: () => () => undefined,
+      pickDirectory: vi.fn(async () => null),
     },
   };
   return { openDialog, saveAsDialog, save, openRecent, getRecentFiles };

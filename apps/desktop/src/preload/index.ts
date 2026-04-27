@@ -96,6 +96,8 @@ const file = {
   openDialog: () => ipcRenderer.invoke('file:open-dialog'),
   /** Show the OS save-as dialog and return the chosen path. */
   saveAsDialog: () => ipcRenderer.invoke('file:save-as-dialog') as Promise<string | null>,
+  /** Show a directory picker; returns the selected folder or null if cancelled. */
+  pickDirectory: () => ipcRenderer.invoke('file:pick-directory') as Promise<string | null>,
   /** Write the five-file bundle atomically under `irPath`. */
   save: (payload: {
     irPath: string;
@@ -112,6 +114,8 @@ const file = {
   /** Menu-bar -> renderer subscriptions. */
   onMenuNew: (listener: () => void) =>
     subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
+  onMenuNewProject: (listener: () => void) =>
+    subscribe('menu:file-new-project', (() => listener()) as (p: unknown) => void),
   onMenuOpen: (listener: () => void) =>
     subscribe('menu:file-open', (() => listener()) as (p: unknown) => void),
   onMenuSave: (listener: () => void) =>
@@ -120,7 +124,35 @@ const file = {
     subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
 };
 
-const contexture = { chat, file };
+const scaffold = {
+  /** Kick off the composable scaffolder; events arrive on `onEvent`. */
+  start: (config: {
+    targetDir: string;
+    projectName: string;
+    apps: string[];
+    description?: string;
+  }) => ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
+  /** Subscribe to preflight + stage events streamed from main. */
+  onEvent: (listener: (event: unknown) => void) =>
+    subscribe('scaffold:event', listener as (p: unknown) => void),
+};
+
+const shell = {
+  /** Reveal a file or folder in the OS file manager (Finder / Explorer). */
+  reveal: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:reveal', path) as Promise<void>,
+  /** Open a folder (or file) in VS Code via the `vscode://` URL scheme. */
+  openInEditor: (path: string): Promise<void> =>
+    ipcRenderer.invoke('shell:open-in-editor', path) as Promise<void>,
+};
+
+const project = {
+  /** Recursively delete a directory (used by the New Project "delete and start over" flow). */
+  deleteDirectory: (path: string): Promise<void> =>
+    ipcRenderer.invoke('project:delete-directory', path) as Promise<void>,
+};
+
+const contexture = { chat, file, scaffold, shell, project };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

@@ -102,6 +102,7 @@ export interface OpenedDocument {
 export interface ContextureFileAPI {
   openDialog: () => Promise<OpenedDocument | null>;
   saveAsDialog: () => Promise<string | null>;
+  pickDirectory: () => Promise<string | null>;
   save: (payload: {
     irPath: string;
     schema: unknown;
@@ -112,14 +113,60 @@ export interface ContextureFileAPI {
   getRecentFiles: () => Promise<string[]>;
   openRecent: (filePath: string) => Promise<OpenedDocument | null>;
   onMenuNew: (listener: () => void) => Unsubscribe;
+  onMenuNewProject: (listener: () => void) => Unsubscribe;
   onMenuOpen: (listener: () => void) => Unsubscribe;
   onMenuSave: (listener: () => void) => Unsubscribe;
   onMenuSaveAs: (listener: () => void) => Unsubscribe;
 }
 
+export type ScaffoldPreflightError =
+  | { kind: 'missing-bun' }
+  | { kind: 'missing-git' }
+  | { kind: 'missing-node' }
+  | { kind: 'no-network' }
+  | { kind: 'parent-not-writable'; path: string }
+  | { kind: 'target-exists'; path: string }
+  | { kind: 'insufficient-space'; bytesFree: number };
+
+export type ScaffoldEvent =
+  | { kind: 'preflight-failed'; error: ScaffoldPreflightError }
+  | { kind: 'stage-start'; stage: number }
+  | { kind: 'stdout-chunk'; stage: number; chunk: string }
+  | { kind: 'stderr-chunk'; stage: number; chunk: string }
+  | { kind: 'stage-done'; stage: number }
+  | { kind: 'stage-failed'; stage: number; stderr: string; retrySafe: boolean }
+  | { kind: 'scaffold-done' };
+
+export type AppKind = 'web' | 'mobile' | 'desktop';
+
+export interface ContextureScaffoldAPI {
+  start: (config: {
+    targetDir: string;
+    projectName: string;
+    apps: AppKind[];
+    description?: string;
+  }) => Promise<void>;
+  onEvent: (listener: (event: ScaffoldEvent) => void) => Unsubscribe;
+}
+
+export interface ContextureShellAPI {
+  /** Reveal the given path in the OS file manager (Finder / Explorer). */
+  reveal: (path: string) => Promise<void>;
+  /** Open a folder or file in VS Code via the `vscode://` URL scheme. */
+  openInEditor: (path: string) => Promise<void>;
+}
+
+export interface ContextureProjectAPI {
+  /** Recursively delete a directory — used by the "delete and start over" flow. */
+  deleteDirectory: (path: string) => Promise<void>;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   file: ContextureFileAPI;
+  scaffold: ContextureScaffoldAPI;
+  shell: ContextureShellAPI;
+  project: ContextureProjectAPI;
 }
 
 declare global {

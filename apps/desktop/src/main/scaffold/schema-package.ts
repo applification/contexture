@@ -21,6 +21,20 @@ export interface SchemaPackageDeps {
 
 const EMPTY_SCHEMA: Schema = { version: '1', types: [] };
 
+function makeChatHistory(description?: string): string {
+  const messages = description?.trim()
+    ? [
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: description.trim(),
+          createdAt: Date.now(),
+        },
+      ]
+    : [];
+  return `${JSON.stringify({ version: '1', messages }, null, 2)}\n`;
+}
+
 function makePackageJson(projectName: string): string {
   return `${JSON.stringify(
     {
@@ -63,10 +77,7 @@ export async function scaffoldSchemaPackage(
     `${ctxDir}/layout.json`,
     `${JSON.stringify({ version: '1', positions: {} }, null, 2)}\n`,
   );
-  await fs.writeFile(
-    `${ctxDir}/chat.json`,
-    `${JSON.stringify({ version: '1', messages: [] }, null, 2)}\n`,
-  );
+  await fs.writeFile(`${ctxDir}/chat.json`, makeChatHistory(config.description));
   await fs.writeFile(
     `${ctxDir}/emitted.json`,
     `${JSON.stringify({ version: '1', files: {} }, null, 2)}\n`,

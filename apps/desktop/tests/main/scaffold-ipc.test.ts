@@ -6,10 +6,11 @@
  */
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import { handleScaffoldStart } from '@main/ipc/scaffold';
+import { deriveStages } from '@main/scaffold/scaffold-project';
 import type { Spawner } from '@main/scaffold/spawn-runner';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/my-proj', projectName: 'my-proj' };
+const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
 
 let fs: ReturnType<typeof createMemFsAdapter>;
 
@@ -25,8 +26,8 @@ function alwaysOkPreflight() {
 
 beforeEach(() => {
   fs = createMemFsAdapter();
-  // Seed the files that shell stages 1-5 would have laid down — the
-  // in-process stages reach for `apps/web/package.json` and the IR.
+  // Seed apps/web/package.json — WORKSPACE_STITCH reads it to add the schema dep.
+  // The real flow has WEB_NEXT create it; here the pass-through spawner skips that shell call.
   fs.writeFile(`${config.targetDir}/apps/web/package.json`, `${JSON.stringify({ name: 'web' })}\n`);
 });
 
@@ -43,8 +44,9 @@ describe('handleScaffoldStart', () => {
     });
     const starts = events.filter((e) => e.kind === 'stage-start').map((e) => e.stage);
     const dones = events.filter((e) => e.kind === 'stage-done').map((e) => e.stage);
-    expect(starts).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(dones).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const expected = deriveStages(config.apps as ('web' | 'mobile' | 'desktop')[]);
+    expect(starts).toEqual(expected);
+    expect(dones).toEqual(expected);
   });
 
   it('emits a preflight-failed event and stops when preflight returns errors', async () => {

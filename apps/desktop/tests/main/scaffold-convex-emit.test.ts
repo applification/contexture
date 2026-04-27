@@ -9,7 +9,7 @@ import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import { scaffoldConvexEmit } from '@main/scaffold/convex-emit';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/my-proj', projectName: 'my-proj' };
+const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
 const schemaDir = '/work/my-proj/packages/schema';
 
 let fs: ReturnType<typeof createMemFsAdapter>;
