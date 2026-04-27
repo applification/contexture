@@ -11,7 +11,7 @@ import type { FsAdapter } from '@main/documents/document-store';
 import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emit as emitZod } from '@renderer/model/emit-zod';
-import type { Schema } from '@renderer/model/ir';
+import { IRSchema, type Schema } from '@renderer/model/ir';
 
 import type { ScaffoldConfig } from './scaffold-project';
 
@@ -67,9 +67,16 @@ export async function scaffoldSchemaPackage(
   const gitignorePath = `${schemaDir}/.gitignore`;
   const ctxDir = `${schemaDir}/.contexture`;
 
-  await fs.writeFile(irPath, `${JSON.stringify(EMPTY_SCHEMA, null, 2)}\n`);
-  await fs.writeFile(schemaTsPath, emitZod(EMPTY_SCHEMA, irPath));
-  await fs.writeFile(schemaJsonPath, `${JSON.stringify(emitJsonSchema(EMPTY_SCHEMA), null, 2)}\n`);
+  // When promoting a scratch file, use its IR content instead of the empty schema.
+  let ir: Schema = EMPTY_SCHEMA;
+  if (config.scratchPath) {
+    const raw = await fs.readFile(config.scratchPath);
+    ir = IRSchema.parse(JSON.parse(raw));
+  }
+
+  await fs.writeFile(irPath, `${JSON.stringify(ir, null, 2)}\n`);
+  await fs.writeFile(schemaTsPath, emitZod(ir, irPath));
+  await fs.writeFile(schemaJsonPath, `${JSON.stringify(emitJsonSchema(ir), null, 2)}\n`);
   await fs.writeFile(indexPath, emitSchemaIndex(config.projectName));
   await fs.writeFile(pkgPath, makePackageJson(config.projectName));
   await fs.writeFile(gitignorePath, GITIGNORE);

@@ -9,7 +9,9 @@ export type PreflightError =
   | { kind: 'no-network' }
   | { kind: 'parent-not-writable'; path: string }
   | { kind: 'target-exists'; path: string }
-  | { kind: 'insufficient-space'; bytesFree: number };
+  | { kind: 'insufficient-space'; bytesFree: number }
+  | { kind: 'scratch-unreadable' }
+  | { kind: 'scratch-invalid-ir' };
 
 export function preflightErrorCopy(error: PreflightError): string {
   switch (error.kind) {
@@ -29,5 +31,9 @@ export function preflightErrorCopy(error: PreflightError): string {
       const mb = Math.round(error.bytesFree / (1024 * 1024));
       return `Not enough free disk space (~${mb} MB available). Free up space or pick another drive.`;
     }
+    case 'scratch-unreadable':
+      return 'Could not read the selected scratch file. Check it exists and is readable.';
+    case 'scratch-invalid-ir':
+      return 'The selected file is not a valid Contexture IR. Choose a different .contexture.json.';
   }
 }

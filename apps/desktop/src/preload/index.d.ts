@@ -103,6 +103,8 @@ export interface ContextureFileAPI {
   openDialog: () => Promise<OpenedDocument | null>;
   saveAsDialog: () => Promise<string | null>;
   pickDirectory: () => Promise<string | null>;
+  /** Pick a .contexture.json scratch file; returns the absolute path or null if cancelled. */
+  pickContextureFile: () => Promise<string | null>;
   save: (payload: {
     irPath: string;
     schema: unknown;
@@ -126,7 +128,9 @@ export type ScaffoldPreflightError =
   | { kind: 'no-network' }
   | { kind: 'parent-not-writable'; path: string }
   | { kind: 'target-exists'; path: string }
-  | { kind: 'insufficient-space'; bytesFree: number };
+  | { kind: 'insufficient-space'; bytesFree: number }
+  | { kind: 'scratch-unreadable' }
+  | { kind: 'scratch-invalid-ir' };
 
 export type ScaffoldEvent =
   | { kind: 'preflight-failed'; error: ScaffoldPreflightError }
@@ -145,6 +149,7 @@ export interface ContextureScaffoldAPI {
     projectName: string;
     apps: AppKind[];
     description?: string;
+    scratchPath?: string;
   }) => Promise<void>;
   onEvent: (listener: (event: ScaffoldEvent) => void) => Unsubscribe;
 }

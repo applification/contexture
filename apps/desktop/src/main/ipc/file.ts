@@ -133,6 +133,16 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     return result.filePaths[0];
   });
 
+  ipcMain.handle('file:pick-contexture-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose Scratch IR File',
+      filters: [CONTEXTURE_OPEN_FILTER],
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
   ipcMain.handle('file:save-as-dialog', async () => {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save Contexture File As',

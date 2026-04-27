@@ -29,7 +29,9 @@ export type PreflightError =
   | { kind: 'no-network' }
   | { kind: 'parent-not-writable'; path: string }
   | { kind: 'target-exists'; path: string }
-  | { kind: 'insufficient-space'; bytesFree: number };
+  | { kind: 'insufficient-space'; bytesFree: number }
+  | { kind: 'scratch-unreadable' }
+  | { kind: 'scratch-invalid-ir' };
 
 export type PreflightResult = { ok: true } | { ok: false; error: PreflightError };
 
