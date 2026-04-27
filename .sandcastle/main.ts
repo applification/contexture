@@ -137,6 +137,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             agent: sandcastle.claudeCode("claude-opus-4-6"),
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
+              ISSUE_NUMBER: issue.id,
+              ISSUE_TITLE: issue.title,
               BRANCH: issue.branch,
             },
           });
