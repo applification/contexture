@@ -15,11 +15,16 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",
-    "prepare": "husky"
+    "ci": "turbo typecheck && turbo test && biome check .",
+    "prepare": "husky",
+    "sandcastle": "bun .sandcastle/main.mts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
     "husky": "^9.1.7",
     "turbo": "^2.5.4"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "^0.5.5"
   }
 }

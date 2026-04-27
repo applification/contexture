@@ -17,6 +17,7 @@ playwright-report/
 .env
 .env.local
 .env.*.local
+.sandcastle/.env
 
 # Paperclip agent worktrees and local state
 .paperclip/
