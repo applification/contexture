@@ -42,4 +42,9 @@ export function registerDriftIpc(mainWindow: BrowserWindow): void {
     await activeWatcher.check();
     return { ok: true };
   });
+
+  ipcMain.handle('drift:dismiss', () => {
+    activeWatcher?.resetDrifted();
+    return { ok: true };
+  });
 }

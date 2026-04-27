@@ -166,6 +166,9 @@ const drift = {
   /** Trigger a manual hash re-check (called on window focus). */
   check: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('drift:check') as Promise<{ ok: boolean }>,
+  /** Reset the main-side drifted flag after user dismisses the banner. */
+  dismiss: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('drift:dismiss') as Promise<{ ok: boolean }>,
   onDetected: (listener: () => void) =>
     subscribe('drift:detected', (() => listener()) as (p: unknown) => void),
   onResolved: (listener: () => void) =>

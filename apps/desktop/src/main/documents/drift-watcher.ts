@@ -20,6 +20,8 @@ export interface DriftWatcher {
   stop(): void;
   /** Force an immediate hash check (used by window-focus handler). */
   check(): Promise<void>;
+  /** Reset the drifted flag without stopping the watcher (used after dismiss). */
+  resetDrifted(): void;
 }
 
 export interface DriftWatcherOptions {
@@ -103,5 +105,8 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
       drifted = false;
     },
     check: doCheck,
+    resetDrifted() {
+      drifted = false;
+    },
   };
 }

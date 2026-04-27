@@ -173,6 +173,8 @@ export interface ContextureDriftAPI {
   unwatch: () => Promise<{ ok: boolean }>;
   /** Trigger a manual hash check (window focus). */
   check: () => Promise<{ ok: boolean }>;
+  /** Reset the main-side drifted flag after user dismisses the banner. */
+  dismiss: () => Promise<{ ok: boolean }>;
   onDetected: (listener: () => void) => Unsubscribe;
   onResolved: (listener: () => void) => Unsubscribe;
 }

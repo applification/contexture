@@ -17,5 +17,8 @@ export const useDriftStore = create<DriftState>((set) => ({
   isDrifted: false,
   setDrifted: () => set({ isDrifted: true }),
   setResolved: () => set({ isDrifted: false }),
-  dismiss: () => set({ isDrifted: false }),
+  dismiss: () => {
+    set({ isDrifted: false });
+    void window.contexture?.drift.dismiss();
+  },
 }));
