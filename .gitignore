@@ -9,6 +9,7 @@ coverage/
 .turbo
 .next
 next-env.d.ts
+*.tsbuildinfo
 storybook-static/
 test-results/
 playwright-report/

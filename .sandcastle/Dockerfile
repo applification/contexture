@@ -5,6 +5,15 @@ RUN apt-get update && apt-get install -y \
   git \
   curl \
   jq \
+  ca-certificates \
+  gnupg \
+  xvfb \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 24 (matches CI: actions/setup-node node-version: 24).
+# Playwright and electron-builder both expect a real `node` on PATH.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+  && apt-get install -y nodejs \
   && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -13,6 +22,27 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
   | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
   && apt-get update && apt-get install -y gh \
+  && rm -rf /var/lib/apt/lists/*
+
+# Playwright + Electron runtime libraries (mirrors .github/workflows/ci.yml
+# `e2e-electron` job). Lets the sandbox run `apps/web` Playwright tests and
+# `apps/desktop` Electron Playwright tests under xvfb, the same way CI does.
+RUN apt-get update && apt-get install -y \
+  libnss3 \
+  libatk1.0-0 \
+  libatk-bridge2.0-0 \
+  libcups2 \
+  libdrm2 \
+  libxkbcommon0 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxfixes3 \
+  libxrandr2 \
+  libgbm1 \
+  libasound2t64 \
+  libpango-1.0-0 \
+  libcairo2 \
+  libx11-xcb1 \
   && rm -rf /var/lib/apt/lists/*
 
 # Install turbo globally
