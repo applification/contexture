@@ -156,7 +156,26 @@ const project = {
     ipcRenderer.invoke('project:delete-directory', path) as Promise<void>,
 };
 
-const contexture = { chat, file, scaffold, shell, project };
+const drift = {
+  /** Start watching a file for drift; stops any previous watcher. */
+  watch: (payload: { watchedPath: string; emittedJsonPath: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('drift:watch', payload) as Promise<{ ok: boolean }>,
+  /** Stop the active watcher. */
+  unwatch: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('drift:unwatch') as Promise<{ ok: boolean }>,
+  /** Trigger a manual hash re-check (called on window focus). */
+  check: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('drift:check') as Promise<{ ok: boolean }>,
+  /** Reset the main-side drifted flag after user dismisses the banner. */
+  dismiss: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('drift:dismiss') as Promise<{ ok: boolean }>,
+  onDetected: (listener: () => void) =>
+    subscribe('drift:detected', (() => listener()) as (p: unknown) => void),
+  onResolved: (listener: () => void) =>
+    subscribe('drift:resolved', (() => listener()) as (p: unknown) => void),
+};
+
+const contexture = { chat, file, scaffold, shell, project, drift };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

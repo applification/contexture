@@ -166,12 +166,26 @@ export interface ContextureProjectAPI {
   deleteDirectory: (path: string) => Promise<void>;
 }
 
+export interface ContextureDriftAPI {
+  /** Start watching a file for drift against emitted.json. */
+  watch: (payload: { watchedPath: string; emittedJsonPath: string }) => Promise<{ ok: boolean }>;
+  /** Stop the active watcher. */
+  unwatch: () => Promise<{ ok: boolean }>;
+  /** Trigger a manual hash check (window focus). */
+  check: () => Promise<{ ok: boolean }>;
+  /** Reset the main-side drifted flag after user dismisses the banner. */
+  dismiss: () => Promise<{ ok: boolean }>;
+  onDetected: (listener: () => void) => Unsubscribe;
+  onResolved: (listener: () => void) => Unsubscribe;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   file: ContextureFileAPI;
   scaffold: ContextureScaffoldAPI;
   shell: ContextureShellAPI;
   project: ContextureProjectAPI;
+  drift: ContextureDriftAPI;
 }
 
 declare global {
