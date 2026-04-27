@@ -1,18 +1,20 @@
 /**
- * `createCompositeStageRunner` — the production StageRunner: delegates
- * shell-backed stages (1-5, 9) to the spawn runner, runs the in-process
- * stages (6 scaffold, 7 convex emit, 8 workspace stitch + git init,
- * 10 no-op) directly, and gives the orchestrator a single runner to
- * drive. Testing through fakes for fs + spawner so we can assert
- * dispatch without touching disk or shelling out.
+ * `createCompositeStageRunner` — dispatches shell-backed stages to the
+ * spawn runner and runs in-process stages directly. Tests use fakes for
+ * fs + spawner so dispatch is verified without touching disk or shelling out.
  */
 import type { FsAdapter } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import { createCompositeStageRunner } from '@main/scaffold/composite-runner';
+import { STAGE } from '@main/scaffold/scaffold-project';
 import type { Spawner } from '@main/scaffold/spawn-runner';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/my-proj', projectName: 'my-proj' };
+const config = {
+  targetDir: '/work/my-proj',
+  projectName: 'my-proj',
+  apps: ['web'] as const,
+};
 
 let fs: ReturnType<typeof createMemFsAdapter>;
 let spawnCalls: Array<{ cmd: string; args: string[]; cwd: string }>;
@@ -39,25 +41,52 @@ function okSpawner(): Spawner {
 }
 
 describe('createCompositeStageRunner', () => {
-  it('dispatches stage 1 to the spawner (bunx create-turbo)', async () => {
+  it('TURBO_SKELETON runs in-process — writes root package.json, turbo.json, .gitignore', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(1, config)) {
+    for await (const _ of runner.run(STAGE.TURBO_SKELETON, config)) {
+      // drain
+    }
+    expect(fs.exists('/work/my-proj/package.json')).toBe(true);
+    expect(fs.exists('/work/my-proj/turbo.json')).toBe(true);
+    expect(fs.exists('/work/my-proj/.gitignore')).toBe(true);
+    expect(spawnCalls).toHaveLength(0);
+  });
+
+  it('WEB_NEXT dispatches to spawner (bunx create-next-app)', async () => {
+    const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
+    for await (const _ of runner.run(STAGE.WEB_NEXT, config)) {
       // drain
     }
     expect(spawnCalls).toHaveLength(1);
     expect(spawnCalls[0].cmd).toBe('bunx');
-    expect(spawnCalls[0].args[0]).toBe('create-turbo@latest');
+    expect(spawnCalls[0].args[0]).toBe('create-next-app@latest');
   });
 
-  it('stage 5: seeds packages/schema anchor + installs convex locally, then spawns convex dev there', async () => {
+  it('MOBILE_EXPO dispatches to spawner (bunx create-expo-app)', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(5, config)) {
+    for await (const _ of runner.run(STAGE.MOBILE_EXPO, config)) {
       // drain
     }
-    // Anchor written with convex as a dep.
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0].args[0]).toBe('create-expo-app@latest');
+  });
+
+  it('DESKTOP_ELECTRON dispatches to spawner (bunx create-electron-app)', async () => {
+    const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
+    for await (const _ of runner.run(STAGE.DESKTOP_ELECTRON, config)) {
+      // drain
+    }
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0].args[0]).toBe('create-electron-app@latest');
+  });
+
+  it('CONVEX_INIT: seeds packages/schema anchor + installs convex locally, then spawns convex dev', async () => {
+    const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
+    for await (const _ of runner.run(STAGE.CONVEX_INIT, config)) {
+      // drain
+    }
     const pkg = JSON.parse(await fs.readFile('/work/my-proj/packages/schema/package.json'));
     expect(pkg.dependencies.convex).toBeDefined();
-    // Two spawns: `bun install` (so convex/server resolves), then convex dev.
     expect(spawnCalls).toHaveLength(2);
     expect(spawnCalls[0].cmd).toBe('bun');
     expect(spawnCalls[0].args).toEqual(['install']);
@@ -67,42 +96,38 @@ describe('createCompositeStageRunner', () => {
     expect(spawnCalls[1].cwd).toBe('/work/my-proj/packages/schema');
   });
 
-  it('runs stage 6 in-process — writes the schema package tree', async () => {
+  it('SCHEMA_PACKAGE runs in-process — writes the schema package tree', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(6, config)) {
+    for await (const _ of runner.run(STAGE.SCHEMA_PACKAGE, config)) {
       // drain
     }
     expect(fs.exists('/work/my-proj/packages/schema/my-proj.contexture.json')).toBe(true);
     expect(fs.exists('/work/my-proj/packages/schema/package.json')).toBe(true);
-    // Spawner must not have been touched for in-process stages.
     expect(spawnCalls).toHaveLength(0);
   });
 
-  it('runs stage 7 in-process — writes the Convex schema', async () => {
-    // Stage 6 runs first in the real flow; emulate it.
+  it('CONVEX_EMIT runs in-process — writes the Convex schema', async () => {
     await fs.writeFile(
       `${config.targetDir}/packages/schema/my-proj.contexture.json`,
       JSON.stringify({ version: '1', types: [] }),
     );
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(7, config)) {
+    for await (const _ of runner.run(STAGE.CONVEX_EMIT, config)) {
       // drain
     }
     expect(fs.exists('/work/my-proj/packages/schema/convex/schema.ts')).toBe(true);
     expect(spawnCalls).toHaveLength(0);
   });
 
-  it('runs stage 8 — stitch + git init trio via spawner', async () => {
+  it('WORKSPACE_STITCH — stitch + git init trio via spawner', async () => {
     await seedWebPackageJson(fs);
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(8, config)) {
+    for await (const _ of runner.run(STAGE.WORKSPACE_STITCH, config)) {
       // drain
     }
-    // Files written by stitch half.
     expect(fs.exists('/work/my-proj/CLAUDE.md')).toBe(true);
     expect(fs.exists('/work/my-proj/biome.json')).toBe(true);
     expect(fs.exists('/work/my-proj/.gitignore')).toBe(true);
-    // Git trio dispatched to spawner.
     expect(spawnCalls.map((c) => c.args[0])).toEqual(['init', 'add', 'commit']);
     for (const c of spawnCalls) {
       expect(c.cmd).toBe('git');
@@ -110,9 +135,9 @@ describe('createCompositeStageRunner', () => {
     }
   });
 
-  it('dispatches stage 9 to the spawner (bun install)', async () => {
+  it('BUN_INSTALL dispatches to spawner (bun install)', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(9, config)) {
+    for await (const _ of runner.run(STAGE.BUN_INSTALL, config)) {
       // drain
     }
     expect(spawnCalls).toHaveLength(1);
@@ -120,9 +145,9 @@ describe('createCompositeStageRunner', () => {
     expect(spawnCalls[0].args).toEqual(['install']);
   });
 
-  it('stage 10 is a no-op in v1 — no spawner, no file writes', async () => {
+  it('LLM_SEED is a no-op — no spawner calls, no file writes', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
-    for await (const _ of runner.run(10, config)) {
+    for await (const _ of runner.run(STAGE.LLM_SEED, config)) {
       // drain
     }
     expect(spawnCalls).toHaveLength(0);

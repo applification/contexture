@@ -1,19 +1,22 @@
 /**
- * Short, user-facing labels for the ten scaffolder stages. Kept in the
+ * Short, user-facing labels for scaffolder stages. Kept in the
  * renderer because only the UI needs them; main-side code works with
  * stage numbers directly.
  */
+import { STAGE } from '@main/scaffold/scaffold-project';
+
 export const SCAFFOLD_STAGE_LABELS: Readonly<Record<number, string>> = {
-  1: 'Scaffolding monorepo (Turborepo)',
-  2: 'Removing default web app',
-  3: 'Installing Next.js',
-  4: 'Adding shadcn/ui',
-  5: 'Provisioning Convex',
-  6: 'Emitting schema package',
-  7: 'Emitting Convex schema + seeds',
-  8: 'Stitching workspace + CLAUDE.md',
-  9: 'Installing dependencies',
-  10: 'Seeding initial IR',
+  [STAGE.TURBO_SKELETON]: 'Scaffolding monorepo',
+  [STAGE.WEB_NEXT]: 'Installing Next.js',
+  [STAGE.WEB_SHADCN]: 'Adding shadcn/ui',
+  [STAGE.MOBILE_EXPO]: 'Installing Expo (React Native)',
+  [STAGE.DESKTOP_ELECTRON]: 'Installing Electron (Forge)',
+  [STAGE.CONVEX_INIT]: 'Provisioning Convex',
+  [STAGE.SCHEMA_PACKAGE]: 'Emitting schema package',
+  [STAGE.CONVEX_EMIT]: 'Emitting Convex schema + seeds',
+  [STAGE.WORKSPACE_STITCH]: 'Stitching workspace + CLAUDE.md',
+  [STAGE.BUN_INSTALL]: 'Installing dependencies',
+  [STAGE.LLM_SEED]: 'Seeding initial IR',
 };
 
 export function labelForStage(stage: number): string {

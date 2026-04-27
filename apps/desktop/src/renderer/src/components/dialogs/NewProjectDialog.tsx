@@ -2,22 +2,24 @@
  * New Project dialog — form, preflight, and live progress.
  *
  * Three views in one dialog, switched by `phase`:
- *   - `form`    — name + parent-dir inputs; inline preflight error if
- *                 the scaffolder's stage-0 checks fail.
- *   - `running` — ten stage rows with running/done/pending status plus
- *                 a streaming log tail from stdout/stderr chunks.
- *   - `done` / `failed` — land in later slices.
+ *   - `form`    — name + parent-dir inputs + app picker; inline
+ *                 preflight error if the scaffolder's stage-0 checks fail.
+ *   - `running` — dynamic stage rows (based on selected apps) with
+ *                 running/done/pending status plus a streaming log tail.
+ *   - `done` / `failed` — success and failure panels.
  *
  * Event fan-out: a single `scaffold.onEvent` subscription mutates the
  * store; components below re-render off those store slices.
  */
+import { deriveStages } from '@main/scaffold/scaffold-project';
 import { type PreflightError, preflightErrorCopy } from '@renderer/model/preflight-error-copy';
 import { labelForStage } from '@renderer/model/scaffold-stage-labels';
 import { validateProjectName } from '@renderer/model/validate-project-name';
-import { type StageStatus, useNewProjectStore } from '@renderer/store/new-project';
+import { type AppKind, type StageStatus, useNewProjectStore } from '@renderer/store/new-project';
 import { Folder } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +32,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-const STAGE_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const APP_OPTIONS: { kind: AppKind; label: string; description: string }[] = [
+  { kind: 'web', label: 'Web', description: 'Next.js + shadcn/ui' },
+  { kind: 'mobile', label: 'Mobile', description: 'Expo (React Native)' },
+  { kind: 'desktop', label: 'Desktop', description: 'Electron Forge' },
+];
 
 export interface NewProjectDialogProps {
   /** Called with the scaffolded IR path when the user dismisses the success panel. */
@@ -43,11 +49,11 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
   const phase = useNewProjectStore((s) => s.phase);
   const name = useNewProjectStore((s) => s.name);
   const parentDir = useNewProjectStore((s) => s.parentDir);
+  const apps = useNewProjectStore((s) => s.apps);
+  const description = useNewProjectStore((s) => s.description);
   const setName = useNewProjectStore((s) => s.setName);
   const setParentDir = useNewProjectStore((s) => s.setParentDir);
-  const startingPoint = useNewProjectStore((s) => s.startingPoint);
-  const description = useNewProjectStore((s) => s.description);
-  const setStartingPoint = useNewProjectStore((s) => s.setStartingPoint);
+  const toggleApp = useNewProjectStore((s) => s.toggleApp);
   const setDescription = useNewProjectStore((s) => s.setDescription);
   const preflightError = useNewProjectStore((s) => s.preflightError);
   const setPreflightError = useNewProjectStore((s) => s.setPreflightError);
@@ -59,9 +65,15 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
   const resetProgress = useNewProjectStore((s) => s.resetProgress);
 
   const nameValidation = name === '' ? { ok: true as const } : validateProjectName(name);
-  const startingPointValid = startingPoint === 'describe' && description.trim() !== '';
-  const canCreate = name !== '' && nameValidation.ok && parentDir !== '' && startingPointValid;
+  const canCreate = name !== '' && nameValidation.ok && parentDir !== '' && apps.length >= 1;
   const targetPath = parentDir && name ? `${parentDir}/${name}` : '';
+
+  const onOpenProjectRef = useRef(onOpenProject);
+  onOpenProjectRef.current = onOpenProject;
+  const targetPathRef = useRef(targetPath);
+  targetPathRef.current = targetPath;
+  const nameRef = useRef(name);
+  nameRef.current = name;
 
   useEffect(() => {
     const scaffold = window.contexture?.scaffold;
@@ -83,16 +95,19 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
           setFailure({ stage: event.stage, stderr: event.stderr, retrySafe: event.retrySafe });
           appendLog(event.stderr);
           return;
-        case 'scaffold-done':
-          setPhase('done');
+        case 'scaffold-done': {
+          const irPath = `${targetPathRef.current}/packages/schema/${nameRef.current}.contexture.json`;
+          close();
+          void onOpenProjectRef.current?.(irPath);
           return;
+        }
         case 'stdout-chunk':
         case 'stderr-chunk':
           appendLog(event.chunk);
           return;
       }
     });
-  }, [setPreflightError, setPhase, setFailure, markStage, appendLog]);
+  }, [setPreflightError, setPhase, setFailure, markStage, appendLog, close]);
 
   async function handlePickFolder(): Promise<void> {
     const picked = await window.contexture?.file.pickDirectory();
@@ -103,13 +118,17 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
     if (!targetPath) return;
     clearPreflightError();
     resetProgress();
-    await window.contexture?.scaffold.start({ targetDir: targetPath, projectName: name });
+    await window.contexture?.scaffold.start({
+      targetDir: targetPath,
+      projectName: name,
+      apps,
+      description: description.trim() || undefined,
+    });
   }
 
-  const showSuccess = phase === 'done';
   const showFailure = phase === 'failed';
   const showProgress = phase === 'running';
-  const showForm = !showProgress && !showSuccess && !showFailure;
+  const showForm = !showProgress && !showFailure;
 
   return (
     <Dialog
@@ -122,27 +141,18 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
         <DialogHeader>
           <DialogTitle>New Project</DialogTitle>
           <DialogDescription>
-            {showSuccess
-              ? 'Your project is ready.'
-              : showFailure
-                ? 'Scaffolding hit a snag.'
-                : showProgress
-                  ? 'Scaffolding your project — this usually takes a minute.'
-                  : 'Scaffold a Contexture monorepo under a folder you choose.'}
+            {showFailure
+              ? 'Scaffolding hit a snag.'
+              : showProgress
+                ? 'Scaffolding your project — this usually takes a minute.'
+                : 'Scaffold a Contexture monorepo under a folder you choose.'}
           </DialogDescription>
         </DialogHeader>
 
-        {showSuccess ? (
-          <SuccessView
-            targetPath={targetPath}
-            irPath={`${targetPath}/packages/schema/${name}.contexture.json`}
-            logPath={`${targetPath}/.contexture/scaffold.log`}
-            onOpenProject={onOpenProject}
-          />
-        ) : showFailure ? (
+        {showFailure ? (
           <FailureView targetPath={targetPath} onRetry={() => void handleCreate()} />
         ) : showProgress ? (
-          <ProgressView />
+          <ProgressView apps={apps} />
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -182,45 +192,51 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
             )}
 
             <div className="space-y-2">
-              <Label>Starting point</Label>
+              <Label>Apps to include</Label>
+              <p className="text-xs text-muted-foreground">
+                Convex is always included. Select at least one app layer.
+              </p>
               <div className="space-y-2">
-                <label className="flex items-start gap-2 text-sm cursor-pointer">
-                  <input
-                    type="radio"
-                    name="starting-point"
-                    className="mt-1"
-                    checked={startingPoint === 'describe'}
-                    onChange={() => setStartingPoint('describe')}
-                    aria-label="Describe what you're building"
-                  />
-                  <span>Describe what you're building</span>
-                </label>
-                <label className="flex items-start gap-2 text-sm cursor-not-allowed text-muted-foreground">
-                  <input
-                    type="radio"
-                    name="starting-point"
-                    className="mt-1"
-                    disabled
-                    aria-label="Promote an existing scratch file"
-                  />
-                  <span>
-                    Promote an existing scratch file{' '}
-                    <span className="text-xs">(coming soon — #124)</span>
-                  </span>
-                </label>
+                {APP_OPTIONS.map(({ kind, label, description }) => (
+                  <label
+                    key={kind}
+                    htmlFor={`app-${kind}`}
+                    className="flex items-start gap-2 text-sm cursor-pointer"
+                  >
+                    <Checkbox
+                      id={`app-${kind}`}
+                      checked={apps.includes(kind)}
+                      onCheckedChange={() => toggleApp(kind)}
+                      aria-label={label}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      {label} <span className="text-xs text-muted-foreground">({description})</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-              {startingPoint === 'describe' && (
-                <div className="space-y-1">
-                  <Label htmlFor="new-project-description">Describe your project</Label>
-                  <Textarea
-                    id="new-project-description"
-                    rows={3}
-                    placeholder="A photo-sharing app where users post and like photos…"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
+              {apps.length === 0 && (
+                <p className="text-xs text-destructive">Select at least one app.</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-project-description">
+                Initial prompt{' '}
+                <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Textarea
+                id="new-project-description"
+                rows={3}
+                placeholder="A photo-sharing app where users post and like photos…"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Seeded into the chat when you open the project. Claude will build your schema from
+                this.
+              </p>
             </div>
 
             {preflightError && (
@@ -243,58 +259,6 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function SuccessView({
-  targetPath,
-  irPath,
-  logPath,
-  onOpenProject,
-}: {
-  targetPath: string;
-  irPath: string;
-  logPath: string;
-  onOpenProject?: (irPath: string) => void;
-}): React.JSX.Element {
-  const close = useNewProjectStore((s) => s.close);
-  function handleClose(): void {
-    onOpenProject?.(irPath);
-    close();
-  }
-  return (
-    <div data-testid="scaffold-success" className="space-y-3">
-      <div className="flex items-center gap-2 text-sm">
-        <span role="img" aria-label="success">
-          ✓
-        </span>
-        <span>Project scaffolded successfully.</span>
-      </div>
-      <div className="space-y-1">
-        <Label>Location</Label>
-        <p className="text-xs font-mono text-muted-foreground break-all">{targetPath}</p>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(targetPath)}>
-          Reveal
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => void window.contexture?.shell.openInEditor(targetPath)}
-        >
-          Open in VS Code
-        </Button>
-        <Button variant="outline" onClick={() => void navigator.clipboard.writeText(targetPath)}>
-          Copy path
-        </Button>
-        <Button variant="outline" onClick={() => void window.contexture?.shell.reveal(logPath)}>
-          View log
-        </Button>
-        <Button data-testid="scaffold-success-close" onClick={handleClose}>
-          Close
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -357,14 +321,15 @@ function FailureView({
   );
 }
 
-function ProgressView(): React.JSX.Element {
+function ProgressView({ apps }: { apps: AppKind[] }): React.JSX.Element {
   const stageStates = useNewProjectStore((s) => s.stageStates);
   const log = useNewProjectStore((s) => s.log);
+  const stages = deriveStages(apps);
 
   return (
     <div className="space-y-3">
       <ul className="space-y-1">
-        {STAGE_NUMBERS.map((n) => {
+        {stages.map((n) => {
           const status = stageStates[n] ?? 'pending';
           return (
             <li

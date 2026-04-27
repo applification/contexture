@@ -1,27 +1,71 @@
 /**
- * `scaffoldProject` — the ten-stage project scaffolder. Streams
+ * `scaffoldProject` — the composable project scaffolder. Derives a
+ * dynamic stage list from the selected app kinds, then streams
  * `StageEvent`s per stage so the renderer can show live progress, and
  * writes `.contexture/scaffold.log` on both success and failure paths.
  *
  * Stage implementations are injected via `StageRunner` so the
- * orchestrator is unit-testable without shelling out; real runners
- * wire `child_process.spawn` + the project emitters in later slices.
+ * orchestrator is unit-testable without shelling out.
  *
- * Failure policy: any stage throwing aborts the chain. Stages 1-4
- * (turbo/rm/next/shadcn) are "start over only" — a failed run should
- * be wiped and retried fresh. Stages 5+ (`convex dev`, scaffold
- * emitters, git init, `bun install`) are retry-safe against the same
- * directory.
+ * Failure policy: any stage throwing aborts the chain. The TurboRepo
+ * skeleton stage (1) is "start over only". Stages 2+ are retry-safe
+ * against the same directory.
  */
 
-export type StageNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-export const STAGE_NUMBERS: readonly StageNumber[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-/** First stage that is safe to retry against the same target dir. */
-const FIRST_RETRY_SAFE_STAGE: StageNumber = 5;
+export type AppKind = 'web' | 'mobile' | 'desktop';
 
 export interface ScaffoldConfig {
   targetDir: string;
   projectName: string;
+  apps: AppKind[];
+  /** Initial user prompt seeded into chat.json when the project is created. */
+  description?: string;
+}
+
+/**
+ * Fixed stage numbers. Optional app stages (WEB_*, MOBILE, DESKTOP)
+ * are included only when the corresponding app kind is selected.
+ */
+export const STAGE = {
+  TURBO_SKELETON: 1,
+  WEB_NEXT: 2,
+  WEB_SHADCN: 3,
+  MOBILE_EXPO: 4,
+  DESKTOP_ELECTRON: 5,
+  CONVEX_INIT: 6,
+  SCHEMA_PACKAGE: 7,
+  CONVEX_EMIT: 8,
+  WORKSPACE_STITCH: 9,
+  BUN_INSTALL: 10,
+  LLM_SEED: 11,
+} as const;
+
+export type StageNumber = (typeof STAGE)[keyof typeof STAGE];
+
+/** First stage that is safe to retry against the same target dir. */
+const FIRST_RETRY_SAFE_STAGE: StageNumber = STAGE.WEB_NEXT;
+
+/** Derive the ordered stage list for a given app selection. */
+export function deriveStages(apps: AppKind[]): StageNumber[] {
+  const stages: StageNumber[] = [STAGE.TURBO_SKELETON];
+  if (apps.includes('web')) {
+    stages.push(STAGE.WEB_NEXT, STAGE.WEB_SHADCN);
+  }
+  if (apps.includes('mobile')) {
+    stages.push(STAGE.MOBILE_EXPO);
+  }
+  if (apps.includes('desktop')) {
+    stages.push(STAGE.DESKTOP_ELECTRON);
+  }
+  stages.push(
+    STAGE.CONVEX_INIT,
+    STAGE.SCHEMA_PACKAGE,
+    STAGE.CONVEX_EMIT,
+    STAGE.WORKSPACE_STITCH,
+    STAGE.BUN_INSTALL,
+    STAGE.LLM_SEED,
+  );
+  return stages;
 }
 
 export type StageEvent =
@@ -51,10 +95,11 @@ export async function* scaffoldProject(
   config: ScaffoldConfig,
   deps: ScaffoldDeps,
 ): AsyncIterable<StageEvent> {
+  const stages = deriveStages(config.apps);
   const buffered: StageEvent[] = [];
   let failedStderr = '';
 
-  for (const stage of STAGE_NUMBERS) {
+  for (const stage of stages) {
     const startEvent: StageEvent = { kind: 'stage-start', stage };
     buffered.push(startEvent);
     yield startEvent;

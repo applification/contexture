@@ -125,9 +125,13 @@ const file = {
 };
 
 const scaffold = {
-  /** Kick off the 10-stage scaffolder; events arrive on `onEvent`. */
-  start: (config: { targetDir: string; projectName: string }) =>
-    ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
+  /** Kick off the composable scaffolder; events arrive on `onEvent`. */
+  start: (config: {
+    targetDir: string;
+    projectName: string;
+    apps: string[];
+    description?: string;
+  }) => ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
   /** Subscribe to preflight + stage events streamed from main. */
   onEvent: (listener: (event: unknown) => void) =>
     subscribe('scaffold:event', listener as (p: unknown) => void),

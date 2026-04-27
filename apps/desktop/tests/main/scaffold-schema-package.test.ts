@@ -9,7 +9,7 @@ import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import { scaffoldSchemaPackage } from '@main/scaffold/schema-package';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/my-proj', projectName: 'my-proj' };
+const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
 const schemaDir = '/work/my-proj/packages/schema';
 
 let fs: ReturnType<typeof createMemFsAdapter>;
@@ -48,7 +48,7 @@ describe('scaffoldSchemaPackage', () => {
     expect(fs.exists(`${schemaDir}/.gitignore`)).toBe(true);
   });
 
-  it('seeds an empty layout.json, chat.json, and emitted.json under .contexture/', async () => {
+  it('seeds an empty chat.json when no description is provided', async () => {
     await scaffoldSchemaPackage(config, { fs });
     expect(JSON.parse(await fs.readFile(`${schemaDir}/.contexture/layout.json`))).toEqual({
       version: '1',
@@ -62,5 +62,24 @@ describe('scaffoldSchemaPackage', () => {
       version: '1',
       files: {},
     });
+  });
+
+  it('seeds chat.json with the description as the first user message when provided', async () => {
+    const withDesc = { ...config, description: 'A photo-sharing app' };
+    await scaffoldSchemaPackage(withDesc, { fs });
+    const chat = JSON.parse(await fs.readFile(`${schemaDir}/.contexture/chat.json`));
+    expect(chat.version).toBe('1');
+    expect(chat.messages).toHaveLength(1);
+    expect(chat.messages[0].role).toBe('user');
+    expect(chat.messages[0].content).toBe('A photo-sharing app');
+    expect(typeof chat.messages[0].id).toBe('string');
+    expect(typeof chat.messages[0].createdAt).toBe('number');
+  });
+
+  it('trims whitespace from the description before seeding', async () => {
+    const withDesc = { ...config, description: '  A blog platform  ' };
+    await scaffoldSchemaPackage(withDesc, { fs });
+    const chat = JSON.parse(await fs.readFile(`${schemaDir}/.contexture/chat.json`));
+    expect(chat.messages[0].content).toBe('A blog platform');
   });
 });

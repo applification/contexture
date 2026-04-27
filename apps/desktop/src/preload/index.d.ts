@@ -137,8 +137,15 @@ export type ScaffoldEvent =
   | { kind: 'stage-failed'; stage: number; stderr: string; retrySafe: boolean }
   | { kind: 'scaffold-done' };
 
+export type AppKind = 'web' | 'mobile' | 'desktop';
+
 export interface ContextureScaffoldAPI {
-  start: (config: { targetDir: string; projectName: string }) => Promise<void>;
+  start: (config: {
+    targetDir: string;
+    projectName: string;
+    apps: AppKind[];
+    description?: string;
+  }) => Promise<void>;
   onEvent: (listener: (event: ScaffoldEvent) => void) => Unsubscribe;
 }
 

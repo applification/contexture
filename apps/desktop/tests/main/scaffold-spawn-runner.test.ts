@@ -5,10 +5,11 @@
  * as StageChunks, non-zero exit throws) without actually forking a
  * process. Real spawn wiring is a one-liner in production.
  */
+import { STAGE } from '@main/scaffold/scaffold-project';
 import { createSpawnStageRunner, type Spawner } from '@main/scaffold/spawn-runner';
 import { describe, expect, it } from 'vitest';
 
-const config = { targetDir: '/work/p', projectName: 'p' };
+const config = { targetDir: '/work/p', projectName: 'p', apps: ['web'] as const };
 
 function fakeSpawner(
   fn: (args: Parameters<Spawner>[0]) => {
@@ -34,13 +35,13 @@ describe('spawnStageRunner', () => {
     });
     const runner = createSpawnStageRunner(spawner);
     const chunks: Array<string> = [];
-    for await (const ev of runner.run(1, config)) {
+    for await (const ev of runner.run(STAGE.WEB_NEXT, config)) {
       if (ev.kind === 'stdout-chunk') chunks.push(ev.chunk);
     }
     expect(calls).toHaveLength(1);
     expect(calls[0].cmd).toBe('bunx');
-    expect(calls[0].args[0]).toBe('create-turbo@latest');
-    expect(calls[0].cwd).toBe('/work');
+    expect(calls[0].args[0]).toBe('create-next-app@latest');
+    expect(calls[0].cwd).toBe('/work/p');
     expect(chunks).toEqual(['creating...\n', 'done.\n']);
   });
 
@@ -49,7 +50,7 @@ describe('spawnStageRunner', () => {
     const runner = createSpawnStageRunner(spawner);
     let threw = false;
     try {
-      for await (const _ of runner.run(3, config)) {
+      for await (const _ of runner.run(STAGE.WEB_SHADCN, config)) {
         // drain
       }
     } catch (e) {

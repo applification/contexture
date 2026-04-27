@@ -145,6 +145,12 @@ export default function App(): React.JSX.Element {
   chatMessagesRef.current = chat.messages;
   const chatHydrateRef = useRef(chat.hydrate);
   chatHydrateRef.current = chat.hydrate;
+  const chatSendRef = useRef(chat.send);
+  chatSendRef.current = chat.send;
+
+  // Captures the first seeded user message from a newly scaffolded project
+  // so onOpenProject can auto-send it after the bundle loads.
+  const pendingAutoSendRef = useRef<string | null>(null);
 
   useNewProject();
 
@@ -158,6 +164,17 @@ export default function App(): React.JSX.Element {
         void window.contexture?.chat.setSessionId(loadedChat.sessionId);
       } else {
         void window.contexture?.chat.clearSession();
+      }
+      // Capture a seeded first message for auto-send (set by onOpenProject).
+      const first = loadedChat.messages[0];
+      if (
+        pendingAutoSendRef.current &&
+        first?.role === 'user' &&
+        loadedChat.messages.length === 1
+      ) {
+        pendingAutoSendRef.current = first.content;
+      } else {
+        pendingAutoSendRef.current = null;
       }
     },
     onNew: () => {
@@ -221,6 +238,7 @@ export default function App(): React.JSX.Element {
   // multi-op chat turn) surfaces as an in-panel error rather than
   // crashing the sidebar.
   const filePath = useDocumentStore((s) => s.filePath);
+  const documentMode = useDocumentStore((s) => s.mode);
   const zodEmission = useMemo((): { source: string; error: string | null } => {
     if (activeTab !== 'schema') return { source: '', error: null };
     try {
@@ -277,6 +295,8 @@ export default function App(): React.JSX.Element {
                 onLoadSample={loadSample}
                 recentFiles={recentFiles}
                 onOpenRecent={fileMenu.handleOpenPath}
+                isNewProject={documentMode === 'project'}
+                projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
               />
             )}
           </div>
@@ -335,7 +355,22 @@ export default function App(): React.JSX.Element {
 
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
-      <NewProjectDialog onOpenProject={fileMenu.handleOpenPath} />
+      <NewProjectDialog
+        onOpenProject={async (irPath) => {
+          // Signal onBundleLoaded to capture a seeded first message.
+          pendingAutoSendRef.current = '__pending__';
+          await fileMenu.handleOpenPath(irPath);
+          // Switch to chat and ensure the sidebar is visible.
+          setActiveTab('chat');
+          useUIChromeStore.getState().setSidebarVisible(true);
+          // If onBundleLoaded captured a seeded first message, auto-send it.
+          const toSend = pendingAutoSendRef.current;
+          pendingAutoSendRef.current = null;
+          if (toSend && toSend !== '__pending__') {
+            await chatSendRef.current(toSend);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -344,10 +379,14 @@ function EmptyState({
   onLoadSample,
   recentFiles,
   onOpenRecent,
+  isNewProject = false,
+  projectName = null,
 }: {
   onLoadSample: () => void;
   recentFiles: string[];
   onOpenRecent: (path: string) => void;
+  isNewProject?: boolean;
+  projectName?: string | null;
 }): React.JSX.Element {
   return (
     <div
@@ -355,40 +394,56 @@ function EmptyState({
       style={{ background: 'var(--graph-bg)' }}
     >
       <GraphBackground />
-      <div className="relative z-10 text-center text-muted-foreground max-w-sm">
-        <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
-        <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>
-        <p className="text-sm mb-4">
-          Open a <code className="text-xs">.contexture.json</code> file or start chatting with
-          Claude to create one.
-        </p>
-        <Button onClick={onLoadSample}>Load allotment sample</Button>
+      {isNewProject ? (
+        <div className="relative z-10 text-center text-muted-foreground max-w-sm space-y-3">
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+            {projectName ?? 'New project'}
+          </h1>
+          <p className="text-sm">
+            Your project has been scaffolded. Claude is building your schema in the chat panel —
+            types will appear here as they're created.
+          </p>
+          <p className="text-xs text-muted-foreground/60">
+            You can iterate on the schema by continuing the conversation, or edit types directly
+            once they appear on the canvas.
+          </p>
+        </div>
+      ) : (
+        <div className="relative z-10 text-center text-muted-foreground max-w-sm">
+          <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
+          <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>
+          <p className="text-sm mb-4">
+            Open a <code className="text-xs">.contexture.json</code> file or start chatting with
+            Claude to create one.
+          </p>
+          <Button onClick={onLoadSample}>Load allotment sample</Button>
 
-        {recentFiles.length > 0 && (
-          <div className="mt-6 text-left">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
-              <Clock className="size-3" />
-              <span>Recent files</span>
+          {recentFiles.length > 0 && (
+            <div className="mt-6 text-left">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
+                <Clock className="size-3" />
+                <span>Recent files</span>
+              </div>
+              <div className="space-y-0.5">
+                {recentFiles.slice(0, 5).map((fp) => (
+                  <button
+                    type="button"
+                    key={fp}
+                    onClick={() => onOpenRecent(fp)}
+                    className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
+                    title={fp}
+                  >
+                    {fp.split('/').pop()}
+                    <span className="text-muted-foreground/50 ml-1.5">
+                      {fp.split('/').slice(0, -1).join('/')}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-0.5">
-              {recentFiles.slice(0, 5).map((fp) => (
-                <button
-                  type="button"
-                  key={fp}
-                  onClick={() => onOpenRecent(fp)}
-                  className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
-                  title={fp}
-                >
-                  {fp.split('/').pop()}
-                  <span className="text-muted-foreground/50 ml-1.5">
-                    {fp.split('/').slice(0, -1).join('/')}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

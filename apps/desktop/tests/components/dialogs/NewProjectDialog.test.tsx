@@ -4,11 +4,11 @@
  *   - project-name input live-validates via `validateProjectName`;
  *   - parent-dir button invokes `window.contexture.file.pickDirectory`;
  *   - target-path preview is `${parent}/${name}`;
- *   - Create is disabled until name is valid AND parent is chosen.
- *
- * The scaffold-start wiring + progress / success panels land in later
- * slices; here we only confirm the form shape + gating.
+ *   - app picker checkboxes (web pre-checked, mobile/desktop unchecked);
+ *   - Create is disabled until name is valid AND parent is chosen AND
+ *     at least one app is selected.
  */
+import { STAGE } from '@main/scaffold/scaffold-project';
 import { NewProjectDialog } from '@renderer/components/dialogs/NewProjectDialog';
 import { useNewProjectStore } from '@renderer/store/new-project';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -144,7 +144,32 @@ describe('NewProjectDialog', () => {
     expect(screen.getByText(/\/Users\/me\/projects\/my-proj/)).toBeInTheDocument();
   });
 
-  it('Create is enabled only when name is valid AND parent is chosen AND starting-point is valid', () => {
+  it('app picker shows Web pre-checked, Mobile and Desktop unchecked', () => {
+    mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+    });
+    expect(screen.getByRole('checkbox', { name: /Web/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Mobile/i })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Desktop/i })).not.toBeChecked();
+  });
+
+  it('Create is disabled when no apps are selected', () => {
+    mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    // Uncheck Web (the only pre-checked app)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Web/i }));
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeDisabled();
+    expect(screen.getByText('Select at least one app.')).toBeInTheDocument();
+  });
+
+  it('Create is enabled when name, parent, and at least one app are set', () => {
     mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
@@ -153,94 +178,40 @@ describe('NewProjectDialog', () => {
     const create = screen.getByRole('button', { name: /^Create$/i });
     expect(create).toBeDisabled();
 
-    // Name only — still disabled.
     act(() => {
       useNewProjectStore.getState().setName('my-proj');
     });
     expect(create).toBeDisabled();
 
-    // Name + parent, no starting point — still disabled.
     act(() => {
       useNewProjectStore.getState().setParentDir('/tmp');
     });
-    expect(create).toBeDisabled();
-
-    // Add describe + description — now enabled.
-    act(() => {
-      useNewProjectStore.getState().setStartingPoint('describe');
-      useNewProjectStore.getState().setDescription('a blog');
-    });
+    // Web is pre-checked so now all conditions are met.
     expect(create).toBeEnabled();
 
-    // Invalid name with everything else — disabled again.
+    // Invalid name — disabled again.
     act(() => {
       useNewProjectStore.getState().setName('Bad');
     });
     expect(create).toBeDisabled();
   });
 
-  it('Create invokes scaffold.start with targetDir + projectName', async () => {
+  it('Create invokes scaffold.start with targetDir, projectName, and selected apps', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
       useNewProjectStore.getState().open();
       useNewProjectStore.getState().setName('my-proj');
       useNewProjectStore.getState().setParentDir('/Users/me/projects');
-      useNewProjectStore.getState().setStartingPoint('describe');
-      useNewProjectStore.getState().setDescription('a blog');
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     await waitFor(() => {
       expect(bridge.scaffoldStart).toHaveBeenCalledWith({
         targetDir: '/Users/me/projects/my-proj',
         projectName: 'my-proj',
+        apps: ['web'],
       });
     });
-  });
-
-  it('renders both starting-point radios; promote-scratch is disabled with #124 hint', () => {
-    mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-    });
-    const describe = screen.getByLabelText(/Describe what you're building/i);
-    const promote = screen.getByLabelText(/Promote an existing scratch/i);
-    expect(describe).toBeEnabled();
-    expect(promote).toBeDisabled();
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
-  });
-
-  it('Create is disabled until a starting point is chosen (even with name+parent)', () => {
-    mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    expect(screen.getByRole('button', { name: /^Create$/i })).toBeDisabled();
-    act(() => {
-      useNewProjectStore.getState().setStartingPoint('describe');
-      useNewProjectStore.getState().setDescription('a blog');
-    });
-    expect(screen.getByRole('button', { name: /^Create$/i })).toBeEnabled();
-  });
-
-  it('describe path requires a non-empty description', () => {
-    mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-      useNewProjectStore.getState().setStartingPoint('describe');
-    });
-    expect(screen.getByRole('button', { name: /^Create$/i })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/Describe your project/i), {
-      target: { value: 'a photo app' },
-    });
-    expect(screen.getByRole('button', { name: /^Create$/i })).toBeEnabled();
   });
 
   it('shows an inline preflight error when main reports preflight-failed', async () => {
@@ -282,7 +253,7 @@ describe('NewProjectDialog', () => {
     });
   });
 
-  it('switches to the progress view on stage-start and shows all ten stage labels', async () => {
+  it('switches to the progress view on stage-start and shows stage labels', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
@@ -292,13 +263,31 @@ describe('NewProjectDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     act(() => {
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.TURBO_SKELETON });
     });
     await waitFor(() => {
       expect(screen.getByText(/Scaffolding monorepo/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/Installing dependencies/i)).toBeInTheDocument();
     expect(screen.getByText(/Seeding initial IR/i)).toBeInTheDocument();
+  });
+
+  it('shows web-specific stages (Next.js, shadcn) when web is selected', async () => {
+    const bridge = mockFileBridge();
+    render(<NewProjectDialog />);
+    act(() => {
+      useNewProjectStore.getState().open();
+      useNewProjectStore.getState().setName('my-proj');
+      useNewProjectStore.getState().setParentDir('/tmp');
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    act(() => {
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.TURBO_SKELETON });
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Installing Next\.js/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Adding shadcn\/ui/i)).toBeInTheDocument();
   });
 
   it('flips the active row to running and previous rows to done as events arrive', async () => {
@@ -311,16 +300,24 @@ describe('NewProjectDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     act(() => {
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
-      bridge.fireScaffoldEvent({ kind: 'stage-done', stage: 1 });
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 2 });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.TURBO_SKELETON });
+      bridge.fireScaffoldEvent({ kind: 'stage-done', stage: STAGE.TURBO_SKELETON });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.WEB_NEXT });
     });
     await waitFor(() => {
-      const row1 = screen.getByTestId('scaffold-stage-1');
-      expect(row1).toHaveAttribute('data-status', 'done');
+      expect(screen.getByTestId(`scaffold-stage-${STAGE.TURBO_SKELETON}`)).toHaveAttribute(
+        'data-status',
+        'done',
+      );
     });
-    expect(screen.getByTestId('scaffold-stage-2')).toHaveAttribute('data-status', 'running');
-    expect(screen.getByTestId('scaffold-stage-3')).toHaveAttribute('data-status', 'pending');
+    expect(screen.getByTestId(`scaffold-stage-${STAGE.WEB_NEXT}`)).toHaveAttribute(
+      'data-status',
+      'running',
+    );
+    expect(screen.getByTestId(`scaffold-stage-${STAGE.WEB_SHADCN}`)).toHaveAttribute(
+      'data-status',
+      'pending',
+    );
   });
 
   it('appends stdout/stderr chunks to the streaming log', async () => {
@@ -333,15 +330,15 @@ describe('NewProjectDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     act(() => {
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.TURBO_SKELETON });
       bridge.fireScaffoldEvent({
         kind: 'stdout-chunk',
-        stage: 1,
+        stage: STAGE.TURBO_SKELETON,
         chunk: 'creating apps/...\n',
       });
       bridge.fireScaffoldEvent({
         kind: 'stderr-chunk',
-        stage: 1,
+        stage: STAGE.TURBO_SKELETON,
         chunk: 'warn: something\n',
       });
     });
@@ -352,28 +349,10 @@ describe('NewProjectDialog', () => {
     });
   });
 
-  it('transitions to the success panel when scaffold-done fires', async () => {
+  it('closes the dialog and calls onOpenProject with the IR path when scaffold-done fires', async () => {
     const bridge = mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
-    act(() => {
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 1 });
-      bridge.fireScaffoldEvent({ kind: 'stage-done', stage: 1 });
-      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
-    });
-    await waitFor(() => {
-      expect(useNewProjectStore.getState().phase).toBe('done');
-    });
-  });
-
-  it('shows the success panel with the target path when phase is done', async () => {
-    const bridge = mockFileBridge();
-    render(<NewProjectDialog />);
+    const onOpenProject = vi.fn();
+    render(<NewProjectDialog onOpenProject={onOpenProject} />);
     act(() => {
       useNewProjectStore.getState().open();
       useNewProjectStore.getState().setName('my-proj');
@@ -384,9 +363,11 @@ describe('NewProjectDialog', () => {
       bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
     });
     await waitFor(() => {
-      expect(screen.getByTestId('scaffold-success')).toBeInTheDocument();
+      expect(useNewProjectStore.getState().isOpen).toBe(false);
     });
-    expect(screen.getByTestId('scaffold-success')).toHaveTextContent('/tmp/my-proj');
+    expect(onOpenProject).toHaveBeenCalledWith(
+      '/tmp/my-proj/packages/schema/my-proj.contexture.json',
+    );
   });
 
   it('shows the failure panel with the failed stage label when stage-failed fires', async () => {
@@ -399,12 +380,12 @@ describe('NewProjectDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
     act(() => {
-      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: 3 });
+      bridge.fireScaffoldEvent({ kind: 'stage-start', stage: STAGE.WEB_NEXT });
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 3,
+        stage: STAGE.WEB_NEXT,
         stderr: 'next-app exited 1',
-        retrySafe: false,
+        retrySafe: true,
       });
     });
     await waitFor(() => {
@@ -425,7 +406,7 @@ describe('NewProjectDialog', () => {
     act(() => {
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 2,
+        stage: STAGE.TURBO_SKELETON,
         stderr: 'boom',
         retrySafe: false,
       });
@@ -448,9 +429,9 @@ describe('NewProjectDialog', () => {
     act(() => {
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 3,
+        stage: STAGE.WEB_NEXT,
         stderr: 'boom',
-        retrySafe: false,
+        retrySafe: true,
       });
     });
     await waitFor(() => {
@@ -479,9 +460,9 @@ describe('NewProjectDialog', () => {
     act(() => {
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 3,
+        stage: STAGE.WEB_NEXT,
         stderr: 'boom',
-        retrySafe: false,
+        retrySafe: true,
       });
     });
     await waitFor(() => {
@@ -504,9 +485,9 @@ describe('NewProjectDialog', () => {
     act(() => {
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 3,
+        stage: STAGE.WEB_NEXT,
         stderr: 'boom',
-        retrySafe: false,
+        retrySafe: true,
       });
     });
     await waitFor(() => {
@@ -529,7 +510,7 @@ describe('NewProjectDialog', () => {
     act(() => {
       bridge.fireScaffoldEvent({
         kind: 'stage-failed',
-        stage: 6,
+        stage: STAGE.CONVEX_INIT,
         stderr: 'convex hiccup',
         retrySafe: true,
       });
@@ -544,36 +525,11 @@ describe('NewProjectDialog', () => {
     expect(bridge.scaffoldStart).toHaveBeenCalledWith({
       targetDir: '/tmp/my-proj',
       projectName: 'my-proj',
+      apps: ['web'],
     });
   });
 
-  it('Copy path writes the target path to the clipboard', async () => {
-    const bridge = mockFileBridge();
-    const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
-    act(() => {
-      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
-    });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Copy path/i })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Copy path/i }));
-    await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith('/tmp/my-proj');
-    });
-  });
-
-  it('Reveal on the success panel reveals the target folder', async () => {
+  it('closes the dialog even when no onOpenProject is provided', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
@@ -586,15 +542,11 @@ describe('NewProjectDialog', () => {
       bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Reveal/i })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Reveal/i }));
-    await waitFor(() => {
-      expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj');
+      expect(useNewProjectStore.getState().isOpen).toBe(false);
     });
   });
 
-  it('Open in VS Code on the success panel opens the target folder in VS Code', async () => {
+  it('scaffold-done closes the dialog and resets the store', async () => {
     const bridge = mockFileBridge();
     render(<NewProjectDialog />);
     act(() => {
@@ -607,75 +559,8 @@ describe('NewProjectDialog', () => {
       bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Open in VS Code/i })).toBeInTheDocument();
+      expect(useNewProjectStore.getState().isOpen).toBe(false);
     });
-    fireEvent.click(screen.getByRole('button', { name: /Open in VS Code/i }));
-    await waitFor(() => {
-      expect(bridge.shellOpenInEditor).toHaveBeenCalledWith('/tmp/my-proj');
-    });
-  });
-
-  it('View log on the success panel reveals the scaffold log file', async () => {
-    const bridge = mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
-    act(() => {
-      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
-    });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /View log/i })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /View log/i }));
-    await waitFor(() => {
-      expect(bridge.shellReveal).toHaveBeenCalledWith('/tmp/my-proj/.contexture/scaffold.log');
-    });
-  });
-
-  it('Close on the success panel opens the scaffolded IR before closing', async () => {
-    const bridge = mockFileBridge();
-    const onOpenProject = vi.fn();
-    render(<NewProjectDialog onOpenProject={onOpenProject} />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
-    act(() => {
-      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId('scaffold-success-close')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('scaffold-success-close'));
-    expect(onOpenProject).toHaveBeenCalledWith(
-      '/tmp/my-proj/packages/schema/my-proj.contexture.json',
-    );
-    expect(useNewProjectStore.getState().isOpen).toBe(false);
-  });
-
-  it('Close on the success panel closes and resets the store', async () => {
-    const bridge = mockFileBridge();
-    render(<NewProjectDialog />);
-    act(() => {
-      useNewProjectStore.getState().open();
-      useNewProjectStore.getState().setName('my-proj');
-      useNewProjectStore.getState().setParentDir('/tmp');
-    });
-    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
-    act(() => {
-      bridge.fireScaffoldEvent({ kind: 'scaffold-done' });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId('scaffold-success-close')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('scaffold-success-close'));
-    expect(useNewProjectStore.getState().isOpen).toBe(false);
     expect(useNewProjectStore.getState().name).toBe('');
     expect(useNewProjectStore.getState().phase).toBe('form');
   });
