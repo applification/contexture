@@ -25,7 +25,7 @@ export function DriftBanner(): React.JSX.Element | null {
     >
       <AlertTriangle className="size-3.5 shrink-0" />
       <span className="flex-1">
-        <code className="font-mono">apps/web/convex/schema.ts</code> was modified outside
+        <code className="font-mono">packages/schema/convex/schema.ts</code> was modified outside
         Contexture.
       </span>
       <TooltipProvider delayDuration={300}>

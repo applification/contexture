@@ -53,7 +53,7 @@ export function useDrift(): void {
       return;
     }
 
-    const watchedPath = `${root}/apps/web/convex/schema.ts`;
+    const watchedPath = `${root}/packages/schema/convex/schema.ts`;
     const emittedJsonPath = emittedJsonPathFor(filePath);
 
     void driftApi.watch({ watchedPath, emittedJsonPath });
