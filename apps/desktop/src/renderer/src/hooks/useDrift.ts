@@ -14,23 +14,30 @@ import { useDocumentStore } from '../store/document';
 import { useDriftStore } from '../store/drift';
 
 const IR_SUFFIX = '.contexture.json';
-const PACKAGES_SCHEMA_SUFFIX = '/packages/schema/';
 
-/** Returns the monorepo root for a canonical scaffold IR path, or null. */
-function projectRootFor(irPath: string): string | null {
+/**
+ * Derives drift-related paths from the IR file path.
+ *
+ * IR lives at: <root>/packages/schema/<name>.contexture.json
+ * Convex schema: <root>/packages/schema/convex/schema.ts
+ *   → same dir as the IR, subdir convex/
+ * Emitted manifest: <root>/packages/schema/.contexture/emitted.json
+ *   → same dir as the IR, subdir .contexture/
+ *
+ * Both use the same base dir, so we never need to compute the monorepo
+ * root — just strip the IR filename and append the relative paths.
+ * This guarantees watchedPath matches the key written into emitted.json
+ * by document-store (which also derives paths from the same IR path).
+ */
+function driftPathsFor(irPath: string): { watchedPath: string; emittedJsonPath: string } | null {
   if (!irPath.endsWith(IR_SUFFIX)) return null;
   const slash = irPath.lastIndexOf('/');
   if (slash === -1) return null;
-  const dir = irPath.slice(0, slash);
-  if (!dir.endsWith('/packages/schema')) return null;
-  return dir.slice(0, -PACKAGES_SCHEMA_SUFFIX.length + 1);
-}
-
-/** Returns the emitted.json path for a given IR path. */
-function emittedJsonPathFor(irPath: string): string {
-  const slash = irPath.lastIndexOf('/');
-  const dir = slash === -1 ? '' : irPath.slice(0, slash);
-  return `${dir}/.contexture/emitted.json`;
+  const dir = irPath.slice(0, slash); // e.g. /proj/packages/schema
+  return {
+    watchedPath: `${dir}/convex/schema.ts`,
+    emittedJsonPath: `${dir}/.contexture/emitted.json`,
+  };
 }
 
 export function useDrift(): void {
@@ -47,14 +54,13 @@ export function useDrift(): void {
       return;
     }
 
-    const root = projectRootFor(filePath);
-    if (!root) {
+    const paths = driftPathsFor(filePath);
+    if (!paths) {
       void driftApi.unwatch();
       return;
     }
 
-    const watchedPath = `${root}/packages/schema/convex/schema.ts`;
-    const emittedJsonPath = emittedJsonPathFor(filePath);
+    const { watchedPath, emittedJsonPath } = paths;
 
     void driftApi.watch({ watchedPath, emittedJsonPath });
 
