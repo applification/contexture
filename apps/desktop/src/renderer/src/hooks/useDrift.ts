@@ -9,10 +9,29 @@
  *
  * Renders nothing — call once from App.tsx.
  */
-import { bundlePathsFor, projectRootFor } from '@main/documents/document-store';
 import { useEffect } from 'react';
 import { useDocumentStore } from '../store/document';
 import { useDriftStore } from '../store/drift';
+
+const IR_SUFFIX = '.contexture.json';
+const PACKAGES_SCHEMA_SUFFIX = '/packages/schema/';
+
+/** Returns the monorepo root for a canonical scaffold IR path, or null. */
+function projectRootFor(irPath: string): string | null {
+  if (!irPath.endsWith(IR_SUFFIX)) return null;
+  const slash = irPath.lastIndexOf('/');
+  if (slash === -1) return null;
+  const dir = irPath.slice(0, slash);
+  if (!dir.endsWith('/packages/schema')) return null;
+  return dir.slice(0, -PACKAGES_SCHEMA_SUFFIX.length + 1);
+}
+
+/** Returns the emitted.json path for a given IR path. */
+function emittedJsonPathFor(irPath: string): string {
+  const slash = irPath.lastIndexOf('/');
+  const dir = slash === -1 ? '' : irPath.slice(0, slash);
+  return `${dir}/.contexture/emitted.json`;
+}
 
 export function useDrift(): void {
   const filePath = useDocumentStore((s) => s.filePath);
@@ -34,9 +53,8 @@ export function useDrift(): void {
       return;
     }
 
-    const paths = bundlePathsFor(filePath);
     const watchedPath = `${root}/apps/web/convex/schema.ts`;
-    const emittedJsonPath = paths.emitted;
+    const emittedJsonPath = emittedJsonPathFor(filePath);
 
     void driftApi.watch({ watchedPath, emittedJsonPath });
 
