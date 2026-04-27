@@ -23,6 +23,10 @@ test.describe('New Project dialog', () => {
   });
 
   async function openDialog(): Promise<void> {
+    // Close any previously open dialog so each test starts from a clean state.
+    const closeBtn = page.getByRole('button', { name: /^Cancel$/i });
+    if (await closeBtn.isVisible()) await closeBtn.click();
+
     await electronApp.evaluate(({ BrowserWindow }) => {
       const [win] = BrowserWindow.getAllWindows();
       win?.webContents.send('menu:file-new-project');
@@ -42,7 +46,7 @@ test.describe('New Project dialog', () => {
   test('typing an invalid project name surfaces the validation error', async () => {
     await openDialog();
     await page.getByLabel(/Project name/i).fill('Bad Name With Spaces');
-    await expect(page.getByText(/lowercase letters/i)).toBeVisible();
+    await expect(page.getByText('Name must be lowercase.')).toBeVisible();
   });
 
   test('app picker shows Web pre-checked and Mobile, Desktop unchecked', async () => {
@@ -55,7 +59,7 @@ test.describe('New Project dialog', () => {
   test('unchecking all apps disables Create and surfaces validation message', async () => {
     await openDialog();
     await page.getByRole('checkbox', { name: /Web/i }).uncheck();
-    await expect(page.getByText(/at least one app/i)).toBeVisible();
+    await expect(page.getByText('Select at least one app.')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Create$/i })).toBeDisabled();
   });
 });
