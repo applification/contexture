@@ -33,6 +33,7 @@ import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
+import { DriftBanner } from './components/hud/DriftBanner';
 import { SchemaPanel } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
@@ -48,6 +49,7 @@ import {
 } from './components/ui/empty';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
+import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
 import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
@@ -153,6 +155,7 @@ export default function App(): React.JSX.Element {
   const pendingAutoSendRef = useRef<string | null>(null);
 
   useNewProject();
+  useDrift();
 
   const fileMenu = useFileMenu({
     getLayout: () => ({ version: '1', positions: positionsRef.current }),
@@ -268,37 +271,40 @@ export default function App(): React.JSX.Element {
         id="main-layout"
       >
         <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%">
-          <div className="relative w-full h-full">
-            {hasSchema && (
-              <div className="absolute top-2 left-2 z-10">
-                <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      className="h-8 px-2 gap-1.5 shadow-sm"
-                      title="Graph controls"
-                    >
-                      <SlidersHorizontal className="size-4" />
-                      <ChevronDown className="size-3" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0 w-72" align="start">
-                    <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
-            {hasSchema ? (
-              <GraphCanvas positions={positions} onPositionsChange={setPositions} />
-            ) : (
-              <EmptyState
-                onLoadSample={loadSample}
-                recentFiles={recentFiles}
-                onOpenRecent={fileMenu.handleOpenPath}
-                isNewProject={documentMode === 'project'}
-                projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
-              />
-            )}
+          <div className="flex flex-col w-full h-full">
+            <DriftBanner />
+            <div className="relative flex-1 min-h-0">
+              {hasSchema && (
+                <div className="absolute top-2 left-2 z-10">
+                  <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        className="h-8 px-2 gap-1.5 shadow-sm"
+                        title="Graph controls"
+                      >
+                        <SlidersHorizontal className="size-4" />
+                        <ChevronDown className="size-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-72" align="start">
+                      <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+              {hasSchema ? (
+                <GraphCanvas positions={positions} onPositionsChange={setPositions} />
+              ) : (
+                <EmptyState
+                  onLoadSample={loadSample}
+                  recentFiles={recentFiles}
+                  onOpenRecent={fileMenu.handleOpenPath}
+                  isNewProject={documentMode === 'project'}
+                  projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
+                />
+              )}
+            </div>
           </div>
         </ResizablePanel>
 

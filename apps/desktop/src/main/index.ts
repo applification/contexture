@@ -10,6 +10,7 @@ syncShellEnvironment();
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { registerClaudeIpc } from './ipc/claude';
+import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
 import { registerProjectIpc } from './ipc/project';
 import { registerScaffoldIpc } from './ipc/scaffold';
@@ -78,6 +79,7 @@ app.whenReady().then(() => {
   registerShellIpc();
   registerProjectIpc();
   registerClaudeIpc(mainWindow);
+  registerDriftIpc(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
