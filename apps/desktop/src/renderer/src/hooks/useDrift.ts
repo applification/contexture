@@ -29,7 +29,9 @@ const IR_SUFFIX = '.contexture.json';
  * This guarantees watchedPath matches the key written into emitted.json
  * by document-store (which also derives paths from the same IR path).
  */
-function driftPathsFor(irPath: string): { watchedPath: string; emittedJsonPath: string } | null {
+export function driftPathsFor(
+  irPath: string,
+): { watchedPath: string; emittedJsonPath: string } | null {
   if (!irPath.endsWith(IR_SUFFIX)) return null;
   const slash = irPath.lastIndexOf('/');
   if (slash === -1) return null;
