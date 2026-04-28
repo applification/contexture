@@ -26,12 +26,12 @@ describe('scaffoldWorkspaceStitch', () => {
   it('adds @<project>/schema: workspace:* to apps/web/package.json dependencies when web selected', async () => {
     await fs.writeFile(
       webPkgPath,
-      `${JSON.stringify({ name: 'web', dependencies: { next: '^15.0.0' } }, null, 2)}\n`,
+      `${JSON.stringify({ name: 'web', dependencies: { next: '^16.0.0' } }, null, 2)}\n`,
     );
     await scaffoldWorkspaceStitch(webConfig, { fs });
     const pkg = JSON.parse(await fs.readFile(webPkgPath));
     expect(pkg.dependencies['@my-proj/schema']).toBe('workspace:*');
-    expect(pkg.dependencies.next).toBe('^15.0.0');
+    expect(pkg.dependencies.next).toBe('^16.0.0');
     expect(pkg.name).toBe('web');
   });
 
@@ -75,7 +75,7 @@ describe('scaffoldWorkspaceStitch', () => {
   it('is idempotent — running twice leaves the web package.json unchanged', async () => {
     await fs.writeFile(
       webPkgPath,
-      `${JSON.stringify({ name: 'web', dependencies: { next: '^15.0.0' } }, null, 2)}\n`,
+      `${JSON.stringify({ name: 'web', dependencies: { next: '^16.0.0' } }, null, 2)}\n`,
     );
     await scaffoldWorkspaceStitch(webConfig, { fs });
     const first = await fs.readFile(webPkgPath);

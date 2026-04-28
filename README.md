@@ -97,7 +97,7 @@ Requires `ANTHROPIC_API_KEY` and `GH_TOKEN` environment variables — see
 
 - **Monorepo**: Turborepo, Bun workspaces
 - **Desktop**: Electron 35, React 19, TypeScript, Vite, Zustand, React Flow, Claude Agent SDK, Zod
-- **Web**: Next.js 15, React 19, TypeScript, Tailwind CSS 4, shadcn/ui
+- **Web**: Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui
 - **AI Night Shift**: Sandcastle, Claude Code, Docker
 
 ## License

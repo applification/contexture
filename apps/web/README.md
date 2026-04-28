@@ -6,7 +6,7 @@ The Contexture marketing website built with Next.js.
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 15 (Turbopack) |
+| Framework | Next.js 16 (Turbopack) |
 | UI | React 19, TypeScript |
 | Styling | Tailwind CSS 4, shadcn/ui |
 | Fonts | Geist |
