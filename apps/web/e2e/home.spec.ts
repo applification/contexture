@@ -33,6 +33,16 @@ test.describe('Home page', () => {
     await expect(cards).toHaveCount(6);
   });
 
+  test('AI section promotes model independence', async ({ page }) => {
+    await page.goto('/');
+    const aiSection = page.locator('section', {
+      has: page.locator('h2:has-text("Describe your domain")'),
+    });
+    await expect(aiSection).toBeVisible();
+    await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);
+    await expect(aiSection.locator('text=Multi-model AI')).toBeVisible();
+  });
+
   test('footer contains expected links', async ({ page }) => {
     await page.goto('/');
     const footer = page.locator('footer');

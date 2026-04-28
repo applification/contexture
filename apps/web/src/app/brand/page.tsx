@@ -515,7 +515,7 @@ export default function BrandPage() {
           </h3>
           <div className="flex flex-wrap gap-3 mb-10">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-accent/20 bg-accent/5 text-accent">
-              Powered by Claude
+              Multi-model AI
             </span>
             <span className="inline-flex items-center text-xs font-medium px-3 py-1 rounded-full border border-border/60 text-muted-foreground">
               v0.1.0

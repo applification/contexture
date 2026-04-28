@@ -8,14 +8,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Contexture — Visual Zod schema editor',
   description:
-    'Visual Zod schema editor with LLM support. Chat with Claude to build closed-world schemas; emit Zod + JSON Schema for your LLM structured-output pipelines.',
+    'Visual Zod schema editor with multi-model AI support. Chat with any LLM to build closed-world schemas; emit Zod + JSON Schema for your structured-output pipelines.',
   keywords: [
     'Zod schema editor',
     'visual schema builder',
     'LLM structured output',
     'JSON Schema editor',
     'TypeScript schema tool',
-    'Claude AI',
+    'multi-model AI',
     'schema design',
     'AI agents',
   ],
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Contexture — Visual Zod schema editor',
     description:
-      'Chat with Claude to build closed-world Zod schemas. Emit Zod + JSON Schema for your LLM structured-output pipelines.',
+      'Chat with any LLM to build closed-world Zod schemas. Emit Zod + JSON Schema for your structured-output pipelines.',
     type: 'website',
     siteName: 'Contexture',
     images: [

@@ -61,7 +61,7 @@ const features = [
     icon: Brain,
     title: 'Chat-driven authoring',
     description:
-      'Describe a domain and Claude edits the schema via a small op vocabulary. Every turn animates on the graph so you can follow what changed.',
+      'Describe a domain and your LLM edits the schema via a small op vocabulary. Every turn animates on the graph so you can follow what changed.',
   },
   {
     icon: Network,
@@ -154,8 +154,9 @@ export default function Home() {
             Where schemas take shape.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Contexture pairs a visual graph editor with Claude — chat to describe a domain, watch
-            the graph assemble, and emit Zod + JSON Schema your products can import directly.
+            Contexture pairs a visual graph editor with your choice of LLM — chat to describe a
+            domain, watch the graph assemble, and emit Zod + JSON Schema your products can import
+            directly.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <TrackedLink
@@ -215,7 +216,7 @@ export default function Home() {
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
               Design the closed-world schemas your structured-output prompts depend on. Built for
-              engineers shipping products with Claude, GPT, and other LLM APIs.
+              engineers shipping products with any LLM — Claude, GPT, Gemini, and more.
             </p>
           </div>
 
@@ -259,7 +260,7 @@ export default function Home() {
           <div className="text-center mb-10 sm:mb-16">
             <div className="inline-flex items-center gap-2 text-sm text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
               <Brain className="size-4" />
-              Powered by Claude
+              Multi-model AI
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-5">
               Describe your domain.{' '}
@@ -268,7 +269,7 @@ export default function Home() {
               </span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Build schemas through conversation, not configuration. Claude edits via a small op
+              Build schemas through conversation, not configuration. Your LLM edits via a small op
               vocabulary — add_type, add_field, set_discriminator, rename — so every turn is an
               atomic change you can undo or refine.
             </p>
@@ -331,7 +332,7 @@ export default function Home() {
               Add a Harvest type for my allotment schema with a date, quantity (kg), and a ref to
               the Crop it came from.
             </div>
-            <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">Claude:</div>
+            <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">AI:</div>
             <div className="text-muted-foreground">
               add_type Harvest (object) · add_field Harvest.date (date) · add_field
               Harvest.quantityKg (number, min=0) · add_field Harvest.crop (ref → Crop)
@@ -361,8 +362,9 @@ export default function Home() {
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Emit Zod at build time; your prompt runner hands the same schema to Claude or OpenAI
-                for typed, validated responses. Parse failures become compile-time errors.
+                Emit Zod at build time; your prompt runner hands the same schema to any LLM —
+                Claude, GPT, Gemini — for typed, validated responses. Parse failures become
+                compile-time errors.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
@@ -370,7 +372,7 @@ export default function Home() {
                 Data ingestion
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Shape what Claude extracts from PDFs, emails, or transcripts. The IR ships in the
+                Shape what your LLM extracts from PDFs, emails, or transcripts. The IR ships in the
                 prompt so every tool call targets a known, named type.
               </p>
             </div>
