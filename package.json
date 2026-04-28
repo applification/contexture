@@ -28,5 +28,10 @@
   },
   "dependencies": {
     "@ai-hero/sandcastle": "^0.5.5"
-  }
+  },
+  "trustedDependencies": [
+    "electron",
+    "@biomejs/biome",
+    "esbuild"
+  ]
 }
