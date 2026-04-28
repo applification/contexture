@@ -18,7 +18,8 @@
     "ci": "turbo typecheck && turbo test && biome check .",
     "prepare": "husky",
     "sandcastle": "bun .sandcastle/main.ts",
-    "sandcastle:build": "bunx sandcastle docker build-image"
+    "sandcastle:build": "bunx sandcastle docker build-image",
+    "cleanup": "bun scripts/cleanup-branches.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
