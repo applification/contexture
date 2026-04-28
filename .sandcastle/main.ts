@@ -12,11 +12,17 @@ const MAX_PARALLEL = 4;
 // Env files are gitignored, so copy them in explicitly.
 const copyToWorktree: string[] = ["apps/desktop/.env", "apps/web/.env.local"];
 
-// Mount the host bun cache so parallel sandboxes share install artefacts and
-// `bun install` is warm across iterations.
-const sandboxProvider = docker({
-  mounts: [{ hostPath: "~/.bun/install/cache", sandboxPath: "/home/agent/.bun/install/cache" }],
-});
+// Each sandbox gets its own bun cache. Sharing ~/.bun/install/cache across
+// parallel sandboxes races on tarball extraction and silently produces broken
+// installs (e.g. a package with package.json pointing at a build/ output that
+// was never written). Cold installs are slower; broken node_modules are worse.
+const sandboxProvider = docker({});
+
+// Verify the install actually produced a usable workspace. `bun install` exits
+// 0 even when individual extractions are mangled, so we follow with `turbo
+// typecheck`, which resolves and loads imports across every workspace and
+// fails loudly if a package's main entry is missing.
+const installAndVerify = "bun install && bun run typecheck";
 
 mkdirSync(".sandcastle/logs/plans", { recursive: true });
 const STREAM_LOG_PATH = ".sandcastle/logs/stream.log";
@@ -69,7 +75,7 @@ async function createIssueSandboxWithRetry(issue: Issue) {
     return await sandcastle.createSandbox({
       sandbox: sandboxProvider,
       branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: "bun install" }] } },
+      hooks: { sandbox: { onSandboxReady: [{ command: installAndVerify }] } },
       copyToWorktree,
     });
   } catch (err) {
@@ -78,7 +84,7 @@ async function createIssueSandboxWithRetry(issue: Issue) {
     return sandcastle.createSandbox({
       sandbox: sandboxProvider,
       branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: "bun install" }] } },
+      hooks: { sandbox: { onSandboxReady: [{ command: installAndVerify }] } },
       copyToWorktree,
     });
   }

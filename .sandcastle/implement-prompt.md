@@ -35,7 +35,7 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Before committing, run `bun run ci` to ensure typecheck, tests, and lint all pass.
+Run `bun run ci` to ensure typecheck, tests, and lint all pass. This is mandatory — do not commit if it fails. If `bun run ci` fails before you have made any changes, the sandbox itself is broken (e.g. corrupt `node_modules`); stop and report the failure rather than committing.
 
 # COMMIT
 
