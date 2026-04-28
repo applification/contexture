@@ -8,6 +8,16 @@ Here are the open issues in the repo:
 
 </issues-json>
 
+# OPEN PRs
+
+These open PRs already address issues (via `Closes #N` / `Fixes #N` / `Resolves #N` in their body). **Exclude any issue whose number appears here** — it already has a PR in flight and must not be re-worked:
+
+<open-prs>
+
+!`gh pr list --state open --json number,body --jq '[.[] | {pr: .number, closes: [.body | scan("(?i)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#(\\d+)") | .[0] | tonumber]}]'`
+
+</open-prs>
+
 # TASK
 
 Analyze the open issues and build a dependency graph. For each issue, determine whether it **blocks** or **is blocked by** any other open issue.
@@ -29,7 +39,9 @@ If the issue appears to be a PRD and it has implementation issues which link to 
 Output your plan as a JSON object wrapped in `<plan>` tags:
 
 <plan>
-{"issues": [{"number": 42, "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug"}]}
+{"issues": [{"number": 42, "title": "Fix auth bug", "branch": "sandcastle/issue-42-fix-auth-bug", "labels": ["bug", "Sandcastle"]}]}
 </plan>
+
+`labels` must be the exact label names from the issue (preserve case).
 
 Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).

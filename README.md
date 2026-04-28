@@ -55,20 +55,20 @@ sandboxes, and humans review the results during the day.
 ### How it works
 
 The orchestration loop in [`.sandcastle/main.ts`](.sandcastle/main.ts) runs
-up to 10 plan-execute-merge cycles:
+up to 10 plan-execute-PR cycles:
 
 1. **Plan** — A Claude Opus agent reads all open issues labelled `Sandcastle`,
    builds a dependency graph, and selects the unblocked issues that can be
    worked in parallel.
-2. **Execute + Review** — For each issue, a Docker sandbox is created on its
-   own branch. An implementer agent writes the code (up to 100 iterations),
-   then a reviewer agent stress-tests edge cases and refines the work. All
-   issue pipelines run concurrently.
-3. **Merge** — A single agent merges all completed branches, resolves
-   conflicts, and runs `bun run ci` to verify the result.
+2. **Execute + Review + PR** — For each issue, a Docker sandbox is created on
+   its own branch. An implementer agent writes the code, a reviewer agent
+   stress-tests edge cases and refines the work (skipped for docs-only
+   diffs), and a PR-opener agent pushes the branch and opens a pull request
+   linked to the issue. All issue pipelines run concurrently.
 
-After each merge cycle, newly unblocked issues are picked up in the next
-iteration.
+Humans review and merge the resulting PRs during the day. The merged PR
+closes the issue via `Closes #N`. After each iteration, newly unblocked
+issues are picked up in the next loop.
 
 ### Prompt files
 
@@ -76,8 +76,9 @@ iteration.
 |---|---|
 | [`plan-prompt.md`](.sandcastle/plan-prompt.md) | Issue triage and dependency analysis |
 | [`implement-prompt.md`](.sandcastle/implement-prompt.md) | TDD implementation with `RALPH:` commit convention |
+| [`implement-docs-prompt.md`](.sandcastle/implement-docs-prompt.md) | Lighter implementer for documentation-only issues |
 | [`review-prompt.md`](.sandcastle/review-prompt.md) | Code review, edge-case testing, quality pass |
-| [`merge-prompt.md`](.sandcastle/merge-prompt.md) | Branch merging and conflict resolution |
+| [`pr-prompt.md`](.sandcastle/pr-prompt.md) | Push branch and open the pull request |
 | [`CODING_STANDARDS.md`](.sandcastle/CODING_STANDARDS.md) | Style and testing standards agents must follow |
 
 ### Running Sandcastle

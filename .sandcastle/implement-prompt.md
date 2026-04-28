@@ -2,11 +2,11 @@
 
 Fix issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
 
-Pull in the issue using `gh issue view`, with comments. If it has a parent PRD, pull that in too.
+Pull in the issue using `gh issue view {{ISSUE_NUMBER}} --json number,title,body,labels,comments,state,author`. If it has a parent PRD, pull that in the same way. (The `--json` form avoids a GitHub `projectItems` permission error on tokens without project scope.)
 
 Only work on the issue specified.
 
-Work on branch {{BRANCH}}. Make commits, run tests, and close the issue when done.
+Work on branch {{BRANCH}}. Make commits and run tests. Do NOT push the branch, open a PR, or close the issue — a separate agent handles PR creation, and the merged PR closes the issue automatically.
 
 # CONTEXT
 
@@ -53,7 +53,7 @@ Keep it concise.
 
 If the task is not complete, leave a comment on the GitHub issue with what was done.
 
-Do not close the issue - this will be done later.
+Do not close the issue — the merged PR will close it automatically via `Closes #N`.
 
 Once complete, output <promise>COMPLETE</promise>.
 
