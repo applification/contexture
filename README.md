@@ -55,26 +55,47 @@ sandboxes, and humans review the results during the day.
 ### How it works
 
 The orchestration loop in [`.sandcastle/main.ts`](.sandcastle/main.ts) runs
-up to 10 plan-execute-PR cycles:
+up to 10 iterations, each with two phases:
 
-1. **Plan** — A Claude Opus agent reads all open issues labelled `Sandcastle`,
-   builds a dependency graph, and selects the unblocked issues that can be
-   worked in parallel.
-2. **Execute + Review + PR** — For each issue, a Docker sandbox is created on
-   its own branch. An implementer agent writes the code, a reviewer agent
-   stress-tests edge cases and refines the work (skipped for docs-only
-   diffs), and a PR-opener agent pushes the branch and opens a pull request
-   linked to the issue. All issue pipelines run concurrently.
+1. **Eligibility (deterministic)** — [`pickEligible()`](.sandcastle/eligibility.ts)
+   filters open issues by the `Sandcastle` label and excludes any already claimed
+   by an open PR (via `Closes/Fixes/Resolves #N` in the PR body). When two or
+   more candidates survive, a lightweight subset-selector agent picks a
+   non-conflicting subset for parallel work; single-issue iterations skip the
+   LLM round-trip entirely.
+2. **Per-issue pipeline** — Each issue goes through
+   [`runIssuePipeline()`](.sandcastle/pipeline.ts): a reconciliation check
+   re-verifies live state (guards against issues closed or claimed while queued),
+   then a Docker sandbox is created on a dedicated branch. An implementer agent
+   writes the code, a reviewer agent stress-tests edge cases (skipped for
+   docs-only diffs), and a PR-opener agent pushes the branch and opens a pull
+   request linked to the issue. Pipelines run concurrently up to `MAX_PARALLEL`
+   slots with retry on transient sandbox failures.
 
 Humans review and merge the resulting PRs during the day. The merged PR
 closes the issue via `Closes #N`. After each iteration, newly unblocked
 issues are picked up in the next loop.
 
+### Modules
+
+| File | Role |
+|---|---|
+| [`main.ts`](.sandcastle/main.ts) | Iteration loop and orchestrator entry point |
+| [`pipeline.ts`](.sandcastle/pipeline.ts) | Per-issue pipeline (implement → review → PR) |
+| [`eligibility.ts`](.sandcastle/eligibility.ts) | Deterministic eligibility filtering |
+| [`workflow.ts`](.sandcastle/workflow.ts) | Agent specs, labels, limits, and sandbox config |
+| [`harness.ts`](.sandcastle/harness.ts) | Agent provider factory and stream logger |
+| [`plan.ts`](.sandcastle/plan.ts) | Branch-name contract and `<plan>` tag parser |
+| [`gh.ts`](.sandcastle/gh.ts) | GitHub CLI adapter (spawn + decode) |
+| [`gh-parse.ts`](.sandcastle/gh-parse.ts) | Zod schemas and body parsing for `gh` output |
+| [`concurrency.ts`](.sandcastle/concurrency.ts) | Bounded-parallelism semaphore |
+| [`retry.ts`](.sandcastle/retry.ts) | Typed retry with backoff for sandbox creation |
+
 ### Prompt files
 
 | File | Role |
 |---|---|
-| [`plan-prompt.md`](.sandcastle/plan-prompt.md) | Issue triage and dependency analysis |
+| [`select-subset-prompt.md`](.sandcastle/select-subset-prompt.md) | Conflict-avoidance subset selection (2+ candidates only) |
 | [`implement-prompt.md`](.sandcastle/implement-prompt.md) | TDD implementation with `RALPH:` commit convention |
 | [`implement-docs-prompt.md`](.sandcastle/implement-docs-prompt.md) | Lighter implementer for documentation-only issues |
 | [`review-prompt.md`](.sandcastle/review-prompt.md) | Code review, edge-case testing, quality pass |
