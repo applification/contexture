@@ -39,10 +39,10 @@ bunx portless proxy start --https
 bun run dev:portless
 ```
 
-Main worktree resolves to `http://contexture-web.localhost:1355`. In a git
-worktree, the branch is auto-prepended, e.g.
-`http://issue-208.contexture-web.localhost:1355`. Portless assigns an
-ephemeral `PORT` and Next.js respects it.
+Main worktree resolves to `http://web.localhost:1355` (name inferred from
+`package.json`). Linked git worktrees auto-prepend the branch as a subdomain,
+e.g. `http://issue-208.web.localhost:1355` — no per-worktree config needed.
+Portless assigns an ephemeral `PORT` and Next.js respects it.
 
 ## Deployment
 
