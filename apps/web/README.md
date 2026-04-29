@@ -30,16 +30,20 @@ For running multiple worktrees in parallel (Conductor / Claude Code), use
 over port numbers.
 
 ```bash
-# One-time global install
+# One-time global install (do NOT add as a project dependency)
 npm install -g portless
 
-# From apps/web (uses portless.json -> name: "contexture")
-portless bun run dev
+# Optional: HTTP/2 + TLS (faster page loads, no browser warnings)
+portless proxy start --https
+
+# From apps/web
+bun run dev:portless
 ```
 
-Main worktree resolves to `https://contexture.localhost`. Other worktrees
-auto-prepend the branch as a subdomain, e.g. `https://issue-208.contexture.localhost`.
-Portless assigns a free `PORT` per run, which Next.js respects automatically.
+Main worktree resolves to `http://contexture-web.localhost:1355`. In a git
+worktree, the branch is auto-prepended, e.g.
+`http://issue-208.contexture-web.localhost:1355`. Portless assigns an
+ephemeral `PORT` and Next.js respects it.
 
 ## Deployment
 
