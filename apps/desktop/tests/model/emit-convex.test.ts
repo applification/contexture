@@ -178,6 +178,18 @@ describe('emitConvexSchema', () => {
     expect(() => emitConvexSchema(ir)).toThrow(/_id.*reserves/);
   });
 
+  it('includes the IR source path in the banner when provided', () => {
+    const ir: Schema = { version: '1', types: [] };
+    const out = emitConvexSchema(ir, '/proj/packages/contexture/app.contexture.json');
+    expect(out).toContain('Source: /proj/packages/contexture/app.contexture.json');
+  });
+
+  it('omits source path from the banner when not provided', () => {
+    const ir: Schema = { version: '1', types: [] };
+    const out = emitConvexSchema(ir);
+    expect(out).not.toContain('Source:');
+  });
+
   it('does not flag `_`-prefix on non-table object types', () => {
     const ir: Schema = {
       version: '1',

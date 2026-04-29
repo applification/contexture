@@ -23,7 +23,7 @@ rather than owning its own \`convex/\` folder.
 {{PROJECT_NAME}}/
   apps/web/             Next.js app (App Router, Tailwind, shadcn)
                         imports @{{PROJECT_NAME}}/contexture
-  packages/contexture/      Shared schema package (Zod + JSON + Convex)
+  packages/contexture/  Shared schema package (Zod + JSON + Convex)
     {{PROJECT_NAME}}.contexture.json   source of truth
     {{PROJECT_NAME}}.schema.ts          @contexture-generated (Zod)
     {{PROJECT_NAME}}.schema.json        @contexture-generated (JSON Schema)

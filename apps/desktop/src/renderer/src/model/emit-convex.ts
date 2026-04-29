@@ -1,7 +1,7 @@
 /**
  * Pure IR → Convex schema source emitter.
  *
- * Turns the IR into the contents of `apps/web/convex/schema.ts`:
+ * Turns the IR into the contents of `convex/schema.ts`:
  * table-flagged `ObjectTypeDef`s become `defineTable(...)` entries on
  * `defineSchema`; indexes chain on via `.index("name", [fields])`.
  * Non-table object types that are referenced via `ref` are inlined as
