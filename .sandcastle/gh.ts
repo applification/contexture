@@ -1,41 +1,12 @@
-import { z } from "zod";
+import { IssueListSchema, IssueSnapshotSchema, PRListSchema, prListToClosing } from "./gh-parse";
+import type { IssueSnapshot, OpenPRClosing } from "./gh-parse";
 
-// gh CLI shapes. We Zod-validate at the boundary: gh's output is technically
-// untrusted (a malicious branch name in a label or PR body shouldn't slip
-// through and reach pickEligible() unchecked). Schemas are deliberately
-// narrower than gh's full JSON — we accept the fields we use.
+// Adapter to the `gh` CLI. Spawns the binary, parses its JSON output, and
+// hands the raw shape to gh-parse.ts for Zod validation. Everything testable
+// (regexes, schemas, body parsing) lives in gh-parse.ts; this file only owns
+// the spawn-and-decode seam.
 
-const RawIssue = z.object({
-  number: z.number().int().positive(),
-  title: z.string(),
-  labels: z.array(z.object({ name: z.string() })),
-});
-export type RawIssue = z.infer<typeof RawIssue>;
-
-const IssueListSchema = z.array(RawIssue);
-
-const PRBodyEntry = z.object({
-  number: z.number().int().positive(),
-  body: z.string().nullable(),
-});
-const PRListSchema = z.array(PRBodyEntry);
-
-// PRs declare which issues they close via `Closes #N` / `Fixes #N` /
-// `Resolves #N` (case-insensitive, optional past tense). Same regex the
-// planner prompt was using, lifted into TypeScript.
-const CLOSES_PATTERN = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
-
-export type OpenPRClosing = { pr: number; closes: number[] };
-
-function extractClosingNumbers(body: string | null): number[] {
-  if (body === null) return [];
-  const numbers = new Set<number>();
-  for (const match of body.matchAll(CLOSES_PATTERN)) {
-    const n = Number.parseInt(match[1] ?? "", 10);
-    if (Number.isInteger(n) && n > 0) numbers.add(n);
-  }
-  return [...numbers];
-}
+export type { IssueSnapshot, OpenPRClosing } from "./gh-parse";
 
 async function ghJson(args: string[]): Promise<unknown> {
   const proc = Bun.spawn(["gh", ...args], { stdout: "pipe", stderr: "pipe" });
@@ -50,9 +21,8 @@ async function ghJson(args: string[]): Promise<unknown> {
   return JSON.parse(stdout);
 }
 
-// Fetch open issues carrying the harness's tracker label. Fields kept narrow
-// — pickEligible() needs only number/title/labels.
-export async function fetchOpenLabelledIssues(label: string): Promise<RawIssue[]> {
+// Fetch open issues carrying the harness's tracker label.
+export async function fetchOpenLabelledIssues(label: string): Promise<IssueSnapshot[]> {
   const raw = await ghJson([
     "issue",
     "list",
@@ -61,7 +31,7 @@ export async function fetchOpenLabelledIssues(label: string): Promise<RawIssue[]
     "--label",
     label,
     "--json",
-    "number,title,labels",
+    "number,title,state,labels",
   ]);
   return IssueListSchema.parse(raw);
 }
@@ -71,27 +41,17 @@ export async function fetchOpenLabelledIssues(label: string): Promise<RawIssue[]
 // Sandcastle issue still claims that issue.
 export async function fetchOpenPRsClosingIssues(): Promise<OpenPRClosing[]> {
   const raw = await ghJson(["pr", "list", "--state", "open", "--json", "number,body"]);
-  const prs = PRListSchema.parse(raw);
-  return prs.map((pr) => ({ pr: pr.number, closes: extractClosingNumbers(pr.body) }));
+  return prListToClosing(PRListSchema.parse(raw));
 }
 
-// Single-issue live state probe used by reconciliation-lite (B.2).
-const IssueStateSchema = z.object({
-  state: z.enum(["OPEN", "CLOSED", "open", "closed"]).transform((s) => s.toLowerCase() as "open" | "closed"),
-  labels: z.array(z.object({ name: z.string() })),
-});
-export type IssueLiveState = z.infer<typeof IssueStateSchema>;
-
-export async function fetchIssueLiveState(issueNumber: number): Promise<IssueLiveState> {
+// Single-issue live state probe used by reconciliation.
+export async function fetchIssueLiveState(issueNumber: number): Promise<IssueSnapshot> {
   const raw = await ghJson([
     "issue",
     "view",
     String(issueNumber),
     "--json",
-    "state,labels",
+    "number,title,state,labels",
   ]);
-  return IssueStateSchema.parse(raw);
+  return IssueSnapshotSchema.parse(raw);
 }
-
-// Re-export helpers for tests.
-export const __test__ = { extractClosingNumbers, IssueListSchema, PRListSchema, IssueStateSchema };
