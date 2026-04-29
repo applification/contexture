@@ -13,7 +13,6 @@ import {
   useState,
 } from 'react';
 import type { BundledLanguage, BundledTheme, HighlighterGeneric, ThemedToken } from 'shiki';
-import { createHighlighter } from 'shiki';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -148,10 +147,12 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = createHighlighter({
-    langs: [language],
-    themes: ['github-light', 'github-dark'],
-  });
+  const highlighterPromise = import('shiki').then(({ createHighlighter }) =>
+    createHighlighter({
+      langs: [language],
+      themes: ['github-light', 'github-dark'],
+    }),
+  );
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;

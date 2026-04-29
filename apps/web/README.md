@@ -32,11 +32,20 @@ Main worktree resolves to `http://web.localhost:1355` (name inferred from
 e.g. `http://issue-208.web.localhost:1355`. Portless assigns an ephemeral
 `PORT` and Next.js respects it.
 
-To bypass Portless (e.g. CI or a one-off plain `next dev`):
+To print the URL for the current worktree:
+
+```bash
+bunx portless get web
+```
+
+To bypass Portless for a one-off plain `next dev`:
 
 ```bash
 PORTLESS=0 bun run dev
 ```
+
+The Playwright e2e config bypasses the package script and runs `bunx next dev`
+directly so test runners can manage the process on `http://localhost:3000`.
 
 Optional: enable HTTP/2 + TLS once for faster page loads and no browser warnings:
 
