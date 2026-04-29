@@ -71,15 +71,40 @@ const isDocsOnly = (issue: Issue) =>
   issue.labels.includes("documentation") &&
   !issue.labels.some((l) => l !== "documentation" && l !== LABEL);
 
-async function changedPaths(worktreePath: string): Promise<string[]> {
-  const proc = Bun.spawn(["git", "diff", "--name-only", "main..HEAD"], {
-    cwd: worktreePath,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+async function gitOutput(args: string[], cwd: string): Promise<string> {
+  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
   const out = await new Response(proc.stdout).text();
   await proc.exited;
+  return out;
+}
+
+// Files changed by `commits` relative to their first parent. If a commit has
+// no parent (initial commit on an isolated branch), `--name-only` against the
+// commit alone shows everything in it. We pass the commit SHA range
+// `<first>^..<last>` so we capture exactly the work the agent introduced this
+// run, regardless of where main currently sits.
+async function pathsTouchedByCommits(
+  worktreePath: string,
+  commits: { sha: string }[],
+): Promise<string[]> {
+  if (commits.length === 0) return [];
+  const first = commits[0]?.sha ?? "";
+  const last = commits[commits.length - 1]?.sha ?? "";
+  const range = `${first}^..${last}`;
+  const out = await gitOutput(["diff", "--name-only", range], worktreePath);
   return out.split("\n").filter((p) => p.length > 0);
+}
+
+// True when the current branch has any commit ahead of its merge-base with
+// main. We use merge-base (not literal `main..HEAD`) so the orchestrator
+// works correctly when launched from a feature branch — otherwise the diff
+// would include every commit the launching branch added on top of main and
+// always look "non-empty".
+async function branchHasWorkAheadOfMain(worktreePath: string): Promise<boolean> {
+  const base = (await gitOutput(["merge-base", "main", "HEAD"], worktreePath)).trim();
+  if (base.length === 0) return false;
+  const log = await gitOutput(["rev-list", "--count", `${base}..HEAD`], worktreePath);
+  return Number.parseInt(log.trim(), 10) > 0;
 }
 
 async function createIssueSandboxWithRetry(issue: Issue) {
@@ -126,15 +151,14 @@ async function runIssue(issue: Issue, iteration: number) {
     logging: streamLogger(`iter${iteration}-implementer-${issue.number}`),
   });
 
-  // Use branch-vs-main diff (not just this run's commits) so that a re-run
-  // on a branch already containing prior work still opens its PR.
-  const paths = await changedPaths(sandbox.worktreePath);
-  if (paths.length === 0) {
-    return implementResult;
-  }
-
-  const allMarkdown = paths.every((p) => p.endsWith(".md"));
-  const skipReview = docsOnly || allMarkdown;
+  // Reviewer decision: based on what *this* run committed, not the whole
+  // branch's diff against main. Reviewing the same code repeatedly across
+  // re-runs (or, worse, "reviewing" the launching branch's own development
+  // commits when the orchestrator is run from a feature branch) wastes a
+  // Claude call and confuses the agent.
+  const thisRunPaths = await pathsTouchedByCommits(sandbox.worktreePath, implementResult.commits);
+  const allMarkdown = thisRunPaths.length > 0 && thisRunPaths.every((p) => p.endsWith(".md"));
+  const skipReview = docsOnly || allMarkdown || thisRunPaths.length === 0;
 
   if (!skipReview) {
     await sandbox.run({
@@ -144,6 +168,15 @@ async function runIssue(issue: Issue, iteration: number) {
       promptArgs: issuePromptArgs,
       logging: streamLogger(`iter${iteration}-reviewer-${issue.number}`),
     });
+  }
+
+  // PR-opener decision: based on whether the issue branch has any commits
+  // ahead of its merge-base with main. This catches the resilience case the
+  // original code aimed for — a previous run committed but the PR-opener
+  // didn't fire — without falsely triggering on commits the launching
+  // branch already had ahead of main.
+  if (!(await branchHasWorkAheadOfMain(sandbox.worktreePath))) {
+    return implementResult;
   }
 
   await sandbox.run({
