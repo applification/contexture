@@ -14,7 +14,8 @@
       "**/*.jsx",
       "**/*.json",
       "**/*.jsonc",
-      "!.sandcastle"
+      "!.sandcastle",
+      "!.claude/settings.local.json"
     ]
   },
   "formatter": {
