@@ -17,7 +17,7 @@ export interface ShellStageSpec {
 export function shellStageSpecFor(stage: number, config: ScaffoldConfig): ShellStageSpec {
   const target = config.targetDir;
   const webDir = `${target}/apps/web`;
-  const schemaDir = `${target}/packages/schema`;
+  const schemaDir = `${target}/packages/contexture`;
   switch (stage) {
     case STAGE.WEB_NEXT:
       return {

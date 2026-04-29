@@ -1,7 +1,7 @@
 /**
  * `scaffoldConvexEmit` (stage 7) — emits the Convex schema (and
  * per-table CRUD seeds, if the initial IR had any tables) at
- * `packages/schema/convex/`. At scaffold time the IR is empty, so
+ * `packages/contexture/convex/`. At scaffold time the IR is empty, so
  * the convex schema is the degenerate `defineSchema({})`. The stage
  * still needs to run so `bun run dev` finds a valid schema file.
  */
@@ -10,7 +10,7 @@ import { scaffoldConvexEmit } from '@main/scaffold/convex-emit';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
-const schemaDir = '/work/my-proj/packages/schema';
+const schemaDir = '/work/my-proj/packages/contexture';
 
 let fs: ReturnType<typeof createMemFsAdapter>;
 
@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 describe('scaffoldConvexEmit', () => {
-  it('writes packages/schema/convex/schema.ts with the contexture-generated banner', async () => {
+  it('writes packages/contexture/convex/schema.ts with the contexture-generated banner', async () => {
     // Stage 6 has already written the empty IR; we read it back.
     const irPath = `${schemaDir}/my-proj.contexture.json`;
     await fs.writeFile(irPath, JSON.stringify({ version: '1', types: [] }));

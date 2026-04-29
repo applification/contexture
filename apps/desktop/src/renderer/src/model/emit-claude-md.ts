@@ -12,9 +12,9 @@
 const TEMPLATE = `# {{PROJECT_NAME}}
 
 A Convex + Next.js monorepo scaffolded by Contexture. The schema is the
-source of truth at \`packages/schema/{{PROJECT_NAME}}.contexture.json\` and
-is re-emitted automatically to \`packages/schema/convex/schema.ts\` on every
-edit. \`apps/web\` imports the workspace package \`@{{PROJECT_NAME}}/schema\`
+source of truth at \`packages/contexture/{{PROJECT_NAME}}.contexture.json\` and
+is re-emitted automatically to \`packages/contexture/convex/schema.ts\` on every
+edit. \`apps/web\` imports the workspace package \`@{{PROJECT_NAME}}/contexture\`
 rather than owning its own \`convex/\` folder.
 
 ## Layout
@@ -22,8 +22,8 @@ rather than owning its own \`convex/\` folder.
 \`\`\`
 {{PROJECT_NAME}}/
   apps/web/             Next.js app (App Router, Tailwind, shadcn)
-                        imports @{{PROJECT_NAME}}/schema
-  packages/schema/      Shared schema package (Zod + JSON + Convex)
+                        imports @{{PROJECT_NAME}}/contexture
+  packages/contexture/      Shared schema package (Zod + JSON + Convex)
     {{PROJECT_NAME}}.contexture.json   source of truth
     {{PROJECT_NAME}}.schema.ts          @contexture-generated (Zod)
     {{PROJECT_NAME}}.schema.json        @contexture-generated (JSON Schema)
@@ -36,9 +36,9 @@ rather than owning its own \`convex/\` folder.
 
 ## Source of truth
 
-Do NOT edit \`packages/schema/convex/schema.ts\` directly — it is regenerated
+Do NOT edit \`packages/contexture/convex/schema.ts\` directly — it is regenerated
 on every IR save. To change the schema, edit
-\`packages/schema/{{PROJECT_NAME}}.contexture.json\` (or ask the user to
+\`packages/contexture/{{PROJECT_NAME}}.contexture.json\` (or ask the user to
 use Contexture's editor).
 
 If you do edit the generated file by mistake, Contexture detects the
@@ -47,24 +47,24 @@ into the IR. Your work is never silently clobbered.
 
 ## CRUD files are yours
 
-\`packages/schema/convex/<table>.ts\` files are seeded once by the scaffolder and
+\`packages/contexture/convex/<table>.ts\` files are seeded once by the scaffolder and
 are \`@contexture-seeded\`, not \`@contexture-generated\`. Add queries,
 mutations, and indexes as the app requires — Contexture does not
 regenerate them.
 
 ## Using the schema from app code
 
-Import Zod schemas from \`@{{PROJECT_NAME}}/schema\` for runtime
+Import Zod schemas from \`@{{PROJECT_NAME}}/contexture\` for runtime
 validation and inferred types:
 
 \`\`\`ts
-import { Post } from '@{{PROJECT_NAME}}/schema';
+import { Post } from '@{{PROJECT_NAME}}/contexture';
 
 const parsed = Post.parse(input);
 type Post = z.infer<typeof Post>;
 \`\`\`
 
-The Convex validators in \`packages/schema/convex/schema.ts\` are derived from
+The Convex validators in \`packages/contexture/convex/schema.ts\` are derived from
 the same source, so field shape is guaranteed to match.
 
 ## Conventions
@@ -77,15 +77,15 @@ the same source, so field shape is guaranteed to match.
 
 ## Adding a table
 
-1. Open the IR (\`packages/schema/{{PROJECT_NAME}}.contexture.json\`) or
+1. Open the IR (\`packages/contexture/{{PROJECT_NAME}}.contexture.json\`) or
    Contexture.
 2. Add the object type, set \`"table": true\`.
-3. Save. Contexture re-emits \`packages/schema/convex/schema.ts\`.
-4. Add CRUD handlers in \`packages/schema/convex/<table>.ts\` as needed.
+3. Save. Contexture re-emits \`packages/contexture/convex/schema.ts\`.
+4. Add CRUD handlers in \`packages/contexture/convex/<table>.ts\` as needed.
 
 ## What NOT to touch
 
-\`packages/schema/.contexture/\` — Contexture's internal state (graph
+\`packages/contexture/.contexture/\` — Contexture's internal state (graph
 layout, chat history, emit manifest). The directory is gitignored.
 
 ## Commands

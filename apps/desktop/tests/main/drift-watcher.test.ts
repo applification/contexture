@@ -8,7 +8,7 @@ import { createDriftWatcher } from '@main/documents/drift-watcher';
 import { describe, expect, it, vi } from 'vitest';
 
 const WATCHED = '/proj/apps/web/convex/schema.ts';
-const EMITTED = '/proj/packages/schema/.contexture/emitted.json';
+const EMITTED = '/proj/packages/contexture/.contexture/emitted.json';
 
 function sha256(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex');

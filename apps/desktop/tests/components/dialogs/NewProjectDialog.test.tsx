@@ -366,7 +366,7 @@ describe('NewProjectDialog', () => {
       expect(useNewProjectStore.getState().isOpen).toBe(false);
     });
     expect(onOpenProject).toHaveBeenCalledWith(
-      '/tmp/my-proj/packages/schema/my-proj.contexture.json',
+      '/tmp/my-proj/packages/contexture/my-proj.contexture.json',
     );
   });
 

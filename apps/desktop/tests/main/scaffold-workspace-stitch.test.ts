@@ -1,6 +1,6 @@
 /**
  * `scaffoldWorkspaceStitch` (stage 9) — when 'web' is in config.apps,
- * merges `@<project>/schema: workspace:*` into `apps/web/package.json`;
+ * merges `@<project>/contexture: workspace:*` into `apps/web/package.json`;
  * always writes the root `CLAUDE.md`, `biome.json`, and `.gitignore`.
  * Pure file manipulation; git init is handled by a separate step.
  */
@@ -23,14 +23,14 @@ beforeEach(() => {
 });
 
 describe('scaffoldWorkspaceStitch', () => {
-  it('adds @<project>/schema: workspace:* to apps/web/package.json dependencies when web selected', async () => {
+  it('adds @<project>/contexture: workspace:* to apps/web/package.json dependencies when web selected', async () => {
     await fs.writeFile(
       webPkgPath,
       `${JSON.stringify({ name: 'web', dependencies: { next: '^16.0.0' } }, null, 2)}\n`,
     );
     await scaffoldWorkspaceStitch(webConfig, { fs });
     const pkg = JSON.parse(await fs.readFile(webPkgPath));
-    expect(pkg.dependencies['@my-proj/schema']).toBe('workspace:*');
+    expect(pkg.dependencies['@my-proj/contexture']).toBe('workspace:*');
     expect(pkg.dependencies.next).toBe('^16.0.0');
     expect(pkg.name).toBe('web');
   });
@@ -39,7 +39,7 @@ describe('scaffoldWorkspaceStitch', () => {
     await fs.writeFile(webPkgPath, `${JSON.stringify({ name: 'web' }, null, 2)}\n`);
     await scaffoldWorkspaceStitch(webConfig, { fs });
     const pkg = JSON.parse(await fs.readFile(webPkgPath));
-    expect(pkg.dependencies['@my-proj/schema']).toBe('workspace:*');
+    expect(pkg.dependencies['@my-proj/contexture']).toBe('workspace:*');
   });
 
   it('skips web package.json when web is not in apps', async () => {

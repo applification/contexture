@@ -4,7 +4,7 @@
  * stays dumb and the regression surface lives here.
  *
  * Kebab-case is the house style because it becomes the npm package name
- * (`@<name>/schema`), the monorepo directory, and the Convex project
+ * (`@<name>/contexture`), the monorepo directory, and the Convex project
  * slug — all three require the lowercase-letters-digits-hyphen shape.
  */
 import { validateProjectName } from '@renderer/model/validate-project-name';

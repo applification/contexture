@@ -80,20 +80,20 @@ describe('createCompositeStageRunner', () => {
     expect(spawnCalls[0].args[0]).toBe('create-electron-app@latest');
   });
 
-  it('CONVEX_INIT: seeds packages/schema anchor + installs convex locally, then spawns convex dev', async () => {
+  it('CONVEX_INIT: seeds packages/contexture anchor + installs convex locally, then spawns convex dev', async () => {
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
     for await (const _ of runner.run(STAGE.CONVEX_INIT, config)) {
       // drain
     }
-    const pkg = JSON.parse(await fs.readFile('/work/my-proj/packages/schema/package.json'));
+    const pkg = JSON.parse(await fs.readFile('/work/my-proj/packages/contexture/package.json'));
     expect(pkg.dependencies.convex).toBeDefined();
     expect(spawnCalls).toHaveLength(2);
     expect(spawnCalls[0].cmd).toBe('bun');
     expect(spawnCalls[0].args).toEqual(['install']);
-    expect(spawnCalls[0].cwd).toBe('/work/my-proj/packages/schema');
+    expect(spawnCalls[0].cwd).toBe('/work/my-proj/packages/contexture');
     expect(spawnCalls[1].cmd).toBe('bunx');
     expect(spawnCalls[1].args[0]).toBe('convex@latest');
-    expect(spawnCalls[1].cwd).toBe('/work/my-proj/packages/schema');
+    expect(spawnCalls[1].cwd).toBe('/work/my-proj/packages/contexture');
   });
 
   it('SCHEMA_PACKAGE runs in-process — writes the schema package tree', async () => {
@@ -101,21 +101,21 @@ describe('createCompositeStageRunner', () => {
     for await (const _ of runner.run(STAGE.SCHEMA_PACKAGE, config)) {
       // drain
     }
-    expect(fs.exists('/work/my-proj/packages/schema/my-proj.contexture.json')).toBe(true);
-    expect(fs.exists('/work/my-proj/packages/schema/package.json')).toBe(true);
+    expect(fs.exists('/work/my-proj/packages/contexture/my-proj.contexture.json')).toBe(true);
+    expect(fs.exists('/work/my-proj/packages/contexture/package.json')).toBe(true);
     expect(spawnCalls).toHaveLength(0);
   });
 
   it('CONVEX_EMIT runs in-process — writes the Convex schema', async () => {
     await fs.writeFile(
-      `${config.targetDir}/packages/schema/my-proj.contexture.json`,
+      `${config.targetDir}/packages/contexture/my-proj.contexture.json`,
       JSON.stringify({ version: '1', types: [] }),
     );
     const runner = createCompositeStageRunner({ fs, spawner: okSpawner() });
     for await (const _ of runner.run(STAGE.CONVEX_EMIT, config)) {
       // drain
     }
-    expect(fs.exists('/work/my-proj/packages/schema/convex/schema.ts')).toBe(true);
+    expect(fs.exists('/work/my-proj/packages/contexture/convex/schema.ts')).toBe(true);
     expect(spawnCalls).toHaveLength(0);
   });
 

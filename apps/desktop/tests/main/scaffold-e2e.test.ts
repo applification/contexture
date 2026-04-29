@@ -59,9 +59,9 @@ describeOrSkip('scaffold end-to-end (SCAFFOLD_E2E=1)', () => {
         // Key artefacts on disk.
         expect(existsSync(join(targetDir, 'apps/web/package.json'))).toBe(true);
         expect(
-          existsSync(join(targetDir, 'packages/schema', `${projectName}.contexture.json`)),
+          existsSync(join(targetDir, 'packages/contexture', `${projectName}.contexture.json`)),
         ).toBe(true);
-        expect(existsSync(join(targetDir, 'packages/schema/convex/schema.ts'))).toBe(true);
+        expect(existsSync(join(targetDir, 'packages/contexture/convex/schema.ts'))).toBe(true);
         expect(existsSync(join(targetDir, 'CLAUDE.md'))).toBe(true);
         expect(existsSync(join(targetDir, 'biome.json'))).toBe(true);
         expect(existsSync(join(targetDir, '.git'))).toBe(true);

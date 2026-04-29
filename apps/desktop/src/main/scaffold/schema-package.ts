@@ -1,5 +1,5 @@
 /**
- * `scaffoldSchemaPackage` (stage 6) — lays down the `packages/schema/`
+ * `scaffoldSchemaPackage` (stage 6) — lays down the `packages/contexture/`
  * tree: initial IR, Zod bundle + JSON mirror + barrel, workspace
  * package.json, .gitignore, and the .contexture/ marker with empty
  * layout/chat/emitted sidecars. Pure file generation against an
@@ -38,7 +38,7 @@ function makeChatHistory(description?: string): string {
 function makePackageJson(projectName: string): string {
   return `${JSON.stringify(
     {
-      name: `@${projectName}/schema`,
+      name: `@${projectName}/contexture`,
       version: '0.0.0',
       private: true,
       type: 'module',
@@ -58,7 +58,7 @@ export async function scaffoldSchemaPackage(
   deps: SchemaPackageDeps,
 ): Promise<void> {
   const { fs } = deps;
-  const schemaDir = `${config.targetDir}/packages/schema`;
+  const schemaDir = `${config.targetDir}/packages/contexture`;
   const irPath = `${schemaDir}/${config.projectName}.contexture.json`;
   const schemaTsPath = `${schemaDir}/${config.projectName}.schema.ts`;
   const schemaJsonPath = `${schemaDir}/${config.projectName}.schema.json`;
@@ -76,8 +76,11 @@ export async function scaffoldSchemaPackage(
 
   await fs.writeFile(irPath, `${JSON.stringify(ir, null, 2)}\n`);
   await fs.writeFile(schemaTsPath, emitZod(ir, irPath));
-  await fs.writeFile(schemaJsonPath, `${JSON.stringify(emitJsonSchema(ir), null, 2)}\n`);
-  await fs.writeFile(indexPath, emitSchemaIndex(config.projectName));
+  await fs.writeFile(
+    schemaJsonPath,
+    `${JSON.stringify(emitJsonSchema(ir, undefined, irPath), null, 2)}\n`,
+  );
+  await fs.writeFile(indexPath, emitSchemaIndex(config.projectName, irPath));
   await fs.writeFile(pkgPath, makePackageJson(config.projectName));
   await fs.writeFile(gitignorePath, GITIGNORE);
   await fs.writeFile(

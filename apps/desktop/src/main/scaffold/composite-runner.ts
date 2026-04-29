@@ -54,12 +54,12 @@ export function createCompositeStageRunner(deps: CompositeRunnerDeps): StageRunn
         // on disk or its config bundler fails. So we write a bare anchor,
         // install only convex locally, then run `convex dev --once`. Stage 7
         // rewrites this file with the real schema-package shape later.
-        const schemaDir = `${config.targetDir}/packages/schema`;
+        const schemaDir = `${config.targetDir}/packages/contexture`;
         await fs.writeFile(
           `${schemaDir}/package.json`,
           `${JSON.stringify(
             {
-              name: `@${config.projectName}/schema`,
+              name: `@${config.projectName}/contexture`,
               private: true,
               dependencies: { convex: 'latest' },
             },

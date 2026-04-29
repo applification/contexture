@@ -1,6 +1,6 @@
 /**
  * `scaffoldWorkspaceStitch` (stage 9) — finishes the file side of the
- * scaffold: if a web app was created, adds `@<project>/schema: workspace:*`
+ * scaffold: if a web app was created, adds `@<project>/contexture: workspace:*`
  * to `apps/web/package.json`; writes the root `CLAUDE.md`, `biome.json`,
  * and root `.gitignore` (overwriting the skeleton's version with the
  * richer one). Pure file work; the subsequent git + bun install stages
@@ -51,7 +51,7 @@ export async function scaffoldWorkspaceStitch(
     const raw = await fs.readFile(webPkgPath);
     const pkg = JSON.parse(raw) as { dependencies?: Record<string, string>; [k: string]: unknown };
     pkg.dependencies ??= {};
-    pkg.dependencies[`@${config.projectName}/schema`] = 'workspace:*';
+    pkg.dependencies[`@${config.projectName}/contexture`] = 'workspace:*';
     await fs.writeFile(webPkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
   }
 
