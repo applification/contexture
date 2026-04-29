@@ -5,6 +5,8 @@
  * Run via: bun run cleanup
  */
 
+import { readdir, rm } from 'node:fs/promises';
+
 type PrState = 'MERGED' | 'CLOSED' | 'OPEN' | 'NONE' | 'UNKNOWN';
 
 type Category = 'merged' | 'merged-via-squash' | 'closed-unmerged';
@@ -84,6 +86,27 @@ async function listWorktrees(): Promise<WorktreeEntry[]> {
   }
   if (path !== null) entries.push({ path, branch });
   return entries;
+}
+
+async function clearSandcastleLogs(): Promise<number> {
+  const dir = '.sandcastle/logs';
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of entries) {
+    const p = `${dir}/${name}`;
+    try {
+      await rm(p, { recursive: true, force: true });
+      removed++;
+    } catch (e) {
+      console.error(`  ${RED}✗ failed to remove ${p}: ${e}${RESET}`);
+    }
+  }
+  return removed;
 }
 
 async function isMerged(ref: string): Promise<boolean> {
@@ -367,10 +390,18 @@ async function main() {
     await sh(['git', 'worktree', 'prune']);
   }
 
+  const logsRemoved = await clearSandcastleLogs();
+  if (logsRemoved > 0) {
+    console.log(
+      `${GREEN}Cleared ${logsRemoved} entr${logsRemoved === 1 ? 'y' : 'ies'} from .sandcastle/logs/${RESET}\n`,
+    );
+  }
+
   console.log(`${BOLD}Summary${RESET}`);
   console.log(`  Local branches deleted:  ${deletedLocal}`);
   console.log(`  Remote branches deleted: ${deletedRemote}`);
   console.log(`  Worktrees removed:       ${worktreesRemoved}`);
+  console.log(`  Logs cleared:            ${logsRemoved}`);
   console.log(`  Skipped (this session):  ${skipped}`);
   console.log(`  Errors:                  ${errors}`);
   if (skippedOpen.length > 0) {
@@ -388,5 +419,3 @@ async function main() {
 }
 
 await main();
-
-export {};
