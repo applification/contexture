@@ -3,8 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:portless": "portless run next dev",
+    "dev": "portless run next dev",
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

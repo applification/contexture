@@ -23,26 +23,26 @@ cd apps/web
 bun run dev
 ```
 
-### Portless (multi-worktree dev)
-
-For running multiple worktrees in parallel (Conductor / Claude Code), use
-[Portless](https://portless.sh) to get stable, named URLs instead of fighting
-over port numbers.
-
-Portless is a `devDependency` of this app, so a normal `bun install` is enough.
-
-```bash
-# Optional: HTTP/2 + TLS (faster page loads, no browser warnings)
-bunx portless proxy start --https
-
-# From apps/web
-bun run dev:portless
-```
+`dev` runs Next.js through [Portless](https://portless.sh) so each git
+worktree gets its own stable URL with no port conflicts. Portless is a
+`devDependency`, so a normal `bun install` covers it.
 
 Main worktree resolves to `http://web.localhost:1355` (name inferred from
 `package.json`). Linked git worktrees auto-prepend the branch as a subdomain,
-e.g. `http://issue-208.web.localhost:1355` — no per-worktree config needed.
-Portless assigns an ephemeral `PORT` and Next.js respects it.
+e.g. `http://issue-208.web.localhost:1355`. Portless assigns an ephemeral
+`PORT` and Next.js respects it.
+
+To bypass Portless (e.g. CI or a one-off plain `next dev`):
+
+```bash
+PORTLESS=0 bun run dev
+```
+
+Optional: enable HTTP/2 + TLS once for faster page loads and no browser warnings:
+
+```bash
+bunx portless proxy start --https
+```
 
 ## Deployment
 
