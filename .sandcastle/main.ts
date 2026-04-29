@@ -78,11 +78,10 @@ async function gitOutput(args: string[], cwd: string): Promise<string> {
   return out;
 }
 
-// Files changed by `commits` relative to their first parent. If a commit has
-// no parent (initial commit on an isolated branch), `--name-only` against the
-// commit alone shows everything in it. We pass the commit SHA range
-// `<first>^..<last>` so we capture exactly the work the agent introduced this
-// run, regardless of where main currently sits.
+// Files changed by `commits` relative to their first parent. We pass the SHA
+// range `<first>^..<last>` so we capture exactly the work the agent
+// introduced this run, regardless of where main currently sits or which
+// branch the orchestrator was launched from.
 async function pathsTouchedByCommits(
   worktreePath: string,
   commits: { sha: string }[],
@@ -93,18 +92,6 @@ async function pathsTouchedByCommits(
   const range = `${first}^..${last}`;
   const out = await gitOutput(["diff", "--name-only", range], worktreePath);
   return out.split("\n").filter((p) => p.length > 0);
-}
-
-// True when the current branch has any commit ahead of its merge-base with
-// main. We use merge-base (not literal `main..HEAD`) so the orchestrator
-// works correctly when launched from a feature branch — otherwise the diff
-// would include every commit the launching branch added on top of main and
-// always look "non-empty".
-async function branchHasWorkAheadOfMain(worktreePath: string): Promise<boolean> {
-  const base = (await gitOutput(["merge-base", "main", "HEAD"], worktreePath)).trim();
-  if (base.length === 0) return false;
-  const log = await gitOutput(["rev-list", "--count", `${base}..HEAD`], worktreePath);
-  return Number.parseInt(log.trim(), 10) > 0;
 }
 
 async function createIssueSandboxWithRetry(issue: Issue) {
@@ -151,14 +138,18 @@ async function runIssue(issue: Issue, iteration: number) {
     logging: streamLogger(`iter${iteration}-implementer-${issue.number}`),
   });
 
-  // Reviewer decision: based on what *this* run committed, not the whole
-  // branch's diff against main. Reviewing the same code repeatedly across
-  // re-runs (or, worse, "reviewing" the launching branch's own development
-  // commits when the orchestrator is run from a feature branch) wastes a
-  // Claude call and confuses the agent.
+  // Both reviewer and PR-opener gate on whether *this* implementer run made
+  // commits. The previous logic compared `main..HEAD`, which was incorrect
+  // when the orchestrator was launched from a feature branch — every commit
+  // the launching branch had already added on top of main showed up in the
+  // diff and falsely triggered both phases.
+  if (implementResult.commits.length === 0) {
+    return implementResult;
+  }
+
   const thisRunPaths = await pathsTouchedByCommits(sandbox.worktreePath, implementResult.commits);
   const allMarkdown = thisRunPaths.length > 0 && thisRunPaths.every((p) => p.endsWith(".md"));
-  const skipReview = docsOnly || allMarkdown || thisRunPaths.length === 0;
+  const skipReview = docsOnly || allMarkdown;
 
   if (!skipReview) {
     await sandbox.run({
@@ -168,15 +159,6 @@ async function runIssue(issue: Issue, iteration: number) {
       promptArgs: issuePromptArgs,
       logging: streamLogger(`iter${iteration}-reviewer-${issue.number}`),
     });
-  }
-
-  // PR-opener decision: based on whether the issue branch has any commits
-  // ahead of its merge-base with main. This catches the resilience case the
-  // original code aimed for — a previous run committed but the PR-opener
-  // didn't fire — without falsely triggering on commits the launching
-  // branch already had ahead of main.
-  if (!(await branchHasWorkAheadOfMain(sandbox.worktreePath))) {
-    return implementResult;
   }
 
   await sandbox.run({
