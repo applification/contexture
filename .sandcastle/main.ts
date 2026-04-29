@@ -4,15 +4,16 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
 import { parsePlan } from "./plan";
 import type { Issue } from "./plan";
-
-const MAX_ITERATIONS = 10;
-const MAX_PARALLEL = 4;
-
-// Skip host->worktree copy: this monorepo's node_modules is ~3.5GB and
-// blows past sandcastle's hard-coded 60s copy timeout. The implementer
-// sandbox runs `bun install` inside the container instead.
-// Env files are gitignored, so copy them in explicitly.
-const copyToWorktree: string[] = ["apps/desktop/.env", "apps/web/.env.local"];
+import {
+  AGENTS,
+  BRANCH_FORMAT,
+  COPY_TO_WORKTREE,
+  INSTALL_AND_VERIFY,
+  LABEL,
+  MAX_ITERATIONS,
+  MAX_PARALLEL,
+} from "./workflow";
+import type { AgentSpec } from "./workflow";
 
 // Each sandbox gets its own bun cache. Sharing ~/.bun/install/cache across
 // parallel sandboxes races on tarball extraction and silently produces broken
@@ -20,14 +21,16 @@ const copyToWorktree: string[] = ["apps/desktop/.env", "apps/web/.env.local"];
 // was never written). Cold installs are slower; broken node_modules are worse.
 const sandboxProvider = docker({});
 
-// Verify the install actually produced a usable workspace. `bun install` exits
-// 0 even when individual extractions are mangled, so we follow with `turbo
-// typecheck`, which resolves and loads imports across every workspace and
-// fails loudly if a package's main entry is missing.
-const installAndVerify = "bun install && bun run typecheck";
-
 mkdirSync(".sandcastle/logs/plans", { recursive: true });
 const STREAM_LOG_PATH = ".sandcastle/logs/stream.log";
+
+// Build a `claudeCode` agent invocation from an AgentSpec, threading the
+// optional `effort` setting through only when present.
+function agent(spec: AgentSpec) {
+  return spec.effort === undefined
+    ? sandcastle.claudeCode(spec.model)
+    : sandcastle.claudeCode(spec.model, { effort: spec.effort });
+}
 
 function streamLogger(name: string): LoggingOption {
   return {
@@ -52,7 +55,7 @@ function streamLogger(name: string): LoggingOption {
 
 const isDocsOnly = (issue: Issue) =>
   issue.labels.includes("documentation") &&
-  !issue.labels.some((l) => l !== "documentation" && l !== "Sandcastle");
+  !issue.labels.some((l) => l !== "documentation" && l !== LABEL);
 
 const isSandboxStartupError = (err: unknown): boolean => {
   const msg = err instanceof Error ? err.message : String(err);
@@ -75,8 +78,8 @@ async function createIssueSandboxWithRetry(issue: Issue) {
     return await sandcastle.createSandbox({
       sandbox: sandboxProvider,
       branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: installAndVerify }] } },
-      copyToWorktree,
+      hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
+      copyToWorktree: [...COPY_TO_WORKTREE],
     });
   } catch (err) {
     if (!isSandboxStartupError(err)) throw err;
@@ -84,8 +87,8 @@ async function createIssueSandboxWithRetry(issue: Issue) {
     return sandcastle.createSandbox({
       sandbox: sandboxProvider,
       branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: installAndVerify }] } },
-      copyToWorktree,
+      hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
+      copyToWorktree: [...COPY_TO_WORKTREE],
     });
   }
 }
@@ -94,19 +97,19 @@ async function runIssue(issue: Issue, iteration: number) {
   await using sandbox = await createIssueSandboxWithRetry(issue);
 
   const docsOnly = isDocsOnly(issue);
-  const implementPromptFile = docsOnly
-    ? "./.sandcastle/implement-docs-prompt.md"
-    : "./.sandcastle/implement-prompt.md";
+  const implementerSpec = docsOnly ? AGENTS.implementerDocs : AGENTS.implementer;
+
+  const issuePromptArgs = {
+    ISSUE_NUMBER: String(issue.number),
+    ISSUE_TITLE: issue.title,
+    BRANCH: issue.branch,
+  };
 
   const implementResult = await sandbox.run({
     name: "Implementer #" + issue.number,
-    agent: sandcastle.claudeCode("claude-opus-4-6"),
-    promptFile: implementPromptFile,
-    promptArgs: {
-      ISSUE_NUMBER: String(issue.number),
-      ISSUE_TITLE: issue.title,
-      BRANCH: issue.branch,
-    },
+    agent: agent(implementerSpec),
+    promptFile: implementerSpec.promptPath,
+    promptArgs: issuePromptArgs,
     logging: streamLogger(`iter${iteration}-implementer-${issue.number}`),
   });
 
@@ -123,26 +126,18 @@ async function runIssue(issue: Issue, iteration: number) {
   if (!skipReview) {
     await sandbox.run({
       name: "Reviewer #" + issue.number,
-      agent: sandcastle.claudeCode("claude-opus-4-6"),
-      promptFile: "./.sandcastle/review-prompt.md",
-      promptArgs: {
-        ISSUE_NUMBER: String(issue.number),
-        ISSUE_TITLE: issue.title,
-        BRANCH: issue.branch,
-      },
+      agent: agent(AGENTS.reviewer),
+      promptFile: AGENTS.reviewer.promptPath,
+      promptArgs: issuePromptArgs,
       logging: streamLogger(`iter${iteration}-reviewer-${issue.number}`),
     });
   }
 
   await sandbox.run({
     name: "PR-Opener #" + issue.number,
-    agent: sandcastle.claudeCode("claude-opus-4-6", { effort: "low" }),
-    promptFile: "./.sandcastle/pr-prompt.md",
-    promptArgs: {
-      ISSUE_NUMBER: String(issue.number),
-      ISSUE_TITLE: issue.title,
-      BRANCH: issue.branch,
-    },
+    agent: agent(AGENTS.prOpener),
+    promptFile: AGENTS.prOpener.promptPath,
+    promptArgs: issuePromptArgs,
     logging: streamLogger(`iter${iteration}-pr-${issue.number}`),
   });
 
@@ -156,8 +151,12 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   const plan = await sandcastle.run({
     sandbox: sandboxProvider,
     name: "Planner",
-    agent: sandcastle.claudeCode("claude-opus-4-6", { effort: "high" }),
-    promptFile: "./.sandcastle/plan-prompt.md",
+    agent: agent(AGENTS.planner),
+    promptFile: AGENTS.planner.promptPath,
+    promptArgs: {
+      LABEL,
+      BRANCH_FORMAT,
+    },
     logging: streamLogger(`iter${iteration}-planner`),
   });
 
@@ -175,7 +174,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     console.log(`  #${issue.number}: ${issue.title} → ${issue.branch} [${issue.labels.join(", ")}]`);
   }
 
-  // Phase 2: per-issue pipeline (implement → maybe review → open PR), max 4 in parallel
+  // Phase 2: per-issue pipeline (implement → maybe review → open PR), max N in parallel
   let running = 0;
   const queue: (() => void)[] = [];
   const acquire = () =>
