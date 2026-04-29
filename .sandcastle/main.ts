@@ -2,8 +2,14 @@ import { mkdirSync, appendFileSync } from "node:fs";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
-import { pickEligible } from "./eligibility";
-import { fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./gh";
+import { checkStillEligible, pickEligible } from "./eligibility";
+import type { ReconciliationReason } from "./eligibility";
+import {
+  fetchIssueLiveState,
+  fetchOpenLabelledIssues,
+  fetchOpenPRsClosingIssues,
+} from "./gh";
+import type { OpenPRClosing } from "./gh";
 import { parsePlan } from "./plan";
 import type { Issue } from "./plan";
 import { isSandboxStartupRetryable, retryWithBackoff } from "./retry";
@@ -118,7 +124,41 @@ async function createIssueSandboxWithRetry(issue: Issue) {
   );
 }
 
-async function runIssue(issue: Issue, iteration: number) {
+type IssueOutcome =
+  | { kind: "ran"; result: sandcastle.SandboxRunResult }
+  | { kind: "reconciledSkip"; reason: ReconciliationReason };
+
+function describeReconciliation(reason: ReconciliationReason): string {
+  switch (reason.kind) {
+    case "issueClosed":
+      return "issue closed since planning";
+    case "labelRemoved":
+      return `${LABEL} label removed since planning`;
+    case "claimedByPR":
+      return `claimed by PR #${reason.pr}`;
+  }
+}
+
+async function runIssue(
+  issue: Issue,
+  iteration: number,
+  openPRs: OpenPRClosing[],
+): Promise<IssueOutcome> {
+  // Reconciliation-lite: re-check the issue's live state before creating a
+  // sandbox. The window between iteration plan and per-issue dispatch can be
+  // 5–30 minutes when MAX_PARALLEL slots are saturated; an issue closed,
+  // relabelled, or claimed by a freshly-opened PR in that window shouldn't
+  // burn a multi-minute sandbox start. The openPRs cache passed in is the
+  // iteration-start snapshot — we deliberately don't re-fetch PRs per issue.
+  const live = await fetchIssueLiveState(issue.number);
+  const reconciliation = checkStillEligible(issue, live, openPRs, { label: LABEL });
+  if (!reconciliation.eligible) {
+    console.log(
+      `  ⤺ #${issue.number} skipped (${describeReconciliation(reconciliation.reason)})`,
+    );
+    return { kind: "reconciledSkip", reason: reconciliation.reason };
+  }
+
   await using sandbox = await createIssueSandboxWithRetry(issue);
 
   const docsOnly = isDocsOnly(issue);
@@ -144,7 +184,7 @@ async function runIssue(issue: Issue, iteration: number) {
   // the launching branch had already added on top of main showed up in the
   // diff and falsely triggered both phases.
   if (implementResult.commits.length === 0) {
-    return implementResult;
+    return { kind: "ran", result: implementResult };
   }
 
   const thisRunPaths = await pathsTouchedByCommits(sandbox.worktreePath, implementResult.commits);
@@ -169,7 +209,7 @@ async function runIssue(issue: Issue, iteration: number) {
     logging: streamLogger(`iter${iteration}-pr-${issue.number}`),
   });
 
-  return implementResult;
+  return { kind: "ran", result: implementResult };
 }
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
@@ -250,7 +290,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     issues.map(async (issue) => {
       await acquire();
       try {
-        return await runIssue(issue, iteration);
+        return await runIssue(issue, iteration, openPRs);
       } finally {
         release();
       }
@@ -274,12 +314,19 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     }
   }
 
-  const completed = settled.filter(
-    (o): o is PromiseFulfilledResult<sandcastle.SandboxRunResult> =>
-      o.status === "fulfilled" && o.value.commits.length > 0,
+  const fulfilled = settled.filter(
+    (o): o is PromiseFulfilledResult<IssueOutcome> => o.status === "fulfilled",
+  );
+  const reconciledSkips = fulfilled.filter((o) => o.value.kind === "reconciledSkip").length;
+  const completed = fulfilled.filter(
+    (o) => o.value.kind === "ran" && o.value.result.commits.length > 0,
   );
 
-  console.log(`\nIteration ${iteration} complete. ${completed.length}/${issues.length} issue(s) produced commits.`);
+  const summaryParts = [
+    `${completed.length}/${issues.length} issue(s) produced commits`,
+  ];
+  if (reconciledSkips > 0) summaryParts.push(`${reconciledSkips} reconciled-skip`);
+  console.log(`\nIteration ${iteration} complete. ${summaryParts.join("; ")}.`);
 
   if (completed.length === 0) {
     console.log("No progress this iteration. Exiting.");
