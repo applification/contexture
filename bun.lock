@@ -117,6 +117,7 @@
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^4.5.2",
         "jsdom": "^29.0.1",
+        "portless": "^0.11.1",
         "tailwindcss": "^4",
         "typescript": "^5",
         "vitest": "^3.2.1",
@@ -2402,6 +2403,8 @@
     "points-on-path": ["points-on-path@0.2.1", "", { "dependencies": { "path-data-parser": "0.1.0", "points-on-curve": "0.2.0" } }, "sha512-25ClnWWuw7JbWZcgqY/gJ4FQWadKxGWk+3kR/7kD0tCaDtPPMj7oHu2ToLaVhfpnHrZzYby2w6tUA0eOIuUg8g=="],
 
     "polished": ["polished@4.3.1", "", { "dependencies": { "@babel/runtime": "^7.17.8" } }, "sha512-OBatVyC/N7SCW/FaDHrSd+vn0o5cS855TOmYi4OkdWUMSJCET/xip//ch8xGUvtr3i44X9LVyWwQlRMTN3pwSA=="],
+
+    "portless": ["portless@0.11.1", "", { "os": [ "linux", "win32", "darwin", ], "bin": { "portless": "dist/cli.js" } }, "sha512-A/U6sBo/aC+MDoLjVTzAUeB18KTzJQs7z+MnuyyCjJTOZoCh9xZzOjSqUPA+aWS0uS3UytWPrNLA5AO96TzuKQ=="],
 
     "possible-typed-array-names": ["possible-typed-array-names@1.1.0", "", {}, "sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg=="],
 

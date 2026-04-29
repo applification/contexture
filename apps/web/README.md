@@ -29,12 +29,11 @@ For running multiple worktrees in parallel (Conductor / Claude Code), use
 [Portless](https://portless.sh) to get stable, named URLs instead of fighting
 over port numbers.
 
-```bash
-# One-time global install (do NOT add as a project dependency)
-npm install -g portless
+Portless is a `devDependency` of this app, so a normal `bun install` is enough.
 
+```bash
 # Optional: HTTP/2 + TLS (faster page loads, no browser warnings)
-portless proxy start --https
+bunx portless proxy start --https
 
 # From apps/web
 bun run dev:portless
