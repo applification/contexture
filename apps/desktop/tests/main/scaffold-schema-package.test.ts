@@ -1,5 +1,5 @@
 /**
- * `scaffoldSchemaPackage` (stage 6) — lays down `packages/schema/`
+ * `scaffoldSchemaPackage` (stage 6) — lays down `packages/contexture/`
  * with the initial IR, empty sidecars, a workspace package.json, a
  * `.gitignore`, and the `.contexture/` marker dir with empty
  * layout/chat/emitted stubs. Drives through MemFsAdapter so the
@@ -10,7 +10,7 @@ import { scaffoldSchemaPackage } from '@main/scaffold/schema-package';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const config = { targetDir: '/work/my-proj', projectName: 'my-proj', apps: ['web'] as const };
-const schemaDir = '/work/my-proj/packages/schema';
+const schemaDir = '/work/my-proj/packages/contexture';
 
 let fs: ReturnType<typeof createMemFsAdapter>;
 
@@ -36,10 +36,10 @@ describe('scaffoldSchemaPackage', () => {
     expect(index).toContain(`export * from './my-proj.schema';`);
   });
 
-  it('writes a workspace package.json with the @<project>/schema name', async () => {
+  it('writes a workspace package.json with the @<project>/contexture name', async () => {
     await scaffoldSchemaPackage(config, { fs });
     const pkg = JSON.parse(await fs.readFile(`${schemaDir}/package.json`));
-    expect(pkg.name).toBe('@my-proj/schema');
+    expect(pkg.name).toBe('@my-proj/contexture');
     expect(pkg.private).toBe(true);
   });
 

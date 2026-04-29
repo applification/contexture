@@ -1,6 +1,6 @@
 /**
  * `DriftBanner` — non-blocking banner shown at the top of the graph
- * view when `apps/web/convex/schema.ts` has been hand-edited outside
+ * view when `packages/contexture/convex/schema.ts` has been hand-edited outside
  * Contexture (drift detected by the main-process watcher).
  *
  * "Review changes" opens the reconcile modal (see #126); "Dismiss"
@@ -26,7 +26,7 @@ export function DriftBanner(): React.JSX.Element | null {
     >
       <AlertTriangle className="size-3.5 shrink-0" />
       <span className="flex-1">
-        <code className="font-mono">packages/schema/convex/schema.ts</code> was modified outside
+        <code className="font-mono">packages/contexture/convex/schema.ts</code> was modified outside
         Contexture.
       </span>
       <Button

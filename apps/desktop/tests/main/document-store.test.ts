@@ -229,10 +229,10 @@ describe('DocumentStore', () => {
   });
 
   it('project-mode open writes CLAUDE.md at the project root if missing, with {{PROJECT_NAME}} substituted', async () => {
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(sampleIR),
-      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/packages/contexture/.contexture/.keep': '',
     });
     const bundle = await store.open(monorepoIrPath);
     expect(bundle.mode).toBe('project');
@@ -243,10 +243,10 @@ describe('DocumentStore', () => {
   });
 
   it('project-mode open never overwrites an existing CLAUDE.md', async () => {
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(sampleIR),
-      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/packages/contexture/.contexture/.keep': '',
       '/proj/CLAUDE.md': '# user-owned notes\n',
     });
     await store.open(monorepoIrPath);
@@ -255,7 +255,7 @@ describe('DocumentStore', () => {
   });
 
   it('project-mode open seeds apps/web/convex/<table>.ts for each table-flagged type when missing', async () => {
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const tableSchema: Schema = {
       version: '1',
       types: [
@@ -275,23 +275,23 @@ describe('DocumentStore', () => {
     };
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/packages/contexture/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
-    const postPath = '/proj/packages/schema/convex/Post.ts';
+    const postPath = '/proj/packages/contexture/convex/Post.ts';
     expect(fs.exists(postPath)).toBe(true);
     const contents = await fs.readFile(postPath);
     expect(contents).toContain('@contexture-seeded');
     expect(contents).toContain('ctx.db.query("Post")');
     // Non-table types get no file.
-    expect(fs.exists('/proj/packages/schema/convex/Inline.ts')).toBe(false);
+    expect(fs.exists('/proj/packages/contexture/convex/Inline.ts')).toBe(false);
   });
 
   it('auto-save never clobbers a user-edited seeded CRUD file', async () => {
     // Seeded CRUD files are @contexture-seeded, not @contexture-generated.
     // Once seeded, they must survive every subsequent IR save — the user
     // or coding agent owns them.
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const tableSchema: Schema = {
       version: '1',
       types: [
@@ -305,10 +305,10 @@ describe('DocumentStore', () => {
     };
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/packages/contexture/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
-    const crudPath = '/proj/packages/schema/convex/Post.ts';
+    const crudPath = '/proj/packages/contexture/convex/Post.ts';
     // User edits the seeded file.
     const userEdit = '// user took over\nexport const list = () => 42;\n';
     await fs.writeFile(crudPath, userEdit);
@@ -323,7 +323,7 @@ describe('DocumentStore', () => {
   });
 
   it('project-mode open never overwrites an existing per-table CRUD file', async () => {
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const tableSchema: Schema = {
       version: '1',
       types: [
@@ -338,11 +338,11 @@ describe('DocumentStore', () => {
     const userOwned = '// user-modified CRUD, do not touch\nexport const list = null;\n';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/schema/.contexture/.keep': '',
-      '/proj/packages/schema/convex/Post.ts': userOwned,
+      '/proj/packages/contexture/.contexture/.keep': '',
+      '/proj/packages/contexture/convex/Post.ts': userOwned,
     });
     await store.open(monorepoIrPath);
-    expect(await fs.readFile('/proj/packages/schema/convex/Post.ts')).toBe(userOwned);
+    expect(await fs.readFile('/proj/packages/contexture/convex/Post.ts')).toBe(userOwned);
   });
 
   it('scratch-mode open does not seed per-table CRUD files', async () => {
@@ -360,8 +360,8 @@ describe('DocumentStore', () => {
     const { store, fs } = setup({ [irPath]: JSON.stringify(tableSchema) });
     await store.open(irPath);
     // Scratch mode has no project root, so no convex tree can be seeded.
-    expect(fs.exists('/packages/schema/convex/Post.ts')).toBe(false);
-    expect(fs.exists('/work/packages/schema/convex/Post.ts')).toBe(false);
+    expect(fs.exists('/packages/contexture/convex/Post.ts')).toBe(false);
+    expect(fs.exists('/work/packages/contexture/convex/Post.ts')).toBe(false);
   });
 
   it('scratch-mode open does not write CLAUDE.md', async () => {
@@ -406,7 +406,7 @@ describe('DocumentStore', () => {
     // Seeded files are not @contexture-generated, so they must not appear
     // in the drift manifest. A drift check flags regen-on-mismatch;
     // listing seeded files there would cause them to be regenerated.
-    const monorepoIrPath = '/proj/packages/schema/my-app.contexture.json';
+    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const tableSchema: Schema = {
       version: '1',
       types: [
@@ -420,7 +420,7 @@ describe('DocumentStore', () => {
     };
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/schema/.contexture/.keep': '',
+      '/proj/packages/contexture/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
     await store.save({
@@ -430,9 +430,9 @@ describe('DocumentStore', () => {
       chat: { version: '1', messages: [] },
     });
     const manifest = JSON.parse(
-      await fs.readFile('/proj/packages/schema/.contexture/emitted.json'),
+      await fs.readFile('/proj/packages/contexture/.contexture/emitted.json'),
     ) as { files: Record<string, string> };
-    expect(Object.keys(manifest.files)).not.toContain('/proj/packages/schema/convex/Post.ts');
+    expect(Object.keys(manifest.files)).not.toContain('/proj/packages/contexture/convex/Post.ts');
   });
 
   it('scratch-mode save does not write a schema index', async () => {

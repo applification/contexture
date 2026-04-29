@@ -3,7 +3,7 @@
  * project-mode document.
  *
  * When a project-mode document is open, starts watching
- * `apps/web/convex/schema.ts` against `.contexture/emitted.json`.
+ * `packages/contexture/convex/schema.ts` against `.contexture/emitted.json`.
  * Also triggers a manual re-check on window focus so edits made while
  * Contexture was in the background are caught immediately on return.
  *
@@ -18,10 +18,10 @@ const IR_SUFFIX = '.contexture.json';
 /**
  * Derives drift-related paths from the IR file path.
  *
- * IR lives at: <root>/packages/schema/<name>.contexture.json
- * Convex schema: <root>/packages/schema/convex/schema.ts
+ * IR lives at: <root>/packages/contexture/<name>.contexture.json
+ * Convex schema: <root>/packages/contexture/convex/schema.ts
  *   → same dir as the IR, subdir convex/
- * Emitted manifest: <root>/packages/schema/.contexture/emitted.json
+ * Emitted manifest: <root>/packages/contexture/.contexture/emitted.json
  *   → same dir as the IR, subdir .contexture/
  *
  * Both use the same base dir, so we never need to compute the monorepo
@@ -35,7 +35,7 @@ export function driftPathsFor(
   if (!irPath.endsWith(IR_SUFFIX)) return null;
   const slash = irPath.lastIndexOf('/');
   if (slash === -1) return null;
-  const dir = irPath.slice(0, slash); // e.g. /proj/packages/schema
+  const dir = irPath.slice(0, slash); // e.g. /proj/packages/contexture
   return {
     watchedPath: `${dir}/convex/schema.ts`,
     emittedJsonPath: `${dir}/.contexture/emitted.json`,

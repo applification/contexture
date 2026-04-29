@@ -1,7 +1,7 @@
 /**
  * Pure IR → Convex schema source emitter.
  *
- * Turns the IR into the contents of `apps/web/convex/schema.ts`:
+ * Turns the IR into the contents of `convex/schema.ts`:
  * table-flagged `ObjectTypeDef`s become `defineTable(...)` entries on
  * `defineSchema`; indexes chain on via `.index("name", [fields])`.
  * Non-table object types that are referenced via `ref` are inlined as
@@ -16,11 +16,14 @@
  */
 import type { FieldDef, FieldType, Schema, TypeDef } from './ir';
 
-const BANNER = '// @contexture-generated — do not edit by hand. Regenerated on every IR save.';
+function banner(sourcePath?: string): string {
+  const base = '// @contexture-generated — do not edit by hand. Regenerated on every IR save.';
+  return sourcePath ? `${base} Source: ${sourcePath}` : base;
+}
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
-export function emitConvexSchema(schema: Schema): string {
+export function emitConvexSchema(schema: Schema, sourcePath?: string): string {
   validateReservedNames(schema);
   const objectByName = new Map<string, ObjectType>();
   for (const t of schema.types) {
@@ -41,7 +44,7 @@ export function emitConvexSchema(schema: Schema): string {
       : 'export default defineSchema({});\n';
 
   return [
-    BANNER,
+    banner(sourcePath),
     '',
     `import { defineSchema, defineTable } from 'convex/server';`,
     `import { v } from 'convex/values';`,

@@ -2,7 +2,7 @@
  * `validateProjectName` — enforces the name shape the scaffolder needs.
  *
  * The project name becomes all of: the monorepo directory, the npm
- * scope in `@<name>/schema`, and the Convex project slug passed to
+ * scope in `@<name>/contexture`, and the Convex project slug passed to
  * `convex dev --project`. Intersecting those three rulesets gives us
  * kebab-case, must-start-with-letter, and the npm 214-char cap.
  */

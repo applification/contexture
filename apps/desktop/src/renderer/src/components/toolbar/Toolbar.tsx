@@ -28,7 +28,7 @@ export function Toolbar(): React.JSX.Element {
   const filePath = useDocumentStore((s) => s.filePath);
   const documentMode = useDocumentStore((s) => s.mode);
 
-  // Project root is two dirs above the IR path (packages/schema/<name>.contexture.json).
+  // Project root is two dirs above the IR path (packages/contexture/<name>.contexture.json).
   const projectRoot =
     filePath && documentMode === 'project' ? filePath.split('/').slice(0, -3).join('/') : null;
 

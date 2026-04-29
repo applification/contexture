@@ -56,7 +56,7 @@ describe('shellStageSpecFor', () => {
     expect(spec.cwd).toBe('/work/my-proj');
   });
 
-  it('CONVEX_INIT: convex dev one-shot configure, local backend, inside packages/schema', () => {
+  it('CONVEX_INIT: convex dev one-shot configure, local backend, inside packages/contexture', () => {
     const spec = shellStageSpecFor(STAGE.CONVEX_INIT, config);
     expect(spec.cmd).toBe('bunx');
     expect(spec.args).toEqual([
@@ -68,7 +68,7 @@ describe('shellStageSpecFor', () => {
       '--project',
       'my-proj',
     ]);
-    expect(spec.cwd).toBe('/work/my-proj/packages/schema');
+    expect(spec.cwd).toBe('/work/my-proj/packages/contexture');
   });
 
   it('BUN_INSTALL: bun install at the project root', () => {

@@ -1,7 +1,7 @@
 /**
  * `scaffoldConvexEmit` (stage 7) — reads the IR that stage 6 just
  * wrote and emits the Convex schema at
- * `packages/schema/convex/schema.ts`. At scaffold time the IR is
+ * `packages/contexture/convex/schema.ts`. At scaffold time the IR is
  * empty, so the emitted file is a degenerate `defineSchema({})` — but
  * Convex requires the file to exist before `bun run dev` can start,
  * so this stage always runs.
@@ -27,13 +27,13 @@ export async function scaffoldConvexEmit(
   deps: ConvexEmitDeps,
 ): Promise<void> {
   const { fs } = deps;
-  const schemaDir = `${config.targetDir}/packages/schema`;
+  const schemaDir = `${config.targetDir}/packages/contexture`;
   const irPath = `${schemaDir}/${config.projectName}.contexture.json`;
   const convexPath = `${schemaDir}/convex/schema.ts`;
   const emittedPath = `${schemaDir}/.contexture/emitted.json`;
 
   const ir = JSON.parse(await fs.readFile(irPath)) as Schema;
-  const convexSource = emitConvexSchema(ir);
+  const convexSource = emitConvexSchema(ir, irPath);
   await fs.writeFile(convexPath, convexSource);
 
   // Seed emitted.json with the hash of the file we just wrote so the

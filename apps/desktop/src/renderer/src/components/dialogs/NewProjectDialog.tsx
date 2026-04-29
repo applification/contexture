@@ -126,7 +126,7 @@ export function NewProjectDialog({ onOpenProject }: NewProjectDialogProps = {}):
           appendLog(event.stderr);
           return;
         case 'scaffold-done': {
-          const irPath = `${targetPathRef.current}/packages/schema/${nameRef.current}.contexture.json`;
+          const irPath = `${targetPathRef.current}/packages/contexture/${nameRef.current}.contexture.json`;
           close();
           void onOpenProjectRef.current?.(irPath);
           return;

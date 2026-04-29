@@ -23,10 +23,12 @@
 import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
 
 const DRAFT = 'https://json-schema.org/draft/2020-12/schema';
-const GENERATED_MARKER =
-  '@contexture-generated — do not edit by hand. Regenerated on every IR save.';
+function generatedMarker(sourcePath?: string): string {
+  const base = '@contexture-generated — do not edit by hand. Regenerated on every IR save.';
+  return sourcePath ? `${base} Source: ${sourcePath}` : base;
+}
 
-export function emit(schema: Schema, rootTypeName?: string): object {
+export function emit(schema: Schema, rootTypeName?: string, sourcePath?: string): object {
   const aliases = new Map<string, ImportDecl>();
   (schema.imports ?? []).forEach((imp) => {
     aliases.set(imp.alias, imp);
@@ -46,13 +48,13 @@ export function emit(schema: Schema, rootTypeName?: string): object {
     const rootSchema = emitTypeDef(root, aliases) as Record<string, unknown>;
     return {
       $schema: DRAFT,
-      $contexture_generated: GENERATED_MARKER,
+      $contexture_generated: generatedMarker(sourcePath),
       ...rootSchema,
       ...(Object.keys(defs).length > 0 ? { $defs: defs } : {}),
     };
   }
 
-  return { $schema: DRAFT, $contexture_generated: GENERATED_MARKER, $defs: defs };
+  return { $schema: DRAFT, $contexture_generated: generatedMarker(sourcePath), $defs: defs };
 }
 
 function emitTypeDef(type: TypeDef, aliases: Map<string, ImportDecl>): object {

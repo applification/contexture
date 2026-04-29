@@ -18,6 +18,18 @@ describe('emit (JSON Schema)', () => {
     expect(out.$contexture_generated).toContain('@contexture-generated');
   });
 
+  it('includes the IR source path in the marker when provided', () => {
+    const out = emit({ version: '1', types: [] }, undefined, '/proj/ir.contexture.json') as {
+      $contexture_generated?: string;
+    };
+    expect(out.$contexture_generated).toContain('Source: /proj/ir.contexture.json');
+  });
+
+  it('omits source path from the marker when not provided', () => {
+    const out = emit({ version: '1', types: [] }) as { $contexture_generated?: string };
+    expect(out.$contexture_generated).not.toContain('Source:');
+  });
+
   it('emits an object TypeDef as an object schema in $defs', () => {
     const out = emit({
       version: '1',

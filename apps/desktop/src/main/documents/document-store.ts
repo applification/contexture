@@ -97,13 +97,13 @@ export interface DocumentStoreDeps {
   /** Override for tests — defaults to the real Zod emitter. */
   emitZod?: (schema: Schema, sourcePath: string) => string;
   /** Override for tests — defaults to the real JSON-schema emitter. */
-  emitJsonSchema?: (schema: Schema) => unknown;
+  emitJsonSchema?: (schema: Schema, sourcePath?: string) => unknown;
   /** Override for tests — defaults to the real schema-index emitter. */
-  emitSchemaIndex?: (baseName: string) => string;
+  emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
   /** Override for tests — defaults to the real CLAUDE.md emitter. */
   emitClaudeMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
-  emitConvex?: (schema: Schema) => string;
+  emitConvex?: (schema: Schema, sourcePath?: string) => string;
   /** Override for tests — defaults to the real per-table CRUD emitter. */
   emitTableCrud?: (schema: Schema, tableName: string) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
@@ -131,17 +131,17 @@ function baseNameFor(irPath: string): string {
 
 /**
  * Monorepo project root for IRs sitting at
- * `<root>/packages/schema/<name>.contexture.json`. Returns `null` for
+ * `<root>/packages/contexture/<name>.contexture.json`. Returns `null` for
  * IRs that don't follow the canonical scaffold layout — those projects
  * don't get a CLAUDE.md written (there's no unambiguous "root").
  */
 export function projectRootFor(irPath: string): string | null {
-  const schemaSuffix = '/packages/schema/';
+  const suffix = '/packages/contexture/';
   const slash = irPath.lastIndexOf('/');
   if (slash === -1) return null;
   const dir = irPath.slice(0, slash);
-  if (!dir.endsWith('/packages/schema')) return null;
-  return dir.slice(0, -schemaSuffix.length + 1);
+  if (!dir.endsWith('/packages/contexture')) return null;
+  return dir.slice(0, -suffix.length + 1);
 }
 
 export interface EmittedManifest {
@@ -185,7 +185,7 @@ export function bundlePathsFor(irPath: string): {
     emitted: `${ctxDir}/${EMITTED_FILE}`,
     schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
-    // Workspace re-export: consumers `import { … } from '@<project>/schema'`
+    // Workspace re-export: consumers `import { … } from '@<project>/contexture'`
     // and resolve to this barrel rather than a specific `.schema` module.
     schemaIndex: `${dir}/index.ts`,
     // Convex demands a `convex/` subdir sibling of its callers; the
@@ -200,7 +200,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     fs,
     recentFilesPath,
     emitZod = defaultEmitZod,
-    emitJsonSchema = defaultEmitJsonSchema,
+    emitJsonSchema = (s: Schema, sp?: string) => defaultEmitJsonSchema(s, undefined, sp),
     emitSchemaIndex = defaultEmitSchemaIndex,
     emitClaudeMd = defaultEmitClaudeMd,
     emitConvex = defaultEmitConvex,
@@ -270,7 +270,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
         if (!(await fs.fileExists(claudePath))) {
           await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
         }
-        // Seed one `packages/schema/convex/<table>.ts` per table-flagged
+        // Seed one `packages/contexture/convex/<table>.ts` per table-flagged
         // object. Written only if missing — these are `@contexture-seeded`,
         // owned by the user/coding agent from first write on.
         const schemaDir = contextureDirFor(irPath).slice(0, -'/.contexture'.length);
@@ -348,10 +348,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     // Project mode: full bundle. Emit first — a throwing emitter must
     // abort before any write touches disk.
     const schemaTs = emitZod(input.schema, irPath);
-    const schemaJson = JSON.stringify(emitJsonSchema(input.schema), null, 2);
+    const schemaJson = JSON.stringify(emitJsonSchema(input.schema, irPath), null, 2);
     const baseName = baseNameFor(irPath);
-    const schemaIndex = emitSchemaIndex(baseName);
-    const convexSource = emitConvex(input.schema);
+    const schemaIndex = emitSchemaIndex(baseName, irPath);
+    const convexSource = emitConvex(input.schema, irPath);
 
     // Pair each emitted artefact with its content hash so we can build
     // the drift-detection manifest before writing. The IR is the source
