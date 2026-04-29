@@ -275,7 +275,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     // artefacts graduate to project mode by running `mkdir .contexture/`
     // (or, eventually, the New Project flow).
     if (mode === 'scratch') {
-      await writeBundleAtomic([{ path: paths.ir, content: saveIR(input.schema) }]);
+      await writeBundleAtomic([{ path: paths.ir, content: `${saveIR(input.schema)}\n` }]);
       await bumpRecent(irPath);
       return;
     }
@@ -290,7 +290,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     });
 
     const files = [
-      { path: paths.ir, content: saveIR(input.schema) },
+      { path: paths.ir, content: `${saveIR(input.schema)}\n` },
       { path: paths.layout, content: saveLayout(input.layout) },
       { path: paths.chat, content: saveChatHistory(input.chat) },
       ...emitted,
