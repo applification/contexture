@@ -9,11 +9,6 @@
 // GitHub label used to opt issues into the Sandcastle workflow.
 export const LABEL = "Sandcastle";
 
-// Branch name template the planner must follow for each issue. The {number}
-// and {slug} placeholders are filled by the planner (or, post-B.1, by
-// pickEligible()). Validated against a regex in plan.ts at parse time.
-export const BRANCH_FORMAT = "sandcastle/issue-{number}-{slug}";
-
 // ---------- Orchestrator limits ----------
 
 export const MAX_ITERATIONS = 10;

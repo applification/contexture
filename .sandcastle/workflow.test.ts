@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
-import { AGENTS, BRANCH_FORMAT, LABEL, MAX_ITERATIONS, MAX_PARALLEL } from "./workflow";
+import { AGENTS, LABEL, MAX_ITERATIONS, MAX_PARALLEL } from "./workflow";
 
 describe("workflow config", () => {
   test("AGENTS exposes all five expected keys", () => {
@@ -22,9 +22,8 @@ describe("workflow config", () => {
     }
   });
 
-  test("LABEL and BRANCH_FORMAT are non-empty", () => {
+  test("LABEL is non-empty", () => {
     expect(LABEL.length).toBeGreaterThan(0);
-    expect(BRANCH_FORMAT.length).toBeGreaterThan(0);
   });
 
   test("MAX_ITERATIONS and MAX_PARALLEL are positive integers", () => {
