@@ -7,6 +7,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['*.web.localhost'],
   images: {
     formats: ['image/avif', 'image/webp'],
   },
