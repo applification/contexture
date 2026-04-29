@@ -80,11 +80,15 @@ export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 // docs-only branching, the conditional reviewer skip) stays in main.ts —
 // only the agent invocation parameters live here.
 export const AGENTS = {
-  planner: {
+  // Subset selector. Invoked only when pickEligible() returns 2+ candidates
+  // (count-gated; see main.ts). Job is conflict avoidance among already-
+  // eligible issues, not building a dependency graph from scratch — hence
+  // medium effort, not high.
+  subsetSelector: {
     provider: "claudeCode",
     model: "claude-opus-4-6",
-    effort: "high",
-    promptPath: "./.sandcastle/plan-prompt.md",
+    effort: "medium",
+    promptPath: "./.sandcastle/select-subset-prompt.md",
   },
   implementer: {
     provider: "claudeCode",

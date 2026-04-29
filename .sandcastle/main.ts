@@ -2,12 +2,13 @@ import { mkdirSync, appendFileSync } from "node:fs";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
+import { pickEligible } from "./eligibility";
+import { fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./gh";
 import { parsePlan } from "./plan";
 import type { Issue } from "./plan";
 import { isSandboxStartupRetryable, retryWithBackoff } from "./retry";
 import {
   AGENTS,
-  BRANCH_FORMAT,
   COPY_TO_WORKTREE,
   INSTALL_AND_VERIFY,
   LABEL,
@@ -159,22 +160,52 @@ async function runIssue(issue: Issue, iteration: number) {
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
-  // Phase 1: Plan
-  const plan = await sandcastle.run({
-    sandbox: sandboxProvider,
-    name: "Planner",
-    agent: agent(AGENTS.planner),
-    promptFile: AGENTS.planner.promptPath,
-    promptArgs: {
-      LABEL,
-      BRANCH_FORMAT,
-    },
-    logging: streamLogger(`iter${iteration}-planner`),
-  });
+  // Phase 1: Eligibility (deterministic) → optional subset selection (LLM).
+  // pickEligible() filters by label and excludes issues already claimed by an
+  // open PR; it returns already-validated Issue objects with deterministic
+  // branch names. The LLM only runs when 2+ candidates survive (conflict
+  // avoidance); a single eligible issue is dispatched directly.
+  const [rawIssues, openPRs] = await Promise.all([
+    fetchOpenLabelledIssues(LABEL),
+    fetchOpenPRsClosingIssues(),
+  ]);
 
-  await Bun.write(`.sandcastle/logs/plans/plan-${iteration}.md`, plan.stdout);
+  const { eligible, needsPlanner, excluded } = pickEligible(rawIssues, openPRs, { label: LABEL });
 
-  const { issues } = parsePlan(plan.stdout);
+  for (const e of excluded) {
+    const detail = e.reason.kind === "claimedByPR" ? `claimed by PR #${e.reason.pr}` : e.reason.kind;
+    console.log(`  - #${e.number} excluded: ${detail}`);
+  }
+
+  if (eligible.length === 0) {
+    console.log("No eligible issues this iteration. Exiting.");
+    break;
+  }
+
+  let issues: Issue[];
+  if (needsPlanner) {
+    console.log(
+      `  ${eligible.length} eligible candidates; running subset selector for conflict avoidance.`,
+    );
+    const candidatesJson = JSON.stringify(eligible);
+    const plan = await sandcastle.run({
+      sandbox: sandboxProvider,
+      name: "Subset selector",
+      agent: agent(AGENTS.subsetSelector),
+      promptFile: AGENTS.subsetSelector.promptPath,
+      promptArgs: {
+        LABEL,
+        MAX_PARALLEL: String(MAX_PARALLEL),
+        CANDIDATES_JSON: candidatesJson,
+      },
+      logging: streamLogger(`iter${iteration}-subset-selector`),
+    });
+    await Bun.write(`.sandcastle/logs/plans/plan-${iteration}.md`, plan.stdout);
+    issues = parsePlan(plan.stdout).issues;
+  } else {
+    console.log("  1 eligible candidate; skipping subset selector.");
+    issues = eligible;
+  }
 
   if (issues.length === 0) {
     console.log("No issues to work on. Exiting.");

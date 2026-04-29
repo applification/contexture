@@ -5,7 +5,7 @@ import { AGENTS, BRANCH_FORMAT, LABEL, MAX_ITERATIONS, MAX_PARALLEL } from "./wo
 describe("workflow config", () => {
   test("AGENTS exposes all five expected keys", () => {
     expect(Object.keys(AGENTS).sort()).toEqual(
-      ["implementer", "implementerDocs", "planner", "prOpener", "reviewer"].sort(),
+      ["implementer", "implementerDocs", "prOpener", "reviewer", "subsetSelector"].sort(),
     );
   });
 
@@ -34,9 +34,10 @@ describe("workflow config", () => {
     expect(MAX_PARALLEL).toBeGreaterThan(0);
   });
 
-  test("plan-prompt.md references {{LABEL}} and {{BRANCH_FORMAT}} placeholders", () => {
-    const content = readFileSync(AGENTS.planner.promptPath, "utf8");
+  test("select-subset-prompt.md references the placeholders main.ts injects", () => {
+    const content = readFileSync(AGENTS.subsetSelector.promptPath, "utf8");
     expect(content).toContain("{{LABEL}}");
-    expect(content).toContain("{{BRANCH_FORMAT}}");
+    expect(content).toContain("{{MAX_PARALLEL}}");
+    expect(content).toContain("{{CANDIDATES_JSON}}");
   });
 });
