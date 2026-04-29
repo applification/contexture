@@ -18,7 +18,11 @@ export default defineConfig({
     // bundle. They ship as `.ts` sources with ESM exports, and externalizing
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
-    plugins: [externalizeDepsPlugin({ exclude: ['@contexture/stdlib', '@contexture/runtime'] })],
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
+      }),
+    ],
     resolve: { alias: sharedAliases },
     define: {
       'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
@@ -29,7 +33,11 @@ export default defineConfig({
     // bundle. They ship as `.ts` sources with ESM exports, and externalizing
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
-    plugins: [externalizeDepsPlugin({ exclude: ['@contexture/stdlib', '@contexture/runtime'] })],
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
+      }),
+    ],
     resolve: { alias: sharedAliases },
   },
   renderer: {
