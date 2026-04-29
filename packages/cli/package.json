@@ -1,0 +1,27 @@
+{
+  "name": "@contexture/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Command-line schema editing tools for Contexture projects.",
+  "type": "module",
+  "bin": {
+    "contexture": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@contexture/core": "workspace:*",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.1"
+  }
+}
