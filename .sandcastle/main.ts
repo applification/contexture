@@ -4,6 +4,7 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
 import { parsePlan } from "./plan";
 import type { Issue } from "./plan";
+import { isSandboxStartupRetryable, retryWithBackoff } from "./retry";
 import {
   AGENTS,
   BRANCH_FORMAT,
@@ -69,11 +70,6 @@ const isDocsOnly = (issue: Issue) =>
   issue.labels.includes("documentation") &&
   !issue.labels.some((l) => l !== "documentation" && l !== LABEL);
 
-const isSandboxStartupError = (err: unknown): boolean => {
-  const msg = err instanceof Error ? err.message : String(err);
-  return /docker|sandbox|container|image|network|ECONNREFUSED|EPIPE/i.test(msg);
-};
-
 async function changedPaths(worktreePath: string): Promise<string[]> {
   const proc = Bun.spawn(["git", "diff", "--name-only", "main..HEAD"], {
     cwd: worktreePath,
@@ -86,23 +82,27 @@ async function changedPaths(worktreePath: string): Promise<string[]> {
 }
 
 async function createIssueSandboxWithRetry(issue: Issue) {
-  try {
-    return await sandcastle.createSandbox({
-      sandbox: sandboxProvider,
-      branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
-      copyToWorktree: [...COPY_TO_WORKTREE],
-    });
-  } catch (err) {
-    if (!isSandboxStartupError(err)) throw err;
-    console.warn(`  ↻ #${issue.number} retry after sandbox startup error: ${err}`);
-    return sandcastle.createSandbox({
-      sandbox: sandboxProvider,
-      branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
-      copyToWorktree: [...COPY_TO_WORKTREE],
-    });
-  }
+  return retryWithBackoff(
+    () =>
+      sandcastle.createSandbox({
+        sandbox: sandboxProvider,
+        branch: issue.branch,
+        hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
+        copyToWorktree: [...COPY_TO_WORKTREE],
+      }),
+    {
+      maxAttempts: 2,
+      baseMs: 2000,
+      jitter: true,
+      isRetryable: isSandboxStartupRetryable,
+      onRetry: ({ attempt, nextDelayMs, error }) => {
+        const tag = (error as { _tag?: unknown })._tag ?? "unknown";
+        console.warn(
+          `  ↻ #${issue.number} attempt ${attempt} failed (${tag}); retrying in ${nextDelayMs}ms`,
+        );
+      },
+    },
+  );
 }
 
 async function runIssue(issue: Issue, iteration: number) {
@@ -213,7 +213,18 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   for (const [i, outcome] of settled.entries()) {
     if (outcome.status === "rejected") {
-      console.error(`  ✗ #${issues[i]!.number} (${issues[i]!.branch}) failed: ${outcome.reason}`);
+      const issue = issues[i]!;
+      const reason: unknown = outcome.reason;
+      const errorTag =
+        typeof reason === "object" && reason !== null && "_tag" in reason
+          ? String((reason as { _tag: unknown })._tag)
+          : reason instanceof Error
+            ? reason.constructor.name
+            : "UnknownError";
+      const message = reason instanceof Error ? reason.message : String(reason);
+      console.error(
+        `  ✗ #${issue.number} (${issue.branch}) failed [${errorTag}]: ${message}`,
+      );
     }
   }
 
