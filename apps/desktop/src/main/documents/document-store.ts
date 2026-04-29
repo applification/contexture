@@ -16,10 +16,15 @@
  * wires `NodeFsAdapter`; tests wire `MemFsAdapter`.
  */
 
-import { createHash } from 'node:crypto';
+import {
+  bundlePathsFor,
+  contextureDirFor,
+  IR_SUFFIX,
+  projectRootFor,
+  runEmitPipeline,
+} from '@contexture/core';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
-import { emitConvexSchema as defaultEmitConvex } from '@renderer/model/emit-convex';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emitTableCrud as defaultEmitTableCrud } from '@renderer/model/emit-table-crud';
@@ -28,14 +33,20 @@ import type { Schema } from '@renderer/model/ir';
 import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
 import { load as loadIR, save as saveIR } from '@renderer/model/load';
 
-export const IR_SUFFIX = '.contexture.json';
-export const SCHEMA_TS_SUFFIX = '.schema.ts';
-export const SCHEMA_JSON_SUFFIX = '.schema.json';
 /** Layout + chat now live inside `.contexture/` as implementation sidecars. */
-export const LAYOUT_FILE = 'layout.json';
-export const CHAT_FILE = 'chat.json';
 /** Hash manifest of every @contexture-generated artefact, used for drift detection. */
-export const EMITTED_FILE = 'emitted.json';
+export {
+  bundlePathsFor,
+  CHAT_FILE,
+  contextureDirFor,
+  EMITTED_FILE,
+  type EmittedManifest,
+  IR_SUFFIX,
+  LAYOUT_FILE,
+  projectRootFor,
+  SCHEMA_JSON_SUFFIX,
+  SCHEMA_TS_SUFFIX,
+} from '@contexture/core';
 
 // Legacy sibling-file names — kept exported so `main/ipc/file.ts` can
 // continue to read pre-project-mode documents without hard-breaking a
@@ -112,87 +123,11 @@ export interface DocumentStoreDeps {
 
 const MAX_RECENT = 10;
 
-/**
- * Path to the `.contexture/` marker directory sitting next to the IR.
- * Project mode is detected by probing this directory on open.
- */
-export function contextureDirFor(irPath: string): string {
-  const slash = irPath.lastIndexOf('/');
-  const dir = slash === -1 ? '' : irPath.slice(0, slash);
-  return `${dir}/.contexture`;
-}
-
 /** IR file base name — `/work/garden.contexture.json` → `garden`. */
 function baseNameFor(irPath: string): string {
   const slash = irPath.lastIndexOf('/');
   const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
   return leaf.slice(0, -IR_SUFFIX.length);
-}
-
-/**
- * Monorepo project root for IRs sitting at
- * `<root>/packages/contexture/<name>.contexture.json`. Returns `null` for
- * IRs that don't follow the canonical scaffold layout — those projects
- * don't get a CLAUDE.md written (there's no unambiguous "root").
- */
-export function projectRootFor(irPath: string): string | null {
-  const suffix = '/packages/contexture/';
-  const slash = irPath.lastIndexOf('/');
-  if (slash === -1) return null;
-  const dir = irPath.slice(0, slash);
-  if (!dir.endsWith('/packages/contexture')) return null;
-  return dir.slice(0, -suffix.length + 1);
-}
-
-export interface EmittedManifest {
-  version: '1';
-  files: Record<string, string>;
-}
-
-function sha256(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
-}
-
-function buildManifest(entries: ReadonlyArray<{ path: string; content: string }>): EmittedManifest {
-  const files: Record<string, string> = {};
-  for (const { path, content } of entries) files[path] = sha256(content);
-  return { version: '1', files };
-}
-
-export function bundlePathsFor(irPath: string): {
-  ir: string;
-  layout: string;
-  chat: string;
-  emitted: string;
-  schemaTs: string;
-  schemaJson: string;
-  schemaIndex: string;
-  convex: string;
-} {
-  if (!irPath.endsWith(IR_SUFFIX)) {
-    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${irPath}`);
-  }
-  const base = irPath.slice(0, -IR_SUFFIX.length);
-  const ctxDir = contextureDirFor(irPath);
-  const dir = ctxDir.slice(0, -'/.contexture'.length);
-  return {
-    ir: irPath,
-    // Layout + chat live inside `.contexture/` in project mode. In
-    // scratch mode these paths are never read or written (scratch save
-    // skips sidecars; scratch open tolerates ENOENT and uses defaults).
-    layout: `${ctxDir}/${LAYOUT_FILE}`,
-    chat: `${ctxDir}/${CHAT_FILE}`,
-    emitted: `${ctxDir}/${EMITTED_FILE}`,
-    schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
-    schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
-    // Workspace re-export: consumers `import { … } from '@<project>/contexture'`
-    // and resolve to this barrel rather than a specific `.schema` module.
-    schemaIndex: `${dir}/index.ts`,
-    // Convex demands a `convex/` subdir sibling of its callers; the
-    // schema package hosts it so `apps/web` imports the workspace
-    // package rather than owning its own convex folder.
-    convex: `${dir}/convex/schema.ts`,
-  };
 }
 
 export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
@@ -203,7 +138,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     emitJsonSchema = (s: Schema, sp?: string) => defaultEmitJsonSchema(s, undefined, sp),
     emitSchemaIndex = defaultEmitSchemaIndex,
     emitClaudeMd = defaultEmitClaudeMd,
-    emitConvex = defaultEmitConvex,
+    emitConvex,
     emitTableCrud = defaultEmitTableCrud,
     onRecentFileAdded,
   } = deps;
@@ -340,33 +275,22 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     // artefacts graduate to project mode by running `mkdir .contexture/`
     // (or, eventually, the New Project flow).
     if (mode === 'scratch') {
-      await writeBundleAtomic([{ path: paths.ir, content: saveIR(input.schema) }]);
+      await writeBundleAtomic([{ path: paths.ir, content: `${saveIR(input.schema)}\n` }]);
       await bumpRecent(irPath);
       return;
     }
 
     // Project mode: full bundle. Emit first — a throwing emitter must
     // abort before any write touches disk.
-    const schemaTs = emitZod(input.schema, irPath);
-    const schemaJson = JSON.stringify(emitJsonSchema(input.schema, irPath), null, 2);
-    const baseName = baseNameFor(irPath);
-    const schemaIndex = emitSchemaIndex(baseName, irPath);
-    const convexSource = emitConvex(input.schema, irPath);
-
-    // Pair each emitted artefact with its content hash so we can build
-    // the drift-detection manifest before writing. The IR is the source
-    // of truth, not a generated file, so it does not appear in the
-    // manifest.
-    const emitted: Array<{ path: string; content: string }> = [
-      { path: paths.schemaTs, content: schemaTs },
-      { path: paths.schemaJson, content: schemaJson },
-      { path: paths.schemaIndex, content: schemaIndex },
-      { path: paths.convex, content: convexSource },
-    ];
-    const manifest = buildManifest(emitted);
+    const { emitted, manifest } = runEmitPipeline(input.schema, irPath, {
+      emitZod,
+      emitJsonSchema,
+      emitSchemaIndex,
+      emitConvex,
+    });
 
     const files = [
-      { path: paths.ir, content: saveIR(input.schema) },
+      { path: paths.ir, content: `${saveIR(input.schema)}\n` },
       { path: paths.layout, content: saveLayout(input.layout) },
       { path: paths.chat, content: saveChatHistory(input.chat) },
       ...emitted,

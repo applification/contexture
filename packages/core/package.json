@@ -1,0 +1,36 @@
+{
+  "name": "@contexture/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared Contexture IR, ops, and emit pipeline.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./emit-claude-md": "./src/emit-claude-md.ts",
+    "./emit-convex": "./src/emit-convex.ts",
+    "./emit-json-schema": "./src/emit-json-schema.ts",
+    "./emit-schema-index": "./src/emit-schema-index.ts",
+    "./emit-table-crud": "./src/emit-table-crud.ts",
+    "./emit-zod": "./src/emit-zod.ts",
+    "./file-forward": "./src/file-forward.ts",
+    "./ir": "./src/ir.ts",
+    "./load": "./src/load.ts",
+    "./migrations": "./src/migrations/index.ts",
+    "./ops": "./src/ops.ts",
+    "./op-tools": "./src/op-tools.ts",
+    "./pipeline": "./src/pipeline.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.1"
+  }
+}

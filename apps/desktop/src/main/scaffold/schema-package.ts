@@ -7,11 +7,9 @@
  * mirrors + barrel so the scaffolded tree matches what a subsequent
  * save would produce.
  */
+
+import { IRSchema, runEmitPipeline, type Schema } from '@contexture/core';
 import type { FsAdapter } from '@main/documents/document-store';
-import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
-import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
-import { emit as emitZod } from '@renderer/model/emit-zod';
-import { IRSchema, type Schema } from '@renderer/model/ir';
 
 import type { ScaffoldConfig } from './scaffold-project';
 
@@ -45,6 +43,7 @@ function makePackageJson(projectName: string): string {
       main: './index.ts',
       types: './index.ts',
       dependencies: { convex: 'latest' },
+      devDependencies: { '@contexture/cli': 'workspace:*' },
     },
     null,
     2,
@@ -75,12 +74,11 @@ export async function scaffoldSchemaPackage(
   }
 
   await fs.writeFile(irPath, `${JSON.stringify(ir, null, 2)}\n`);
-  await fs.writeFile(schemaTsPath, emitZod(ir, irPath));
-  await fs.writeFile(
-    schemaJsonPath,
-    `${JSON.stringify(emitJsonSchema(ir, undefined, irPath), null, 2)}\n`,
-  );
-  await fs.writeFile(indexPath, emitSchemaIndex(config.projectName, irPath));
+  const { emitted } = runEmitPipeline(ir, irPath);
+  const emittedByPath = new Map(emitted.map((file) => [file.path, file.content]));
+  await fs.writeFile(schemaTsPath, emittedByPath.get(schemaTsPath) ?? '');
+  await fs.writeFile(schemaJsonPath, emittedByPath.get(schemaJsonPath) ?? '');
+  await fs.writeFile(indexPath, emittedByPath.get(indexPath) ?? '');
   await fs.writeFile(pkgPath, makePackageJson(config.projectName));
   await fs.writeFile(gitignorePath, GITIGNORE);
   await fs.writeFile(
