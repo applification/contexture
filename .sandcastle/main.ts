@@ -24,12 +24,24 @@ const sandboxProvider = docker({});
 mkdirSync(".sandcastle/logs/plans", { recursive: true });
 const STREAM_LOG_PATH = ".sandcastle/logs/stream.log";
 
-// Build a `claudeCode` agent invocation from an AgentSpec, threading the
-// optional `effort` setting through only when present.
+// Build a sandcastle AgentProvider from an AgentSpec. Dispatches on the
+// `provider` discriminator so adding a new backend means adding a case here
+// (and a variant in workflow.ts), not touching every call site.
 function agent(spec: AgentSpec) {
-  return spec.effort === undefined
-    ? sandcastle.claudeCode(spec.model)
-    : sandcastle.claudeCode(spec.model, { effort: spec.effort });
+  switch (spec.provider) {
+    case "claudeCode":
+      return spec.effort === undefined
+        ? sandcastle.claudeCode(spec.model)
+        : sandcastle.claudeCode(spec.model, { effort: spec.effort });
+    case "codex":
+      return spec.effort === undefined
+        ? sandcastle.codex(spec.model)
+        : sandcastle.codex(spec.model, { effort: spec.effort });
+    case "opencode":
+      return sandcastle.opencode(spec.model);
+    case "pi":
+      return sandcastle.pi(spec.model);
+  }
 }
 
 function streamLogger(name: string): LoggingOption {

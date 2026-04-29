@@ -9,8 +9,12 @@ describe("workflow config", () => {
     );
   });
 
-  test("every agent has a non-empty model and a resolvable promptPath", () => {
+  test("every agent has a known provider, non-empty model, and a resolvable promptPath", () => {
+    const validProviders = new Set(["claudeCode", "codex", "opencode", "pi"]);
     for (const [key, spec] of Object.entries(AGENTS)) {
+      expect(validProviders.has(spec.provider), `${key}.provider must be a known backend`).toBe(
+        true,
+      );
       expect(spec.model.length, `${key}.model must be non-empty`).toBeGreaterThan(0);
       expect(existsSync(spec.promptPath), `${key}.promptPath ${spec.promptPath} must resolve`).toBe(
         true,

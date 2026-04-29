@@ -38,34 +38,71 @@ export const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
 
 // ---------- Agent specs ----------
 
-export type AgentSpec = {
+// Provider-tagged spec. Each agent declares which sandcastle agent provider
+// it uses (claudeCode | codex | opencode | pi); main.ts dispatches on the
+// `provider` discriminator. Adding a new backend (e.g. Gemini, Ollama) means
+// adding a variant here and a case in main.ts's `agent()` helper, with no
+// other downstream changes.
+//
+// Per-provider `effort` types are kept narrow to mirror sandcastle's own
+// option types: claudeCode supports low/medium/high/max, codex adds xhigh,
+// opencode and pi don't take an effort knob.
+
+export type ClaudeCodeSpec = {
+  provider: "claudeCode";
   model: string;
-  effort?: "low" | "medium" | "high";
+  effort?: "low" | "medium" | "high" | "max";
   promptPath: string;
 };
+
+export type CodexSpec = {
+  provider: "codex";
+  model: string;
+  effort?: "low" | "medium" | "high" | "xhigh";
+  promptPath: string;
+};
+
+export type OpenCodeSpec = {
+  provider: "opencode";
+  model: string;
+  promptPath: string;
+};
+
+export type PiSpec = {
+  provider: "pi";
+  model: string;
+  promptPath: string;
+};
+
+export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 
 // Each agent is keyed by purpose. Control flow (which agent runs when, the
 // docs-only branching, the conditional reviewer skip) stays in main.ts —
 // only the agent invocation parameters live here.
 export const AGENTS = {
   planner: {
+    provider: "claudeCode",
     model: "claude-opus-4-6",
     effort: "high",
     promptPath: "./.sandcastle/plan-prompt.md",
   },
   implementer: {
+    provider: "claudeCode",
     model: "claude-opus-4-6",
     promptPath: "./.sandcastle/implement-prompt.md",
   },
   implementerDocs: {
+    provider: "claudeCode",
     model: "claude-opus-4-6",
     promptPath: "./.sandcastle/implement-docs-prompt.md",
   },
   reviewer: {
+    provider: "claudeCode",
     model: "claude-opus-4-6",
     promptPath: "./.sandcastle/review-prompt.md",
   },
   prOpener: {
+    provider: "claudeCode",
     model: "claude-opus-4-6",
     effort: "low",
     promptPath: "./.sandcastle/pr-prompt.md",
