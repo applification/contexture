@@ -28,7 +28,8 @@
     "turbo": "^2.5.4"
   },
   "dependencies": {
-    "@ai-hero/sandcastle": "^0.5.5"
+    "@ai-hero/sandcastle": "^0.5.5",
+    "zod": "^4.3.6"
   },
   "trustedDependencies": [
     "electron",

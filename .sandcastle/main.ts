@@ -2,6 +2,8 @@ import { mkdirSync, appendFileSync } from "node:fs";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
+import { parsePlan } from "./plan";
+import type { Issue } from "./plan";
 
 const MAX_ITERATIONS = 10;
 const MAX_PARALLEL = 4;
@@ -47,8 +49,6 @@ function streamLogger(name: string): LoggingOption {
     },
   };
 }
-
-type Issue = { number: number; title: string; branch: string; labels: string[] };
 
 const isDocsOnly = (issue: Issue) =>
   issue.labels.includes("documentation") &&
@@ -163,12 +163,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   await Bun.write(`.sandcastle/logs/plans/plan-${iteration}.md`, plan.stdout);
 
-  const planMatch = plan.stdout.match(/<plan>([\s\S]*?)<\/plan>/);
-  if (!planMatch) {
-    throw new Error("Orchestrator did not produce a <plan> tag.\n\n" + plan.stdout);
-  }
-
-  const { issues } = JSON.parse(planMatch[1]!) as { issues: Issue[] };
+  const { issues } = parsePlan(plan.stdout);
 
   if (issues.length === 0) {
     console.log("No issues to work on. Exiting.");
