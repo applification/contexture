@@ -167,15 +167,15 @@ export interface ContextureProjectAPI {
 }
 
 export interface ContextureDriftAPI {
-  /** Start watching a file for drift against emitted.json. */
-  watch: (payload: { watchedPath: string; emittedJsonPath: string }) => Promise<{ ok: boolean }>;
+  /** Start watching all manifest files for drift against emitted.json. */
+  watch: (payload: { emittedJsonPath: string }) => Promise<{ ok: boolean }>;
   /** Stop the active watcher. */
   unwatch: () => Promise<{ ok: boolean }>;
   /** Trigger a manual hash check (window focus). */
   check: () => Promise<{ ok: boolean }>;
   /** Reset the main-side drifted flag after user dismisses the banner. */
   dismiss: () => Promise<{ ok: boolean }>;
-  onDetected: (listener: () => void) => Unsubscribe;
+  onDetected: (listener: (payload: { paths: string[] }) => void) => Unsubscribe;
   onResolved: (listener: () => void) => Unsubscribe;
 }
 

@@ -16,20 +16,16 @@ import { createDriftWatcher, type DriftWatcher } from '../documents/drift-watche
 let activeWatcher: DriftWatcher | null = null;
 
 export function registerDriftIpc(mainWindow: BrowserWindow): void {
-  ipcMain.handle(
-    'drift:watch',
-    (_evt, payload: { watchedPath: string; emittedJsonPath: string }) => {
-      activeWatcher?.stop();
-      activeWatcher = createDriftWatcher({
-        watchedPath: payload.watchedPath,
-        emittedJsonPath: payload.emittedJsonPath,
-        onDrift: () => mainWindow.webContents.send('drift:detected'),
-        onResolved: () => mainWindow.webContents.send('drift:resolved'),
-      });
-      activeWatcher.start();
-      return { ok: true };
-    },
-  );
+  ipcMain.handle('drift:watch', (_evt, payload: { emittedJsonPath: string }) => {
+    activeWatcher?.stop();
+    activeWatcher = createDriftWatcher({
+      emittedJsonPath: payload.emittedJsonPath,
+      onDrift: (paths) => mainWindow.webContents.send('drift:detected', { paths }),
+      onResolved: () => mainWindow.webContents.send('drift:resolved'),
+    });
+    activeWatcher.start();
+    return { ok: true };
+  });
 
   ipcMain.handle('drift:unwatch', () => {
     activeWatcher?.stop();

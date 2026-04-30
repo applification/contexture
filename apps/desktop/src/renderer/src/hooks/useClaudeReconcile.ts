@@ -20,7 +20,7 @@ import { useDocumentStore } from '../store/document';
 import { type ApplyResult, apply, type Op } from '../store/ops';
 import { type ReconcileOp, useReconcileStore } from '../store/reconcile';
 import { useUndoStore } from '../store/undo';
-import { driftPathsFor } from './useDrift';
+import { convexPathFor } from './useDrift';
 
 interface RawReconcileEntry {
   op: unknown;
@@ -54,14 +54,14 @@ export function useClaudeReconcile(): void {
       return;
     }
 
-    const paths = driftPathsFor(filePath);
-    if (!paths) {
+    const watchedPath = convexPathFor(filePath);
+    if (!watchedPath) {
       reconcileStore.setError('Could not derive Convex schema path from the open IR.');
       return;
     }
 
     void (async () => {
-      const convexSource = await window.api?.readFileSilent(paths.watchedPath);
+      const convexSource = await window.api?.readFileSilent(watchedPath);
       if (cancelledRef.current) return;
       if (convexSource === null || convexSource === undefined) {
         reconcileStore.setError('Cannot read convex/schema.ts.');
