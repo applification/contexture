@@ -26,5 +26,9 @@ playwright-report/
 # Claude Code scheduled-task runtime artefacts
 .claude/scheduled_tasks.lock
 
+# Claude Code session-local permissions (auto-created on launch, including
+# inside sandcastle's bind-mounted worktree).
+.claude/settings.local.json
+
 # Sensitive docs migrated to Paperclip issue documents (ONT-49)
 Marketing/
