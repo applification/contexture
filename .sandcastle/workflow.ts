@@ -20,10 +20,7 @@ export const MAX_PARALLEL = 4;
 // blows past sandcastle's hard-coded 60s copy timeout. The implementer
 // sandbox runs `bun install` inside the container instead.
 // Env files are gitignored, so copy them in explicitly.
-export const COPY_TO_WORKTREE: readonly string[] = [
-  "apps/desktop/.env",
-  "apps/web/.env.local",
-];
+export const COPY_TO_WORKTREE: readonly string[] = ["apps/desktop/.env", "apps/web/.env.local"];
 
 // Verify the install actually produced a usable workspace. `bun install` exits
 // 0 even when individual extractions are mangled, so we follow with `turbo
@@ -39,23 +36,22 @@ export const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
 // adding a variant here and a case in main.ts's `agent()` helper, with no
 // other downstream changes.
 //
-// Per-provider `effort` types are kept narrow to mirror sandcastle's own
-// option types: claudeCode supports low/medium/high/max, codex adds xhigh,
-// opencode and pi don't take an effort knob.
+// Per-provider `effort` types are sourced from sandcastle's own option
+// types so they stay aligned with what the underlying provider accepts.
+
+import type { ClaudeCodeOptions, CodexOptions } from "@ai-hero/sandcastle";
 
 export type ClaudeCodeSpec = {
   provider: "claudeCode";
   model: string;
-  effort?: "low" | "medium" | "high" | "max";
   promptPath: string;
-};
+} & Pick<ClaudeCodeOptions, "effort">;
 
 export type CodexSpec = {
   provider: "codex";
   model: string;
-  effort?: "low" | "medium" | "high" | "xhigh";
   promptPath: string;
-};
+} & Pick<CodexOptions, "effort">;
 
 export type OpenCodeSpec = {
   provider: "opencode";
@@ -81,28 +77,31 @@ export const AGENTS = {
   // medium effort, not high.
   subsetSelector: {
     provider: "claudeCode",
-    model: "claude-opus-4-6",
+    model: "claude-sonnet-4-6",
     effort: "medium",
     promptPath: "./.sandcastle/select-subset-prompt.md",
   },
   implementer: {
     provider: "claudeCode",
-    model: "claude-opus-4-6",
+    model: "claude-sonnet-4-6",
+    effort: "high",
     promptPath: "./.sandcastle/implement-prompt.md",
   },
   implementerDocs: {
     provider: "claudeCode",
-    model: "claude-opus-4-6",
+    model: "claude-sonnet-4-6",
+    effort: "high",
     promptPath: "./.sandcastle/implement-docs-prompt.md",
   },
   reviewer: {
     provider: "claudeCode",
-    model: "claude-opus-4-6",
+    model: "claude-opus-4-7",
+    effort: "high",
     promptPath: "./.sandcastle/review-prompt.md",
   },
   prOpener: {
     provider: "claudeCode",
-    model: "claude-opus-4-6",
+    model: "claude-haiku-4-5-20251001",
     effort: "low",
     promptPath: "./.sandcastle/pr-prompt.md",
   },

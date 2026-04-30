@@ -8,16 +8,6 @@ Only work on the issue specified.
 
 Work on branch {{BRANCH}}. Make commits and run tests. Do NOT push the branch, open a PR, or close the issue — a separate agent handles PR creation, and the merged PR closes the issue automatically.
 
-# CONTEXT
-
-Here are the last 10 commits:
-
-<recent-commits>
-
-!`git log -n 10 --format="%H%n%ad%n%B---" --date=short`
-
-</recent-commits>
-
 # EXPLORATION
 
 Explore the repo and fill your context window with relevant information that will allow you to complete the task.
