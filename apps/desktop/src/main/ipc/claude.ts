@@ -529,8 +529,11 @@ Contexture emit an output as close as possible to the hand-edited file.
 - \`delete_type\` { name: string }
 - \`add_field\` { typeName: string; field: FieldDef; index?: number }
 - \`update_field\` { typeName: string; fieldName: string; patch: Partial<FieldDef> }
-- \`delete_field\` { typeName: string; fieldName: string }
+- \`remove_field\` { typeName: string; fieldName: string }
 - \`reorder_fields\` { typeName: string; order: string[] }
+- \`add_value\` { typeName: string; value: string; description?: string }
+- \`update_value\` { typeName: string; value: string; patch: { value?: string; description?: string } }
+- \`remove_value\` { typeName: string; value: string }
 - \`add_variant\` { typeName: string; variant: string }
 - \`set_discriminator\` { typeName: string; discriminator: string }
 - \`add_import\` { import: ImportDecl }

@@ -15,7 +15,7 @@ function toolNamed(tools: OpToolDescriptor[], name: string): OpToolDescriptor {
 }
 
 describe('createOpTools', () => {
-  it('registers one SDK tool per op (17 total)', () => {
+  it('registers one SDK tool per op (20 total)', () => {
     const { tools } = makeTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
@@ -24,11 +24,13 @@ describe('createOpTools', () => {
         'add_import',
         'add_index',
         'add_type',
+        'add_value',
         'add_variant',
-        'delete_field',
         'delete_type',
+        'remove_field',
         'remove_import',
         'remove_index',
+        'remove_value',
         'rename_type',
         'reorder_fields',
         'replace_schema',
@@ -37,6 +39,7 @@ describe('createOpTools', () => {
         'update_field',
         'update_index',
         'update_type',
+        'update_value',
       ].sort(),
     );
   });
@@ -205,6 +208,52 @@ describe('createOpTools', () => {
       replace.handler({ schema: { version: '1', types: [{ kind: 'bogus' }] } }),
     ).rejects.toThrow(/replace_schema/i);
     expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
+  it('add_value forwards a strict Op', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'add_value');
+    await tool.handler({ typeName: 'Role', value: 'viewer' });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'add_value',
+      typeName: 'Role',
+      value: 'viewer',
+    });
+  });
+
+  it('add_value rejects empty typeName or value', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'add_value');
+    await expect(tool.handler({ typeName: '', value: 'viewer' })).rejects.toThrow();
+    await expect(tool.handler({ typeName: 'Role', value: '' })).rejects.toThrow();
+    expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
+  it('update_value forwards a strict Op with patch', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'update_value');
+    await tool.handler({ typeName: 'Role', value: 'admin', patch: { description: 'Full access' } });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'update_value',
+      typeName: 'Role',
+      value: 'admin',
+      patch: { description: 'Full access' },
+    });
+  });
+
+  it('remove_value forwards a strict Op', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'remove_value');
+    await tool.handler({ typeName: 'Role', value: 'admin' });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'remove_value',
+      typeName: 'Role',
+      value: 'admin',
+    });
   });
 
   it('propagates ApplyResult errors back to the SDK caller', async () => {

@@ -193,10 +193,10 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       forward,
     ),
     strictTool(
-      'delete_field',
-      'Delete a field by name.',
+      'remove_field',
+      'Remove a field by name.',
       { typeName: z.string().min(1), fieldName: z.string().min(1) },
-      ({ typeName, fieldName }) => ({ kind: 'delete_field', typeName, fieldName }),
+      ({ typeName, fieldName }) => ({ kind: 'remove_field', typeName, fieldName }),
       forward,
     ),
     strictTool(
@@ -266,6 +266,38 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
         }),
       },
       ({ typeName, name, patch }) => ({ kind: 'update_index', typeName, name, patch }),
+      forward,
+    ),
+    strictTool(
+      'add_value',
+      'Add a value to an enum type. Provide typeName (the enum) and value (the new variant string). Optionally include description.',
+      {
+        typeName: z.string().min(1),
+        value: z.string().min(1),
+        description: z.string().optional(),
+      },
+      ({ typeName, value, description }) => ({ kind: 'add_value', typeName, value, description }),
+      forward,
+    ),
+    strictTool(
+      'update_value',
+      'Update an existing enum value. Provide typeName, the current value string, and a patch with optional new value/description. Note: renaming a value does not migrate runtime data.',
+      {
+        typeName: z.string().min(1),
+        value: z.string().min(1),
+        patch: z.object({
+          value: z.string().min(1).optional(),
+          description: z.string().optional(),
+        }),
+      },
+      ({ typeName, value, patch }) => ({ kind: 'update_value', typeName, value, patch }),
+      forward,
+    ),
+    strictTool(
+      'remove_value',
+      'Remove a single value from an enum type by its string.',
+      { typeName: z.string().min(1), value: z.string().min(1) },
+      ({ typeName, value }) => ({ kind: 'remove_value', typeName, value }),
       forward,
     ),
     // --- Type-level (lenient with meta-schema validation) ---

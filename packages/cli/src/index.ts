@@ -192,8 +192,28 @@ function commandToToolInput(command: string, args: string[]): { tool: string; in
         input: { typeName: args[0], fieldName: args[1], patch: parseJsonArg(args[2], 'patchJson') },
       };
     case 'delete-field':
-      requireArgs(args, 2, 'delete-field <type> <field>');
-      return { tool: 'delete_field', input: { typeName: args[0], fieldName: args[1] } };
+    case 'remove-field':
+      requireArgs(args, 2, 'remove-field <type> <field>');
+      return { tool: 'remove_field', input: { typeName: args[0], fieldName: args[1] } };
+    case 'add-value':
+      requireArgs(args, 2, 'add-value <type> <value> [description]');
+      return {
+        tool: 'add_value',
+        input: { typeName: args[0], value: args[1], description: args[2] },
+      };
+    case 'update-value':
+      requireArgs(args, 3, 'update-value <type> <value> <patchJson>');
+      return {
+        tool: 'update_value',
+        input: {
+          typeName: args[0],
+          value: args[1],
+          patch: parseJsonArg(args[2], 'patchJson'),
+        },
+      };
+    case 'remove-value':
+      requireArgs(args, 2, 'remove-value <type> <value>');
+      return { tool: 'remove_value', input: { typeName: args[0], value: args[1] } };
     case 'reorder-fields':
       requireArgs(args, 2, 'reorder-fields <type> <fieldNamesJsonOrCsv>');
       return {
