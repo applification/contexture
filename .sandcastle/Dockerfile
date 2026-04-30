@@ -48,6 +48,9 @@ RUN apt-get update && apt-get install -y \
 # Install turbo globally
 RUN bun install -g turbo
 
+# Install agent-browser CLI globally (root so it lands on the system PATH)
+RUN npm install -g agent-browser
+
 # The oven/bun image already has a "bun" user (UID 1000).
 RUN usermod -d /home/agent -m -l agent bun
 # oven/bun's home dir is mode 700 (vs 755 on node:slim). Sandcastle runs the
@@ -60,6 +63,14 @@ USER agent
 
 # Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Pre-fetch Chrome for Testing into the image so AFK sessions don't need
+# network access for the browser binary at runtime.
+RUN agent-browser install
+
+# Register agent-browser as a Claude Code skill so AFK sessions can invoke
+# browser actions (navigate, click, screenshot, etc.) without further setup.
+RUN npx --yes skills add https://github.com/vercel-labs/agent-browser --skill agent-browser
 
 # Claude Code's install creates ~/.claude, ~/.claude.json, and ~/.cache
 # owned by UID 1000. Sandcastle runs the container as the host UID, so
