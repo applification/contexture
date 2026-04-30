@@ -5,7 +5,6 @@ import { fetchIssueLiveState } from "./gh";
 import type { OpenPRClosing } from "./gh";
 import { agent, streamLogger } from "./harness";
 import type { Issue } from "./issue";
-import { isSandboxStartupRetryable, retryWithBackoff } from "./retry";
 import { AGENTS, COPY_TO_WORKTREE, INSTALL_AND_VERIFY, LABEL } from "./workflow";
 
 export type IssueOutcome =
@@ -50,33 +49,6 @@ async function pathsTouchedByCommits(
   return out.split("\n").filter((p) => p.length > 0);
 }
 
-async function createIssueSandboxWithRetry(
-  issue: Issue,
-  sandboxProvider: sandcastle.SandboxProvider,
-) {
-  return retryWithBackoff(
-    () =>
-      sandcastle.createSandbox({
-        sandbox: sandboxProvider,
-        branch: issue.branch,
-        hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
-        copyToWorktree: [...COPY_TO_WORKTREE],
-      }),
-    {
-      maxAttempts: 2,
-      baseMs: 2000,
-      jitter: true,
-      isRetryable: isSandboxStartupRetryable,
-      onRetry: ({ attempt, nextDelayMs, error }) => {
-        const tag = (error as { _tag?: unknown })._tag ?? "unknown";
-        console.warn(
-          `  ↻ #${issue.number} attempt ${attempt} failed (${tag}); retrying in ${nextDelayMs}ms`,
-        );
-      },
-    },
-  );
-}
-
 export type PipelineContext = {
   iteration: number;
   openPRs: OpenPRClosing[];
@@ -101,7 +73,12 @@ export async function runIssuePipeline(
     return { kind: "reconciledSkip", reason: verdict.reason };
   }
 
-  await using sandbox = await createIssueSandboxWithRetry(issue, ctx.sandboxProvider);
+  await using sandbox = await sandcastle.createSandbox({
+    sandbox: ctx.sandboxProvider,
+    branch: issue.branch,
+    hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
+    copyToWorktree: [...COPY_TO_WORKTREE],
+  });
 
   const docsOnly = isDocsOnly(issue);
   const implementerSpec = docsOnly ? AGENTS.implementerDocs : AGENTS.implementer;
