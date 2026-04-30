@@ -1,8 +1,8 @@
 /**
- * `ReconcileModal` — drift reconciliation surface (issue #126).
+ * `ReconcileModal` — drift reconciliation surface (issue #161).
  *
- * Opens from `DriftBanner`'s "Review changes" button when the watched
- * `convex/schema.ts` has been hand-edited. Two-pane layout:
+ * Opens from `DriftBanner`'s "Review changes" button when any watched
+ * generated file has been hand-edited. Two-pane layout:
  *
  *   - Left: LLM-proposed op checklist (each row = one IR op).
  *     Toggling a row re-renders the right pane.
@@ -11,19 +11,25 @@
  *     disk, with a residual changed-line count underneath.
  *
  * Apply selected → run checked ops through the undo store as one
- * transaction, mark drift resolved, close. Open in chat → seed a new
- * chat thread with IR + Convex source + proposed ops. Cancel → leave
- * drift state alone.
+ * transaction, mark drift resolved, close.
+ * Discard on-disk → overwrite the target file with the current emit.
+ * Open in chat → seed a new chat thread with IR + source + proposed ops.
+ * Cancel → leave drift state alone.
  */
+
+import { baseNameFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useClaudeReconcile } from '@renderer/hooks/useClaudeReconcile';
 import { emitConvexSchema } from '@renderer/model/emit-convex';
+import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
+import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
+import { emit as emitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';
-import { type ReconcileOp, useReconcileStore } from '@renderer/store/reconcile';
+import { type ReconcileOp, targetKindFor, useReconcileStore } from '@renderer/store/reconcile';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { diffLines } from 'diff';
@@ -47,9 +53,27 @@ interface EmitResult {
   error: string | null;
 }
 
-function safeEmit(schema: Schema): EmitResult {
+function safeEmitForTarget(schema: Schema, targetPath: string, irPath: string | null): EmitResult {
+  const kind = targetKindFor(targetPath);
   try {
-    return { source: emitConvexSchema(schema), error: null };
+    let source: string;
+    switch (kind) {
+      case 'convex':
+        source = emitConvexSchema(schema, irPath ?? undefined);
+        break;
+      case 'zod':
+        source = emitZod(schema, irPath ?? '<unknown>');
+        break;
+      case 'json-schema':
+        source = `${JSON.stringify(emitJsonSchema(schema, undefined, irPath ?? undefined), null, 2)}\n`;
+        break;
+      case 'schema-index':
+        source = emitSchemaIndex(irPath ? baseNameFor(irPath) : 'schema', irPath ?? undefined);
+        break;
+      case 'unknown':
+        return { source: '', error: `Cannot emit for unknown target kind (${targetPath}).` };
+    }
+    return { source, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { source: '', error: message };
@@ -83,13 +107,23 @@ function countResidualLines(left: string, right: string): number {
   return n;
 }
 
+/** Short display name for a path, trimmed to the portion after `packages/contexture/`. */
+function shortPath(fullPath: string): string {
+  const marker = 'packages/contexture/';
+  const idx = fullPath.lastIndexOf(marker);
+  if (idx !== -1) return fullPath.slice(idx + marker.length);
+  const slash = fullPath.lastIndexOf('/');
+  return slash === -1 ? fullPath : fullPath.slice(slash + 1);
+}
+
 export function ReconcileModal(): React.JSX.Element {
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
   const proposedOps = useReconcileStore((s) => s.proposedOps);
   const selectedIndices = useReconcileStore((s) => s.selectedIndices);
   const error = useReconcileStore((s) => s.error);
-  const convexSource = useReconcileStore((s) => s.convexSource);
+  const onDiskSource = useReconcileStore((s) => s.onDiskSource);
+  const targetPath = useReconcileStore((s) => s.targetPath);
   const close = useReconcileStore((s) => s.close);
   const setLoading = useReconcileStore((s) => s.setLoading);
   const setError = useReconcileStore((s) => s.setError);
@@ -104,21 +138,25 @@ export function ReconcileModal(): React.JSX.Element {
   useClaudeReconcile();
 
   const schema = useUndoStore((s) => s.schema);
+  const filePath = useDocumentStore((s) => s.filePath);
 
-  // Recompute the would-be Convex emit each time the user toggles an
-  // op. Cheap (pure function, < 10ms even on large schemas), so a
+  const displayName = targetPath ? shortPath(targetPath) : 'generated file';
+
+  // Recompute the would-be emit each time the user toggles an op.
+  // Cheap (pure function, < 10ms even on large schemas), so a
   // simple `useMemo` is sufficient — no need to debounce.
   const projection = useMemo(() => {
+    if (!targetPath) return { schema, error: null, emit: { source: '', error: 'No target.' } };
     const projected = applySelectedOps(schema, proposedOps, selectedIndices);
-    const emit = safeEmit(projected.schema);
+    const emit = safeEmitForTarget(projected.schema, targetPath, filePath);
     return { ...projected, emit };
-  }, [schema, proposedOps, selectedIndices]);
+  }, [schema, proposedOps, selectedIndices, targetPath, filePath]);
 
   const residualLines = useMemo(() => {
-    if (convexSource === null) return 0;
+    if (onDiskSource === null) return 0;
     if (projection.emit.error) return 0;
-    return countResidualLines(projection.emit.source, convexSource);
-  }, [convexSource, projection]);
+    return countResidualLines(projection.emit.source, onDiskSource);
+  }, [onDiskSource, projection]);
 
   const handleApply = useCallback(() => {
     setApplying();
@@ -139,21 +177,35 @@ export function ReconcileModal(): React.JSX.Element {
     close();
   }, [proposedOps, selectedIndices, setApplying, setError, close]);
 
+  const handleDiscard = useCallback(() => {
+    if (!targetPath || !projection.emit.source || projection.emit.error) return;
+    void window.api
+      ?.saveFile(targetPath, projection.emit.source)
+      .then(() => {
+        useDriftStore.getState().setResolved();
+        void window.contexture?.drift.dismiss();
+        close();
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`Failed to overwrite file: ${message}`);
+      });
+  }, [targetPath, projection, close, setError]);
+
   const handleOpenInChat = useCallback(() => {
-    const filePath = useDocumentStore.getState().filePath;
     const irJson = JSON.stringify(schema, null, 2);
     const opsJson = JSON.stringify(proposedOps, null, 2);
     const message = [
-      'Help me reconcile a Convex schema drift. Context follows.',
+      `Help me reconcile a drift in \`${displayName}\`. Context follows.`,
       '',
       '## Current IR',
       '```json',
       irJson,
       '```',
       '',
-      '## Hand-edited convex/schema.ts',
-      '```ts',
-      convexSource ?? '(unavailable)',
+      `## Hand-edited \`${displayName}\``,
+      '```',
+      onDiskSource ?? '(unavailable)',
       '```',
       '',
       '## Proposed reconcile ops',
@@ -174,7 +226,7 @@ export function ReconcileModal(): React.JSX.Element {
     useUIChromeStore.getState().setSidebarTab('chat');
     useUIChromeStore.getState().setSidebarVisible(true);
     close();
-  }, [schema, proposedOps, convexSource, history, close]);
+  }, [schema, proposedOps, onDiskSource, displayName, filePath, history, close]);
 
   const handleRetry = useCallback(() => {
     setLoading();
@@ -182,6 +234,9 @@ export function ReconcileModal(): React.JSX.Element {
 
   const applyDisabled =
     status !== 'ready' || selectedIndices.size === 0 || proposedOps.length === 0;
+
+  const discardDisabled =
+    status !== 'ready' || !targetPath || !!projection.emit.error || !projection.emit.source;
 
   return (
     <Dialog
@@ -192,10 +247,10 @@ export function ReconcileModal(): React.JSX.Element {
     >
       <DialogContent className="max-w-6xl w-full">
         <DialogHeader>
-          <DialogTitle>Reconcile schema changes</DialogTitle>
+          <DialogTitle>Reconcile changes</DialogTitle>
           <DialogDescription>
-            <code className="font-mono">convex/schema.ts</code> was edited outside Contexture.
-            Select the ops to bring the IR in line with the file, or open the proposal in chat for
+            <code className="font-mono">{displayName}</code> was edited outside Contexture. Select
+            the ops to bring the IR in line with the file, or open the proposal in chat for
             iteration.
           </DialogDescription>
         </DialogHeader>
@@ -288,7 +343,7 @@ export function ReconcileModal(): React.JSX.Element {
                 </p>
               )}
               {(status === 'ready' || status === 'applying') &&
-                convexSource !== null &&
+                onDiskSource !== null &&
                 (projection.emit.error ? (
                   <p className="p-3 text-sm text-destructive">
                     Cannot emit current schema: {projection.emit.error}
@@ -296,17 +351,21 @@ export function ReconcileModal(): React.JSX.Element {
                 ) : (
                   <MultiFileDiff
                     oldFile={{
-                      name: 'schema.ts',
+                      name: displayName,
                       contents: projection.emit.source,
-                      lang: 'ts',
+                      lang: displayName.endsWith('.json') ? 'json' : 'ts',
                     }}
-                    newFile={{ name: 'schema.ts', contents: convexSource, lang: 'ts' }}
+                    newFile={{
+                      name: displayName,
+                      contents: onDiskSource,
+                      lang: displayName.endsWith('.json') ? 'json' : 'ts',
+                    }}
                     options={{ diffStyle: 'split', disableFileHeader: true }}
                     disableWorkerPool={true}
                   />
                 ))}
             </div>
-            {(status === 'ready' || status === 'applying') && convexSource !== null && (
+            {(status === 'ready' || status === 'applying') && onDiskSource !== null && (
               <div className="px-3 py-2 border-t text-xs text-muted-foreground">
                 Residual: {residualLines} changed line{residualLines !== 1 ? 's' : ''} not covered
                 by selected ops
@@ -318,6 +377,14 @@ export function ReconcileModal(): React.JSX.Element {
         <DialogFooter>
           <Button variant="ghost" onClick={close}>
             Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDiscard}
+            disabled={discardDisabled}
+            title="Overwrite the on-disk file with what Contexture would emit"
+          >
+            Discard on-disk changes
           </Button>
           <Button
             variant="outline"

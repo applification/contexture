@@ -178,12 +178,13 @@ const drift = {
 const reconcile = {
   /**
    * Fire a one-shot Claude query that returns reconcile ops for the
-   * current IR + on-disk Convex source. Used by the reconcile modal
-   * to populate its op checklist.
+   * current IR + on-disk source of any emitted file. Used by the
+   * reconcile modal to populate its op checklist.
    */
   query: (payload: {
     irJson: string;
-    convexSource: string;
+    onDiskSource: string;
+    targetKind: string;
   }): Promise<{ ok: boolean; ops?: unknown[]; error?: string }> =>
     ipcRenderer.invoke('reconcile:query', payload) as Promise<{
       ok: boolean;

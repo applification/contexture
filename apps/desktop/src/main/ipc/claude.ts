@@ -345,19 +345,19 @@ export function registerClaudeIpc(mainWindow: BrowserWindow): ClaudeIpc {
   // stay completely isolated from the modal's request/response.
   ipcMain.handle(
     'reconcile:query',
-    async (_evt, payload: { irJson: string; convexSource: string }) => {
+    async (_evt, payload: { irJson: string; onDiskSource: string; targetKind: string }) => {
       try {
         const env: Record<string, string> | undefined =
           currentAuth.mode === 'api-key' && currentAuth.key
             ? { ANTHROPIC_API_KEY: currentAuth.key }
             : undefined;
         const iterator = query({
-          prompt: buildReconcileUserTurn(payload.irJson, payload.convexSource),
+          prompt: buildReconcileUserTurn(payload.irJson, payload.onDiskSource, payload.targetKind),
           options: {
             // Raw systemPrompt (not preset+append): the reconcile turn
             // wants none of Claude Code's default tool/skill framing —
             // it's a single Q→A round-trip producing JSON.
-            systemPrompt: RECONCILE_SYSTEM_PROMPT,
+            systemPrompt: buildReconcileSystemPrompt(payload.targetKind),
             allowedTools: [],
             disallowedTools: DISALLOWED_BUILTINS,
             model: currentModel,
@@ -479,22 +479,47 @@ function toSdkTool(descriptor: OpToolDescriptor) {
 }
 
 /**
- * System prompt for `reconcile:query`. TypeScript-constructed (not a
- * skill file) per the issue spec — keeps the modal's prompt static,
- * cacheable, and decoupled from the chat-session prompt builder.
+ * Target-kind descriptions used in the reconcile system prompt.
+ * These are lightly tuned per target so the model understands the
+ * output format it is reconciling against.
+ */
+const TARGET_KIND_DESCRIPTIONS: Record<string, string> = {
+  convex:
+    'a hand-edited `convex/schema.ts` file (Convex database schema). ' +
+    'Focus on `defineTable`, `v.*` validators, and Convex index definitions.',
+  zod:
+    'a hand-edited `.schema.ts` file (Zod schema mirror). ' +
+    'Focus on `z.object`, `z.enum`, `z.discriminatedUnion`, and inferred TypeScript types.',
+  'json-schema':
+    'a hand-edited `.schema.json` file (JSON Schema). ' +
+    'Focus on `$defs`, `properties`, `required`, `type`, and `enum` arrays.',
+  'schema-index':
+    'a hand-edited `index.ts` schema-index file that re-exports named Zod schemas. ' +
+    'Focus on the set of exported names and their re-export paths.',
+};
+
+/**
+ * Build the reconcile system prompt for `reconcile:query`. Varies
+ * lightly by `targetKind` so the model understands which file format
+ * it is reconciling against. TypeScript-constructed (not a skill file)
+ * to keep the prompt static, cacheable, and decoupled from the
+ * chat-session prompt builder.
  *
  * The op-vocabulary list is duplicated from `system-prompt.ts` rather
  * than imported because that module lives in the renderer's path
  * (`@renderer/...`) and we want this file (which runs in the main
  * process bundle) to keep its imports narrow.
  */
-const RECONCILE_SYSTEM_PROMPT = `You are a schema reconciliation assistant for Contexture.
+function buildReconcileSystemPrompt(targetKind: string): string {
+  const kindDesc =
+    TARGET_KIND_DESCRIPTIONS[targetKind] ??
+    'a hand-edited generated file that has diverged from what Contexture would emit.';
 
-The user has a Contexture IR (a JSON description of a Zod schema) and a
-hand-edited \`convex/schema.ts\` file that has diverged from what Contexture
-would emit from that IR. Your job is to return a JSON array of ops that,
-when applied to the IR, would make Contexture emit a \`schema.ts\` as close
-as possible to the hand-edited file.
+  return `You are a schema reconciliation assistant for Contexture.
+
+The user has a Contexture IR (a JSON description of a schema) and ${kindDesc}
+Your job is to return a JSON array of ops that, when applied to the IR, would make
+Contexture emit an output as close as possible to the hand-edited file.
 
 ## Op vocabulary
 
@@ -547,17 +572,18 @@ Mark \`lossy: true\` for:
 
 If no ops are needed (the IR already produces the hand-edited file), return \`[]\`.
 
-The current IR and the hand-edited \`schema.ts\` are in the user message.`;
+The current IR and the hand-edited file are in the user message.`;
+}
 
-function buildReconcileUserTurn(irJson: string, convexSource: string): string {
+function buildReconcileUserTurn(irJson: string, onDiskSource: string, targetKind: string): string {
   return [
     '<current_ir>',
     irJson,
     '</current_ir>',
     '',
-    '<convex_source>',
-    convexSource,
-    '</convex_source>',
+    `<on_disk_source kind="${targetKind}">`,
+    onDiskSource,
+    '</on_disk_source>',
     '',
     'Return the reconcile ops JSON array.',
   ].join('\n');
