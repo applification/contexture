@@ -33,7 +33,13 @@ const COPY_TO_WORKTREE: readonly string[] = ["apps/desktop/.env", "apps/web/.env
 // 0 even when individual extractions are mangled, so we follow with `turbo
 // typecheck`, which resolves and loads imports across every workspace and
 // fails loudly if a package's main entry is missing.
-const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
+//
+// `gh auth setup-git` wires git to use the gh CLI as a credential helper.
+// gh is already authed via $GH_TOKEN (injected by sandcastle), but git
+// itself has no helper configured — without this, `git push` from the
+// pr-opener phase fails and the agent burns ~10 calls discovering a
+// workable credential scheme.
+const INSTALL_AND_VERIFY = "gh auth setup-git && bun install && bun run typecheck";
 
 // ---------- Agent specs ----------
 
