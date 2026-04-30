@@ -23,6 +23,10 @@ export function detectOS(userAgent: string, secChUAPlatform?: string): OSDetecti
   if (platform === 'windows') return { os: 'windows' };
   if (platform === 'linux') return { os: 'linux' };
 
+  // iOS includes "Mac OS X" and Android includes "Linux" in their UAs, which would
+  // otherwise trigger false positives for desktop OS detection.
+  if (/android|iphone|ipad|ipod/i.test(userAgent)) return { os: 'unknown' };
+
   if (/mac os x|macintosh/i.test(userAgent)) return { os: 'macos' };
   if (/windows nt/i.test(userAgent)) return { os: 'windows' };
   if (/linux/i.test(userAgent)) return { os: 'linux' };

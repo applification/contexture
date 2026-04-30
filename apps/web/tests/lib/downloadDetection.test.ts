@@ -42,6 +42,28 @@ describe('detectOS', () => {
     expect(result.os).toBe('unknown');
   });
 
+  it('returns unknown for empty User-Agent', () => {
+    const result = detectOS('');
+    expect(result.os).toBe('unknown');
+  });
+
+  it('returns unknown for iOS User-Agent despite containing "Mac OS X"', () => {
+    const result = detectOS(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    );
+    expect(result.os).toBe('unknown');
+  });
+
+  it('returns unknown for iPad User-Agent despite containing "Mac OS X"', () => {
+    const result = detectOS('Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
+    expect(result.os).toBe('unknown');
+  });
+
+  it('returns unknown for Android User-Agent despite containing "Linux"', () => {
+    const result = detectOS('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36');
+    expect(result.os).toBe('unknown');
+  });
+
   it('prefers Sec-CH-UA-Platform over User-Agent for macOS', () => {
     const result = detectOS('Mozilla/5.0 (Windows NT 10.0)', '"macOS"');
     expect(result.os).toBe('macos');
