@@ -18,6 +18,7 @@
     "ci": "turbo typecheck && turbo test && biome check .",
     "prepare": "husky",
     "sandcastle": "bun .sandcastle/main.ts",
+    "sandcastle:analyze": "bun .sandcastle/analyze.ts",
     "sandcastle:build": "bunx sandcastle docker build-image",
     "cleanup": "bun scripts/cleanup-branches.ts"
   },

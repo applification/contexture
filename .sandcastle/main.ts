@@ -232,3 +232,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 }
 
 console.log("\nAll done.");
+
+// Auto-run the analyzer at end-of-orchestration so every run produces a
+// fresh `.sandcastle/logs/analysis.md`. Skipped with --no-analyze; failures
+// are non-fatal (we don't want a bad analyzer to break sandcastle).
+if (!process.argv.includes("--no-analyze")) {
+  try {
+    await import("./analyze");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Analyzer failed: ${msg}`);
+  }
+}
