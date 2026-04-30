@@ -61,22 +61,21 @@ describe("evaluate", () => {
 });
 
 describe("pickEligible", () => {
-  test("returns a single eligible issue with needsPlanner=false", () => {
+  test("returns a single eligible issue", () => {
     const result = pickEligible([snapshot()], [], cfg);
     expect(result.eligible).toHaveLength(1);
     expect(result.eligible[0]?.branch).toBe("sandcastle/issue-42-fix-auth-bug");
-    expect(result.needsPlanner).toBe(false);
     expect(result.excluded).toEqual([]);
   });
 
-  test("with 2+ eligible issues, needsPlanner=true", () => {
+  test("returns eligible issues ordered by issue number ascending", () => {
     const snapshots = [
+      snapshot({ number: 5, title: "fifth" }),
       snapshot({ number: 1, title: "first" }),
-      snapshot({ number: 2, title: "second" }),
+      snapshot({ number: 3, title: "third" }),
     ];
     const result = pickEligible(snapshots, [], cfg);
-    expect(result.eligible).toHaveLength(2);
-    expect(result.needsPlanner).toBe(true);
+    expect(result.eligible.map((i) => i.number)).toEqual([1, 3, 5]);
   });
 
   test("excludes issues missing the tracker label", () => {
@@ -94,7 +93,7 @@ describe("pickEligible", () => {
     ]);
   });
 
-  test("mix of eligible and excluded — eligible count drives needsPlanner", () => {
+  test("mix of eligible and excluded", () => {
     const snapshots = [
       snapshot({ number: 1, title: "kept" }),
       snapshot({ number: 2, title: "no-label", labels: ["bug"] }),
@@ -103,11 +102,10 @@ describe("pickEligible", () => {
     const openPRs: OpenPRClosing[] = [{ pr: 50, closes: [3] }];
     const result = pickEligible(snapshots, openPRs, cfg);
     expect(result.eligible.map((i) => i.number)).toEqual([1]);
-    expect(result.needsPlanner).toBe(false);
     expect(result.excluded).toHaveLength(2);
   });
 
-  test("returned issues are validated against the plan.ts Issue schema (branch matches regex)", () => {
+  test("returned issues are validated against the issue.ts Issue schema (branch matches regex)", () => {
     const result = pickEligible([snapshot({ title: "Test  it" })], [], cfg);
     const branch = result.eligible[0]?.branch ?? "";
     expect(branch).toMatch(/^sandcastle\/issue-\d+-[a-z0-9._-]+$/);

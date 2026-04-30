@@ -8,21 +8,15 @@ Only work on the issue specified.
 
 Work on branch {{BRANCH}}. Make commits and run tests. Do NOT push the branch, open a PR, or close the issue — a separate agent handles PR creation, and the merged PR closes the issue automatically.
 
-# CONTEXT
-
-Here are the last 10 commits:
-
-<recent-commits>
-
-!`git log -n 10 --format="%H%n%ad%n%B---" --date=short`
-
-</recent-commits>
-
 # EXPLORATION
 
-Explore the repo and fill your context window with relevant information that will allow you to complete the task.
+Read only what you need to make this specific change. Do not crawl the whole repo.
 
-Pay extra attention to test files that touch the relevant parts of the code.
+1. Start from the issue body — it usually names the files or modules involved. Read those.
+2. Use `grep` / `rg` to find direct callers and tests of the symbols you'll change. Read the closest tests.
+3. Stop exploring once you can describe the change you're about to make. If you find yourself reading unrelated code "for context", that's a signal to stop.
+
+Avoid: opening every file in a directory, reading framework/config files unrelated to the change, fetching docs you can already see in the source.
 
 # EXECUTION
 

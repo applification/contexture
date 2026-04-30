@@ -1,6 +1,6 @@
 import type { IssueSnapshot, OpenPRClosing } from "./gh";
-import { Issue, makeBranch } from "./plan";
-import type { Issue as IssueT } from "./plan";
+import { Issue, makeBranch } from "./issue";
+import type { Issue as IssueT } from "./issue";
 
 export type EligibilityConfig = { label: string };
 
@@ -36,15 +36,14 @@ export function evaluate(
 
 export type EligibilityResult = {
   eligible: IssueT[];
-  // True when more than one candidate survives. The orchestrator dispatches a
-  // subset-selection agent only in that case; a single eligible issue is
-  // dispatched directly without an LLM round-trip.
-  needsPlanner: boolean;
   excluded: Array<{ number: number; reason: ExclusionReason }>;
 };
 
 // Iteration-start partition: applies `evaluate` to every snapshot, mints
-// branch names for survivors, validates them through plan.ts's Issue schema.
+// branch names for survivors, validates them through issue.ts's Issue
+// schema. Eligible issues are returned ordered by issue number ascending
+// so callers have a deterministic "oldest first" pick without a separate
+// sort.
 export function pickEligible(
   snapshots: IssueSnapshot[],
   openPRs: OpenPRClosing[],
@@ -69,5 +68,6 @@ export function pickEligible(
     );
   }
 
-  return { eligible, needsPlanner: eligible.length > 1, excluded };
+  eligible.sort((a, b) => a.number - b.number);
+  return { eligible, excluded };
 }

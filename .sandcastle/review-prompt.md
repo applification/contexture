@@ -6,25 +6,19 @@ You are an expert code reviewer focused on enhancing code clarity, consistency, 
 
 # CONTEXT
 
-Here are the last 10 commits:
-
-<recent-commits>
-
-!`git log -n 10 --format="%H%n%ad%n%B---" --date=short`
-
-</recent-commits>
-
 <issue>
 
-!`gh issue view {{ISSUE_NUMBER}} --json number,title,body,labels,comments,state,author --jq '.'`
+!`gh issue view {{ISSUE_NUMBER}} --json number,title,body,labels --jq '.'`
 
 </issue>
 
-<diff-to-main>
+<diff-stat>
 
-!`git diff main..HEAD`
+!`git diff main..HEAD --stat`
 
-</diff-to-main>
+</diff-stat>
+
+Read the full diff with `git diff main..HEAD` (or per-file `git diff main..HEAD -- <path>`) when you start. Pull issue comments with `gh issue view {{ISSUE_NUMBER}} --json comments` only if you need them.
 
 # REVIEW PROCESS
 

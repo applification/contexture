@@ -61,14 +61,21 @@ USER agent
 # Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-# Claude Code's install creates ~/.claude and ~/.claude.json owned by UID 1000.
-# Sandcastle runs the container as the host UID, so make them world-writable
-# (the install script also writes a starter .claude.json that Claude updates
-# on each run — non-writable config makes Claude hang silently).
-RUN chmod -R a+rwX /home/agent/.claude /home/agent/.claude.json /home/agent/.local
+# Claude Code's install creates ~/.claude, ~/.claude.json, and ~/.cache
+# owned by UID 1000. Sandcastle runs the container as the host UID, so
+# anything the runtime UID needs to read or write must be made world-
+# writable (otherwise Claude hangs silently on its config, and bun
+# install's postinstall scripts — electron, etc. — fail trying to write
+# their per-tool subdirs under ~/.cache).
+RUN chmod -R a+rwX /home/agent/.claude /home/agent/.claude.json /home/agent/.local /home/agent/.cache /home/agent/.npm
 
-# Add Claude to PATH
+# Add Claude to PATH and pin HOME for non-passwd UIDs. When sandcastle
+# runs the container as the host UID (which has no /etc/passwd entry),
+# $HOME defaults to "/" — bun install then tries to mkdir /.cache and
+# fails. Fixing HOME here lets every tool write to /home/agent/.cache
+# as intended.
 ENV PATH="/home/agent/.local/bin:$PATH"
+ENV HOME=/home/agent
 
 WORKDIR /home/agent
 

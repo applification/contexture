@@ -8,16 +8,6 @@ Only work on the issue specified.
 
 Work on branch {{BRANCH}}. This is a documentation-only change — markdown files only. Do not touch source code.
 
-# CONTEXT
-
-Here are the last 10 commits:
-
-<recent-commits>
-
-!`git log -n 10 --format="%H%n%ad%n%B---" --date=short`
-
-</recent-commits>
-
 # EXECUTION
 
 1. Read the relevant docs and the issue.

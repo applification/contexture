@@ -1,13 +1,50 @@
 import { appendFileSync } from "node:fs";
 import * as sandcastle from "@ai-hero/sandcastle";
-import type { AgentStreamEvent, LoggingOption } from "@ai-hero/sandcastle";
-import type { AgentSpec } from "./workflow";
+import type {
+  AgentStreamEvent,
+  ClaudeCodeOptions,
+  CodexOptions,
+  LoggingOption,
+} from "@ai-hero/sandcastle";
+
+// Provider-tagged spec. Each agent declares which sandcastle agent provider
+// it uses (claudeCode | codex | opencode | pi); `agent()` below dispatches on
+// the `provider` discriminator. Adding a new backend (e.g. Gemini, Ollama)
+// means adding a variant here and a case in `agent()`, with no other
+// downstream changes.
+//
+// Per-provider `effort` types are sourced from sandcastle's own option types
+// so they stay aligned with what the underlying provider accepts.
+
+export type ClaudeCodeSpec = {
+  provider: "claudeCode";
+  model: string;
+  promptPath: string;
+} & Pick<ClaudeCodeOptions, "effort">;
+
+export type CodexSpec = {
+  provider: "codex";
+  model: string;
+  promptPath: string;
+} & Pick<CodexOptions, "effort">;
+
+export type OpenCodeSpec = {
+  provider: "opencode";
+  model: string;
+  promptPath: string;
+};
+
+export type PiSpec = {
+  provider: "pi";
+  model: string;
+  promptPath: string;
+};
+
+export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 
 export const STREAM_LOG_PATH = ".sandcastle/logs/stream.log";
 
-// Build a sandcastle AgentProvider from an AgentSpec. Dispatches on the
-// `provider` discriminator so adding a new backend means adding a case here
-// (and a variant in workflow.ts), not touching every call site.
+// Build a sandcastle AgentProvider from an AgentSpec.
 export function agent(spec: AgentSpec) {
   switch (spec.provider) {
     case "claudeCode":
