@@ -4,7 +4,7 @@ import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
 import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./github";
 import { enforcementFor } from "./enforcement";
-import { agent, emitRunStart, emitUsageFromRun, streamLogger } from "./harness";
+import { agent, emitPhaseOutcome, emitRunStart, emitUsageFromRun, streamLogger } from "./harness";
 import type { AgentSpec } from "./harness";
 import type { Issue } from "./issue";
 
@@ -179,6 +179,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       logging: streamLogger(implementerLogName),
     });
     emitUsageFromRun(implementerLogName, iteration, implementResult.iterations);
+    emitPhaseOutcome("implementer", iteration, issue.number, implementResult.commits.length);
 
     // Both reviewer and PR-opener gate on whether *this* implementer run made
     // commits. Comparing `main..HEAD` would be incorrect when the orchestrator
@@ -206,6 +207,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         logging: streamLogger(reviewerLogName),
       });
       emitUsageFromRun(reviewerLogName, iteration, reviewerResult.iterations);
+      emitPhaseOutcome("reviewer", iteration, issue.number, reviewerResult.commits.length);
+      // Surface the reviewer's value-add signal on stdout so it's visible during
+      // a run without grepping logs. This is the experiment: if reviewer commits
+      // are rare across many runs, the phase is dead weight.
+      console.log(
+        reviewerResult.commits.length > 0
+          ? `  ✎ Reviewer made ${reviewerResult.commits.length} commit(s) on #${issue.number}`
+          : `  ∅ Reviewer made no commits on #${issue.number}`,
+      );
     }
 
     const prLogName = `iter${iteration}-pr-${issue.number}`;
@@ -217,6 +227,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       logging: streamLogger(prLogName),
     });
     emitUsageFromRun(prLogName, iteration, prResult.iterations);
+    emitPhaseOutcome("pr-opener", iteration, issue.number, prResult.commits.length);
   } catch (reason) {
     const errorTag =
       typeof reason === "object" && reason !== null && "_tag" in reason
