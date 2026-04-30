@@ -1,23 +1,30 @@
-## CI Checks
+## Tool discipline
 
-After pushing to a PR branch, verify CI passes before requesting review:
+Prefer dedicated tools over Bash for filesystem ops — `Read` over `cat`, `Glob` over `find`, `Grep` over `grep`/`rg`, `Edit`/`Write` over `sed`/heredocs. Bash is for tests, git, gh, package managers, builds.
+
+## Orientation
+
+Turborepo monorepo (Bun workspaces). See [README.md](README.md) for the app/package table and tech stack.
+
+Coding standards live in [.sandcastle/CODING_STANDARDS.md](.sandcastle/CODING_STANDARDS.md) — they apply to all contributors, not just AFK agents. Read them before writing code.
+
+## Commands
 
 ```bash
-# Check PR status
-gh pr view <number> --json statusCheckRollup --jq '.statusCheckRollup[] | [.name, .conclusion] | @tsv'
-
-# Get failed job logs
-gh run view <run-id> --log-failed | head -60
+bun run dev         # all apps in dev mode (turbo)
+bun run ci          # typecheck + test + biome check — run before pushing
+bun run typecheck   # turbo typecheck
+bun run test        # turbo test (Vitest)
+bun run lint        # biome lint
+bun run format      # biome format --write
 ```
 
-- If CI fails, fix the issue and push again.
-- Run `bun run format:check` and `bun run lint` locally before pushing to catch issues early.
-- Do not request review or mark a PR as ready while CI is failing.
+Run a single test file: `cd packages/<pkg> && bun test path/to/file.test.ts`.
 
-## Versioning & Releases
+## CI
 
-- Semver versioning: vMAJOR.MINOR.PATCH
-- Conventional commits required
-- QA determines release readiness, CTO executes releases
-- GitHub Actions handles build/publish on version tags (v*.*.\*)
-- Never push directly to main — all work via feature branches and PRs
+If CI fails on a pushed branch, fix it before merging.
+
+## Commits
+
+Use conventional commits.
