@@ -74,8 +74,21 @@ RUN chmod -R a+rwX /home/agent/.claude /home/agent/.claude.json /home/agent/.loc
 # $HOME defaults to "/" — bun install then tries to mkdir /.cache and
 # fails. Fixing HOME here lets every tool write to /home/agent/.cache
 # as intended.
-ENV PATH="/home/agent/.local/bin:$PATH"
+#
+# Also pre-resolve the workspace binaries the agents need. bun hoists
+# per-workspace, so the canonical path for `tsc` and `vitest` is the
+# workspace's own node_modules/.bin (root only has hoisted-to-root tools
+# like biome). Putting these on PATH means agents stop burning calls on
+# `which tsc` / `find -name vitest`.
+ENV PATH="/home/agent/workspace/apps/desktop/node_modules/.bin:/home/agent/workspace/node_modules/.bin:/home/agent/.local/bin:$PATH"
 ENV HOME=/home/agent
+
+# Sandcastle runs the container as the host UID, which has no write access to
+# the repo's .turbo/cache (owned by the host user inside the bind mount).
+# Pre-set TURBO_CACHE_DIR to a world-writable tmpfs path so `bun run ci` and
+# the husky pre-commit hook stop failing for permission reasons.
+ENV TURBO_CACHE_DIR=/tmp/turbo-cache
+RUN mkdir -p /tmp/turbo-cache && chmod 1777 /tmp/turbo-cache
 
 WORKDIR /home/agent
 
