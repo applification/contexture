@@ -73,17 +73,23 @@ export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 // Each agent is keyed by purpose. Control flow (which agent runs when, the
 // docs-only branching, the conditional reviewer skip) stays in main.ts —
 // only the agent invocation parameters live here.
+//
+// Effort levels reflect Sandcastle's intended workload: simple bug fixes
+// and minor tweaks. Anything complex is handled HITL in Claude Code, not
+// here — so we don't pay for high-effort thinking on routine work.
+// Reviewer is the exception: edge-case stress-testing genuinely benefits
+// from extended thinking, and it's the last gate before a human review.
 export const AGENTS = {
   implementer: {
     provider: "claudeCode",
     model: "claude-sonnet-4-6",
-    effort: "high",
+    effort: "medium",
     promptPath: "./.sandcastle/implement-prompt.md",
   },
   implementerDocs: {
     provider: "claudeCode",
     model: "claude-sonnet-4-6",
-    effort: "high",
+    effort: "low",
     promptPath: "./.sandcastle/implement-docs-prompt.md",
   },
   reviewer: {

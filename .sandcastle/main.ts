@@ -1,4 +1,3 @@
-import { mkdirSync } from "node:fs";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { pickEligible } from "./eligibility";
 import { fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./gh";
@@ -10,8 +9,6 @@ import { LABEL, MAX_ITERATIONS } from "./workflow";
 // installs (e.g. a package with package.json pointing at a build/ output that
 // was never written). Cold installs are slower; broken node_modules are worse.
 const sandboxProvider = docker({});
-
-mkdirSync(".sandcastle/logs/plans", { recursive: true });
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
