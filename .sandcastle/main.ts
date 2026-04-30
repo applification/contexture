@@ -4,8 +4,72 @@ import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
 import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./gh";
 import { agent, streamLogger } from "./harness";
+import type { AgentSpec } from "./harness";
 import type { Issue } from "./issue";
-import { AGENTS, COPY_TO_WORKTREE, INSTALL_AND_VERIFY, LABEL, MAX_ITERATIONS } from "./workflow";
+
+// ---------- Tracker conventions ----------
+
+// GitHub label used to opt issues into the Sandcastle workflow.
+const LABEL = "Sandcastle";
+
+// ---------- Orchestrator limits ----------
+
+// One issue per iteration, sequentially. Parallelism was removed because the
+// only thing protecting it (the LLM-based subset selector) was an expensive
+// guess at file conflicts, and merge conflicts on overlapping PRs are a
+// normal git outcome — not worth a per-iteration LLM round-trip to avoid.
+const MAX_ITERATIONS = 10;
+
+// ---------- Sandbox setup ----------
+
+// Skip host->worktree copy: this monorepo's node_modules is ~3.5GB and blows
+// past sandcastle's hard-coded 60s copy timeout. The implementer sandbox runs
+// `bun install` inside the container instead. Env files are gitignored, so
+// copy them in explicitly.
+const COPY_TO_WORKTREE: readonly string[] = ["apps/desktop/.env", "apps/web/.env.local"];
+
+// Verify the install actually produced a usable workspace. `bun install` exits
+// 0 even when individual extractions are mangled, so we follow with `turbo
+// typecheck`, which resolves and loads imports across every workspace and
+// fails loudly if a package's main entry is missing.
+const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
+
+// ---------- Agent specs ----------
+
+// Each agent is keyed by purpose. Effort levels reflect Sandcastle's intended
+// workload: simple bug fixes and minor tweaks. Anything complex is handled
+// HITL in Claude Code, not here — so we don't pay for high-effort thinking
+// on routine work. Reviewer is the exception: edge-case stress-testing
+// genuinely benefits from extended thinking, and it's the last gate before a
+// human review.
+const AGENTS = {
+  implementer: {
+    provider: "claudeCode",
+    model: "claude-sonnet-4-6",
+    effort: "medium",
+    promptPath: "./.sandcastle/implement-prompt.md",
+  },
+  implementerDocs: {
+    provider: "claudeCode",
+    model: "claude-sonnet-4-6",
+    effort: "low",
+    promptPath: "./.sandcastle/implement-docs-prompt.md",
+  },
+  reviewer: {
+    provider: "claudeCode",
+    model: "claude-sonnet-4-6",
+    effort: "high",
+    promptPath: "./.sandcastle/review-prompt.md",
+  },
+  prOpener: {
+    provider: "claudeCode",
+    model: "claude-haiku-4-5-20251001",
+    effort: "low",
+    promptPath: "./.sandcastle/pr-prompt.md",
+  },
+} as const satisfies Record<string, AgentSpec>;
+
+// ---------- Sandbox provider ----------
 
 // Each sandbox gets its own bun cache. Sharing ~/.bun/install/cache across
 // parallel sandboxes races on tarball extraction and silently produces broken
