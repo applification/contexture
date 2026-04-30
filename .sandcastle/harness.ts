@@ -44,17 +44,15 @@ export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 
 export const STREAM_LOG_PATH = ".sandcastle/logs/stream.log";
 
-// Build a sandcastle AgentProvider from an AgentSpec.
+// Build a sandcastle AgentProvider from an AgentSpec. Each provider's options
+// object accepts an optional `effort` (or has no effort at all), so we can
+// always pass options through — no need to branch on whether effort is set.
 export function agent(spec: AgentSpec) {
   switch (spec.provider) {
     case "claudeCode":
-      return spec.effort === undefined
-        ? sandcastle.claudeCode(spec.model)
-        : sandcastle.claudeCode(spec.model, { effort: spec.effort });
+      return sandcastle.claudeCode(spec.model, { effort: spec.effort });
     case "codex":
-      return spec.effort === undefined
-        ? sandcastle.codex(spec.model)
-        : sandcastle.codex(spec.model, { effort: spec.effort });
+      return sandcastle.codex(spec.model, { effort: spec.effort });
     case "opencode":
       return sandcastle.opencode(spec.model);
     case "pi":
