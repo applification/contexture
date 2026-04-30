@@ -25,4 +25,22 @@ describe('targetKindFor', () => {
   it('does not confuse a non-convex schema.ts with convex', () => {
     expect(targetKindFor('/proj/packages/other/schema.ts')).toBe('unknown');
   });
+
+  it('returns unknown for an empty string', () => {
+    expect(targetKindFor('')).toBe('unknown');
+  });
+
+  it('does not match index.ts without a leading slash', () => {
+    expect(targetKindFor('index.ts')).toBe('unknown');
+  });
+
+  it('does not match convex/schema.ts without a leading slash', () => {
+    expect(targetKindFor('convex/schema.ts')).toBe('unknown');
+  });
+
+  it('does not confuse a nested index.ts under a non-schema directory', () => {
+    // /index.ts suffix matches any /index.ts — that is expected behaviour per the
+    // bundlePathsFor contract, but confirm a deeply-nested path still resolves.
+    expect(targetKindFor('/proj/packages/contexture/src/index.ts')).toBe('schema-index');
+  });
 });

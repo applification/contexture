@@ -70,7 +70,7 @@ function safeEmitForTarget(schema: Schema, targetPath: string, irPath: string | 
       case 'schema-index':
         source = emitSchemaIndex(irPath ? baseNameFor(irPath) : 'schema', irPath ?? undefined);
         break;
-      default:
+      case 'unknown':
         return { source: '', error: `Cannot emit for unknown target kind (${targetPath}).` };
     }
     return { source, error: null };
@@ -179,12 +179,18 @@ export function ReconcileModal(): React.JSX.Element {
 
   const handleDiscard = useCallback(() => {
     if (!targetPath || !projection.emit.source || projection.emit.error) return;
-    void window.api?.saveFile(targetPath, projection.emit.source).then(() => {
-      useDriftStore.getState().setResolved();
-      void window.contexture?.drift.dismiss();
-      close();
-    });
-  }, [targetPath, projection, close]);
+    void window.api
+      ?.saveFile(targetPath, projection.emit.source)
+      .then(() => {
+        useDriftStore.getState().setResolved();
+        void window.contexture?.drift.dismiss();
+        close();
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`Failed to overwrite file: ${message}`);
+      });
+  }, [targetPath, projection, close, setError]);
 
   const handleOpenInChat = useCallback(() => {
     const irJson = JSON.stringify(schema, null, 2);
