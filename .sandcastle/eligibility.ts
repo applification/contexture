@@ -1,4 +1,4 @@
-import type { IssueSnapshot, OpenPRClosing } from "./gh";
+import type { IssueSnapshot, OpenPRClosing } from "./github";
 import { Issue, makeBranch } from "./issue";
 import type { Issue as IssueT } from "./issue";
 

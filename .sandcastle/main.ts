@@ -2,7 +2,7 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
-import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./gh";
+import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./github";
 import { agent, streamLogger } from "./harness";
 import type { AgentSpec } from "./harness";
 import type { Issue } from "./issue";
@@ -51,7 +51,7 @@ const AGENTS = {
   },
   implementerDocs: {
     provider: "claudeCode",
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5-20251001",
     effort: "low",
     promptPath: "./.sandcastle/implement-docs-prompt.md",
   },
@@ -89,8 +89,7 @@ function describeExclusion(reason: ExclusionReason): string {
 }
 
 const isDocsOnly = (issue: Issue) =>
-  issue.labels.includes("documentation") &&
-  !issue.labels.some((l) => l !== "documentation" && l !== LABEL);
+  issue.labels.includes("documentation") && !issue.labels.some((l) => l !== "documentation" && l !== LABEL);
 
 async function gitOutput(args: string[], cwd: string): Promise<string> {
   const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
@@ -103,10 +102,7 @@ async function gitOutput(args: string[], cwd: string): Promise<string> {
 // range `<first>^..<last>` so we capture exactly the work the agent
 // introduced this run, regardless of where main currently sits or which
 // branch the orchestrator was launched from.
-async function pathsTouchedByCommits(
-  worktreePath: string,
-  commits: { sha: string }[],
-): Promise<string[]> {
+async function pathsTouchedByCommits(worktreePath: string, commits: { sha: string }[]): Promise<string[]> {
   if (commits.length === 0) return [];
   const first = commits[0]?.sha ?? "";
   const last = commits[commits.length - 1]?.sha ?? "";
@@ -121,10 +117,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // Phase 1: Eligibility (deterministic). pickEligible() filters by label and
   // excludes issues already claimed by an open PR; survivors come back sorted
   // by issue number ascending so we can take the oldest with [0].
-  const [snapshots, openPRs] = await Promise.all([
-    fetchOpenLabelledIssues(LABEL),
-    fetchOpenPRsClosingIssues(),
-  ]);
+  const [snapshots, openPRs] = await Promise.all([fetchOpenLabelledIssues(LABEL), fetchOpenPRsClosingIssues()]);
 
   const { eligible, excluded } = pickEligible(snapshots, openPRs, { label: LABEL });
 
@@ -138,9 +131,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     break;
   }
 
-  console.log(
-    `Working on #${issue.number}: ${issue.title} → ${issue.branch} [${issue.labels.join(", ")}]`,
-  );
+  console.log(`Working on #${issue.number}: ${issue.title} → ${issue.branch} [${issue.labels.join(", ")}]`);
 
   // Phase 2: per-issue pipeline (implement → maybe review → open PR).
   let madeCommits = false;
