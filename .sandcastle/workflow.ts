@@ -88,7 +88,7 @@ export const AGENTS = {
   },
   reviewer: {
     provider: "claudeCode",
-    model: "claude-opus-4-7",
+    model: "claude-sonnet-4-6",
     effort: "high",
     promptPath: "./.sandcastle/review-prompt.md",
   },
