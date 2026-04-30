@@ -3,7 +3,7 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
 import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./github";
-import { agent, streamLogger } from "./harness";
+import { agent, emitRunStart, emitUsageFromRun, streamLogger } from "./harness";
 import type { AgentSpec } from "./harness";
 import type { Issue } from "./issue";
 
@@ -111,6 +111,8 @@ async function pathsTouchedByCommits(worktreePath: string, commits: { sha: strin
   return out.split("\n").filter((p) => p.length > 0);
 }
 
+emitRunStart();
+
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
@@ -165,13 +167,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       BRANCH: issue.branch,
     };
 
+    const implementerLogName = `iter${iteration}-implementer-${issue.number}`;
     const implementResult = await sandbox.run({
       name: "Implementer #" + issue.number,
       agent: agent(implementerSpec),
       promptFile: implementerSpec.promptPath,
       promptArgs: issuePromptArgs,
-      logging: streamLogger(`iter${iteration}-implementer-${issue.number}`),
+      logging: streamLogger(implementerLogName),
     });
+    emitUsageFromRun(implementerLogName, iteration, implementResult.iterations);
 
     // Both reviewer and PR-opener gate on whether *this* implementer run made
     // commits. Comparing `main..HEAD` would be incorrect when the orchestrator
@@ -190,22 +194,26 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     const skipReview = docsOnly || allMarkdown;
 
     if (!skipReview) {
-      await sandbox.run({
+      const reviewerLogName = `iter${iteration}-reviewer-${issue.number}`;
+      const reviewerResult = await sandbox.run({
         name: "Reviewer #" + issue.number,
         agent: agent(AGENTS.reviewer),
         promptFile: AGENTS.reviewer.promptPath,
         promptArgs: issuePromptArgs,
-        logging: streamLogger(`iter${iteration}-reviewer-${issue.number}`),
+        logging: streamLogger(reviewerLogName),
       });
+      emitUsageFromRun(reviewerLogName, iteration, reviewerResult.iterations);
     }
 
-    await sandbox.run({
+    const prLogName = `iter${iteration}-pr-${issue.number}`;
+    const prResult = await sandbox.run({
       name: "PR-Opener #" + issue.number,
       agent: agent(AGENTS.prOpener),
       promptFile: AGENTS.prOpener.promptPath,
       promptArgs: issuePromptArgs,
-      logging: streamLogger(`iter${iteration}-pr-${issue.number}`),
+      logging: streamLogger(prLogName),
     });
+    emitUsageFromRun(prLogName, iteration, prResult.iterations);
   } catch (reason) {
     const errorTag =
       typeof reason === "object" && reason !== null && "_tag" in reason
@@ -224,3 +232,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 }
 
 console.log("\nAll done.");
+
+// Auto-run the analyzer at end-of-orchestration so every run produces a
+// fresh `.sandcastle/logs/analysis.md`. Skipped with --no-analyze; failures
+// are non-fatal (we don't want a bad analyzer to break sandcastle).
+if (!process.argv.includes("--no-analyze")) {
+  try {
+    await import("./analyze");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Analyzer failed: ${msg}`);
+  }
+}
