@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { fetchReleases } from '@/lib/changelog';
 
@@ -107,8 +109,71 @@ export default async function ChangelogPage() {
                   </time>
                 </header>
                 {release.body && (
-                  <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {release.body}
+                  <div className="text-sm text-muted-foreground leading-relaxed">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => (
+                          <h3 className="text-lg font-semibold text-foreground mt-6 mb-3">
+                            {children}
+                          </h3>
+                        ),
+                        h2: ({ children }) => (
+                          <h3 className="text-lg font-semibold text-foreground mt-6 mb-3">
+                            {children}
+                          </h3>
+                        ),
+                        h3: ({ children }) => (
+                          <h4 className="text-base font-semibold text-foreground mt-5 mb-2">
+                            {children}
+                          </h4>
+                        ),
+                        h4: ({ children }) => (
+                          <h5 className="text-sm font-semibold text-foreground mt-4 mb-2">
+                            {children}
+                          </h5>
+                        ),
+                        p: ({ children }) => <p className="mb-3">{children}</p>,
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-6 mb-3 space-y-1">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-6 mb-3 space-y-1">{children}</ol>
+                        ),
+                        li: ({ children }) => <li>{children}</li>,
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            className="text-accent hover:underline"
+                            target={href?.startsWith('http') ? '_blank' : undefined}
+                            rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          >
+                            {children}
+                          </a>
+                        ),
+                        code: ({ children }) => (
+                          <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs">
+                            {children}
+                          </code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="p-3 rounded-md bg-muted text-foreground font-mono text-xs overflow-x-auto mb-3">
+                            {children}
+                          </pre>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-2 border-border pl-4 italic mb-3">
+                            {children}
+                          </blockquote>
+                        ),
+                        hr: () => <hr className="my-4 border-border/50" />,
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-foreground">{children}</strong>
+                        ),
+                      }}
+                    >
+                      {release.body}
+                    </ReactMarkdown>
                   </div>
                 )}
               </article>
