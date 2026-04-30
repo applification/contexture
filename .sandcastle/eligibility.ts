@@ -1,6 +1,6 @@
 import type { IssueSnapshot, OpenPRClosing } from "./gh";
-import { Issue, makeBranch } from "./plan";
-import type { Issue as IssueT } from "./plan";
+import { Issue, makeBranch } from "./issue";
+import type { Issue as IssueT } from "./issue";
 
 export type EligibilityConfig = { label: string };
 
@@ -40,9 +40,10 @@ export type EligibilityResult = {
 };
 
 // Iteration-start partition: applies `evaluate` to every snapshot, mints
-// branch names for survivors, validates them through plan.ts's Issue schema.
-// Eligible issues are returned ordered by issue number ascending so callers
-// have a deterministic "oldest first" pick without a separate sort.
+// branch names for survivors, validates them through issue.ts's Issue
+// schema. Eligible issues are returned ordered by issue number ascending
+// so callers have a deterministic "oldest first" pick without a separate
+// sort.
 export function pickEligible(
   snapshots: IssueSnapshot[],
   openPRs: OpenPRClosing[],

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Issue, makeBranch } from "./plan";
+import { Issue, makeBranch } from "./issue";
 
 describe("makeBranch", () => {
   test("derives a kebab slug from a normal title", () => {

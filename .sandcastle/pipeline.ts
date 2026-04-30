@@ -4,7 +4,7 @@ import type { ExclusionReason } from "./eligibility";
 import { fetchIssueLiveState } from "./gh";
 import type { OpenPRClosing } from "./gh";
 import { agent, streamLogger } from "./harness";
-import type { Issue } from "./plan";
+import type { Issue } from "./issue";
 import { isSandboxStartupRetryable, retryWithBackoff } from "./retry";
 import { AGENTS, COPY_TO_WORKTREE, INSTALL_AND_VERIFY, LABEL } from "./workflow";
 

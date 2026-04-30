@@ -105,7 +105,7 @@ describe("pickEligible", () => {
     expect(result.excluded).toHaveLength(2);
   });
 
-  test("returned issues are validated against the plan.ts Issue schema (branch matches regex)", () => {
+  test("returned issues are validated against the issue.ts Issue schema (branch matches regex)", () => {
     const result = pickEligible([snapshot({ title: "Test  it" })], [], cfg);
     const branch = result.eligible[0]?.branch ?? "";
     expect(branch).toMatch(/^sandcastle\/issue-\d+-[a-z0-9._-]+$/);
