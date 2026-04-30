@@ -90,10 +90,11 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   let watchedPaths: string[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   let driftedSet: Set<string> = new Set();
+  let stopped = false;
 
   async function doCheck(): Promise<void> {
     const results = await detectDrift(emittedJsonPath, readFile);
-    if (results.length === 0) return;
+    if (stopped || results.length === 0) return;
 
     const nowDrifted = results.filter((r) => r.status === 'drifted').map((r) => r.path);
     const wasDrifted = driftedSet.size > 0;
@@ -137,9 +138,11 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
 
   return {
     start() {
+      stopped = false;
       void doCheck();
     },
     stop() {
+      stopped = true;
       for (const w of watchers) w.close();
       watchers = [];
       watchedPaths = [];

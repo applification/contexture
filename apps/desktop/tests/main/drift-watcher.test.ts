@@ -336,4 +336,37 @@ describe('createDriftWatcher', () => {
     await watcher.check();
     expect(onDrift).toHaveBeenCalledTimes(2);
   });
+
+  it('does not fire callbacks after stop() during in-flight check', async () => {
+    const original = 'defineSchema({})';
+    const edited = 'defineSchema({ posts: defineTable({}) })';
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+    let resolveFileRead: ((value: string) => void) | null = null;
+    const readFile = async (path: string): Promise<string> => {
+      if (path === EMITTED) return makeManifestSingleHash(sha256(original));
+      if (path === WATCHED) {
+        return new Promise<string>((resolve) => {
+          resolveFileRead = resolve;
+        });
+      }
+      throw new Error('unexpected');
+    };
+    const onDrift = vi.fn();
+    const onResolved = vi.fn();
+    const watcher = createDriftWatcher({
+      emittedJsonPath: EMITTED,
+      onDrift,
+      onResolved,
+      readFile,
+    });
+
+    const checkPromise = watcher.check();
+    await flush();
+    watcher.stop();
+    resolveFileRead?.(edited);
+    await checkPromise;
+
+    expect(onDrift).not.toHaveBeenCalled();
+    expect(onResolved).not.toHaveBeenCalled();
+  });
 });
