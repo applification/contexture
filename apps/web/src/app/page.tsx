@@ -1,4 +1,5 @@
 import { ArrowRight, Brain, Download, GitGraph, Layers, Network, Shield, Zap } from 'lucide-react';
+import { DownloadButton } from '@/components/download-button';
 import { TrackedLink } from '@/components/tracked-link';
 import { AnimatedGraph } from '@/components/ui/animated-graph';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
@@ -406,16 +407,14 @@ export default function Home() {
           <p className="text-muted-foreground mb-10">
             Free and open source. Available for macOS, Windows, and Linux.
           </p>
-          <TrackedLink
-            event="download_click"
-            properties={{ os: 'unknown', location: 'footer_cta' }}
-            href="/download"
+          <DownloadButton
+            location="footer_cta"
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             <Download className="size-4" />
             Download latest release
             <ArrowRight className="size-4" />
-          </TrackedLink>
+          </DownloadButton>
           <p className="text-xs text-muted-foreground mt-6">
             MIT License. Requires macOS 12+, Windows 10+, or Ubuntu 20.04+.
           </p>
