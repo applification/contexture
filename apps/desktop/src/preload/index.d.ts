@@ -182,13 +182,14 @@ export interface ContextureDriftAPI {
 export interface ContextureReconcileAPI {
   /**
    * Fire a one-shot Claude query that proposes IR ops to align the
-   * current schema with the user's hand-edited Convex source. The
+   * current schema with the user's hand-edited on-disk source. The
    * returned `ops` array is raw — the renderer validates each entry
    * via the op-applier before showing it in the modal.
    */
   query: (payload: {
     irJson: string;
-    convexSource: string;
+    onDiskSource: string;
+    targetKind: string;
   }) => Promise<{ ok: boolean; ops?: unknown[]; error?: string }>;
 }
 

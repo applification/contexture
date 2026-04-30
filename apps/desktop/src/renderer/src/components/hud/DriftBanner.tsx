@@ -4,8 +4,8 @@
  * outside Contexture (drift detected by the main-process watcher).
  *
  * Single-file drift shows the file path; multi-file drift shows a count.
- * "Review changes" opens the reconcile modal; "Dismiss" hides the banner
- * until the next drift event.
+ * "Review changes" opens the reconcile modal for the first drifted file;
+ * "Dismiss" hides the banner until the next drift event.
  */
 import { AlertTriangle } from 'lucide-react';
 import { useMemo } from 'react';
@@ -41,6 +41,11 @@ export function DriftBanner(): React.JSX.Element | null {
 
   if (!message) return null;
 
+  // For multi-file drift, review the first drifted file. The user can
+  // dismiss and let the banner re-appear for subsequent files, or use
+  // the per-file list that drift detection surfaces.
+  const reviewTarget = driftedPaths[0];
+
   return (
     <div
       role="alert"
@@ -53,7 +58,7 @@ export function DriftBanner(): React.JSX.Element | null {
         variant="outline"
         size="sm"
         className="h-6 px-2 text-xs"
-        onClick={openReconcile}
+        onClick={() => reviewTarget && openReconcile(reviewTarget)}
         aria-label="Review changes"
       >
         Review changes

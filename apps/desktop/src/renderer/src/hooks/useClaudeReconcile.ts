@@ -3,14 +3,15 @@
  * when the modal opens and feeds the result into the reconcile store.
  *
  * Sequence:
- *   1. Read the on-disk Convex source via the legacy preload helper
- *      `window.api.readFileSilent` (already wired to Node fs).
+ *   1. Read the on-disk source for the target path via the legacy preload
+ *      helper `window.api.readFileSilent` (already wired to Node fs).
  *   2. Snapshot the current IR from the undo store.
- *   3. Round-trip via `window.contexture.reconcile.query`.
- *   4. Validate each returned op by attempting to apply it to a copy
+ *   3. Derive the target kind from the file path.
+ *   4. Round-trip via `window.contexture.reconcile.query`.
+ *   5. Validate each returned op by attempting to apply it to a copy
  *      of the schema — invalid entries are dropped with a console
  *      warning rather than failing the whole load.
- *   5. Push the surviving ops into the reconcile store.
+ *   6. Push the surviving ops into the reconcile store.
  *
  * Drops state updates after the modal closes (re-mounts on next
  * `open()` get a fresh effect run).
@@ -18,9 +19,8 @@
 import { useEffect, useRef } from 'react';
 import { useDocumentStore } from '../store/document';
 import { type ApplyResult, apply, type Op } from '../store/ops';
-import { type ReconcileOp, useReconcileStore } from '../store/reconcile';
+import { type ReconcileOp, targetKindFor, useReconcileStore } from '../store/reconcile';
 import { useUndoStore } from '../store/undo';
-import { convexPathFor } from './useDrift';
 
 interface RawReconcileEntry {
   op: unknown;
@@ -46,25 +46,24 @@ export function useClaudeReconcile(): void {
 
     const reconcileStore = useReconcileStore.getState();
     const docStore = useDocumentStore.getState();
-    const filePath = docStore.filePath;
     const mode = docStore.mode;
 
-    if (mode !== 'project' || !filePath) {
+    if (mode !== 'project') {
       reconcileStore.setError('Reconcile is only available for project-mode documents.');
       return;
     }
 
-    const watchedPath = convexPathFor(filePath);
-    if (!watchedPath) {
-      reconcileStore.setError('Could not derive Convex schema path from the open IR.');
+    const targetPath = reconcileStore.targetPath;
+    if (!targetPath) {
+      reconcileStore.setError('No target file specified for reconciliation.');
       return;
     }
 
     void (async () => {
-      const convexSource = await window.api?.readFileSilent(watchedPath);
+      const onDiskSource = await window.api?.readFileSilent(targetPath);
       if (cancelledRef.current) return;
-      if (convexSource === null || convexSource === undefined) {
-        reconcileStore.setError('Cannot read convex/schema.ts.');
+      if (onDiskSource === null || onDiskSource === undefined) {
+        reconcileStore.setError(`Cannot read ${targetPath}.`);
         return;
       }
 
@@ -75,11 +74,14 @@ export function useClaudeReconcile(): void {
         return;
       }
 
+      const targetKind = targetKindFor(targetPath);
+
       let result: { ok: boolean; ops?: unknown[]; error?: string };
       try {
         result = await reconcileApi.query({
           irJson: JSON.stringify(schema),
-          convexSource,
+          onDiskSource,
+          targetKind,
         });
       } catch (err) {
         if (cancelledRef.current) return;
@@ -116,7 +118,7 @@ export function useClaudeReconcile(): void {
       }
 
       // Empty array is a valid result — schemas already aligned.
-      reconcileStore.setReady(validated, convexSource);
+      reconcileStore.setReady(validated, onDiskSource);
     })();
 
     return () => {
