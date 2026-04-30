@@ -17,7 +17,7 @@
  * Cancel → leave drift state alone.
  */
 
-import { baseNameFor } from '@contexture/core';
+import { baseNameFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useClaudeReconcile } from '@renderer/hooks/useClaudeReconcile';

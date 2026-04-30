@@ -19,6 +19,7 @@
     "./migrations": "./src/migrations/index.ts",
     "./ops": "./src/ops.ts",
     "./op-tools": "./src/op-tools.ts",
+    "./paths": "./src/paths.ts",
     "./pipeline": "./src/pipeline.ts"
   },
   "scripts": {
