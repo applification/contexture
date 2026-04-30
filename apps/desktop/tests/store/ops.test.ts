@@ -510,7 +510,7 @@ describe('apply', () => {
   });
 
   // update_value
-  it('update_value: patches a value entry, rejects missing value, errors on non-enum', () => {
+  it('update_value: patches description on an existing value', () => {
     const base: Schema = {
       version: '1',
       types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'viewer' }] }],
@@ -526,7 +526,44 @@ describe('apply', () => {
     const e = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'enum' }>;
     expect(e.values[0]).toEqual({ value: 'admin', description: 'Full access' });
     expect(e.values[1]).toEqual({ value: 'viewer' });
+  });
 
+  it('update_value: renames a value', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'viewer' }] }],
+    };
+    const s1 = ok(
+      apply(base, {
+        kind: 'update_value',
+        typeName: 'Role',
+        value: 'admin',
+        patch: { value: 'owner' },
+      }),
+    );
+    const e = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'enum' }>;
+    expect(e.values.map((v) => v.value)).toEqual(['owner', 'viewer']);
+  });
+
+  it('update_value: rejects rename to an already-existing value', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'viewer' }] }],
+    };
+    const collision = apply(base, {
+      kind: 'update_value',
+      typeName: 'Role',
+      value: 'admin',
+      patch: { value: 'viewer' },
+    });
+    expect('error' in collision).toBe(true);
+  });
+
+  it('update_value: rejects missing value, non-enum type, and unknown type', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }] }],
+    };
     const missing = apply(base, {
       kind: 'update_value',
       typeName: 'Role',
@@ -534,10 +571,21 @@ describe('apply', () => {
       patch: {},
     });
     expect('error' in missing).toBe(true);
+
+    const notEnum: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'User', fields: [] }],
+    };
+    expect(
+      'error' in apply(notEnum, { kind: 'update_value', typeName: 'User', value: 'x', patch: {} }),
+    ).toBe(true);
+    expect(
+      'error' in apply(base, { kind: 'update_value', typeName: 'Missing', value: 'x', patch: {} }),
+    ).toBe(true);
   });
 
   // remove_value
-  it('remove_value: drops a value by name, rejects missing, errors on non-enum', () => {
+  it('remove_value: drops a value by name', () => {
     const base: Schema = {
       version: '1',
       types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'viewer' }] }],
@@ -545,9 +593,27 @@ describe('apply', () => {
     const s1 = ok(apply(base, { kind: 'remove_value', typeName: 'Role', value: 'admin' }));
     const e = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'enum' }>;
     expect(e.values.map((v) => v.value)).toEqual(['viewer']);
+  });
 
-    const missing = apply(base, { kind: 'remove_value', typeName: 'Role', value: 'nope' });
-    expect('error' in missing).toBe(true);
+  it('remove_value: rejects missing value, non-enum type, and unknown type', () => {
+    const base: Schema = {
+      version: '1',
+      types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }] }],
+    };
+    expect('error' in apply(base, { kind: 'remove_value', typeName: 'Role', value: 'nope' })).toBe(
+      true,
+    );
+
+    const notEnum: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'User', fields: [] }],
+    };
+    expect('error' in apply(notEnum, { kind: 'remove_value', typeName: 'User', value: 'x' })).toBe(
+      true,
+    );
+    expect(
+      'error' in apply(base, { kind: 'remove_value', typeName: 'Missing', value: 'admin' }),
+    ).toBe(true);
   });
 
   // replace_schema is agnostic about semantic errors (unresolved refs etc.)

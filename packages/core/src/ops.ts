@@ -289,6 +289,13 @@ function updateValue(
     if (vi === -1) return { error: `value "${value}" not found on "${typeName}"` };
     const entry = t.values[vi];
     if (!entry) return { error: `value "${value}" not found on "${typeName}"` };
+    if (
+      patch.value !== undefined &&
+      patch.value !== value &&
+      t.values.some((v) => v.value === patch.value)
+    ) {
+      return { error: `value "${patch.value}" already exists on "${typeName}"` };
+    }
     const values = [...t.values];
     values[vi] = { ...entry, ...patch };
     return { ...t, values };
