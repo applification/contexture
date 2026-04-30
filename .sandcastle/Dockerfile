@@ -72,13 +72,27 @@ RUN agent-browser install
 # browser actions (navigate, click, screenshot, etc.) without further setup.
 RUN npx --yes skills add https://github.com/vercel-labs/agent-browser --skill agent-browser
 
+# Wire `gh` as the git credential helper for github.com / gist.github.com.
+# `GH_TOKEN` is injected by sandcastle at runtime, so `gh auth git-credential`
+# resolves credentials on demand and `git push` works without per-run setup.
+# We pre-bake the config in the image (rather than running `gh auth setup-git`)
+# because that command requires `gh` to already be authenticated — `GH_TOKEN`
+# isn't available at build time.
+#
+# Sandcastle's own setup appends user.name/user.email/safe.directory to
+# ~/.gitconfig at sandbox start, so the file must be world-writable (the
+# container runs as the host UID, which doesn't match the `agent` user).
+RUN git config --global credential."https://github.com".helper '!gh auth git-credential' \
+  && git config --global credential."https://gist.github.com".helper '!gh auth git-credential'
+
 # Claude Code's install creates ~/.claude, ~/.claude.json, and ~/.cache
 # owned by UID 1000. Sandcastle runs the container as the host UID, so
 # anything the runtime UID needs to read or write must be made world-
 # writable (otherwise Claude hangs silently on its config, and bun
 # install's postinstall scripts — electron, etc. — fail trying to write
-# their per-tool subdirs under ~/.cache).
-RUN chmod -R a+rwX /home/agent/.claude /home/agent/.claude.json /home/agent/.local /home/agent/.cache /home/agent/.npm
+# their per-tool subdirs under ~/.cache). The same applies to .gitconfig
+# (sandcastle appends user.name/user.email/safe.directory at sandbox start).
+RUN chmod -R a+rwX /home/agent/.claude /home/agent/.claude.json /home/agent/.local /home/agent/.cache /home/agent/.npm /home/agent/.gitconfig
 
 # Add Claude to PATH and pin HOME for non-passwd UIDs. When sandcastle
 # runs the container as the host UID (which has no /etc/passwd entry),
