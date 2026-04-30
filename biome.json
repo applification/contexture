@@ -91,5 +91,29 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@contexture/stdlib": "Apps must import runtime types via @contexture/runtime, not @contexture/stdlib. (Escape hatch: @contexture/stdlib/registry is allowed for editor tooling — see packages/stdlib/src/registry.ts.)",
+                  "@contexture/stdlib/common": "Use @contexture/runtime/common instead.",
+                  "@contexture/stdlib/identity": "Use @contexture/runtime/identity instead.",
+                  "@contexture/stdlib/place": "Use @contexture/runtime/place instead.",
+                  "@contexture/stdlib/money": "Use @contexture/runtime/money instead.",
+                  "@contexture/stdlib/contact": "Use @contexture/runtime/contact instead."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
