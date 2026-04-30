@@ -3,6 +3,7 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
 import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./github";
+import { enforcementFor } from "./enforcement";
 import { agent, emitRunStart, emitUsageFromRun, streamLogger } from "./harness";
 import type { AgentSpec } from "./harness";
 import type { Issue } from "./issue";
@@ -160,6 +161,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
     const docsOnly = isDocsOnly(issue);
     const implementerSpec = docsOnly ? AGENTS.implementerDocs : AGENTS.implementer;
+
+    await enforcementFor(implementerSpec)?.install(sandbox.worktreePath);
 
     const issuePromptArgs = {
       ISSUE_NUMBER: String(issue.number),

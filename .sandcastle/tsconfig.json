@@ -9,6 +9,6 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "**/*.ts"],
   "exclude": ["worktrees", "logs"]
 }

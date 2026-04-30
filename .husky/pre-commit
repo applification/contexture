@@ -1,2 +1,9 @@
-bun run check
+if [ "$(git symbolic-ref --short HEAD 2>/dev/null)" = "main" ]; then
+  echo "Refusing to commit on main. Create a branch:"
+  echo "  git checkout -b <branch-name>"
+  exit 1
+fi
+
+bunx lint-staged
+bun run typecheck
 bun run test
