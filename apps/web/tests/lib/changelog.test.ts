@@ -98,4 +98,74 @@ describe('fetchReleases', () => {
 
     expect(releases).toEqual([]);
   });
+
+  it('returns empty array when all releases are drafts or prereleases', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v2.0.0-rc',
+          name: 'v2.0.0-rc',
+          body: null,
+          published_at: '2024-04-01T00:00:00Z',
+          draft: false,
+          prerelease: true,
+        },
+        {
+          tag_name: 'v2.0.0-draft',
+          name: null,
+          body: null,
+          published_at: '2024-04-02T00:00:00Z',
+          draft: true,
+          prerelease: false,
+        },
+      ],
+    } as Response);
+
+    const releases = await fetchReleases();
+
+    expect(releases).toEqual([]);
+  });
+
+  it('returns releases with null body without throwing', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v1.0.0',
+          name: 'v1.0.0',
+          body: null,
+          published_at: '2024-01-01T00:00:00Z',
+          draft: false,
+          prerelease: false,
+        },
+      ],
+    } as Response);
+
+    const releases = await fetchReleases();
+
+    expect(releases).toHaveLength(1);
+    expect(releases[0].body).toBeNull();
+  });
+
+  it('returns releases with null name without throwing', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          tag_name: 'v1.0.0',
+          name: null,
+          body: 'Some changes',
+          published_at: '2024-01-01T00:00:00Z',
+          draft: false,
+          prerelease: false,
+        },
+      ],
+    } as Response);
+
+    const releases = await fetchReleases();
+
+    expect(releases).toHaveLength(1);
+    expect(releases[0].name).toBeNull();
+  });
 });

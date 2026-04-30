@@ -2,8 +2,8 @@ const GITHUB_RELEASES_API = 'https://api.github.com/repos/applification/contextu
 
 export interface GitHubRelease {
   tag_name: string;
-  name: string;
-  body: string;
+  name: string | null;
+  body: string | null;
   published_at: string;
   draft: boolean;
   prerelease: boolean;
