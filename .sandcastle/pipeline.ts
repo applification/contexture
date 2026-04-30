@@ -90,10 +90,9 @@ export async function runIssuePipeline(
   ctx: PipelineContext,
 ): Promise<IssueOutcome> {
   // Reconciliation-lite: re-check the issue's live state before creating a
-  // sandbox. The window between iteration plan and per-issue dispatch can be
-  // 5–30 minutes when MAX_PARALLEL slots are saturated; an issue closed,
-  // relabelled, or claimed by a freshly-opened PR in that window shouldn't
-  // burn a multi-minute sandbox start. The openPRs cache is the
+  // sandbox. Even with one issue per iteration the snapshot can age (a PR
+  // opens elsewhere, the issue gets closed) and we don't want to burn a
+  // multi-minute sandbox start on stale state. The openPRs cache is the
   // iteration-start snapshot — we deliberately don't re-fetch PRs per issue.
   const live = await fetchIssueLiveState(issue.number);
   const verdict = evaluate(live, ctx.openPRs, { label: LABEL });

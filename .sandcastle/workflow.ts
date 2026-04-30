@@ -11,8 +11,11 @@ export const LABEL = "Sandcastle";
 
 // ---------- Orchestrator limits ----------
 
+// One issue per iteration, sequentially. Parallelism was removed because the
+// only thing protecting it (the LLM-based subset selector) was an expensive
+// guess at file conflicts, and merge conflicts on overlapping PRs are a
+// normal git outcome — not worth a per-iteration LLM round-trip to avoid.
 export const MAX_ITERATIONS = 10;
-export const MAX_PARALLEL = 4;
 
 // ---------- Sandbox setup ----------
 
@@ -71,16 +74,6 @@ export type AgentSpec = ClaudeCodeSpec | CodexSpec | OpenCodeSpec | PiSpec;
 // docs-only branching, the conditional reviewer skip) stays in main.ts —
 // only the agent invocation parameters live here.
 export const AGENTS = {
-  // Subset selector. Invoked only when pickEligible() returns 2+ candidates
-  // (count-gated; see main.ts). Job is conflict avoidance among already-
-  // eligible issues, not building a dependency graph from scratch — hence
-  // medium effort, not high.
-  subsetSelector: {
-    provider: "claudeCode",
-    model: "claude-sonnet-4-6",
-    effort: "medium",
-    promptPath: "./.sandcastle/select-subset-prompt.md",
-  },
   implementer: {
     provider: "claudeCode",
     model: "claude-sonnet-4-6",

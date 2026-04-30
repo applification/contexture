@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
-import { AGENTS, LABEL, MAX_ITERATIONS, MAX_PARALLEL } from "./workflow";
+import { AGENTS, LABEL, MAX_ITERATIONS } from "./workflow";
 
 describe("workflow config", () => {
-  test("AGENTS exposes all five expected keys", () => {
+  test("AGENTS exposes the four expected keys", () => {
     expect(Object.keys(AGENTS).sort()).toEqual(
-      ["implementer", "implementerDocs", "prOpener", "reviewer", "subsetSelector"].sort(),
+      ["implementer", "implementerDocs", "prOpener", "reviewer"].sort(),
     );
   });
 
@@ -26,17 +26,8 @@ describe("workflow config", () => {
     expect(LABEL.length).toBeGreaterThan(0);
   });
 
-  test("MAX_ITERATIONS and MAX_PARALLEL are positive integers", () => {
+  test("MAX_ITERATIONS is a positive integer", () => {
     expect(Number.isInteger(MAX_ITERATIONS)).toBe(true);
     expect(MAX_ITERATIONS).toBeGreaterThan(0);
-    expect(Number.isInteger(MAX_PARALLEL)).toBe(true);
-    expect(MAX_PARALLEL).toBeGreaterThan(0);
-  });
-
-  test("select-subset-prompt.md references the placeholders main.ts injects", () => {
-    const content = readFileSync(AGENTS.subsetSelector.promptPath, "utf8");
-    expect(content).toContain("{{LABEL}}");
-    expect(content).toContain("{{MAX_PARALLEL}}");
-    expect(content).toContain("{{CANDIDATES_JSON}}");
   });
 });
