@@ -117,8 +117,17 @@ const OP_CATALOGUE: OpSpec[] = [
     name: 'update_field',
     shape: '{ typeName: string; fieldName: string; patch: Partial<FieldDef> }',
   },
-  { name: 'delete_field', shape: '{ typeName: string; fieldName: string }' },
+  { name: 'remove_field', shape: '{ typeName: string; fieldName: string }' },
   { name: 'reorder_fields', shape: '{ typeName: string; order: string[] }' },
+  {
+    name: 'add_value',
+    shape: '{ typeName: string; value: string; description?: string }',
+  },
+  {
+    name: 'update_value',
+    shape: '{ typeName: string; value: string; patch: { value?: string; description?: string } }',
+  },
+  { name: 'remove_value', shape: '{ typeName: string; value: string }' },
   { name: 'add_variant', shape: '{ typeName: string; variant: string }' },
   { name: 'set_discriminator', shape: '{ typeName: string; discriminator: string }' },
   { name: 'add_import', shape: '{ import: ImportDecl }' },

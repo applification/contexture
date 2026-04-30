@@ -29,7 +29,15 @@ export type Op =
   | { kind: 'delete_type'; name: string }
   | { kind: 'add_field'; typeName: string; field: FieldDef; index?: number }
   | { kind: 'update_field'; typeName: string; fieldName: string; patch: Partial<FieldDef> }
-  | { kind: 'delete_field'; typeName: string; fieldName: string }
+  | { kind: 'remove_field'; typeName: string; fieldName: string }
+  | { kind: 'add_value'; typeName: string; value: string; description?: string }
+  | {
+      kind: 'update_value';
+      typeName: string;
+      value: string;
+      patch: { value?: string; description?: string };
+    }
+  | { kind: 'remove_value'; typeName: string; value: string }
   | { kind: 'reorder_fields'; typeName: string; order: string[] }
   | { kind: 'add_variant'; typeName: string; variant: string }
   | { kind: 'set_discriminator'; typeName: string; discriminator: string }
@@ -57,8 +65,14 @@ export function apply(schema: Schema, op: Op): ApplyResult {
       return addField(schema, op.typeName, op.field, op.index);
     case 'update_field':
       return updateField(schema, op.typeName, op.fieldName, op.patch);
-    case 'delete_field':
-      return deleteField(schema, op.typeName, op.fieldName);
+    case 'remove_field':
+      return removeField(schema, op.typeName, op.fieldName);
+    case 'add_value':
+      return addValue(schema, op.typeName, op.value, op.description);
+    case 'update_value':
+      return updateValue(schema, op.typeName, op.value, op.patch);
+    case 'remove_value':
+      return removeValue(schema, op.typeName, op.value);
     case 'reorder_fields':
       return reorderFields(schema, op.typeName, op.order);
     case 'add_variant':
@@ -203,7 +217,7 @@ function updateField(
   });
 }
 
-function deleteField(schema: Schema, typeName: string, fieldName: string): ApplyResult {
+function removeField(schema: Schema, typeName: string, fieldName: string): ApplyResult {
   return withObject(schema, typeName, (t) => {
     if (!t.fields.some((f) => f.name === fieldName)) {
       return { error: `field "${fieldName}" not found on "${typeName}"` };
@@ -225,6 +239,68 @@ function reorderFields(schema: Schema, typeName: string, order: string[]): Apply
       next.push(f);
     }
     return { ...t, fields: next };
+  });
+}
+
+// ── enum values ──────────────────────────────────────────────────────────
+
+type EnumType = Extract<TypeDef, { kind: 'enum' }>;
+
+function withEnum(
+  schema: Schema,
+  typeName: string,
+  mutate: (t: EnumType) => EnumType | { error: string },
+): ApplyResult {
+  const idx = schema.types.findIndex((t) => t.name === typeName);
+  if (idx === -1) return { error: `type "${typeName}" not found` };
+  const target = schema.types[idx];
+  if (!target) return { error: `type "${typeName}" not found` };
+  if (target.kind !== 'enum') return { error: `type "${typeName}" is not an enum` };
+  const result = mutate(target);
+  if ('error' in result) return result;
+  const types = [...schema.types];
+  types[idx] = result;
+  return { schema: { ...schema, types } };
+}
+
+function addValue(
+  schema: Schema,
+  typeName: string,
+  value: string,
+  description: string | undefined,
+): ApplyResult {
+  return withEnum(schema, typeName, (t) => {
+    if (t.values.some((v) => v.value === value)) {
+      return { error: `value "${value}" already exists on "${typeName}"` };
+    }
+    const entry = description !== undefined ? { value, description } : { value };
+    return { ...t, values: [...t.values, entry] };
+  });
+}
+
+function updateValue(
+  schema: Schema,
+  typeName: string,
+  value: string,
+  patch: { value?: string; description?: string },
+): ApplyResult {
+  return withEnum(schema, typeName, (t) => {
+    const vi = t.values.findIndex((v) => v.value === value);
+    if (vi === -1) return { error: `value "${value}" not found on "${typeName}"` };
+    const entry = t.values[vi];
+    if (!entry) return { error: `value "${value}" not found on "${typeName}"` };
+    const values = [...t.values];
+    values[vi] = { ...entry, ...patch };
+    return { ...t, values };
+  });
+}
+
+function removeValue(schema: Schema, typeName: string, value: string): ApplyResult {
+  return withEnum(schema, typeName, (t) => {
+    if (!t.values.some((v) => v.value === value)) {
+      return { error: `value "${value}" not found on "${typeName}"` };
+    }
+    return { ...t, values: t.values.filter((v) => v.value !== value) };
   });
 }
 

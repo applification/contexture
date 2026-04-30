@@ -76,12 +76,12 @@ describe('handleKeyDown', () => {
     ).toBeNull();
   });
 
-  it('Delete with selected field → delete_field op', () => {
+  it('Delete with selected field → remove_field op', () => {
     expect(
       handleKeyDown({ key: 'Delete', metaKey: false, ctrlKey: false, shiftKey: false }, fieldSel),
     ).toEqual({
       kind: 'op',
-      op: { kind: 'delete_field', typeName: 'Plot', fieldName: 'name' },
+      op: { kind: 'remove_field', typeName: 'Plot', fieldName: 'name' },
     });
   });
 
@@ -148,6 +148,6 @@ describe('menu builders', () => {
   it('menuForField includes edit/delete', () => {
     const items = menuForField('Plot', 'name');
     expect(items.map((i) => i.label)).toEqual(['Edit field…', 'Delete field']);
-    expect(items[1].op).toEqual({ kind: 'delete_field', typeName: 'Plot', fieldName: 'name' });
+    expect(items[1].op).toEqual({ kind: 'remove_field', typeName: 'Plot', fieldName: 'name' });
   });
 });

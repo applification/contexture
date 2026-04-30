@@ -78,7 +78,7 @@ export function handleKeyDown(event: KeyEvent, selection: CanvasSelection): KeyA
     if (selection.typeName && selection.fieldName) {
       return {
         kind: 'op',
-        op: { kind: 'delete_field', typeName: selection.typeName, fieldName: selection.fieldName },
+        op: { kind: 'remove_field', typeName: selection.typeName, fieldName: selection.fieldName },
       };
     }
     if (selection.typeName) {
@@ -141,7 +141,7 @@ export function menuForField(typeName: string, fieldName: string): MenuItem[] {
     {
       label: 'Delete field',
       destructive: true,
-      op: { kind: 'delete_field', typeName, fieldName },
+      op: { kind: 'remove_field', typeName, fieldName },
     },
   ];
 }
