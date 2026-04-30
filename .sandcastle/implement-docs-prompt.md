@@ -19,8 +19,7 @@ Work on branch {{BRANCH}}. This is a documentation-only change — markdown file
 
 Make a git commit. The commit message must:
 
-1. Start with `RALPH:` prefix
-2. Reference the issue (e.g. `RALPH: Update README sandcastle section (issue #{{ISSUE_NUMBER}})`)
+1. Reference the issue (e.g. `Docs: Update README sandcastle section (issue #{{ISSUE_NUMBER}})`)
 
 Keep it concise.
 
