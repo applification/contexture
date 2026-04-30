@@ -647,10 +647,7 @@ export default function BrandPage() {
             >
               GitHub
             </a>
-            <a
-              href="https://github.com/applification/contexture/releases"
-              className="hover:text-foreground transition-colors"
-            >
+            <a href="/changelog" className="hover:text-foreground transition-colors">
               Changelog
             </a>
           </div>
