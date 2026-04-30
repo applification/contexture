@@ -100,6 +100,26 @@ export function emitUsageFromRun(
   });
 }
 
+// Emit a phase outcome record. Used by the orchestrator to track per-phase
+// commit counts so we can answer questions like "how often does the reviewer
+// actually change anything?" without scraping git history.
+export function emitPhaseOutcome(
+  phase: string,
+  iter: number,
+  issueNumber: number,
+  commitCount: number,
+): void {
+  appendStreamLine({
+    type: "phase",
+    runId: RUN_ID,
+    phase,
+    iter,
+    issue: issueNumber,
+    commits: commitCount,
+    t: new Date().toISOString(),
+  });
+}
+
 // Build a sandcastle AgentProvider from an AgentSpec. Each provider's options
 // object accepts an optional `effort` (or has no effort at all), so we can
 // always pass options through — no need to branch on whether effort is set.

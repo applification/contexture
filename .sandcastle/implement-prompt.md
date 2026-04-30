@@ -1,3 +1,16 @@
+# TOOLS
+
+**Never use Bash for filesystem operations that have a dedicated tool.** Each Bash call costs ~30–40s of overhead in this sandbox; the dedicated tools are an order of magnitude faster and return structured results. This rule is not a suggestion — measured runs spend most of their wasted time here.
+
+| If you want to…             | Use…             | NOT Bash with…                   |
+| --------------------------- | ---------------- | -------------------------------- |
+| Read a file (whole or part) | `Read`           | `cat` / `head` / `tail` / `less` |
+| Find files by name or glob  | `Glob`           | `find` / `ls` / `fd`             |
+| Search file contents        | `Grep`           | `grep` / `rg` / `ag`             |
+| Edit a file                 | `Edit` / `Write` | `sed` / `awk` / `tee` / heredocs |
+
+Bash is for: running tests, git, gh, package managers, build commands. Nothing else.
+
 # TASK
 
 Fix issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
@@ -13,9 +26,9 @@ Work on branch {{BRANCH}}. Make commits and run tests. Do NOT push the branch, o
 Read only what you need to make this specific change. Do not crawl the whole repo.
 
 1. Start from the issue body — it usually names the files or modules involved.
-   - **If the change is isolated to 1–3 named files**, read them directly.
-   - **If the issue spans multiple modules / layers, or you don't yet know which files to touch**, dispatch a single `Agent` call with `subagent_type: "Explore"` to map the relevant code in one round trip. Do not do 10+ narrow `find`/`grep` calls to discover the same thing — that wastes context.
-2. Use `grep` / `rg` to find direct callers and tests of the symbols you'll change. Read the closest tests.
+   - **If the change is isolated to 1–3 named files**, read them directly with `Read`.
+   - **If the issue spans multiple modules / layers, or you don't yet know which files to touch**, dispatch a single `Agent` call with `subagent_type: "Explore"` to map the relevant code in one round trip. Do not do 10+ narrow searches to discover the same thing — that wastes context.
+2. Use `Grep` to find direct callers and tests of the symbols you'll change. Read the closest tests.
 3. Stop exploring once you can describe the change you're about to make. If you find yourself reading unrelated code "for context", that's a signal to stop.
 
 Avoid: opening every file in a directory, reading framework/config files unrelated to the change, fetching docs you can already see in the source.
@@ -35,11 +48,13 @@ Run `bun run ci` to ensure typecheck, tests, and lint all pass. This is mandator
 
 When a lint/typecheck/test command fails, read the **full error output** before re-running. Do not pipe to `head` / `tail` / narrow `grep` on the first failure — you will miss the actual error and re-run unnecessarily. Once you have the error, fix it and verify with one re-run.
 
+**Never run the same command twice with identical args.** If a command appears to have failed, look harder at the output you already have — the answer is in the previous result, not in re-running. Re-running a slow command (`bun run ci` takes ~40s; `gh pr create` is irreversible) wastes time at best and double-submits at worst.
+
 # COMMIT
 
 Make a git commit. The commit message must:
 
-1. Start with `RALPH:` prefix
+1. Start with `IMPLEMENT:` prefix
 2. Include task completed + PRD reference
 3. Key decisions made
 4. Files changed
