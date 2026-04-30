@@ -33,13 +33,7 @@ const COPY_TO_WORKTREE: readonly string[] = ["apps/desktop/.env", "apps/web/.env
 // 0 even when individual extractions are mangled, so we follow with `turbo
 // typecheck`, which resolves and loads imports across every workspace and
 // fails loudly if a package's main entry is missing.
-//
-// `gh auth setup-git` wires git to use the gh CLI as a credential helper.
-// gh is already authed via $GH_TOKEN (injected by sandcastle), but git
-// itself has no helper configured — without this, `git push` from the
-// pr-opener phase fails and the agent burns ~10 calls discovering a
-// workable credential scheme.
-const INSTALL_AND_VERIFY = "gh auth setup-git && bun install && bun run typecheck";
+const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
 
 // ---------- Agent specs ----------
 
@@ -49,6 +43,11 @@ const INSTALL_AND_VERIFY = "gh auth setup-git && bun install && bun run typechec
 // on routine work. Reviewer is the exception: edge-case stress-testing
 // genuinely benefits from extended thinking, and it's the last gate before a
 // human review.
+//
+// PR creation is not an agent — it's a host-side `git push` + `gh pr create
+// --fill` after the sandbox sync. Inside the container the agent has no
+// credentials for the remote, and an LLM round-trip to write a PR body
+// duplicates work the conventional commits already do.
 const AGENTS = {
   implementer: {
     provider: "claudeCode",
@@ -67,12 +66,6 @@ const AGENTS = {
     model: "claude-sonnet-4-6",
     effort: "high",
     promptPath: "./.sandcastle/review-prompt.md",
-  },
-  prOpener: {
-    provider: "claudeCode",
-    model: "claude-haiku-4-5-20251001",
-    effort: "low",
-    promptPath: "./.sandcastle/pr-prompt.md",
   },
 } as const satisfies Record<string, AgentSpec>;
 
@@ -103,6 +96,46 @@ async function gitOutput(args: string[], cwd: string): Promise<string> {
   const out = await new Response(proc.stdout).text();
   await proc.exited;
   return out;
+}
+
+// Run a command and surface stderr if it fails. Used for the host-side
+// `git push` and `gh pr create` after the sandbox finishes — we want a
+// clear failure mode, not a silent skip.
+async function runOrFail(cmd: string[], cwd: string): Promise<string> {
+  const proc = Bun.spawn(cmd, { cwd, stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const code = await proc.exited;
+  if (code !== 0) {
+    throw new Error(`${cmd.join(" ")} failed (exit ${code}): ${stderr.trim() || stdout.trim()}`);
+  }
+  return stdout;
+}
+
+// Push the branch and open a PR from the host. Sandcastle has already
+// synced the sandbox commits to the host's branch by the time we get here,
+// so we use the host's existing git/gh credentials — no in-container
+// credential plumbing needed.
+//
+// Title comes from the first commit (via `--fill-first`); body lists all
+// commit subjects on the branch plus `Closes #N` so merging auto-closes
+// the issue. We construct the body explicitly because passing `--body`
+// alongside `--fill` would replace the commit-derived body, and `--fill`
+// alone has no way to append the Closes line.
+async function openPullRequest(branch: string, issueNumber: number, cwd: string): Promise<string> {
+  await runOrFail(["git", "push", "-u", "origin", branch], cwd);
+  const subjects = (await gitOutput(["log", `main..${branch}`, "--reverse", "--format=%s"], cwd))
+    .split("\n")
+    .filter((s) => s.length > 0);
+  const summary = subjects.length > 0 ? subjects.map((s) => `- ${s}`).join("\n") : "- (no commits)";
+  const body = `## Summary\n\n${summary}\n\nCloses #${issueNumber}`;
+  const url = await runOrFail(
+    ["gh", "pr", "create", "--head", branch, "--fill-first", "--body", body],
+    cwd,
+  );
+  return url.trim();
 }
 
 // Files changed by `commits` relative to their first parent. We pass the SHA
@@ -187,10 +220,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     emitUsageFromRun(implementerLogName, iteration, implementResult.iterations);
     emitPhaseOutcome("implementer", iteration, issue.number, implementResult.commits.length);
 
-    // Both reviewer and PR-opener gate on whether *this* implementer run made
-    // commits. Comparing `main..HEAD` would be incorrect when the orchestrator
-    // is launched from a feature branch — every commit the launching branch
-    // had already added on top of main would falsely trigger both phases.
+    // Reviewer and PR creation both gate on whether *this* implementer run
+    // made commits. Comparing `main..HEAD` would be incorrect when the
+    // orchestrator is launched from a feature branch — every commit the
+    // launching branch had already added on top of main would falsely
+    // trigger both phases.
     if (implementResult.commits.length === 0) {
       console.log(`\nIteration ${iteration} complete. #${issue.number} made no progress.`);
       console.log("No progress this iteration. Exiting.");
@@ -224,16 +258,13 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       );
     }
 
-    const prLogName = `iter${iteration}-pr-${issue.number}`;
-    const prResult = await sandbox.run({
-      name: "PR-Opener #" + issue.number,
-      agent: agent(AGENTS.prOpener),
-      promptFile: AGENTS.prOpener.promptPath,
-      promptArgs: issuePromptArgs,
-      logging: streamLogger(prLogName),
-    });
-    emitUsageFromRun(prLogName, iteration, prResult.iterations);
-    emitPhaseOutcome("pr-opener", iteration, issue.number, prResult.commits.length);
+    // PR creation runs on the host: sandcastle has already applied the
+    // sandbox's commits to the host's branch via syncOut, so we push and
+    // open the PR using the host's git/gh credentials. No agent phase —
+    // an LLM round-trip to write the PR body duplicates work the
+    // conventional commits already do.
+    const prUrl = await openPullRequest(issue.branch, issue.number, process.cwd());
+    console.log(`  ✔ PR opened for #${issue.number}: ${prUrl}`);
   } catch (reason) {
     const errorTag =
       typeof reason === "object" && reason !== null && "_tag" in reason
