@@ -1,85 +1,117 @@
 /**
- * `createDriftWatcher` — watches a single file for hand-edits and
- * compares its SHA-256 hash against the expected hash stored in
- * `.contexture/emitted.json`. When the hashes differ the watcher
- * calls `onDrift`; when they match again (because Contexture rewrote
- * the file) it calls `onResolved`.
+ * Drift detection for `@contexture-generated` files.
  *
- * Only `apps/web/convex/schema.ts` is watched — nothing else.
+ * `detectDrift` is a pure function that reads `.contexture/emitted.json`,
+ * hashes every file listed in the manifest, and returns a per-file
+ * status (`match | drifted | unreadable`). It has no side effects and
+ * can be reused by the CLI's file-backed forward (#207).
+ *
+ * `createDriftWatcher` wraps `detectDrift` with `fs.watch` subscriptions
+ * so the Electron main process gets live callbacks when any manifest
+ * file is hand-edited (or returns to its expected hash).
  *
  * Self-write suppression: the DocumentStore writes `emitted.json`
- * before it writes the watched file in the atomic bundle; by the time
+ * before it writes the watched files in the atomic bundle; by the time
  * the watcher fires the hashes already match, so Contexture's own
  * writes are silently ignored.
  */
 import { createHash } from 'node:crypto';
 import { type FSWatcher, promises as fsPromises, watch } from 'node:fs';
 
+// ─── Pure detector ───────────────────────────────────────────────────
+
+export interface DriftResult {
+  path: string;
+  status: 'match' | 'drifted' | 'unreadable';
+}
+
+export async function detectDrift(
+  emittedJsonPath: string,
+  readFile: (path: string) => Promise<string> = (p) => fsPromises.readFile(p, 'utf-8'),
+): Promise<DriftResult[]> {
+  let manifest: { files?: Record<string, string> };
+  try {
+    const raw = await readFile(emittedJsonPath);
+    manifest = JSON.parse(raw) as { files?: Record<string, string> };
+  } catch {
+    return [];
+  }
+
+  const files = manifest.files;
+  if (!files || Object.keys(files).length === 0) return [];
+
+  const results: DriftResult[] = [];
+  for (const [filePath, expectedHash] of Object.entries(files)) {
+    let actual: string | null;
+    try {
+      const content = await readFile(filePath);
+      actual = createHash('sha256').update(content, 'utf8').digest('hex');
+    } catch {
+      actual = null;
+    }
+    if (actual === null) {
+      results.push({ path: filePath, status: 'unreadable' });
+    } else if (actual !== expectedHash) {
+      results.push({ path: filePath, status: 'drifted' });
+    } else {
+      results.push({ path: filePath, status: 'match' });
+    }
+  }
+  return results;
+}
+
+// ─── Watcher ─────────────────────────────────────────────────────────
+
 export interface DriftWatcher {
   start(): void;
   stop(): void;
-  /** Force an immediate hash check (used by window-focus handler). */
   check(): Promise<void>;
-  /** Reset the drifted flag without stopping the watcher (used after dismiss). */
   resetDrifted(): void;
 }
 
 export interface DriftWatcherOptions {
-  /** Absolute path to the file being watched (e.g. `.../convex/schema.ts`). */
-  watchedPath: string;
-  /** Absolute path to `.contexture/emitted.json`. */
   emittedJsonPath: string;
-  onDrift: () => void;
+  onDrift: (paths: string[]) => void;
   onResolved: () => void;
-  /** Debounce delay in ms (default 300). */
   debounceMs?: number;
-  /** Injected file reader — defaults to `fs.promises.readFile`. Tests stub this. */
   readFile?: (path: string) => Promise<string>;
 }
 
 export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   const {
-    watchedPath,
     emittedJsonPath,
     onDrift,
     onResolved,
     debounceMs = 300,
     readFile = (p) => fsPromises.readFile(p, 'utf-8'),
   } = opts;
-  let watcher: FSWatcher | null = null;
+
+  let watchers: FSWatcher[] = [];
+  let watchedPaths: string[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let drifted = false;
-
-  async function computeHash(path: string): Promise<string | null> {
-    try {
-      const content = await readFile(path);
-      return createHash('sha256').update(content, 'utf8').digest('hex');
-    } catch {
-      return null;
-    }
-  }
-
-  async function expectedHash(): Promise<string | null> {
-    try {
-      const raw = await readFile(emittedJsonPath);
-      const manifest = JSON.parse(raw) as { files?: Record<string, string> };
-      return manifest.files?.[watchedPath] ?? null;
-    } catch {
-      return null;
-    }
-  }
+  let driftedSet: Set<string> = new Set();
 
   async function doCheck(): Promise<void> {
-    const [actual, expected] = await Promise.all([computeHash(watchedPath), expectedHash()]);
-    if (actual === null || expected === null) return;
-    const nowDrifted = actual !== expected;
-    if (nowDrifted && !drifted) {
-      drifted = true;
-      onDrift();
-    } else if (!nowDrifted && drifted) {
-      drifted = false;
+    const results = await detectDrift(emittedJsonPath, readFile);
+    if (results.length === 0) return;
+
+    const nowDrifted = results.filter((r) => r.status === 'drifted').map((r) => r.path);
+    const wasDrifted = driftedSet.size > 0;
+    const isDrifted = nowDrifted.length > 0;
+
+    if (isDrifted) {
+      const changed =
+        nowDrifted.length !== driftedSet.size || nowDrifted.some((p) => !driftedSet.has(p));
+      driftedSet = new Set(nowDrifted);
+      if (!wasDrifted || changed) {
+        onDrift(nowDrifted);
+      }
+    } else if (wasDrifted) {
+      driftedSet = new Set();
       onResolved();
     }
+
+    updateWatchers(results.map((r) => r.path));
   }
 
   function scheduleCheck(): void {
@@ -90,23 +122,36 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
     }, debounceMs);
   }
 
+  function updateWatchers(manifestPaths: string[]): void {
+    const newPaths = manifestPaths.filter((p) => !watchedPaths.includes(p));
+    for (const p of newPaths) {
+      try {
+        const w = watch(p, () => scheduleCheck());
+        watchers.push(w);
+      } catch {
+        // File may not exist yet — that's fine, we'll detect on next check.
+      }
+    }
+    watchedPaths = [...new Set([...watchedPaths, ...manifestPaths])];
+  }
+
   return {
     start() {
-      if (watcher) return;
-      watcher = watch(watchedPath, () => scheduleCheck());
+      void doCheck();
     },
     stop() {
-      watcher?.close();
-      watcher = null;
+      for (const w of watchers) w.close();
+      watchers = [];
+      watchedPaths = [];
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
       }
-      drifted = false;
+      driftedSet = new Set();
     },
     check: doCheck,
     resetDrifted() {
-      drifted = false;
+      driftedSet = new Set();
     },
   };
 }

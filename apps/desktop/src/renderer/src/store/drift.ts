@@ -1,24 +1,24 @@
 /**
- * `useDriftStore` — tracks whether the Convex schema file has been
- * hand-edited outside Contexture. Set by drift IPC events from the
- * main process; cleared by user dismissal or when Contexture re-writes
- * the file (bringing hashes back into agreement).
+ * `useDriftStore` — tracks which generated files have been hand-edited
+ * outside Contexture. Set by drift IPC events from the main process;
+ * cleared by user dismissal or when Contexture re-writes the files
+ * (bringing hashes back into agreement).
  */
 import { create } from 'zustand';
 
 interface DriftState {
-  isDrifted: boolean;
-  setDrifted: () => void;
+  driftedPaths: string[];
+  setDrifted: (paths: string[]) => void;
   setResolved: () => void;
   dismiss: () => void;
 }
 
 export const useDriftStore = create<DriftState>((set) => ({
-  isDrifted: false,
-  setDrifted: () => set({ isDrifted: true }),
-  setResolved: () => set({ isDrifted: false }),
+  driftedPaths: [],
+  setDrifted: (paths: string[]) => set({ driftedPaths: paths }),
+  setResolved: () => set({ driftedPaths: [] }),
   dismiss: () => {
-    set({ isDrifted: false });
+    set({ driftedPaths: [] });
     void window.contexture?.drift.dismiss();
   },
 }));

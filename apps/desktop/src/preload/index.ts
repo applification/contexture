@@ -157,8 +157,8 @@ const project = {
 };
 
 const drift = {
-  /** Start watching a file for drift; stops any previous watcher. */
-  watch: (payload: { watchedPath: string; emittedJsonPath: string }): Promise<{ ok: boolean }> =>
+  /** Start watching all manifest files for drift; stops any previous watcher. */
+  watch: (payload: { emittedJsonPath: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('drift:watch', payload) as Promise<{ ok: boolean }>,
   /** Stop the active watcher. */
   unwatch: (): Promise<{ ok: boolean }> =>
@@ -169,8 +169,8 @@ const drift = {
   /** Reset the main-side drifted flag after user dismisses the banner. */
   dismiss: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('drift:dismiss') as Promise<{ ok: boolean }>,
-  onDetected: (listener: () => void) =>
-    subscribe('drift:detected', (() => listener()) as (p: unknown) => void),
+  onDetected: (listener: (payload: { paths: string[] }) => void) =>
+    subscribe('drift:detected', listener as (p: unknown) => void),
   onResolved: (listener: () => void) =>
     subscribe('drift:resolved', (() => listener()) as (p: unknown) => void),
 };
