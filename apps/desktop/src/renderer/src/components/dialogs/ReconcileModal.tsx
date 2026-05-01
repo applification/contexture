@@ -26,6 +26,7 @@ import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emit as emitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
+import { STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';
@@ -62,10 +63,18 @@ function safeEmitForTarget(schema: Schema, targetPath: string, irPath: string | 
         source = emitConvexSchema(schema, irPath ?? undefined);
         break;
       case 'zod':
-        source = emitZod(schema, irPath ?? '<unknown>');
+        source = emitZod(schema, irPath ?? '<unknown>', {
+          stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+        });
         break;
       case 'json-schema':
-        source = `${JSON.stringify(emitJsonSchema(schema, undefined, irPath ?? undefined), null, 2)}\n`;
+        source = `${JSON.stringify(
+          emitJsonSchema(schema, undefined, irPath ?? undefined, {
+            stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+          }),
+          null,
+          2,
+        )}\n`;
         break;
       case 'schema-index':
         source = emitSchemaIndex(irPath ? baseNameFor(irPath) : 'schema', irPath ?? undefined);

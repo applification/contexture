@@ -9,6 +9,10 @@
  * Import handling follows the plan's uniform mechanism:
  *   - Stdlib aliases (`@contexture/<ns>`) become runtime imports from
  *     `@contexture/runtime/<ns>`, importing only the names actually used.
+ *     If `options.stdlibNamespaces` is provided, qualified refs whose
+ *     namespace matches a known stdlib namespace synthesise an import even
+ *     when `schema.imports` doesn't declare one — this matches the
+ *     validator, which treats stdlib namespaces as ambient.
  *   - Relative aliases map to `./<alias>.schema` (the emitted sibling of the
  *     referenced `.contexture.json`), importing only the names used.
  *   - Local refs emit as bare identifiers.
@@ -20,11 +24,16 @@
  */
 import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
 
-export function emit(schema: Schema, sourcePath: string): string {
-  const ctx = buildContext(schema);
+export interface EmitOptions {
+  /** Namespaces (e.g. `'place'`, `'money'`) treated as ambient stdlib. */
+  stdlibNamespaces?: readonly string[];
+}
+
+export function emit(schema: Schema, sourcePath: string, options: EmitOptions = {}): string {
+  const ctx = buildContext(schema, options);
   const header = `// @contexture-generated — do not edit by hand. Regenerated on every IR save. Source: ${sourcePath}\n`;
   const zodImport = `import { z } from 'zod';\n`;
-  const externalImports = renderExternalImports(schema, ctx);
+  const externalImports = renderExternalImports(ctx);
   const body = schema.types.map((t) => emitTypeDef(t, ctx)).join('');
   return header + zodImport + externalImports + body;
 }
@@ -32,18 +41,27 @@ export function emit(schema: Schema, sourcePath: string): string {
 interface EmitContext {
   /** alias → ImportDecl (for resolving qualified refs). */
   aliases: Map<string, ImportDecl>;
+  /**
+   * Ordered list of imports to render. Includes `schema.imports` plus any
+   * synthetic stdlib imports derived from qualified refs whose namespace
+   * matches `options.stdlibNamespaces`.
+   */
+  imports: ImportDecl[];
   /** alias → set of imported names that were actually referenced. */
   usedByAlias: Map<string, Set<string>>;
   /** `raw` types with an external import hint, keyed by name. */
   rawExternal: Map<string, { from: string; name: string }>;
 }
 
-function buildContext(schema: Schema): EmitContext {
+function buildContext(schema: Schema, options: EmitOptions): EmitContext {
   const aliases = new Map<string, ImportDecl>();
+  const imports: ImportDecl[] = [];
   (schema.imports ?? []).forEach((imp) => {
     aliases.set(imp.alias, imp);
+    imports.push(imp);
   });
 
+  const stdlibNs = new Set(options.stdlibNamespaces ?? []);
   const usedByAlias = new Map<string, Set<string>>();
   const rawExternal = new Map<string, { from: string; name: string }>();
 
@@ -53,6 +71,15 @@ function buildContext(schema: Schema): EmitContext {
       if (dot !== -1) {
         const alias = t.typeName.slice(0, dot);
         const name = t.typeName.slice(dot + 1);
+        if (!aliases.has(alias) && stdlibNs.has(alias)) {
+          const synthetic: ImportDecl = {
+            kind: 'stdlib',
+            path: `@contexture/${alias}`,
+            alias,
+          };
+          aliases.set(alias, synthetic);
+          imports.push(synthetic);
+        }
         if (aliases.has(alias)) {
           const set = usedByAlias.get(alias) ?? new Set<string>();
           set.add(name);
@@ -74,13 +101,13 @@ function buildContext(schema: Schema): EmitContext {
     }
   });
 
-  return { aliases, usedByAlias, rawExternal };
+  return { aliases, imports, usedByAlias, rawExternal };
 }
 
-function renderExternalImports(schema: Schema, ctx: EmitContext): string {
+function renderExternalImports(ctx: EmitContext): string {
   const lines: string[] = [];
 
-  (schema.imports ?? []).forEach((imp) => {
+  ctx.imports.forEach((imp) => {
     const used = ctx.usedByAlias.get(imp.alias);
     if (!used || used.size === 0) return;
     const names = [...used].sort().join(', ');
@@ -88,10 +115,8 @@ function renderExternalImports(schema: Schema, ctx: EmitContext): string {
     lines.push(`import { ${names} } from '${module}';`);
   });
 
-  schema.types.forEach((type) => {
-    if (type.kind === 'raw' && type.import) {
-      lines.push(`import { ${type.import.name} } from '${type.import.from}';`);
-    }
+  ctx.rawExternal.forEach((imp) => {
+    lines.push(`import { ${imp.name} } from '${imp.from}';`);
   });
 
   return lines.length ? `${lines.join('\n')}\n` : '';

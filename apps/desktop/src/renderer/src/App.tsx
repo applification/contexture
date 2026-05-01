@@ -217,7 +217,10 @@ export default function App(): React.JSX.Element {
       saveFixture: async () => '',
     },
     ir: schema,
-    getRootJsonSchema: (rootTypeName) => emitJsonSchema(schema, rootTypeName),
+    getRootJsonSchema: (rootTypeName) =>
+      emitJsonSchema(schema, rootTypeName, undefined, {
+        stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+      }),
     validate: ({ rootTypeName }) => {
       const errors = validate(schema, { stdlib: STDLIB_REGISTRY });
       return errors.length === 0
@@ -246,7 +249,12 @@ export default function App(): React.JSX.Element {
   const zodEmission = useMemo((): { source: string; error: string | null } => {
     if (activeTab !== 'schema') return { source: '', error: null };
     try {
-      return { source: emitZod(schema, filePath ?? '<unsaved>.contexture.json'), error: null };
+      return {
+        source: emitZod(schema, filePath ?? '<unsaved>.contexture.json', {
+          stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+        }),
+        error: null,
+      };
     } catch (e) {
       return { source: '', error: e instanceof Error ? e.message : String(e) };
     }
