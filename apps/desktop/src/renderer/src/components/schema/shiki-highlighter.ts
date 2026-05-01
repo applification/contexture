@@ -20,19 +20,25 @@ let highlighterPromise: Promise<HighlighterCore> | null = null;
 export function getHighlighter(): Promise<HighlighterCore> {
   if (highlighterPromise === null) {
     highlighterPromise = (async () => {
-      const [ts, light, dark] = await Promise.all([
+      const [ts, json, light, dark] = await Promise.all([
         import('shiki/langs/typescript.mjs'),
+        import('shiki/langs/json.mjs'),
         import('shiki/themes/github-light.mjs'),
         import('shiki/themes/github-dark.mjs'),
       ]);
       return createHighlighterCore({
         themes: [light.default, dark.default],
-        langs: [ts.default],
+        langs: [ts.default, json.default],
         engine: createJavaScriptRegexEngine(),
       });
     })();
   }
   return highlighterPromise;
+}
+
+/** Call once at app startup to pre-warm the highlighter before the user opens the Schema tab. */
+export function warmHighlighter(): void {
+  getHighlighter().catch(() => undefined);
 }
 
 /**
