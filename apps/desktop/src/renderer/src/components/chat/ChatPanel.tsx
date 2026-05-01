@@ -73,7 +73,6 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const history = useChatThreads();
 
   const [input, setInput] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Track previous filePath so file-change and initial-mount paths
@@ -161,19 +160,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     });
   }, [history.activeThreadId, history.updateThreadSessionId]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the message list changes; biome can't see `messages` is the intended trigger
+  const messageCount = messages.length;
   useEffect(() => {
+    if (messageCount === 0) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Auto-grow the textarea up to a cap so prompts with a few lines
-  // don't force the user to scroll a single-line input.
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, []);
+  }, [messageCount]);
 
   const fileThreads = useMemo(
     () => history.threadsForFile(filePath),
@@ -367,7 +358,6 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           )}
         >
           <textarea
-            ref={textareaRef}
             value={input}
             onChange={(ev) => setInput(ev.target.value)}
             onKeyDown={handleKeyDown}
@@ -375,9 +365,10 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             disabled={!isReady || isStreaming}
             rows={1}
             className={cn(
-              'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm',
+              'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm leading-5',
+              'field-sizing-content max-h-[calc(8*1.25rem+1.25rem)]',
               'placeholder:text-muted-foreground focus:outline-none',
-              'disabled:cursor-not-allowed max-h-32 overflow-y-auto',
+              'disabled:cursor-not-allowed overflow-y-auto',
             )}
             data-testid="chat-input"
           />
