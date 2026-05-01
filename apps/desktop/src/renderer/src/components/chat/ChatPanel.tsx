@@ -84,8 +84,10 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const prevMessagesRef = useRef<ChatMessage[] | null>(null);
 
   // Restore the active thread's messages on first mount.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once at mount
+  const restoredRef = useRef(false);
   useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
     const thread = history.getActiveThread();
     if (thread && thread.messages.length > 0) {
       hydrate(thread.messages);
@@ -98,7 +100,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       }
     }
     prevMessagesRef.current = thread?.messages ?? [];
-  }, []);
+  }, [history, hydrate]);
 
   // On schema-file change, switch to the most recent thread for that
   // file — or clear the transcript and the SDK session if this file

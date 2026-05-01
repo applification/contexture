@@ -11,7 +11,7 @@
  * tool callbacks — those live in `useClaudeSchemaChat`, driven by the
  * Agent SDK turn pipeline.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AuthMode = 'max' | 'api-key';
 export type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
@@ -81,12 +81,14 @@ export function useClaude(): UseClaudeReturn {
 
   // Push the initial auth + model snapshot to main so the first turn
   // uses it without requiring the user to open the popover first.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot initial sync
+  const syncedRef = useRef(false);
   useEffect(() => {
+    if (syncedRef.current) return;
+    syncedRef.current = true;
     if (authMode === 'max') pushAuth({ mode: 'max' });
     else pushAuth({ mode: 'api-key', key: apiKey });
     pushModelOptions(model, thinkingBudget);
-  }, []);
+  }, [authMode, apiKey, model, thinkingBudget]);
 
   const setAuthMode = useCallback(
     (mode: AuthMode) => {
