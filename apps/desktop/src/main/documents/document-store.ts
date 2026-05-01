@@ -23,6 +23,7 @@ import {
   projectRootFor,
   runEmitPipeline,
 } from '@contexture/core';
+import { NAMESPACES as STDLIB_NAMESPACES } from '@contexture/stdlib/registry';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
 import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
 import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
@@ -134,8 +135,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   const {
     fs,
     recentFilesPath,
-    emitZod = defaultEmitZod,
-    emitJsonSchema = (s: Schema, sp?: string) => defaultEmitJsonSchema(s, undefined, sp),
+    emitZod = (s: Schema, sp: string) =>
+      defaultEmitZod(s, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
+    emitJsonSchema = (s: Schema, sp?: string) =>
+      defaultEmitJsonSchema(s, undefined, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
     emitSchemaIndex = defaultEmitSchemaIndex,
     emitClaudeMd = defaultEmitClaudeMd,
     emitConvex,

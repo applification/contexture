@@ -70,7 +70,19 @@ const FieldTypeSchema: z.ZodType<import('./ir').FieldType> = z.lazy(() =>
       kind: z.literal('literal'),
       value: z.union([z.string(), z.number(), z.boolean()]),
     }),
-    z.object({ kind: z.literal('ref'), typeName: z.string() }),
+    z.object({
+      kind: z.literal('ref'),
+      typeName: z
+        .string()
+        .describe(
+          'Either a local TypeDef name from this schema, or a qualified ' +
+            '"<namespace>.<TypeName>" for a stdlib type (e.g. ' +
+            '"place.CountryCode", "money.Money", "common.Email"). ' +
+            'Bare names that do not match a local type WILL be rejected ' +
+            'by the op layer — the namespace prefix is mandatory for ' +
+            'stdlib refs.',
+        ),
+    }),
     z.object({
       kind: z.literal('array'),
       element: FieldTypeSchema,
@@ -354,7 +366,14 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
     ),
     lenientTool(
       'add_import',
-      'Add an import declaration (stdlib or relative).',
+      'Add an import declaration (stdlib or relative). For stdlib ' +
+        'imports the alias MUST equal the namespace ' +
+        '(e.g. { kind: "stdlib", path: "@contexture/place", alias: "place" }). ' +
+        'Note: stdlib imports are NOT required for refs to resolve — ' +
+        'qualified refs like "place.CountryCode" are auto-imported by ' +
+        'the emitter. Only call add_import for relative imports of ' +
+        'sibling .contexture.json files, or when you specifically want ' +
+        'a stdlib namespace listed in schema.imports[].',
       (payload) => ({
         kind: 'add_import',
         import: payload as Extract<Op, { kind: 'add_import' }>['import'],

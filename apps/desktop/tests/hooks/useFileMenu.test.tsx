@@ -122,13 +122,19 @@ describe('useFileMenu', () => {
   it('handleSave prompts when validation has errors; force-save writes through', async () => {
     const bridge = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/x.contexture.json');
-    // Introduce an unresolved ref → validator barks.
-    useUndoStore.getState().apply({
-      kind: 'add_type',
-      type: {
-        kind: 'object',
-        name: 'Plot',
-        fields: [{ name: 'bogus', type: { kind: 'ref', typeName: 'Nope' } }],
+    // Seed an unresolved-ref schema directly — bypasses the op-layer
+    // semantic gate so we can exercise the save-with-errors path the
+    // way it would fire for a doc loaded from disk.
+    useUndoStore.setState({
+      schema: {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Plot',
+            fields: [{ name: 'bogus', type: { kind: 'ref', typeName: 'Nope' } }],
+          },
+        ],
       },
     });
     const { result } = renderHook(() => useFileMenu());

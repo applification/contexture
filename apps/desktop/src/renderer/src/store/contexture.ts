@@ -12,6 +12,7 @@
  */
 import { create } from 'zustand';
 import type { Schema } from '../model/ir';
+import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { type ApplyResult, apply, type Op } from './ops';
 
 export interface ContextureState {
@@ -23,7 +24,7 @@ export function createContextureStore(initial: Schema) {
   return create<ContextureState>((set, get) => ({
     schema: initial,
     apply: (op) => {
-      const res = apply(get().schema, op);
+      const res = apply(get().schema, op, STDLIB_REGISTRY);
       if ('schema' in res) set({ schema: res.schema });
       return res;
     },

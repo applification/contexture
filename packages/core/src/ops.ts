@@ -14,13 +14,20 @@
  *     local refs and discriminated-union variants. Qualified refs
  *     (`alias.Name`) are left alone — they point at external modules.
  *   - `replace_schema` runs the Zod meta-schema so obviously broken inputs
- *     are caught here; semantic rules (unresolved refs, duplicate names)
- *     stay in `services/validation.ts` so the UI can surface them with
- *     field-level paths after the replacement lands.
+ *     are caught here. When `apply()` is called with a `StdlibCatalog`,
+ *     a delta semantic check (refs, imports, duplicates) gates *every*
+ *     op — including `replace_schema` — so the chat cannot land an IR
+ *     that introduces new unresolved refs or unknown stdlib imports.
  */
 
 import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from './ir';
 import { IRSchema } from './ir';
+import {
+  checkSemantic,
+  newIssues,
+  type SemanticIssue,
+  type StdlibCatalog,
+} from './semantic-validation';
 
 export type Op =
   | { kind: 'add_type'; type: TypeDef }
@@ -51,7 +58,44 @@ export type Op =
 
 export type ApplyResult = { schema: Schema } | { error: string };
 
-export function apply(schema: Schema, op: Op): ApplyResult {
+/**
+ * Apply an `Op` to `schema` and return the next schema or a structured
+ * error.
+ *
+ * When `catalog` is provided, the result is gated by a *delta* semantic
+ * check: any new unresolved-ref / bad-import / duplicate-name issue
+ * introduced by this op rejects the op with a chat-friendly error
+ * (including the `hint` text from `checkSemantic`). Issues that already
+ * existed in `schema` are not blamed on the new op — the chat can fix
+ * them incrementally without the gate getting in the way.
+ *
+ * Without a catalog, this is structural-only (the historical behaviour).
+ */
+export function apply(schema: Schema, op: Op, catalog?: StdlibCatalog): ApplyResult {
+  const result = applyStructural(schema, op);
+  if ('error' in result) return result;
+  if (!catalog) return result;
+  const introduced = newIssues(
+    checkSemantic(schema, catalog),
+    checkSemantic(result.schema, catalog),
+  );
+  if (introduced.length === 0) return result;
+  return { error: formatSemanticErrors(op.kind, introduced) };
+}
+
+function formatSemanticErrors(opKind: string, issues: SemanticIssue[]): string {
+  const lines = issues.map((i) => {
+    const hint = i.hint ? ` ${i.hint}` : '';
+    return `  - ${i.path}: ${i.message}${hint}`;
+  });
+  const lead =
+    issues.length === 1
+      ? `${opKind}: would introduce 1 semantic issue:`
+      : `${opKind}: would introduce ${issues.length} semantic issues:`;
+  return [lead, ...lines].join('\n');
+}
+
+function applyStructural(schema: Schema, op: Op): ApplyResult {
   switch (op.kind) {
     case 'add_type':
       return addType(schema, op.type);

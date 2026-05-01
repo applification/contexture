@@ -28,11 +28,37 @@ function generatedMarker(sourcePath?: string): string {
   return sourcePath ? `${base} Source: ${sourcePath}` : base;
 }
 
-export function emit(schema: Schema, rootTypeName?: string, sourcePath?: string): object {
+export interface EmitOptions {
+  /** Namespaces (e.g. `'place'`, `'money'`) treated as ambient stdlib. */
+  stdlibNamespaces?: readonly string[];
+}
+
+export function emit(
+  schema: Schema,
+  rootTypeName?: string,
+  sourcePath?: string,
+  options: EmitOptions = {},
+): object {
   const aliases = new Map<string, ImportDecl>();
   (schema.imports ?? []).forEach((imp) => {
     aliases.set(imp.alias, imp);
   });
+
+  const stdlibNs = new Set(options.stdlibNamespaces ?? []);
+  const ensureStdlibImport = (alias: string) => {
+    if (aliases.has(alias) || !stdlibNs.has(alias)) return;
+    aliases.set(alias, {
+      kind: 'stdlib',
+      path: `@contexture/${alias}`,
+      alias,
+    });
+  };
+  for (const type of schema.types) {
+    if (type.kind !== 'object') continue;
+    for (const field of type.fields) {
+      collectStdlibAliases(field.type, ensureStdlibImport);
+    }
+  }
 
   const defs: Record<string, object> = {};
   for (const type of schema.types) {
@@ -155,5 +181,14 @@ function emitFieldType(t: FieldType, aliases: Map<string, ImportDecl>): object {
       if (t.max !== undefined) out.maxItems = t.max;
       return out;
     }
+  }
+}
+
+function collectStdlibAliases(t: FieldType, ensure: (alias: string) => void): void {
+  if (t.kind === 'ref') {
+    const dot = t.typeName.indexOf('.');
+    if (dot !== -1) ensure(t.typeName.slice(0, dot));
+  } else if (t.kind === 'array') {
+    collectStdlibAliases(t.element, ensure);
   }
 }

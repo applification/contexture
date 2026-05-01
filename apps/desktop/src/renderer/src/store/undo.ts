@@ -25,6 +25,7 @@
 import { create } from 'zustand';
 import type { Schema } from '../model/ir';
 import { load, save } from '../model/load';
+import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
 export interface UndoableState {
@@ -69,7 +70,7 @@ export function createUndoableContextureStore(initial: Schema) {
 
       apply: (op) => {
         const state = get();
-        const res = applyOp(state.schema, op);
+        const res = applyOp(state.schema, op, STDLIB_REGISTRY);
         if ('error' in res) return res;
 
         if (state.txDepth > 0) {

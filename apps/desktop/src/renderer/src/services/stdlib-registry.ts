@@ -14,15 +14,16 @@
  * validate cleanly. Tests can supply a custom registry (empty, or
  * with a synthetic namespace) without touching the stdlib package.
  */
+import type { StdlibCatalog } from '@contexture/core/semantic-validation';
 import { IR_BY_NAMESPACE, NAMESPACES, type Namespace } from '@contexture/stdlib/registry';
 import type { StdlibRegistry as SystemPromptStdlibRegistry } from '../chat/system-prompt';
 
-export interface StdlibRegistry {
-  /** All stdlib namespace aliases (`common`, `identity`, …). */
-  namespaces: readonly string[];
-  /** Returns true iff the namespace defines a type with that name. */
-  hasType: (namespace: string, typeName: string) => boolean;
-}
+/**
+ * Renderer-facing stdlib registry. Identical shape to the core
+ * `StdlibCatalog` so that `STDLIB_REGISTRY` can be passed straight into
+ * `apply(schema, op, catalog)` and `checkSemantic(schema, catalog)`.
+ */
+export type StdlibRegistry = StdlibCatalog;
 
 export function buildStdlibRegistry(): StdlibRegistry {
   const typeNamesByNamespace: Record<string, ReadonlySet<string>> = Object.fromEntries(

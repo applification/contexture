@@ -41,7 +41,11 @@ export function StatusBar(): React.JSX.Element {
   const tokenCount = useMemo(() => {
     if (typeCount === 0) return 0;
     try {
-      return estimateTokenCount(emitZod(schema, filePath ?? 'untitled.contexture.json'));
+      return estimateTokenCount(
+        emitZod(schema, filePath ?? 'untitled.contexture.json', {
+          stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+        }),
+      );
     } catch {
       // Emitter throws on malformed IR; treat as zero rather than crashing
       // the status bar.
