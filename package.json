@@ -15,7 +15,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",
-    "ci": "turbo typecheck && turbo test && biome check .",
+    "ci": "TURBO_NO_UPDATE_NOTIFIER=1 turbo typecheck test --output-logs=errors-only && biome check .",
     "prepare": "husky",
     "sandcastle": "bun .sandcastle/main.ts",
     "sandcastle:analyze": "bun .sandcastle/analyze.ts",
