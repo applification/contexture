@@ -26,6 +26,16 @@ describe('extractOpsArray', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('extracts array when prose before it contains square brackets', () => {
+    const result = extractOpsArray(
+      'See op list [below]:\n[{"op":{"kind":"add_type"},"label":"Add Post","lossy":false}]',
+    );
+    expect(result).toEqual({
+      ok: true,
+      ops: [{ op: { kind: 'add_type' }, label: 'Add Post', lossy: false }],
+    });
+  });
+
   it('returns ok:false when no array bracket found', () => {
     const result = extractOpsArray('no ops here');
     expect(result).toEqual({ ok: false, error: 'No JSON array found in response.' });

@@ -116,27 +116,30 @@ export function buildReconcileUserTurn(
 /**
  * Pull the JSON ops array out of an assistant response. The model is
  * instructed to return only the array, but a stray code fence or
- * leading sentence shouldn't fail the whole reconcile — match the
- * outermost `[…]` block.
+ * leading sentence shouldn't fail the whole reconcile — scan forward
+ * through every `[` position until we find a slice that parses as an
+ * array. This handles prose that contains `[…]` spans before the
+ * actual payload.
  */
 export function extractOpsArray(
   text: string,
 ): { ok: true; ops: unknown[] } | { ok: false; error: string } {
-  const start = text.indexOf('[');
   const end = text.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) {
-    return { ok: false, error: 'No JSON array found in response.' };
+  let start = text.indexOf('[');
+  let lastError = 'No JSON array found in response.';
+
+  while (start !== -1 && start <= end) {
+    const slice = text.slice(start, end + 1);
+    try {
+      const parsed = JSON.parse(slice);
+      if (Array.isArray(parsed)) return { ok: true, ops: parsed };
+      lastError = 'Response did not parse as a JSON array.';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      lastError = `Failed to parse ops JSON: ${message}`;
+    }
+    start = text.indexOf('[', start + 1);
   }
-  const slice = text.slice(start, end + 1);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(slice);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: `Failed to parse ops JSON: ${message}` };
-  }
-  if (!Array.isArray(parsed)) {
-    return { ok: false, error: 'Response did not parse as a JSON array.' };
-  }
-  return { ok: true, ops: parsed };
+
+  return { ok: false, error: lastError };
 }
