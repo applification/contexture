@@ -52,7 +52,7 @@ describe('useSessionPersistence', () => {
     const onRestore = vi.fn();
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: onRestore,
         storage,
       }),
@@ -84,7 +84,7 @@ describe('useSessionPersistence', () => {
     const onRestore = vi.fn();
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: onRestore,
         storage,
       }),
@@ -109,7 +109,7 @@ describe('useSessionPersistence', () => {
     const onRestore = vi.fn();
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: onRestore,
         storage,
       }),
@@ -124,7 +124,7 @@ describe('useSessionPersistence', () => {
 
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: { Plot: { x: 1, y: 2 } } }),
+        layout: { version: '1', positions: { Plot: { x: 1, y: 2 } } },
         onRestoreSession: vi.fn(),
         storage,
       }),
@@ -155,7 +155,7 @@ describe('useSessionPersistence', () => {
 
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: vi.fn(),
         storage,
       }),
@@ -192,7 +192,7 @@ describe('useSessionPersistence', () => {
 
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: vi.fn(),
         storage,
       }),
@@ -223,7 +223,7 @@ describe('useSessionPersistence', () => {
 
     renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: vi.fn(),
         storage,
       }),
@@ -244,7 +244,7 @@ describe('useSessionPersistence', () => {
 
     const { unmount } = renderHook(() =>
       useSessionPersistence({
-        getLayout: () => ({ version: '1', positions: {} }),
+        layout: { version: '1', positions: {} },
         onRestoreSession: vi.fn(),
         storage,
       }),
@@ -266,6 +266,71 @@ describe('useSessionPersistence', () => {
     unmount();
   });
 
+  it('flushes synchronously on pagehide so a pending debounce never drops', () => {
+    const storage = makeStorage();
+
+    renderHook(() =>
+      useSessionPersistence({
+        layout: { version: '1', positions: {} },
+        onRestoreSession: vi.fn(),
+        storage,
+      }),
+    );
+
+    act(() => {
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'Plot', fields: [] },
+      });
+    });
+
+    // Do NOT advance timers — simulate the renderer being killed
+    // mid-debounce by dispatching `pagehide` before the 300ms fires.
+    expect(storage.getItem(SESSION_KEY)).toBeNull();
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    const raw = storage.getItem(SESSION_KEY);
+    expect(raw).not.toBeNull();
+    const session = JSON.parse(raw ?? '');
+    expect(session.schema.types[0].name).toBe('Plot');
+  });
+
+  it('persists layout-only changes (drag with no schema mutation)', async () => {
+    const storage = makeStorage();
+    // Seed a non-empty schema so the layout-only effect has something
+    // to persist.
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+
+    const { rerender } = renderHook(
+      (layout: { version: '1'; positions: Record<string, { x: number; y: number }> }) =>
+        useSessionPersistence({
+          layout,
+          onRestoreSession: vi.fn(),
+          storage,
+        }),
+      {
+        initialProps: { version: '1', positions: { Plot: { x: 0, y: 0 } } },
+      },
+    );
+
+    // Simulate a drag — new layout reference, same schema.
+    rerender({ version: '1', positions: { Plot: { x: 100, y: 200 } } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    const raw = storage.getItem(SESSION_KEY);
+    expect(raw).not.toBeNull();
+    const session = JSON.parse(raw ?? '');
+    expect(session.layout.positions.Plot).toEqual({ x: 100, y: 200 });
+  });
+
   it('handles corrupt storage data without crashing', () => {
     const storage = makeStorage();
     storage.setItem(SESSION_KEY, 'not valid json {{{{');
@@ -274,7 +339,7 @@ describe('useSessionPersistence', () => {
     expect(() =>
       renderHook(() =>
         useSessionPersistence({
-          getLayout: () => ({ version: '1', positions: {} }),
+          layout: { version: '1', positions: {} },
           onRestoreSession: onRestore,
           storage,
         }),
