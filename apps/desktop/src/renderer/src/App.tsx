@@ -54,9 +54,11 @@ import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
 import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
+import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { emitConvexSchema } from './model/emit-convex';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
 import { emit as emitZod } from './model/emit-zod';
+import type { Layout } from './model/layout';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { STDLIB_REGISTRY } from './services/stdlib-registry';
 import { validate } from './services/validation';
@@ -192,6 +194,14 @@ export default function App(): React.JSX.Element {
   useProjectAutoSave({
     getLayout: () => ({ version: '1', positions: positionsRef.current }),
     getChat: () => ({ version: '1', messages: chatMessagesRef.current }),
+  });
+
+  const sessionLayout = useMemo<Layout>(() => ({ version: '1', positions }), [positions]);
+  useSessionPersistence({
+    layout: sessionLayout,
+    onRestoreSession: (layout) => {
+      setPositions(layout.positions);
+    },
   });
 
   // Pull the recent-files list when the empty state might need it and
