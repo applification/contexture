@@ -25,7 +25,7 @@
  * path for user-authored source to introduce raw tags.
  */
 import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
@@ -98,7 +98,7 @@ export function SchemaPanel({
   const copyTimeoutRef = useRef<number | null>(null);
   const codeRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (codeRef.current) codeRef.current.innerHTML = highlightedHtml ?? '';
   }, [highlightedHtml]);
 
