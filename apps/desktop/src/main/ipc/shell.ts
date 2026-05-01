@@ -15,7 +15,13 @@ function spawnCode(args: readonly string[]): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const proc = spawn('code', [...args], { detached: true, stdio: 'ignore' });
     proc.on('error', reject);
-    proc.on('close', resolve);
+    proc.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve();
+      } else {
+        reject(new Error(`code exited with ${exitCode ?? 'signal'}`));
+      }
+    });
     proc.unref();
   });
 }
