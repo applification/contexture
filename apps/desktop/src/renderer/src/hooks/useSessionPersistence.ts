@@ -1,11 +1,3 @@
-/**
- * `useSessionPersistence` — persists unsaved schema to localStorage so
- * dev-server HMR reloads and macOS window-close + reopen don't wipe the
- * in-memory schema, causing the empty state screen to appear.
- *
- * Only kicks in for unsaved files (filePath === null). Once a file has a
- * path, the file itself (or project auto-save) handles persistence.
- */
 import { useEffect, useRef } from 'react';
 import type { Schema } from '../model/ir';
 import type { Layout } from '../model/layout';
@@ -85,7 +77,11 @@ export function useSessionPersistence({
         return;
       }
       const session: StoredSession = { schema, layout: getLayoutRef.current() };
-      store.setItem(SESSION_KEY, JSON.stringify(session));
+      try {
+        store.setItem(SESSION_KEY, JSON.stringify(session));
+      } catch {
+        // Storage full or unavailable (e.g. private browsing quota) — skip silently.
+      }
     };
 
     const unsubSchema = useUndoStore.subscribe((s) => {

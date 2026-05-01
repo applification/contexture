@@ -1,8 +1,3 @@
-/**
- * `useSessionPersistence` — persists unsaved schema to localStorage so
- * dev-server HMR reloads and macOS window-close + reopen don't wipe the
- * in-memory schema and show an empty canvas.
- */
 import {
   SESSION_KEY,
   type SessionStorage,
@@ -239,6 +234,36 @@ describe('useSessionPersistence', () => {
     });
 
     expect(storage.getItem(SESSION_KEY)).toBeNull();
+  });
+
+  it('does not crash when storage write throws (e.g. private browsing quota)', async () => {
+    const storage = makeStorage();
+    storage.setItem = vi.fn().mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+
+    const { unmount } = renderHook(() =>
+      useSessionPersistence({
+        getLayout: () => ({ version: '1', positions: {} }),
+        onRestoreSession: vi.fn(),
+        storage,
+      }),
+    );
+
+    act(() => {
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'Plot', fields: [] },
+      });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    // If we reach here without throwing, the test passes.
+    // Explicitly unmount before afterEach to guarantee effect cleanup order.
+    unmount();
   });
 
   it('handles corrupt storage data without crashing', () => {
