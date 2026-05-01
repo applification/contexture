@@ -3,6 +3,7 @@ import {
   fetchIssueLiveState,
   fetchOpenLabelledIssues,
   fetchOpenPRsClosingIssues,
+  fetchProjectReadyIssues,
   type RunGh,
 } from "./github";
 
@@ -74,6 +75,68 @@ describe("fetchOpenPRsClosingIssues", () => {
   test("rejects non-string non-null body", async () => {
     const raw = JSON.stringify([{ number: 104, body: 42 }]);
     await expect(fetchOpenPRsClosingIssues(fakeRunGh(raw))).rejects.toThrow();
+  });
+});
+
+describe("fetchProjectReadyIssues", () => {
+  const buildItem = (overrides: {
+    status?: string;
+    labels?: string[];
+    repo?: string;
+    type?: string;
+    number?: number;
+    title?: string;
+  }) => ({
+    status: overrides.status ?? "Ready",
+    labels: overrides.labels ?? ["Sandcastle"],
+    content: {
+      type: overrides.type ?? "Issue",
+      number: overrides.number ?? 1,
+      title: overrides.title ?? "Title",
+      repository: overrides.repo ?? "applification/contexture",
+    },
+  });
+
+  test("filters by status, repo, label, and type=Issue and preserves board order", async () => {
+    const raw = JSON.stringify({
+      items: [
+        buildItem({ number: 237, title: "Top of Ready" }),
+        buildItem({ number: 99, title: "Wrong column", status: "Backlog" }),
+        buildItem({ number: 50, title: "Wrong repo", repo: "applification/other" }),
+        buildItem({ number: 60, title: "Missing label", labels: ["enhancement"] }),
+        buildItem({ number: 70, title: "Draft item", type: "DraftIssue" }),
+        buildItem({ number: 233, title: "Second of Ready" }),
+      ],
+    });
+    const result = await fetchProjectReadyIssues(
+      "applification",
+      1,
+      "applification/contexture",
+      "Sandcastle",
+      fakeRunGh(raw),
+    );
+    expect(result.map((i) => i.number)).toEqual([237, 233]);
+    expect(result[0]).toEqual({
+      number: 237,
+      title: "Top of Ready",
+      state: "open",
+      labels: ["Sandcastle"],
+    });
+  });
+
+  test("passes owner/number/limit through to gh args", async () => {
+    const { runGh, calls } = capturingRunGh(JSON.stringify({ items: [] }));
+    await fetchProjectReadyIssues("applification", 1, "applification/contexture", "Sandcastle", runGh);
+    expect(calls).toEqual([
+      ["project", "item-list", "1", "--owner", "applification", "--format", "json", "--limit", "200"],
+    ]);
+  });
+
+  test("rejects malformed gh output", async () => {
+    const raw = JSON.stringify({ items: [{ status: "Ready", labels: [], content: { type: "Issue" } }] });
+    await expect(
+      fetchProjectReadyIssues("applification", 1, "applification/contexture", "Sandcastle", fakeRunGh(raw)),
+    ).rejects.toThrow();
   });
 });
 

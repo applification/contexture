@@ -111,4 +111,20 @@ describe('ChatPanel', () => {
     expect(screen.getByTitle('Stop')).toBeInTheDocument();
     expect(screen.queryByTitle('Send')).not.toBeInTheDocument();
   });
+
+  it('auto-grows the textarea via CSS field-sizing with an 8-line cap and scroll overflow', async () => {
+    render(<ChatPanel chat={makeChat()} />);
+    await waitFor(() => {
+      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+      expect(ta.disabled).toBe(false);
+    });
+    const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+
+    // Auto-grow is delivered by CSS (`field-sizing: content`) rather
+    // than a useEffect that pokes inline height — verify the contract
+    // is expressed on the element.
+    expect(textarea.className).toMatch(/field-sizing-content/);
+    expect(textarea.className).toMatch(/max-h-\[/);
+    expect(textarea.className).toMatch(/overflow-y-auto/);
+  });
 });
