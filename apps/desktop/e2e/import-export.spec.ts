@@ -20,6 +20,14 @@ test.describe('Import / export round-trip', () => {
     electronApp = await launchElectron();
     page = await electronApp.firstWindow();
     await page.waitForLoadState('domcontentloaded');
+    // Prior specs in the same run leave an unsaved schema in
+    // `window.localStorage` which `useSessionPersistence` restores on
+    // mount — that hides the empty state and the "Load allotment
+    // sample" button. Clear the session and reload so this spec starts
+    // from a clean empty schema.
+    await page.evaluate(() => window.localStorage.removeItem('contexture:session:v1'));
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test.afterAll(async () => {

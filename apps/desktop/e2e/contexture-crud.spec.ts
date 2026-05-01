@@ -23,6 +23,13 @@ test.describe('Contexture CRUD', () => {
     electronApp = await launchElectron();
     page = await electronApp.firstWindow();
     await page.waitForLoadState('domcontentloaded');
+    // `useSessionPersistence` restores any unsaved schema left in
+    // `window.localStorage` by a prior spec, which would hide the
+    // empty state and the "Load allotment sample" button. Clear it
+    // and reload so the spec starts from a clean empty schema.
+    await page.evaluate(() => window.localStorage.removeItem('contexture:session:v1'));
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test.afterAll(async () => {
