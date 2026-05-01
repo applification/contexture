@@ -23,6 +23,8 @@ const meta = {
   component: SchemaPanel,
   args: {
     onCopy: fn(),
+    jsonSource: '',
+    convexSource: '',
   },
   parameters: {
     layout: 'fullscreen',

@@ -55,6 +55,7 @@ import { useFileMenu } from './hooks/useFileMenu';
 import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
+import { emitConvexSchema } from './model/emit-convex';
 import { emit as emitJsonSchema } from './model/emit-json-schema';
 import { emit as emitZod } from './model/emit-zod';
 import type { Layout } from './model/layout';
@@ -256,18 +257,45 @@ export default function App(): React.JSX.Element {
   // crashing the sidebar.
   const filePath = useDocumentStore((s) => s.filePath);
   const documentMode = useDocumentStore((s) => s.mode);
-  const zodEmission = useMemo((): { source: string; error: string | null } => {
-    if (activeTab !== 'schema') return { source: '', error: null };
-    try {
-      return {
-        source: emitZod(schema, filePath ?? '<unsaved>.contexture.json', {
-          stdlibNamespaces: STDLIB_REGISTRY.namespaces,
-        }),
-        error: null,
-      };
-    } catch (e) {
-      return { source: '', error: e instanceof Error ? e.message : String(e) };
+
+  // Emit all three schema formats when the Schema tab is active.
+  // Gated on activeTab so we don't burn cycles on every IR change when
+  // the user is looking at Chat / Eval / Properties.
+  const schemaEmissions = useMemo((): {
+    zodSource: string;
+    jsonSource: string;
+    convexSource: string;
+    error: string | null;
+  } => {
+    if (activeTab !== 'schema') {
+      return { zodSource: '', jsonSource: '', convexSource: '', error: null };
     }
+    const irPath = filePath ?? '<unsaved>.contexture.json';
+    let zodSource = '';
+    let jsonSource = '';
+    let convexSource = '';
+    let error: string | null = null;
+
+    try {
+      zodSource = emitZod(schema, irPath, { stdlibNamespaces: STDLIB_REGISTRY.namespaces });
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      return { zodSource, jsonSource, convexSource, error };
+    }
+
+    try {
+      jsonSource = JSON.stringify(emitJsonSchema(schema, undefined, irPath), null, 2);
+    } catch {
+      // Non-fatal: JSON Schema tab will render empty
+    }
+
+    try {
+      convexSource = emitConvexSchema(schema, irPath);
+    } catch {
+      // Non-fatal: Convex tab will render empty
+    }
+
+    return { zodSource, jsonSource, convexSource, error };
   }, [activeTab, schema, filePath]);
 
   // Filename shown in the SchemaPanel header: the document's basename
@@ -362,9 +390,11 @@ export default function App(): React.JSX.Element {
               </div>
               <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <SchemaPanel
-                  zodSource={zodEmission.source}
+                  zodSource={schemaEmissions.zodSource}
+                  jsonSource={schemaEmissions.jsonSource}
+                  convexSource={schemaEmissions.convexSource}
                   isEmpty={!hasSchema}
-                  error={zodEmission.error}
+                  error={schemaEmissions.error}
                   onCopy={copyToClipboard}
                   schemaFileName={schemaFileName}
                 />

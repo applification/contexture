@@ -1,39 +1,28 @@
 /**
- * SchemaPanel — read-only preview of the emitted Zod TypeScript
- * source.
+ * SchemaPanel — read-only preview of the emitted schema source.
  *
- * The canvas IR is the source of truth; this panel shows exactly
- * what would be written to `<name>.schema.ts` on save, re-rendered
- * whenever the caller hands us a new `zodSource` string (the
- * caller gates re-emission on `activeTab === 'schema'` so we only
- * do the work when the user is looking).
+ * Supports three schema formats via an in-panel tab strip:
+ *   - Zod (TypeScript)  → <name>.schema.ts
+ *   - JSON Schema        → <name>.schema.json
+ *   - Convex             → convex/schema.ts
  *
  * Three visual states:
  *   - Empty (schema has no types): an `Empty` nudge telling the
  *     user to add a type on the canvas.
  *   - Error (emit threw): a muted error line. Transient — the
  *     next valid IR clears it on re-render.
- *   - OK: a header with the derived schema filename + font-size
- *     and copy controls, above a shiki-highlighted code block.
- *     Horizontal scroll, no wrap — preserves the emitter's exact
- *     formatting.
+ *   - OK: a tab strip, header with filename + font-size and copy
+ *     controls, above a shiki-highlighted code block.
  *
- * The header mirrors the shadcn `ai-elements` CodeBlock pattern
- * used on the marketing site's /brand page so the two surfaces
- * feel like the same component family.
+ * Shiki init is lazy (first mount) via `getHighlighter`. We pre-warm
+ * the highlighter on mount so it loads in the background — by the time
+ * the user opens the panel it is usually already initialised. While
+ * loading, a plain `<pre>` fallback keeps the code readable immediately.
  *
- * Shiki init is lazy (first mount) via `getHighlighter`. While
- * the highlighter is still loading we render a plain `<pre>`
- * fallback so the code is readable immediately.
- *
- * Security note: the highlighted HTML is injected via shiki's
- * escaped output (see rendering block below). Shiki tokenises
- * input via TextMate grammars and emits its own HTML with all
- * user text escaped in `<span>` text nodes — there is no path
- * for user-authored Zod source to introduce raw tags. The
- * alternative (`hast-util-to-jsx-runtime`) buys nothing here
- * since the source is already trusted local output from
- * `emit-zod`.
+ * Security note: the highlighted HTML is injected via shiki's escaped
+ * output. Shiki tokenises input via TextMate grammars and emits its own
+ * HTML with all user text escaped in `<span>` text nodes — there is no
+ * path for user-authored source to introduce raw tags.
  */
 import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -41,12 +30,18 @@ import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
+export type SchemaType = 'zod' | 'json' | 'convex';
+
 export interface SchemaPanelProps {
-  /** Emitted Zod TypeScript. Non-empty even for empty schemas (header + z import). */
+  /** Emitted Zod TypeScript source. */
   zodSource: string;
+  /** Emitted JSON Schema (pre-stringified JSON). */
+  jsonSource: string;
+  /** Emitted Convex schema TypeScript source. */
+  convexSource: string;
   /** True when the IR has zero types; drives the empty state. */
   isEmpty: boolean;
-  /** Non-null when `emit()` threw. The message is rendered as-is. */
+  /** Non-null when the primary (Zod) emit threw. Rendered as-is. */
   error: string | null;
   /** Copy full source to clipboard — host wires `navigator.clipboard`. */
   onCopy?: (text: string) => void;
@@ -69,24 +64,56 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 13px
 /** How long the Copy icon flips to a check after a successful copy. */
 const COPY_FEEDBACK_MS = 2000;
 
+const SCHEMA_TABS: { type: SchemaType; label: string }[] = [
+  { type: 'zod', label: 'Zod' },
+  { type: 'json', label: 'JSON Schema' },
+  { type: 'convex', label: 'Convex' },
+];
+
+function deriveFileName(schemaFileName: string, type: SchemaType): string {
+  if (type === 'zod') return schemaFileName;
+  if (type === 'convex') return 'convex/schema.ts';
+  // json: replace .schema.ts → .schema.json, or .ts → .json as fallback
+  const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
+  return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
+}
+
+function langForType(type: SchemaType): string {
+  return type === 'json' ? 'json' : 'typescript';
+}
+
 export function SchemaPanel({
   zodSource,
+  jsonSource,
+  convexSource,
   isEmpty,
   error,
   onCopy,
   schemaFileName = 'schema.ts',
 }: SchemaPanelProps): React.JSX.Element {
+  const [activeSchema, setActiveSchema] = useState<SchemaType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
 
-  // Re-highlight whenever the source changes. `codeToHtml` is sync
-  // after init, so we only `await` the highlighter itself. The
-  // effect bails for the empty / error states which don't render
-  // the code block.
+  // Pre-warm shiki on first mount so it loads in the background.
+  // By the time the user opens the Schema tab the highlighter is
+  // usually already initialised and the code colours appear immediately.
   useEffect(() => {
-    if (isEmpty || error !== null || zodSource === '') {
+    getHighlighter().catch(() => undefined);
+  }, []);
+
+  const sourceByType: Record<SchemaType, string> = {
+    zod: zodSource,
+    json: jsonSource,
+    convex: convexSource,
+  };
+  const activeSource = sourceByType[activeSchema];
+
+  // Re-highlight whenever the active source or schema type changes.
+  useEffect(() => {
+    if (isEmpty || error !== null || activeSource === '') {
       setHighlightedHtml(null);
       return;
     }
@@ -95,26 +122,22 @@ export function SchemaPanel({
       try {
         const hl = await getHighlighter();
         if (cancelled) return;
-        const html = hl.codeToHtml(zodSource, {
-          lang: 'typescript',
+        const html = hl.codeToHtml(activeSource, {
+          lang: langForType(activeSchema),
           themes: SHIKI_THEMES,
           defaultColor: false,
         });
         setHighlightedHtml(html);
       } catch {
-        // Highlighter init or render failed — fall back to plain
-        // <pre>. Don't surface to the user; the source itself is
-        // still readable.
         if (!cancelled) setHighlightedHtml(null);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [zodSource, isEmpty, error]);
+  }, [activeSource, activeSchema, isEmpty, error]);
 
-  // Clear the "copied" feedback timer on unmount so a late-firing
-  // setState can't hit an unmounted component.
+  // Clear the "copied" feedback timer on unmount.
   useEffect(
     () => () => {
       if (copyTimeoutRef.current !== null) {
@@ -125,7 +148,7 @@ export function SchemaPanel({
   );
 
   const handleCopy = (): void => {
-    onCopy?.(zodSource);
+    onCopy?.(activeSource);
     setCopied(true);
     if (copyTimeoutRef.current !== null) {
       window.clearTimeout(copyTimeoutRef.current);
@@ -150,7 +173,7 @@ export function SchemaPanel({
             </EmptyMedia>
             <EmptyTitle className="text-sm font-medium">No schema yet</EmptyTitle>
             <EmptyDescription className="text-xs">
-              Add a type to the canvas to see the generated Zod schema.
+              Add a type to the canvas to see the generated schemas.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -166,20 +189,47 @@ export function SchemaPanel({
             data-testid="schema-error"
             className="font-mono text-xs text-destructive whitespace-pre-wrap"
           >
-            Couldn't emit Zod: {error}
+            Couldn't emit schema: {error}
           </p>
         </div>
       </div>
     );
   }
 
+  const displayFileName = deriveFileName(schemaFileName, activeSchema);
+
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
+      {/* Schema type tab strip */}
+      <div className="flex items-center gap-1 mb-2" role="tablist" aria-label="Schema format">
+        {SCHEMA_TABS.map(({ type, label }) => (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={activeSchema === type}
+            data-testid={`schema-tab-${type}`}
+            onClick={() => {
+              setActiveSchema(type);
+              setHighlightedHtml(null);
+            }}
+            className={[
+              'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+              activeSchema === type
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2" data-testid="schema-filename">
             <FileCode className="size-3.5 shrink-0" />
-            <span className="truncate font-mono">{schemaFileName}</span>
+            <span className="truncate font-mono">{displayFileName}</span>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
             <Button
@@ -232,7 +282,7 @@ export function SchemaPanel({
             /* biome-ignore lint/security/noDangerouslySetInnerHtml: shiki output is trusted, tokenised, escaped HTML */
             <div dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
           ) : (
-            <pre className="p-4 m-0 font-mono">{zodSource}</pre>
+            <pre className="p-4 m-0 font-mono">{activeSource}</pre>
           )}
         </div>
       </div>
