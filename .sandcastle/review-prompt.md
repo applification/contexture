@@ -70,7 +70,7 @@ Never change what the code does - only how it does it. All original features, ou
 
 # EXECUTION
 
-1. Run `bun run ci` first to confirm the current state passes. When any check fails, read the **full error output** before re-running. Do not pipe to `head` / `tail` / narrow `grep` on the first failure — you will miss the actual error and re-run unnecessarily. Once you have the error, fix it and verify with one re-run. **Never run the same command twice with identical args** — if it appears to have failed, the answer is in the output you already have.
+1. Run `bun run ci` first to confirm the current state passes. When any check fails, read the **full error output** before re-running. Do not pipe to `head` / `tail` / narrow `grep` on the first failure — you will miss the actual error and re-run unnecessarily. Once you have the error, fix it and verify with one re-run. **Never run the same command twice with identical args** — if it appears to have failed, the answer is in the output you already have. `cd /home/agent/workspace && bun run ci` is the same command as `bun run ci` when you are already in `/home/agent/workspace`; don't re-run with a redundant `cd` prefix.
 2. Attempt to reproduce the original bug with new test cases — if you can, fix it
 3. Write edge case tests that stress the implementation
 4. Make any code quality improvements directly on this branch
