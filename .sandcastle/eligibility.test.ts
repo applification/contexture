@@ -68,14 +68,14 @@ describe("pickEligible", () => {
     expect(result.excluded).toEqual([]);
   });
 
-  test("returns eligible issues ordered by issue number ascending", () => {
+  test("preserves input snapshot order so callers control selection ordering", () => {
     const snapshots = [
       snapshot({ number: 5, title: "fifth" }),
       snapshot({ number: 1, title: "first" }),
       snapshot({ number: 3, title: "third" }),
     ];
     const result = pickEligible(snapshots, [], cfg);
-    expect(result.eligible.map((i) => i.number)).toEqual([1, 3, 5]);
+    expect(result.eligible.map((i) => i.number)).toEqual([5, 1, 3]);
   });
 
   test("excludes issues missing the tracker label", () => {

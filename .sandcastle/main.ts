@@ -2,7 +2,7 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { evaluate, pickEligible } from "./eligibility";
 import type { ExclusionReason } from "./eligibility";
-import { fetchIssueLiveState, fetchOpenLabelledIssues, fetchOpenPRsClosingIssues } from "./github";
+import { fetchIssueLiveState, fetchOpenPRsClosingIssues, fetchProjectReadyIssues } from "./github";
 import { enforcementFor } from "./enforcement";
 import { agent, emitPhaseOutcome, emitRunStart, emitUsageFromRun, streamLogger } from "./harness";
 import type { AgentSpec } from "./harness";
@@ -13,13 +13,23 @@ import type { Issue } from "./issue";
 // GitHub label used to opt issues into the Sandcastle workflow.
 const LABEL = "Sandcastle";
 
+// Source of truth for issue selection: the Contexture project board's `Ready`
+// column, scoped to this repo. The board's drag-order drives what Sandcastle
+// picks first — see `fetchProjectReadyIssues`. Requires the gh token to carry
+// the `read:project` scope (`gh auth refresh -s read:project`).
+const PROJECT_OWNER = "applification";
+const PROJECT_NUMBER = 1;
+const PROJECT_REPO = "applification/contexture";
+
 // ---------- Orchestrator limits ----------
 
-// One issue per iteration, sequentially. Parallelism was removed because the
-// only thing protecting it (the LLM-based subset selector) was an expensive
-// guess at file conflicts, and merge conflicts on overlapping PRs are a
-// normal git outcome — not worth a per-iteration LLM round-trip to avoid.
-const MAX_ITERATIONS = 10;
+// Each iteration drains a parallel batch of up to MAX_PARALLEL issues. We
+// take the top N from the project board's Ready column (no LLM planner) —
+// merge conflicts on overlapping PRs are a normal git outcome, not worth an
+// LLM round-trip to predict. MAX_ITERATIONS is a safety cap; most runs exit
+// early when Ready is drained.
+const MAX_ITERATIONS = 5;
+const MAX_PARALLEL = 2;
 
 // ---------- Sandbox setup ----------
 
@@ -151,15 +161,34 @@ async function pathsTouchedByCommits(worktreePath: string, commits: { sha: strin
   return out.split("\n").filter((p) => p.length > 0);
 }
 
+// Pre-flight: confirm the gh token has `read:project` scope before we start
+// burning iterations. The project query is the only call that needs the
+// scope; if it fails here, every iteration would fail the same way. Surface
+// the fix-up command so a clean machine can recover without spelunking.
+try {
+  await fetchProjectReadyIssues(PROJECT_OWNER, PROJECT_NUMBER, PROJECT_REPO, LABEL);
+} catch (err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(
+    `Failed to query project ${PROJECT_OWNER}/${PROJECT_NUMBER}: ${msg}\n` +
+      `If this is a missing-scope error, run: gh auth refresh -s read:project`,
+  );
+  process.exit(1);
+}
+
 emitRunStart();
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
-  // Phase 1: Eligibility (deterministic). pickEligible() filters by label and
-  // excludes issues already claimed by an open PR; survivors come back sorted
-  // by issue number ascending so we can take the oldest with [0].
-  const [snapshots, openPRs] = await Promise.all([fetchOpenLabelledIssues(LABEL), fetchOpenPRsClosingIssues()]);
+  // Phase 1: Eligibility. Snapshots come from the project board's Ready
+  // column in user-controlled drag-order; pickEligible() applies the
+  // existing label / claim-by-PR filters and preserves that order so the
+  // batch is the user's top N picks.
+  const [snapshots, openPRs] = await Promise.all([
+    fetchProjectReadyIssues(PROJECT_OWNER, PROJECT_NUMBER, PROJECT_REPO, LABEL),
+    fetchOpenPRsClosingIssues(),
+  ]);
 
   const { eligible, excluded } = pickEligible(snapshots, openPRs, { label: LABEL });
 
@@ -167,119 +196,134 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     console.log(`  - #${e.number} excluded: ${describeExclusion(e.reason)}`);
   }
 
-  const issue = eligible[0];
-  if (issue === undefined) {
+  const batch = eligible.slice(0, MAX_PARALLEL);
+  if (batch.length === 0) {
     console.log("No eligible issues this iteration. Exiting.");
     break;
   }
 
-  console.log(`Working on #${issue.number}: ${issue.title} → ${issue.branch} [${issue.labels.join(", ")}]`);
-
-  // Phase 2: per-issue pipeline (implement → maybe review → open PR).
-  let madeCommits = false;
-  try {
-    // Reconciliation-lite: re-check the issue's live state before creating a
-    // sandbox. Even with one issue per iteration the snapshot can age (a PR
-    // opens elsewhere, the issue gets closed) and we don't want to burn a
-    // multi-minute sandbox start on stale state. The openPRs cache is the
-    // iteration-start snapshot — we deliberately don't re-fetch PRs per issue.
-    const live = await fetchIssueLiveState(issue.number);
-    const verdict = evaluate(live, openPRs, { label: LABEL });
-    if (!verdict.eligible) {
-      console.log(`  ⤺ #${issue.number} skipped (${describeExclusion(verdict.reason)})`);
-      console.log(`\nIteration ${iteration} complete. #${issue.number} reconciled-skip.`);
-      continue;
-    }
-
-    await using sandbox = await sandcastle.createSandbox({
-      sandbox: sandboxProvider,
-      branch: issue.branch,
-      hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
-      copyToWorktree: [...COPY_TO_WORKTREE],
-    });
-
-    const docsOnly = isDocsOnly(issue);
-    const implementerSpec = docsOnly ? AGENTS.implementerDocs : AGENTS.implementer;
-
-    await enforcementFor(implementerSpec)?.install(sandbox.worktreePath);
-
-    const issuePromptArgs = {
-      ISSUE_NUMBER: String(issue.number),
-      ISSUE_TITLE: issue.title,
-      BRANCH: issue.branch,
-    };
-
-    const implementerLogName = `iter${iteration}-implementer-${issue.number}`;
-    const implementResult = await sandbox.run({
-      name: "Implementer #" + issue.number,
-      agent: agent(implementerSpec),
-      promptFile: implementerSpec.promptPath,
-      promptArgs: issuePromptArgs,
-      logging: streamLogger(implementerLogName),
-    });
-    emitUsageFromRun(implementerLogName, iteration, implementResult.iterations);
-    emitPhaseOutcome("implementer", iteration, issue.number, implementResult.commits.length);
-
-    // Reviewer and PR creation both gate on whether *this* implementer run
-    // made commits. Comparing `main..HEAD` would be incorrect when the
-    // orchestrator is launched from a feature branch — every commit the
-    // launching branch had already added on top of main would falsely
-    // trigger both phases.
-    if (implementResult.commits.length === 0) {
-      console.log(`\nIteration ${iteration} complete. #${issue.number} made no progress.`);
-      console.log("No progress this iteration. Exiting.");
-      break;
-    }
-
-    madeCommits = true;
-
-    const thisRunPaths = await pathsTouchedByCommits(sandbox.worktreePath, implementResult.commits);
-    const allMarkdown = thisRunPaths.length > 0 && thisRunPaths.every((p) => p.endsWith(".md"));
-    const skipReview = docsOnly || allMarkdown;
-
-    if (!skipReview) {
-      const reviewerLogName = `iter${iteration}-reviewer-${issue.number}`;
-      const reviewerResult = await sandbox.run({
-        name: "Reviewer #" + issue.number,
-        agent: agent(AGENTS.reviewer),
-        promptFile: AGENTS.reviewer.promptPath,
-        promptArgs: issuePromptArgs,
-        logging: streamLogger(reviewerLogName),
-      });
-      emitUsageFromRun(reviewerLogName, iteration, reviewerResult.iterations);
-      emitPhaseOutcome("reviewer", iteration, issue.number, reviewerResult.commits.length);
-      // Surface the reviewer's value-add signal on stdout so it's visible during
-      // a run without grepping logs. This is the experiment: if reviewer commits
-      // are rare across many runs, the phase is dead weight.
-      console.log(
-        reviewerResult.commits.length > 0
-          ? `  ✎ Reviewer made ${reviewerResult.commits.length} commit(s) on #${issue.number}`
-          : `  ∅ Reviewer made no commits on #${issue.number}`,
-      );
-    }
-
-    // PR creation runs on the host: sandcastle has already applied the
-    // sandbox's commits to the host's branch via syncOut, so we push and
-    // open the PR using the host's git/gh credentials. No agent phase —
-    // an LLM round-trip to write the PR body duplicates work the
-    // conventional commits already do.
-    const prUrl = await openPullRequest(issue.branch, issue.number, process.cwd());
-    console.log(`  ✔ PR opened for #${issue.number}: ${prUrl}`);
-  } catch (reason) {
-    const errorTag =
-      typeof reason === "object" && reason !== null && "_tag" in reason
-        ? String((reason as { _tag: unknown })._tag)
-        : reason instanceof Error
-          ? reason.constructor.name
-          : "UnknownError";
-    const message = reason instanceof Error ? reason.message : String(reason);
-    console.error(`  ✗ #${issue.number} (${issue.branch}) failed [${errorTag}]: ${message}`);
-    continue;
+  console.log(`Batch of ${batch.length}:`);
+  for (const issue of batch) {
+    console.log(`  #${issue.number}: ${issue.title} → ${issue.branch} [${issue.labels.join(", ")}]`);
   }
 
+  // Phase 2: per-issue pipeline (implement → maybe review → open PR), run in
+  // parallel across the batch. Each task is fully independent — its own
+  // sandbox/worktree, its own agent runs, its own host-side PR creation.
+  // Outcomes: "commits" if the implementer produced at least one commit (PR
+  // opened), "no-commits" if it did not, "error" on any thrown failure. We
+  // exit the outer loop when no task in the batch produced commits — that's
+  // the kill-switch against burning iterations on a systemically broken setup.
+  type Outcome = { kind: "commits" | "no-commits" | "error"; issue: Issue };
+
+  const runIssue = async (issue: Issue): Promise<Outcome> => {
+    const tag = `[#${issue.number}]`;
+    try {
+      // Reconciliation-lite: re-check the issue's live state before creating
+      // a sandbox. The iteration-start snapshot can age while earlier batch
+      // items run, and we don't want to burn a multi-minute sandbox start on
+      // stale state. The openPRs cache stays iteration-start — we
+      // deliberately don't re-fetch PRs per issue.
+      const live = await fetchIssueLiveState(issue.number);
+      const verdict = evaluate(live, openPRs, { label: LABEL });
+      if (!verdict.eligible) {
+        console.log(`${tag}  ⤺ skipped (${describeExclusion(verdict.reason)})`);
+        return { kind: "no-commits", issue };
+      }
+
+      await using sandbox = await sandcastle.createSandbox({
+        sandbox: sandboxProvider,
+        branch: issue.branch,
+        hooks: { sandbox: { onSandboxReady: [{ command: INSTALL_AND_VERIFY }] } },
+        copyToWorktree: [...COPY_TO_WORKTREE],
+      });
+
+      const docsOnly = isDocsOnly(issue);
+      const implementerSpec = docsOnly ? AGENTS.implementerDocs : AGENTS.implementer;
+
+      await enforcementFor(implementerSpec)?.install(sandbox.worktreePath);
+
+      const issuePromptArgs = {
+        ISSUE_NUMBER: String(issue.number),
+        ISSUE_TITLE: issue.title,
+        BRANCH: issue.branch,
+      };
+
+      const implementerLogName = `iter${iteration}-implementer-${issue.number}`;
+      const implementResult = await sandbox.run({
+        name: "Implementer #" + issue.number,
+        agent: agent(implementerSpec),
+        promptFile: implementerSpec.promptPath,
+        promptArgs: issuePromptArgs,
+        logging: streamLogger(implementerLogName),
+      });
+      emitUsageFromRun(implementerLogName, iteration, implementResult.iterations);
+      emitPhaseOutcome("implementer", iteration, issue.number, implementResult.commits.length);
+
+      // Reviewer and PR creation both gate on whether *this* implementer run
+      // made commits. Comparing `main..HEAD` would be incorrect when the
+      // orchestrator is launched from a feature branch — every commit the
+      // launching branch had already added on top of main would falsely
+      // trigger both phases.
+      if (implementResult.commits.length === 0) {
+        console.log(`${tag}  no progress`);
+        return { kind: "no-commits", issue };
+      }
+
+      const thisRunPaths = await pathsTouchedByCommits(sandbox.worktreePath, implementResult.commits);
+      const allMarkdown = thisRunPaths.length > 0 && thisRunPaths.every((p) => p.endsWith(".md"));
+      const skipReview = docsOnly || allMarkdown;
+
+      if (!skipReview) {
+        const reviewerLogName = `iter${iteration}-reviewer-${issue.number}`;
+        const reviewerResult = await sandbox.run({
+          name: "Reviewer #" + issue.number,
+          agent: agent(AGENTS.reviewer),
+          promptFile: AGENTS.reviewer.promptPath,
+          promptArgs: issuePromptArgs,
+          logging: streamLogger(reviewerLogName),
+        });
+        emitUsageFromRun(reviewerLogName, iteration, reviewerResult.iterations);
+        emitPhaseOutcome("reviewer", iteration, issue.number, reviewerResult.commits.length);
+        console.log(
+          reviewerResult.commits.length > 0
+            ? `${tag}  ✎ Reviewer made ${reviewerResult.commits.length} commit(s)`
+            : `${tag}  ∅ Reviewer made no commits`,
+        );
+      }
+
+      // PR creation runs on the host: sandcastle has already applied the
+      // sandbox's commits to the host's branch via syncOut, so we push and
+      // open the PR using the host's git/gh credentials. Pushes target
+      // distinct branches across the batch, so concurrent push+create from
+      // sibling tasks don't conflict.
+      const prUrl = await openPullRequest(issue.branch, issue.number, process.cwd());
+      console.log(`${tag}  ✔ PR opened: ${prUrl}`);
+      return { kind: "commits", issue };
+    } catch (reason) {
+      const errorTag =
+        typeof reason === "object" && reason !== null && "_tag" in reason
+          ? String((reason as { _tag: unknown })._tag)
+          : reason instanceof Error
+            ? reason.constructor.name
+            : "UnknownError";
+      const message = reason instanceof Error ? reason.message : String(reason);
+      console.error(`${tag}  ✗ (${issue.branch}) failed [${errorTag}]: ${message}`);
+      return { kind: "error", issue };
+    }
+  };
+
+  const results = await Promise.all(batch.map(runIssue));
+  const commitCount = results.filter((r) => r.kind === "commits").length;
+
   console.log(
-    `\nIteration ${iteration} complete. #${issue.number} ${madeCommits ? "produced commits" : "made no progress"}.`,
+    `\nIteration ${iteration} complete. ${commitCount}/${batch.length} produced commits.`,
   );
+
+  if (commitCount === 0) {
+    console.log("No progress this iteration. Exiting.");
+    break;
+  }
 }
 
 console.log("\nAll done.");
