@@ -173,5 +173,13 @@ describe('SchemaPanel', () => {
       fireEvent.click(screen.getByTestId('schema-tab-convex'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('convex/schema.ts');
     });
+
+    it('derives JSON filename via .ts → .json fallback when name has no .schema.ts suffix', () => {
+      render(<SchemaPanel {...DEFAULT_PROPS} zodSource="a" jsonSource="b" />);
+      // Default schemaFileName is 'schema.ts' — no '.schema.ts' segment, so the
+      // fallback .ts → .json replacement must fire.
+      fireEvent.click(screen.getByTestId('schema-tab-json'));
+      expect(screen.getByTestId('schema-filename').textContent).toContain('schema.json');
+    });
   });
 });

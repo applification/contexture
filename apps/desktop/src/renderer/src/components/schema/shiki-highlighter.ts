@@ -36,11 +36,6 @@ export function getHighlighter(): Promise<HighlighterCore> {
   return highlighterPromise;
 }
 
-/** Call once at app startup to pre-warm the highlighter before the user opens the Schema tab. */
-export function warmHighlighter(): void {
-  getHighlighter().catch(() => undefined);
-}
-
 /**
  * Light/dark theme names passed to `codeToHtml`. Centralised so the
  * panel and any future caller stay in sync with what the highlighter

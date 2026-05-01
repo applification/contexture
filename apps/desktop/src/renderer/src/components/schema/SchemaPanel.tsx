@@ -104,8 +104,12 @@ export function SchemaPanel({
     getHighlighter().catch(() => undefined);
   }, []);
 
-  const activeSource =
-    activeSchema === 'zod' ? zodSource : activeSchema === 'json' ? jsonSource : convexSource;
+  const sourceByType: Record<SchemaType, string> = {
+    zod: zodSource,
+    json: jsonSource,
+    convex: convexSource,
+  };
+  const activeSource = sourceByType[activeSchema];
 
   // Re-highlight whenever the active source or schema type changes.
   useEffect(() => {
