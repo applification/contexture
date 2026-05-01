@@ -97,7 +97,7 @@ function applySelectedOps(
   let next = schema;
   for (let i = 0; i < proposedOps.length; i += 1) {
     if (!selectedIndices.has(i)) continue;
-    const result = apply(next, proposedOps[i].op);
+    const result = apply(next, proposedOps[i].op, STDLIB_REGISTRY);
     if ('error' in result) {
       return { schema: next, error: result.error };
     }

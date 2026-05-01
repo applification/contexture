@@ -17,6 +17,7 @@
  * `open()` get a fresh effect run).
  */
 import { useEffect, useRef } from 'react';
+import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { useDocumentStore } from '../store/document';
 import { type ApplyResult, apply, type Op } from '../store/ops';
 import { type ReconcileOp, targetKindFor, useReconcileStore } from '../store/reconcile';
@@ -104,7 +105,7 @@ export function useClaudeReconcile(): void {
           continue;
         }
         const op = entry.op as Op;
-        const applyResult: ApplyResult = apply(schema, op);
+        const applyResult: ApplyResult = apply(schema, op, STDLIB_REGISTRY);
         if ('error' in applyResult) {
           console.warn('[reconcile] dropping invalid op', op, applyResult.error);
           continue;

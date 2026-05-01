@@ -11,3 +11,4 @@ export * from './migrations';
 export * from './op-tools';
 export * from './ops';
 export * from './pipeline';
+export * from './semantic-validation';

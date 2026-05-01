@@ -18,9 +18,9 @@ describe('validate', () => {
       ],
     };
     const errs = validate(schema);
-    const dup = errs.find((e) => e.code === 'dup_type_name');
+    const dup = errs.find((e) => e.code === 'duplicate_type_name');
     expect(dup).toEqual({
-      code: 'dup_type_name',
+      code: 'duplicate_type_name',
       path: 'types.1',
       message: 'Duplicate type name "User".',
     });
@@ -271,9 +271,9 @@ describe('validate', () => {
       ],
       types: [],
     };
-    const err = validate(schema).find((e) => e.code === 'dup_import_alias');
+    const err = validate(schema).find((e) => e.code === 'duplicate_alias');
     expect(err).toEqual({
-      code: 'dup_import_alias',
+      code: 'duplicate_alias',
       path: 'imports.1',
       message: 'Duplicate import alias "lib".',
     });
@@ -288,7 +288,7 @@ describe('validate', () => {
       ],
       types: [],
     };
-    expect(validate(schema).some((e) => e.code === 'dup_import_alias')).toBe(false);
+    expect(validate(schema).some((e) => e.code === 'duplicate_alias')).toBe(false);
   });
 
   // Rule 7: Zod emit compiles (sandboxed eval wired up in #83).
@@ -314,6 +314,6 @@ describe('validate', () => {
         { kind: 'object', name: 'Post', fields: [] },
       ],
     };
-    expect(validate(schema).some((e) => e.code === 'dup_type_name')).toBe(false);
+    expect(validate(schema).some((e) => e.code === 'duplicate_type_name')).toBe(false);
   });
 });

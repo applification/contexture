@@ -2,23 +2,23 @@
  * Semantic validators for the IR.
  *
  * The Zod meta-schema (`model/ir.ts`) enforces structural correctness
- * at load time. This module layers the 7 semantic rules on top:
+ * at load time. This module layers the semantic rules on top:
  *
  * 1. Structural parse (enforced by the loader; not re-checked here).
- * 2. Every `ref.typeName` resolves — local type OR `alias.Name` with a
- *    matching import alias.
- * 3. No duplicate type names within a file.
- * 4. Discriminated unions — every variant must reference a local `object`
+ * 2. Refs + imports + duplicate type names — delegated to core's
+ *    `checkSemantic` so the validation panel and the op-layer gate
+ *    share one implementation.
+ * 3. Discriminated unions — every variant must reference a local `object`
  *    type whose fields include the discriminator.
- * 5. Enums — non-empty `values`, no duplicate values.
- * 6. Imports — every alias unique. (Cycles are the loader's concern.)
- * 7. Emitted Zod compiles — deferred sandboxed eval, wired up alongside
+ * 4. Enums — non-empty `values`, no duplicate values.
+ * 5. Emitted Zod compiles — deferred sandboxed eval, wired up alongside
  *    the Zod emitter in #83.
  *
  * Each returned `ValidationError` carries a stable `code` and a dotted
  * `path` so the UI can map the message back to the offending field.
  */
-import type { FieldType, Schema } from '../model/ir';
+import { checkSemantic, type SemanticIssue } from '@contexture/core';
+import type { Schema } from '../model/ir';
 import type { StdlibRegistry } from './stdlib-registry';
 
 export interface ValidationError {
@@ -29,10 +29,10 @@ export interface ValidationError {
 
 export interface ValidateOptions {
   /**
-   * Optional stdlib registry used by Rule 2 to resolve qualified refs
+   * Optional stdlib registry used to resolve qualified refs
    * (`<namespace>.<TypeName>`) against bundled stdlib namespaces when
-   * no matching `add_import` has been declared. Callers that want
-   * strict import-only resolution (historical behaviour) pass nothing.
+   * no matching `add_import` has been declared, and to validate that
+   * stdlib imports point at known namespaces with matching aliases.
    */
   stdlib?: StdlibRegistry;
 }
@@ -40,13 +40,19 @@ export interface ValidateOptions {
 export function validate(schema: Schema, options: ValidateOptions = {}): ValidationError[] {
   if (!schema || schema.version !== '1') return [];
   const errors: ValidationError[] = [];
-  errors.push(...checkDuplicateTypeNames(schema));
-  errors.push(...checkRefsResolve(schema, options.stdlib));
+  errors.push(...checkSemantic(schema, options.stdlib).map(toValidationError));
   errors.push(...checkDiscriminatedUnions(schema));
   errors.push(...checkEnums(schema));
-  errors.push(...checkImportAliases(schema));
   errors.push(...checkEmittedZodCompiles(schema));
   return errors;
+}
+
+function toValidationError(issue: SemanticIssue): ValidationError {
+  return {
+    code: issue.code,
+    path: issue.path,
+    message: issue.hint ? `${issue.message} ${issue.hint}` : issue.message,
+  };
 }
 
 /**
@@ -60,23 +66,6 @@ function checkEmittedZodCompiles(_schema: Schema): ValidationError[] {
   // TODO(#83): emit Zod for `_schema`, eval in sandboxed worker,
   // surface `zod_compile_failed` with the offending type path.
   return [];
-}
-
-function checkImportAliases(schema: Schema): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const seen = new Set<string>();
-  (schema.imports ?? []).forEach((imp, i) => {
-    if (seen.has(imp.alias)) {
-      errors.push({
-        code: 'dup_import_alias',
-        path: `imports.${i}`,
-        message: `Duplicate import alias "${imp.alias}".`,
-      });
-    } else {
-      seen.add(imp.alias);
-    }
-  });
-  return errors;
 }
 
 function checkEnums(schema: Schema): ValidationError[] {
@@ -140,69 +129,6 @@ function checkDiscriminatedUnions(schema: Schema): ValidationError[] {
         });
       }
     });
-  });
-  return errors;
-}
-
-function checkRefsResolve(schema: Schema, stdlib?: StdlibRegistry): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const localNames = new Set(schema.types.map((t) => t.name));
-  const aliases = new Set((schema.imports ?? []).map((i) => i.alias));
-
-  const walkField = (t: FieldType, path: string) => {
-    if (t.kind === 'ref') {
-      if (!resolves(t.typeName, localNames, aliases, stdlib)) {
-        errors.push({
-          code: 'unresolved_ref',
-          path,
-          message: `Unresolved ref "${t.typeName}".`,
-        });
-      }
-    } else if (t.kind === 'array') {
-      walkField(t.element, `${path}.element`);
-    }
-  };
-
-  schema.types.forEach((type, ti) => {
-    if (type.kind !== 'object') return;
-    type.fields.forEach((f, fi) => {
-      walkField(f.type, `types.${ti}.fields.${fi}.type`);
-    });
-  });
-  return errors;
-}
-
-function resolves(
-  typeName: string,
-  locals: Set<string>,
-  aliases: Set<string>,
-  stdlib?: StdlibRegistry,
-): boolean {
-  const dot = typeName.indexOf('.');
-  if (dot === -1) return locals.has(typeName);
-  const ns = typeName.slice(0, dot);
-  const name = typeName.slice(dot + 1);
-  // An explicit `add_import` alias satisfies the ref without looking
-  // inside the target module (matches legacy behaviour). A bundled
-  // stdlib namespace satisfies it by name lookup — that's what
-  // `common.Email` without an explicit import relies on.
-  if (aliases.has(ns)) return true;
-  return stdlib?.hasType(ns, name) ?? false;
-}
-
-function checkDuplicateTypeNames(schema: Schema): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const seen = new Set<string>();
-  schema.types.forEach((type, i) => {
-    if (seen.has(type.name)) {
-      errors.push({
-        code: 'dup_type_name',
-        path: `types.${i}`,
-        message: `Duplicate type name "${type.name}".`,
-      });
-    } else {
-      seen.add(type.name);
-    }
   });
   return errors;
 }
