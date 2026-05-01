@@ -56,7 +56,6 @@ export async function scaffoldTurboSkeleton(
       typecheck: 'turbo typecheck',
     },
     devDependencies: {
-      '@contexture/cli': 'workspace:*',
       turbo: 'latest',
     },
   };
