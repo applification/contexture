@@ -43,7 +43,6 @@ function makePackageJson(projectName: string): string {
       main: './index.ts',
       types: './index.ts',
       dependencies: { convex: 'latest' },
-      devDependencies: { '@contexture/cli': 'workspace:*' },
     },
     null,
     2,
