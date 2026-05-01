@@ -20,7 +20,8 @@
     "./ops": "./src/ops.ts",
     "./op-tools": "./src/op-tools.ts",
     "./paths": "./src/paths.ts",
-    "./pipeline": "./src/pipeline.ts"
+    "./pipeline": "./src/pipeline.ts",
+    "./semantic-validation": "./src/semantic-validation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

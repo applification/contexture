@@ -17,7 +17,7 @@
  * Each returned `ValidationError` carries a stable `code` and a dotted
  * `path` so the UI can map the message back to the offending field.
  */
-import { checkSemantic, type SemanticIssue } from '@contexture/core';
+import { checkSemantic, type SemanticIssue } from '@contexture/core/semantic-validation';
 import type { Schema } from '../model/ir';
 import type { StdlibRegistry } from './stdlib-registry';
 

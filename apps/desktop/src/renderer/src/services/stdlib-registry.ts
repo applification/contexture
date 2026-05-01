@@ -14,7 +14,7 @@
  * validate cleanly. Tests can supply a custom registry (empty, or
  * with a synthetic namespace) without touching the stdlib package.
  */
-import type { StdlibCatalog } from '@contexture/core';
+import type { StdlibCatalog } from '@contexture/core/semantic-validation';
 import { IR_BY_NAMESPACE, NAMESPACES, type Namespace } from '@contexture/stdlib/registry';
 import type { StdlibRegistry as SystemPromptStdlibRegistry } from '../chat/system-prompt';
 
