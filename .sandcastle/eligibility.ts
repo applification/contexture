@@ -41,9 +41,9 @@ export type EligibilityResult = {
 
 // Iteration-start partition: applies `evaluate` to every snapshot, mints
 // branch names for survivors, validates them through issue.ts's Issue
-// schema. Eligible issues are returned ordered by issue number ascending
-// so callers have a deterministic "oldest first" pick without a separate
-// sort.
+// schema. Eligible issues are returned in the same order as the input
+// snapshots — callers control ordering by passing snapshots in the order
+// they want them processed (e.g. project board drag-order).
 export function pickEligible(
   snapshots: IssueSnapshot[],
   openPRs: OpenPRClosing[],
@@ -68,6 +68,5 @@ export function pickEligible(
     );
   }
 
-  eligible.sort((a, b) => a.number - b.number);
   return { eligible, excluded };
 }

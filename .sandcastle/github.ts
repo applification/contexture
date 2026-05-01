@@ -33,6 +33,25 @@ const IssueSnapshotSchema = z.object({
 });
 const IssueListSchema = z.array(IssueSnapshotSchema);
 
+// Project items expose the underlying issue under `content` and lift the
+// kanban Status column to a top-level `status` string. `repository` is the
+// owner/name slug — we filter on it because the project can hold items from
+// multiple repos, and Sandcastle only ever wants this repo's issues. `number`
+// and `repository` are absent for `DraftIssue` items (project-only cards
+// not yet promoted to a real issue), so the schema tolerates that and we
+// filter draft items out by `content.type === "Issue"`.
+const ProjectItemSchema = z.object({
+  status: z.string().optional(),
+  labels: z.array(z.string()).optional().default([]),
+  content: z.object({
+    type: z.string(),
+    number: z.number().int().positive().optional(),
+    title: z.string(),
+    repository: z.string().optional(),
+  }),
+});
+const ProjectItemListSchema = z.object({ items: z.array(ProjectItemSchema) });
+
 const PRBodyEntry = z.object({
   number: z.number().int().positive(),
   body: z.string().nullable(),
@@ -76,6 +95,54 @@ export async function fetchOpenLabelledIssues(
     "number,title,state,labels",
   ]);
   return IssueListSchema.parse(raw);
+}
+
+// Fetch issues sitting in the project's `Ready` column for the given repo,
+// preserving the board's drag-order. The orchestrator uses this in place of
+// `fetchOpenLabelledIssues` so the user's kanban order drives selection. We
+// synthesise `state: "open"` because Ready items are by definition open —
+// closing an issue moves it out of Ready automatically.
+export async function fetchProjectReadyIssues(
+  owner: string,
+  projectNumber: number,
+  repo: string,
+  label: string,
+  runGh: RunGh = defaultRunGh,
+): Promise<IssueSnapshot[]> {
+  const raw = await ghJson(runGh, [
+    "project",
+    "item-list",
+    String(projectNumber),
+    "--owner",
+    owner,
+    "--format",
+    "json",
+    "--limit",
+    "200",
+  ]);
+  const { items } = ProjectItemListSchema.parse(raw);
+  const out: IssueSnapshot[] = [];
+  for (const item of items) {
+    // Filter to Ready issues for this repo with the tracker label. DraftIssue
+    // items lack `content.number` and `content.repository`, so the type guard
+    // also narrows the optionals to defined values for the push below.
+    if (
+      item.status !== "Ready" ||
+      item.content.type !== "Issue" ||
+      item.content.repository !== repo ||
+      item.content.number === undefined ||
+      !item.labels.includes(label)
+    ) {
+      continue;
+    }
+    out.push({
+      number: item.content.number,
+      title: item.content.title,
+      state: "open",
+      labels: item.labels,
+    });
+  }
+  return out;
 }
 
 // Fetch every open PR and extract the issue numbers each one closes via its
