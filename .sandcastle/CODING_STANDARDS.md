@@ -13,6 +13,7 @@
 - No `any` — ever (`noExplicitAny` is an error)
 - kebab-case filenames for components; camelCase for utilities
 - 2-space indent, 100-char line width, single quotes, trailing commas (Biome enforced)
+- **Never** suppress lint rules with `biome-ignore` (or `@ts-ignore`/`eslint-disable`). If a rule fires, fix the underlying code — restructure the effect, derive a value, lift state, or pick a different approach. A suppression silences the linter but leaves the smell; future readers can't tell whether it's still warranted. The same applies to `as any` and other type escape hatches.
 
 ## Architecture
 

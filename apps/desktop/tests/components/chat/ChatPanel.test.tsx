@@ -112,7 +112,7 @@ describe('ChatPanel', () => {
     expect(screen.queryByTitle('Send')).not.toBeInTheDocument();
   });
 
-  it('auto-grows textarea height as input increases', async () => {
+  it('auto-grows the textarea via CSS field-sizing with an 8-line cap and scroll overflow', async () => {
     render(<ChatPanel chat={makeChat()} />);
     await waitFor(() => {
       const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
@@ -120,49 +120,11 @@ describe('ChatPanel', () => {
     });
     const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
 
-    // Simulate a tall scrollHeight (multi-line content) and verify the
-    // inline style is updated to match it when input changes.
-    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 80 });
-    fireEvent.change(textarea, { target: { value: 'line1\nline2\nline3' } });
-    expect(textarea.style.height).toBe('80px');
-  });
-
-  it('caps textarea height at 8 lines and keeps overflow-y-auto for scrolling', async () => {
-    render(<ChatPanel chat={makeChat()} />);
-    await waitFor(() => {
-      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
-      expect(ta.disabled).toBe(false);
-    });
-    const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
-
-    // Simulate scrollHeight exceeding 8 lines.
-    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 9999 });
-    fireEvent.change(textarea, { target: { value: 'a\nb\nc\nd\ne\nf\ng\nh\ni\nj' } });
-
-    // The inline height must be capped (not 9999px).
-    const heightPx = parseFloat(textarea.style.height);
-    expect(heightPx).toBeLessThan(9999);
-    expect(heightPx).toBeGreaterThan(0);
-
-    // The textarea must still scroll beyond the cap.
+    // Auto-grow is delivered by CSS (`field-sizing: content`) rather
+    // than a useEffect that pokes inline height — verify the contract
+    // is expressed on the element.
+    expect(textarea.className).toMatch(/field-sizing-content/);
+    expect(textarea.className).toMatch(/max-h-\[/);
     expect(textarea.className).toMatch(/overflow-y-auto/);
-  });
-
-  it('resets textarea height when input is cleared', async () => {
-    render(<ChatPanel chat={makeChat()} />);
-    await waitFor(() => {
-      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
-      expect(ta.disabled).toBe(false);
-    });
-    const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
-
-    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 80 });
-    fireEvent.change(textarea, { target: { value: 'line1\nline2\nline3' } });
-    expect(textarea.style.height).toBe('80px');
-
-    // Clearing input should shrink the textarea back down.
-    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 20 });
-    fireEvent.change(textarea, { target: { value: '' } });
-    expect(textarea.style.height).toBe('20px');
   });
 });

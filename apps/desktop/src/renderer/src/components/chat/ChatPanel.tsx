@@ -73,7 +73,6 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const history = useChatThreads();
 
   const [input, setInput] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Track previous filePath so file-change and initial-mount paths
@@ -161,23 +160,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     });
   }, [history.activeThreadId, history.updateThreadSessionId]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll whenever the message list changes; biome can't see `messages` is the intended trigger
+  const messageCount = messages.length;
   useEffect(() => {
+    if (messageCount === 0) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Auto-grow the textarea up to 8 lines; content scrolls beyond that.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: input is the intended trigger; the effect reads the DOM via textareaRef
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20;
-    const paddingTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
-    const paddingBottom = parseFloat(getComputedStyle(el).paddingBottom) || 0;
-    const maxHeight = lineHeight * 8 + paddingTop + paddingBottom;
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-  }, [input]);
+  }, [messageCount]);
 
   const fileThreads = useMemo(
     () => history.threadsForFile(filePath),
@@ -371,7 +358,6 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           )}
         >
           <textarea
-            ref={textareaRef}
             value={input}
             onChange={(ev) => setInput(ev.target.value)}
             onKeyDown={handleKeyDown}
@@ -379,7 +365,8 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             disabled={!isReady || isStreaming}
             rows={1}
             className={cn(
-              'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm',
+              'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm leading-5',
+              'field-sizing-content max-h-[calc(8*1.25rem+1.25rem)]',
               'placeholder:text-muted-foreground focus:outline-none',
               'disabled:cursor-not-allowed overflow-y-auto',
             )}
