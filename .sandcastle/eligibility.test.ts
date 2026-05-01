@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { evaluate, pickEligible } from "./eligibility";
-import type { IssueSnapshot, OpenPRClosing } from "./gh";
+import type { IssueSnapshot, OpenPRClosing } from "./github";
 
 const cfg = { label: "Sandcastle" };
 

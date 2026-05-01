@@ -147,4 +147,22 @@ describe('ChatPanel', () => {
     // The textarea must still scroll beyond the cap.
     expect(textarea.className).toMatch(/overflow-y-auto/);
   });
+
+  it('resets textarea height when input is cleared', async () => {
+    render(<ChatPanel chat={makeChat()} />);
+    await waitFor(() => {
+      const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+      expect(ta.disabled).toBe(false);
+    });
+    const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 80 });
+    fireEvent.change(textarea, { target: { value: 'line1\nline2\nline3' } });
+    expect(textarea.style.height).toBe('80px');
+
+    // Clearing input should shrink the textarea back down.
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 20 });
+    fireEvent.change(textarea, { target: { value: '' } });
+    expect(textarea.style.height).toBe('20px');
+  });
 });
