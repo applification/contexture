@@ -23,11 +23,21 @@ test.describe('Import / export round-trip', () => {
     // Prior specs in the same run leave an unsaved schema in
     // `window.localStorage` which `useSessionPersistence` restores on
     // mount — that hides the empty state and the "Load allotment
-    // sample" button. Clear the session and reload so this spec starts
-    // from a clean empty schema.
-    await page.evaluate(() => window.localStorage.removeItem('contexture:session:v1'));
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
+    // sample" button. Reset the in-memory schema to empty AND clear
+    // the session key so the persistence loop doesn't immediately
+    // re-write it (storage is cleared synchronously when the schema
+    // becomes empty, but we belt-and-brace it).
+    await page.evaluate(() => {
+      const win = window as unknown as {
+        __contextureUndoStore: {
+          getState: () => { apply: (op: unknown) => unknown };
+        };
+      };
+      win.__contextureUndoStore
+        .getState()
+        .apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
+      window.localStorage.removeItem('contexture:session:v1');
+    });
   });
 
   test.afterAll(async () => {

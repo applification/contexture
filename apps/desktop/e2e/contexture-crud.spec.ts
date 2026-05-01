@@ -25,11 +25,20 @@ test.describe('Contexture CRUD', () => {
     await page.waitForLoadState('domcontentloaded');
     // `useSessionPersistence` restores any unsaved schema left in
     // `window.localStorage` by a prior spec, which would hide the
-    // empty state and the "Load allotment sample" button. Clear it
-    // and reload so the spec starts from a clean empty schema.
-    await page.evaluate(() => window.localStorage.removeItem('contexture:session:v1'));
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
+    // empty state and the "Load allotment sample" button. Reset the
+    // in-memory schema to empty AND clear the session key so the
+    // persistence loop doesn't immediately re-write it.
+    await page.evaluate(() => {
+      const win = window as unknown as {
+        __contextureUndoStore: {
+          getState: () => { apply: (op: unknown) => unknown };
+        };
+      };
+      win.__contextureUndoStore
+        .getState()
+        .apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
+      window.localStorage.removeItem('contexture:session:v1');
+    });
   });
 
   test.afterAll(async () => {
