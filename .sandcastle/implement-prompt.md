@@ -11,6 +11,8 @@
 
 Bash is for: running tests, git, gh, package managers, build commands. Nothing else.
 
+**Orientation.** To learn the tree layout, read `README.md` once — it lists every app and package. For anything it doesn't cover, run a single `Glob "**/*"` (or your harness's equivalent). One call gives you the whole tree instantly.
+
 # TASK
 
 Fix issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
@@ -68,7 +70,15 @@ If the task is not complete, leave a comment on the GitHub issue with what was d
 
 Do not close the issue — the merged PR will close it automatically via `Closes #N`.
 
-Once complete, output <promise>COMPLETE</promise>.
+# FINAL OUTPUT
+
+When the commit is made and `bun run ci` passed, your final message must be exactly:
+
+    <promise>COMPLETE</promise>
+
+No summary, no recap, no file list, no "here's what I did" — the commit message already contains all of that. Any text outside the sentinel risks tripping the harness's failure-tone detector and forcing a re-run.
+
+If you cannot complete the task, instead output a single line beginning with `BLOCKED:` followed by one sentence, then stop.
 
 # FINAL RULES
 
