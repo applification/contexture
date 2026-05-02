@@ -303,8 +303,12 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
     [click, setSidebarVisible, setSidebarTab],
   );
 
-  const onKeyDown = useCallback(
-    (ev: React.KeyboardEvent<HTMLDivElement>) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (ev: KeyboardEvent): void => {
       const e: InteractionKeyEvent = {
         key: ev.key,
         metaKey: ev.metaKey,
@@ -318,17 +322,15 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
       if (action.kind === 'op') dispatch(action.op);
       else if (action.command === 'undo') undo();
       else if (action.command === 'redo') redo();
-    },
-    [dispatch, undo, redo, selectedNodeId],
-  );
+    };
+    el.addEventListener('keydown', handler);
+    return () => el.removeEventListener('keydown', handler);
+  }, [dispatch, undo, redo, selectedNodeId]);
 
   return (
-    <section
-      aria-label="Schema canvas"
+    <div
+      ref={containerRef}
       className="w-full h-full outline-none"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: canvas receives keydown for delete / undo / redo shortcuts
-      tabIndex={0}
-      onKeyDown={onKeyDown}
       data-testid="graph-canvas"
       style={{ background: 'var(--graph-bg)' }}
     >
@@ -359,6 +361,6 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
         <Controls showInteractive={false} />
         <GraphLegend />
       </ReactFlow>
-    </section>
+    </div>
   );
 }

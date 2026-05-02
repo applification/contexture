@@ -25,7 +25,7 @@
  * path for user-authored source to introduce raw tags.
  */
 import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
@@ -96,6 +96,11 @@ export function SchemaPanel({
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
+  const codeRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (codeRef.current) codeRef.current.innerHTML = highlightedHtml ?? '';
+  }, [highlightedHtml]);
 
   // Pre-warm shiki on first mount so it loads in the background.
   // By the time the user opens the Schema tab the highlighter is
@@ -278,9 +283,7 @@ export function SchemaPanel({
           data-testid="schema-code"
         >
           {highlightedHtml !== null ? (
-            /* shiki emits pre-escaped HTML tokens; see security note in the file header. */
-            /* biome-ignore lint/security/noDangerouslySetInnerHtml: shiki output is trusted, tokenised, escaped HTML */
-            <div dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+            <div ref={codeRef} />
           ) : (
             <pre className="p-4 m-0 font-mono">{activeSource}</pre>
           )}

@@ -60,7 +60,7 @@ export function useSessionPersistence({
     } catch {
       store.removeItem(SESSION_KEY);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persistence loop: schema and layout changes both trigger a debounced
   // write. A `pagehide` listener flushes synchronously so a dev-server
@@ -133,12 +133,11 @@ export function useSessionPersistence({
         window.removeEventListener('beforeunload', onPageHide);
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Layout-only changes (e.g. a node drag with no schema mutation) also
   // need to land in storage. Schedule a debounced flush whenever the
   // caller-supplied layout reference changes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: storageRef is stable
   useEffect(() => {
     const store = storageRef.current;
     if (!store) return;

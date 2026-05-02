@@ -56,77 +56,66 @@ export function ChatThreadList({
         const isActive = thread.id === activeThreadId;
 
         return (
-          // biome-ignore lint/a11y/useSemanticElements: div contains nested interactive buttons, cannot use <button>
           <div
             key={thread.id}
-            role="button"
-            tabIndex={0}
             className={cn(
-              'group relative px-3 py-2.5 cursor-pointer border-b border-border/50',
+              'group relative border-b border-border/50',
               'hover:bg-secondary/60 transition-colors',
               isActive && 'bg-secondary/40',
             )}
-            onClick={() => onSelect(thread.id)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onSelect(thread.id);
-              }
-            }}
           >
-            <div className="flex items-start gap-2">
-              {isActive && <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{thread.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {formatDate(thread.updatedAt)} · {messageCount} message
-                  {messageCount !== 1 ? 's' : ''}
-                </p>
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2.5 cursor-pointer"
+              onClick={() => onSelect(thread.id)}
+            >
+              <div className="flex items-start gap-2">
+                {isActive && <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{thread.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatDate(thread.updatedAt)} · {messageCount} message
+                    {messageCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
               </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                {confirmDeleteId === thread.id ? (
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-6 text-destructive hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(thread.id);
-                        setConfirmDeleteId(null);
-                      }}
-                      title="Confirm delete"
-                    >
-                      <Trash2 className="size-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmDeleteId(null);
-                      }}
-                      title="Cancel"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ) : (
+            </button>
+            <div className="absolute top-1/2 -translate-y-1/2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              {confirmDeleteId === thread.id ? (
+                <div className="flex gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-6 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setConfirmDeleteId(thread.id);
+                    className="size-6 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      onDelete(thread.id);
+                      setConfirmDeleteId(null);
                     }}
-                    title="Delete chat"
+                    title="Confirm delete"
                   >
                     <Trash2 className="size-3" />
                   </Button>
-                )}
-              </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    onClick={() => setConfirmDeleteId(null)}
+                    title="Cancel"
+                  >
+                    ×
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => setConfirmDeleteId(thread.id)}
+                  title="Delete chat"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              )}
             </div>
           </div>
         );

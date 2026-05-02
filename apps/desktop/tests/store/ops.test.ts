@@ -1,4 +1,5 @@
 import type { Schema } from '@renderer/model/ir';
+import type { Op } from '@renderer/store/ops';
 import { apply } from '@renderer/store/ops';
 import { describe, expect, it } from 'vitest';
 
@@ -11,8 +12,7 @@ function ok(res: ReturnType<typeof apply>): Schema {
 
 describe('apply', () => {
   it('returns an error for an unknown op kind', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: invalid kind by design
-    const res = apply(empty, { kind: 'nope' } as any);
+    const res = apply(empty, { kind: 'nope' } as unknown as Op);
     expect('error' in res).toBe(true);
   });
 

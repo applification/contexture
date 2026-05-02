@@ -29,14 +29,16 @@ export function MobileNav() {
       {open && (
         <div className="md:hidden absolute top-16 inset-x-0 border-b border-border/50 bg-background/95 backdrop-blur-md">
           <div className="flex flex-col gap-1 px-6 py-4">
-            {/* biome-ignore lint/a11y/useValidAnchor: anchor with valid href, onClick only closes menu */}
-            <a
-              href="#features"
-              onClick={() => setOpen(false)}
-              className="py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
             >
               Features
-            </a>
+            </button>
             <a
               href="/brand"
               onClick={() => setOpen(false)}
@@ -55,14 +57,16 @@ export function MobileNav() {
             <div className="flex items-center gap-3 py-2.5">
               <AnimatedThemeToggler className="size-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors [&_svg]:size-4" />
             </div>
-            {/* biome-ignore lint/a11y/useValidAnchor: anchor with valid href, onClick only closes menu */}
-            <a
-              href="#download"
-              onClick={() => setOpen(false)}
-              className="mt-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium text-center hover:opacity-90 transition-opacity"
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="mt-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium text-center hover:opacity-90 transition-opacity w-full"
             >
               Download
-            </a>
+            </button>
           </div>
         </div>
       )}
