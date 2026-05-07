@@ -7,6 +7,7 @@ const ignoredDirectories = new Set([
   '.git',
   '.next',
   '.turbo',
+  '_generated',
   'build',
   'coverage',
   'dist',

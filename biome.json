@@ -15,7 +15,9 @@
       "**/*.json",
       "**/*.jsonc",
       "!.sandcastle",
-      "!.claude/settings.local.json"
+      "!.claude/settings.local.json",
+      "!apps/missions/convex/_generated",
+      "!apps/missions/.env.local"
     ]
   },
   "formatter": {

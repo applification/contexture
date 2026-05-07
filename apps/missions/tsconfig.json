@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "lib": ["esnext", "dom"],
+    "types": ["node"]
+  },
+  "include": ["convex/**/*", "src/**/*", "vitest.config.ts"],
+  "exclude": ["convex/_generated"]
+}
