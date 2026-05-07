@@ -1,7 +1,37 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { api } from "@contexture/missions";
 import { Orchestrator } from "./missions/orchestrator";
 import { planMission, readPlanFromFile } from "./missions/planner";
 import { renderStatus } from "./missions/status-view";
+
+// Load .sandcastle/.env regardless of where `bun run mission` was invoked
+// from. Bun's built-in dotenv loader only reads from process.cwd(), so the
+// CLI works whether you run it from the repo root or from .sandcastle/.
+async function loadSandcastleEnv(): Promise<void> {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const envPath = resolve(here, ".env");
+  const file = Bun.file(envPath);
+  if (!(await file.exists())) return;
+  const text = await file.text();
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+await loadSandcastleEnv();
 
 const HELP = `Usage: bun run mission <command> [args]
 

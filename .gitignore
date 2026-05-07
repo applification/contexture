@@ -32,3 +32,8 @@ playwright-report/
 
 # Sensitive docs migrated to Paperclip issue documents (ONT-49)
 Marketing/
+
+# Local mission plan files for smoke testing / experiments
+smoke-*-plan.json
+mission-plan-*.json
+

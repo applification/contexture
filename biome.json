@@ -17,7 +17,9 @@
       "!.sandcastle",
       "!.claude/settings.local.json",
       "!apps/missions/convex/_generated",
-      "!apps/missions/.env.local"
+      "!apps/missions/.env.local",
+      "!smoke-*-plan.json",
+      "!mission-plan-*.json"
     ]
   },
   "formatter": {
