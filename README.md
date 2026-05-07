@@ -125,3 +125,5 @@ Requires `ANTHROPIC_API_KEY` and `GH_TOKEN` environment variables — see
 ## License
 
 MIT
+
+<!-- mission: smoke-1, feature: trivial-readme, ts: 1778161668547 -->
