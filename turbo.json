@@ -1,5 +1,7 @@
 {
   "$schema": "https://v2-9-7.turborepo.dev/schema.json",
+  "globalEnv": ["INFISICAL_CLIENT_ID", "INFISICAL_CLIENT_SECRET"],
+  "globalDependencies": ["**/.env.schema"],
   "tasks": {
     "dev": {
       "cache": false,

@@ -14,11 +14,18 @@ storybook-static/
 test-results/
 playwright-report/
 
-# Environment files
+# Environment files. Real values are resolved via varlock + Infisical; the
+# committed `.env.schema` files declare structure only. Any local `.env*`
+# files are escape hatches and stay out of git.
 .env
 .env.local
 .env.*.local
 .sandcastle/.env
+!.env.schema
+!**/.env.schema
+
+# varlock typegen output
+**/env.d.ts
 
 # Paperclip agent worktrees and local state
 .paperclip/

@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "varlock": {
+    "loadPath": "../../"
+  }
+}

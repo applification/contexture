@@ -112,8 +112,11 @@ bun run sandcastle:build
 bun run sandcastle
 ```
 
-Requires `ANTHROPIC_API_KEY` and `GH_TOKEN` environment variables — see
-[`.sandcastle/.env.example`](.sandcastle/.env.example).
+Sandcastle uses your existing `gh` CLI authentication for GitHub. Real
+secrets are resolved at runtime via [varlock](https://varlock.dev) +
+Infisical — see [`.sandcastle/.env.schema`](.sandcastle/.env.schema) for the
+declared variables. AI coding tools see only the schema; values never sit on
+disk.
 
 ## Tech Stack
 

@@ -15,7 +15,8 @@
       "**/*.json",
       "**/*.jsonc",
       "!.sandcastle",
-      "!.claude/settings.local.json"
+      "!.claude/settings.local.json",
+      "!**/env.d.ts"
     ]
   },
   "formatter": {

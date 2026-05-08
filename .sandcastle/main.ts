@@ -35,15 +35,37 @@ const MAX_PARALLEL = 2;
 
 // Skip host->worktree copy: this monorepo's node_modules is ~3.5GB and blows
 // past sandcastle's hard-coded 60s copy timeout. The implementer sandbox runs
-// `bun install` inside the container instead. Env files are gitignored, so
-// copy them in explicitly.
-const COPY_TO_WORKTREE: readonly string[] = ["apps/desktop/.env", "apps/web/.env.local"];
+// `bun install` inside the container instead. Env values come from Infisical
+// via varlock; the credentials to authenticate with Infisical are injected
+// into the sandbox env (see SANDBOX_ENV).
+const COPY_TO_WORKTREE: readonly string[] = [];
 
 // Verify the install actually produced a usable workspace. `bun install` exits
 // 0 even when individual extractions are mangled, so we follow with `turbo
 // typecheck`, which resolves and loads imports across every workspace and
 // fails loudly if a package's main entry is missing.
 const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
+
+// Forward the Infisical machine-identity credentials into the sandbox so
+// varlock-resolved env (`infisical()` items) works inside the container.
+// The credentials live in the host shell env, sourced from the macOS keychain
+// via ~/.zshenv. We fail fast if they are missing — the AFK agent cannot
+// resolve real env values otherwise, and silent fallback to placeholder
+// builds masks misconfiguration.
+const requireEnv = (key: string): string => {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(
+      `${key} is not set on the host. Sandcastle requires Infisical credentials to inject ` +
+        `into the sandbox so varlock can resolve env values. See CLAUDE.md for keychain setup.`,
+    );
+  }
+  return value;
+};
+const SANDBOX_ENV: Record<string, string> = {
+  INFISICAL_CLIENT_ID: requireEnv("INFISICAL_CLIENT_ID"),
+  INFISICAL_CLIENT_SECRET: requireEnv("INFISICAL_CLIENT_SECRET"),
+};
 
 // ---------- Agent specs ----------
 
@@ -85,7 +107,7 @@ const AGENTS = {
 // parallel sandboxes races on tarball extraction and silently produces broken
 // installs (e.g. a package with package.json pointing at a build/ output that
 // was never written). Cold installs are slower; broken node_modules are worse.
-const sandboxProvider = docker({});
+const sandboxProvider = docker({ env: SANDBOX_ENV });
 
 function describeExclusion(reason: ExclusionReason): string {
   switch (reason.kind) {

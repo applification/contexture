@@ -1,5 +1,6 @@
 import bundleAnalyzer from '@next/bundle-analyzer';
 import { withSentryConfig } from '@sentry/nextjs';
+import { varlockNextConfigPlugin } from '@varlock/nextjs-integration/plugin';
 import type { NextConfig } from 'next';
 
 const withBundleAnalyzer = bundleAnalyzer({
@@ -26,7 +27,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(withBundleAnalyzer(nextConfig), {
-  silent: true,
-  disableLogger: true,
-});
+export default varlockNextConfigPlugin()(
+  withSentryConfig(withBundleAnalyzer(nextConfig), {
+    silent: true,
+    disableLogger: true,
+  }),
+);

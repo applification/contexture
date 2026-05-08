@@ -54,11 +54,16 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build
+      - name: Load desktop env (varlock)
+        uses: dmno-dev/varlock-action@v1.0.1
+        with:
+          working-directory: apps/desktop
         env:
-          VITE_POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
-          VITE_POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
-          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          INFISICAL_ENV: prod
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+
+      - name: Build
         run: bun run build --filter=@contexture/desktop
 
       - name: Package and publish (macOS)
