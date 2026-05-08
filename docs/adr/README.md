@@ -26,6 +26,7 @@ Format: Context → Decision → Consequences → Alternatives. Status is `Propo
 | [0018](0018-docker-sandboxed-afk-with-pr-link-claim.md) | AFK agents in Docker sandboxes; PR body links claim issues | Accepted |
 | [0019](0019-separate-marketing-site-on-vercel.md) | Marketing site is a separate Next.js app on Vercel | Accepted |
 | [0020](0020-shadcn-tailwind-v4-oklch.md) | shadcn/ui + Tailwind v4 + OKLCH design tokens | Accepted |
+| [0021](0021-varlock-infisical-env-secrets.md) | varlock + Infisical for env and secrets management | Accepted |
 
 ## Adding a new ADR
 
