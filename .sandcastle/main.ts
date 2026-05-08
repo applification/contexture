@@ -46,18 +46,28 @@ const COPY_TO_WORKTREE: readonly string[] = [];
 // fails loudly if a package's main entry is missing.
 const INSTALL_AND_VERIFY = "bun install && bun run typecheck";
 
-// Forward the Infisical machine-identity credentials into the sandbox so
-// varlock-resolved env (`infisical()` items) works inside the container.
-// The credentials live in the host shell env, sourced from the macOS keychain
-// via ~/.zshenv. We fail fast if they are missing — the AFK agent cannot
-// resolve real env values otherwise, and silent fallback to placeholder
-// builds masks misconfiguration.
+// Forward credentials into the sandbox container:
+//   - INFISICAL_CLIENT_ID / _SECRET: machine-identity creds so varlock-resolved
+//     env (`infisical()` items) works inside the container. Sourced from the
+//     macOS keychain via ~/.zshenv on the host.
+//   - CLAUDE_CODE_OAUTH_TOKEN: auth for the in-container `claude` CLI. Without
+//     this the implementer/reviewer agents fail with `Not logged in · Please
+//     run /login` because host `~/.claude` credentials don't reach the sandbox.
+//     Resolved by varlock from Infisical's `dev` environment (this token is
+//     intentionally absent from staging/prod — sandcastle is dev-only).
+//
+// The orchestrator is launched via `varlock run --path .sandcastle/` (see the
+// `sandcastle` script in the root package.json), so process.env already has
+// these values resolved before main.ts runs. We fail fast if they're missing —
+// the AFK agent cannot do useful work otherwise, and silent fallback masks
+// misconfiguration.
 const requireEnv = (key: string): string => {
   const value = process.env[key];
   if (!value) {
     throw new Error(
-      `${key} is not set on the host. Sandcastle requires Infisical credentials to inject ` +
-        `into the sandbox so varlock can resolve env values. See CLAUDE.md for keychain setup.`,
+      `${key} is not set. Sandcastle is launched via \`varlock run\` which should ` +
+        `resolve this from Infisical (dev env). See .sandcastle/CODING_STANDARDS.md ` +
+        `for keychain setup.`,
     );
   }
   return value;
@@ -65,6 +75,7 @@ const requireEnv = (key: string): string => {
 const SANDBOX_ENV: Record<string, string> = {
   INFISICAL_CLIENT_ID: requireEnv("INFISICAL_CLIENT_ID"),
   INFISICAL_CLIENT_SECRET: requireEnv("INFISICAL_CLIENT_SECRET"),
+  CLAUDE_CODE_OAUTH_TOKEN: requireEnv("CLAUDE_CODE_OAUTH_TOKEN"),
 };
 
 // ---------- Agent specs ----------

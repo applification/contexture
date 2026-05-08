@@ -19,7 +19,7 @@
     "env:scan": "varlock scan",
     "ci": "TURBO_NO_UPDATE_NOTIFIER=1 turbo typecheck test --output-logs=errors-only && biome check . && bun run check:no-suppressions && bun run env:scan",
     "prepare": "husky",
-    "sandcastle": "bun .sandcastle/main.ts",
+    "sandcastle": "varlock run --path .sandcastle/ -- bun .sandcastle/main.ts",
     "sandcastle:analyze": "bun .sandcastle/analyze.ts",
     "sandcastle:build": "bunx sandcastle docker build-image",
     "cleanup": "bun scripts/cleanup-branches.ts"
