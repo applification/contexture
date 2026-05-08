@@ -66,3 +66,33 @@ Never refactor while RED — reach GREEN first.
 - Asserting on call counts/order of internal calls
 - Test name describes HOW not WHAT
 - Test breaks on refactor without behavior change
+
+## Local environment setup
+
+Real env values come from Infisical via [varlock](https://varlock.dev) — the
+committed `.env.schema` files declare structure; nothing sensitive lives on
+disk in the repo (see [CLAUDE.md](../CLAUDE.md) "Env vars").
+
+To resolve those values locally you need an Infisical Universal Auth machine
+identity scoped to the project, plus its Client ID and Client Secret stored
+in your macOS Keychain so they reach every shell:
+
+```bash
+# Store creds in Keychain (one-off, after creating the machine identity in
+# Infisical). Replace the values when prompted by `-w`.
+security add-generic-password -a "$USER" -s INFISICAL_CLIENT_ID -w
+security add-generic-password -a "$USER" -s INFISICAL_CLIENT_SECRET -w
+```
+
+Add to `~/.zshenv` (NOT `.zshrc` — non-interactive child shells skip that;
+varlock invocations from CI scripts and Bun-spawned tools won't see them):
+
+```bash
+export INFISICAL_CLIENT_ID="$(security find-generic-password -a "$USER" -s INFISICAL_CLIENT_ID -w 2>/dev/null)"
+export INFISICAL_CLIENT_SECRET="$(security find-generic-password -a "$USER" -s INFISICAL_CLIENT_SECRET -w 2>/dev/null)"
+```
+
+Restart Terminal (and any IDE / agent host) after editing `.zshenv` so the
+new env propagates. To verify, run `bunx varlock load` inside one of the
+schema directories (`apps/web`, `apps/desktop`, `.sandcastle`) — it should
+resolve cleanly and exit zero.

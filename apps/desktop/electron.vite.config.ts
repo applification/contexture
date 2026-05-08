@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
+import { varlockVitePlugin } from '@varlock/vite-integration';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
@@ -19,14 +20,12 @@ export default defineConfig({
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
     plugins: [
+      varlockVitePlugin(),
       externalizeDepsPlugin({
         exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
       }),
     ],
     resolve: { alias: sharedAliases },
-    define: {
-      'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
-    },
   },
   preload: {
     // Keep `@contexture/*` workspace packages inlined into the main/preload
@@ -34,6 +33,7 @@ export default defineConfig({
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
     plugins: [
+      varlockVitePlugin(),
       externalizeDepsPlugin({
         exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
       }),
@@ -42,6 +42,6 @@ export default defineConfig({
   },
   renderer: {
     resolve: { alias: sharedAliases },
-    plugins: [tailwindcss(), react()],
+    plugins: [varlockVitePlugin(), tailwindcss(), react()],
   },
 });

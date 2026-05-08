@@ -13,6 +13,7 @@ const ignoredDirectories = new Set([
   'node_modules',
   'out',
 ]);
+const ignoredFiles = new Set(['env.d.ts']);
 
 type BannedToken = (typeof bannedTokens)[number];
 
@@ -39,7 +40,11 @@ async function* sourceFiles(dir: string): AsyncGenerator<string> {
       }
       continue;
     }
-    if (entry.isFile() && sourceExtensions.has(extensionOf(entry.name))) {
+    if (
+      entry.isFile() &&
+      sourceExtensions.has(extensionOf(entry.name)) &&
+      !ignoredFiles.has(entry.name)
+    ) {
       yield path;
     }
   }

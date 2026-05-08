@@ -16,7 +16,8 @@
     "format:check": "biome format .",
     "check": "biome check .",
     "check:no-suppressions": "bun scripts/check-no-suppressions.ts",
-    "ci": "TURBO_NO_UPDATE_NOTIFIER=1 turbo typecheck test --output-logs=errors-only && biome check . && bun run check:no-suppressions",
+    "env:scan": "varlock scan",
+    "ci": "TURBO_NO_UPDATE_NOTIFIER=1 turbo typecheck test --output-logs=errors-only && biome check . && bun run check:no-suppressions && bun run env:scan",
     "prepare": "husky",
     "sandcastle": "bun .sandcastle/main.ts",
     "sandcastle:analyze": "bun .sandcastle/analyze.ts",
@@ -26,9 +27,11 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
     "@types/bun": "^1.3.13",
+    "@varlock/infisical-plugin": "^1.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "turbo": "^2.9.7"
+    "turbo": "^2.9.7",
+    "varlock": "^1.1.0"
   },
   "dependencies": {
     "@ai-hero/sandcastle": "^0.5.5",
@@ -41,6 +44,9 @@
     "@biomejs/biome",
     "esbuild"
   ],
+  "overrides": {
+    "@next/env": "npm:@varlock/nextjs-integration@^1.1.0"
+  },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,jsonc}": [
       "biome check --write --no-errors-on-unmatched"

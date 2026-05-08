@@ -27,6 +27,21 @@ Run a single test file: `cd packages/<pkg> && bun test path/to/file.test.ts`.
 
 If CI fails on a pushed branch, fix it before merging.
 
+## Env vars
+
+Real secret values **never** sit on disk in this repo. Each surface declares
+its env in a committed `.env.schema` file ([apps/web](apps/web/.env.schema),
+[apps/desktop](apps/desktop/.env.schema), [.sandcastle](.sandcastle/.env.schema));
+values resolve at runtime from Infisical via [varlock](https://varlock.dev).
+
+- AI agents may read `.env.schema` files freely — they're metadata, not secrets.
+- Do not invent or guess secret values. If env is missing, fail loudly so a
+  human can populate Infisical.
+- `bun run env:scan` runs in CI to detect plaintext leaks. To debug a single
+  schema during development, run `bunx varlock load` from that directory.
+- Local override (rare, e.g. testing a different DSN): create a gitignored
+  `.env.local` next to the schema; varlock reads it before calling Infisical.
+
 ## Commits
 
 Use conventional commits.
