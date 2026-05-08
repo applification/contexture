@@ -20,7 +20,7 @@ export default defineConfig({
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
     plugins: [
-      varlockVitePlugin(),
+      varlockVitePlugin({ ssrInjectMode: 'resolved-env' }),
       externalizeDepsPlugin({
         exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
       }),
@@ -33,7 +33,7 @@ export default defineConfig({
     // them would leave CJS `require()` calls at runtime that can't load
     // `export` statements.
     plugins: [
-      varlockVitePlugin(),
+      varlockVitePlugin({ ssrInjectMode: 'resolved-env' }),
       externalizeDepsPlugin({
         exclude: ['@contexture/core', '@contexture/stdlib', '@contexture/runtime'],
       }),
@@ -42,6 +42,6 @@ export default defineConfig({
   },
   renderer: {
     resolve: { alias: sharedAliases },
-    plugins: [varlockVitePlugin(), tailwindcss(), react()],
+    plugins: [varlockVitePlugin({ ssrInjectMode: 'resolved-env' }), tailwindcss(), react()],
   },
 });
