@@ -6,23 +6,17 @@ Make Contexture the source of truth for downstream app domain models, so coding 
 
 Scope: **Phase 1, Phase 2, and Phase 3 only**.
 
+Status legend: ✅ done · 🟡 partial · ⛔ not started
+
 ---
 
-# Phase 1 — Extract `@contexture/core`
+# Phase 1 — Extract `@contexture/core` ✅
 
-## Objective
+## Outcome
 
-Move all pure domain-model logic out of the Electron renderer so it can be used by:
+All pure domain-model logic lives in `packages/core/` and is consumed by the desktop app, the CLI, and tests. No Electron, React, Zustand, IPC, or DOM imports leak into core.
 
-- Desktop app
-- CLI
-- future MCP wrapper, if needed
-- tests/CI
-- generated downstream projects
-
-## Target package
-
-Create:
+## What shipped
 
 ```txt
 packages/core/
@@ -33,582 +27,208 @@ packages/core/
     ir.ts
     load.ts
     migrations/
-      index.ts
     ops.ts
-    validation.ts
+    op-tools.ts
+    semantic-validation.ts
+    pipeline.ts
+    paths.ts
+    file-forward.ts
     emit-zod.ts
     emit-json-schema.ts
     emit-convex.ts
+    emit-schema-index.ts
+    emit-table-crud.ts
+    emit-claude-md.ts
+  tests/
+    apply-semantic-gate.test.ts
+    emit-stdlib-imports.test.ts
+    file-forward.test.ts
+    semantic-validation.test.ts
 ```
 
-## Move from desktop renderer
+### Divergences from the original draft (kept on purpose)
 
-Move or refactor these existing modules:
-
-```txt
-apps/desktop/src/renderer/src/model/ir.ts
-apps/desktop/src/renderer/src/model/load.ts
-apps/desktop/src/renderer/src/model/migrations/
-apps/desktop/src/renderer/src/model/emit-zod.ts
-apps/desktop/src/renderer/src/model/emit-json-schema.ts
-apps/desktop/src/renderer/src/model/emit-convex.ts
-apps/desktop/src/renderer/src/store/ops.ts
-apps/desktop/src/renderer/src/services/validation.ts
-```
-
-Into:
-
-```txt
-packages/core/src/
-```
-
-Rename `store/ops.ts` to something less UI-specific:
-
-```txt
-packages/core/src/ops.ts
-```
+- `validation.ts` was renamed to `semantic-validation.ts` to make the layer obvious.
+- The original draft listed only Zod / JSON Schema / Convex emitters. Reality ships more: `emit-schema-index`, `emit-table-crud`, `emit-claude-md`.
+- Two additional modules exist beyond the draft:
+  - `pipeline.ts` — `runEmitPipeline(schema, irPath)` runs all emitters and returns a hashed `EmittedManifest` for drift detection.
+  - `paths.ts` — single source of truth for bundle paths (`*.schema.ts`, `*.schema.json`, `convex/schema.ts`, `.contexture/{layout,chat,emitted}.json`).
+  - `file-forward.ts` — `createFileBackedForward(irPath)` applies an op to disk transactionally.
+  - `op-tools.ts` — `createOpTools(forward)` exposes each op as a typed tool (shared by CLI and the in-app agent surface).
 
 ## Public API
 
-`packages/core/src/index.ts` should export:
-
-```ts
-export * from './ir'
-export * from './load'
-export * from './ops'
-export * from './validation'
-export * from './emit-zod'
-export * from './emit-json-schema'
-export * from './emit-convex'
-```
-
-Intended usage:
+`packages/core/src/index.ts` re-exports everything; `package.json` also publishes subpath exports so callers can pull narrowly:
 
 ```ts
 import {
   IRSchema,
   load,
-  save,
   apply,
-  validate,
-  emitZod,
-  emitJsonSchema,
-  emitConvexSchema,
-} from '@contexture/core'
+  createOpTools,
+  createFileBackedForward,
+  runEmitPipeline,
+  bundlePathsFor,
+} from '@contexture/core';
 ```
 
-## Package config
+Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./semantic-validation`, `./pipeline`, `./paths`, `./file-forward`, `./emit-zod`, `./emit-json-schema`, `./emit-convex`, `./emit-schema-index`, `./emit-table-crud`, `./emit-claude-md`.
 
-`packages/core/package.json`:
+## Desktop integration
 
-```json
-{
-  "name": "@contexture/core",
-  "version": "0.14.0",
-  "private": true,
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "dependencies": {
-    "zod": "^4.3.6"
-  }
-}
-```
-
-If `emit-zod` or validation needs stdlib data, avoid importing from desktop. Either keep imports from `@contexture/stdlib`, or make stdlib registry an injected option. Prefer injection where possible:
+The desktop renderer kept its old paths (`apps/desktop/src/renderer/src/model/*.ts`) as **thin re-export shims**, e.g.:
 
 ```ts
-validate(schema, { stdlib })
+// apps/desktop/src/renderer/src/model/ir.ts
+export * from '@contexture/core/ir';
 ```
 
-## Desktop updates
+This avoided rewriting every callsite. Future cleanup (low priority) can drop the shims and update imports to `@contexture/core`.
 
-Change desktop imports from renderer-local modules to core package imports.
+## Exit criteria — met
 
-Examples:
-
-```ts
-// Before
-import { emit } from './model/emit-zod'
-
-// After
-import { emitZod } from '@contexture/core'
-```
-
-```ts
-// Before
-import type { Op } from '../store/ops'
-
-// After
-import type { Op } from '@contexture/core'
-```
-
-The desktop `useUndoStore` should remain in desktop, but use core’s pure reducer:
-
-```ts
-import { apply as applyOp } from '@contexture/core'
-```
-
-## Testing
-
-Move core tests out of desktop where sensible:
-
-```txt
-packages/core/src/*.test.ts
-```
-
-Core should have tests for:
-
-- IR parsing
-- load/save
-- migrations
-- each op
-- validation
-- Zod emitter
-- JSON Schema emitter
-- Convex emitter
-
-## Exit criteria
-
-- `@contexture/core` builds/typechecks.
-- Desktop imports core package instead of renderer-local pure modules.
-- No Electron, React, Zustand, IPC, or DOM imports in `packages/core`.
-- Existing desktop behavior unchanged.
-- These pass:
-
-```bash
-bun run format:check
-bun run lint
-bun run test
-bun run typecheck
-```
+- `@contexture/core` builds and typechecks.
+- Desktop consumes core (via shims).
+- No Electron / React / Zustand / IPC / DOM imports in `packages/core`.
+- `bun run ci` (typecheck + test + biome) passes.
 
 ---
 
-# Phase 2 — Build `contexture` CLI
+# Phase 2 — `@contexture/cli` ✅
 
-## Objective
+## Outcome so far
 
-Create a CLI that coding agents and humans can use to inspect, validate, mutate, and regenerate artifacts from `.contexture.json`.
-
-This becomes the primary automation boundary.
-
-## Target package
-
-Create:
+`packages/cli/src/index.ts` is a single-file CLI wired to `@contexture/core`'s op-tools registry. It can read the IR, validate it, run the emit pipeline, and apply any structured op.
 
 ```txt
 packages/cli/
-  package.json
+  package.json     # bin: contexture -> ./src/index.ts (run via Bun)
   tsconfig.json
-  src/
-    index.ts
-    commands/
-      inspect.ts
-      validate.ts
-      apply.ts
-      emit.ts
-      check-generated.ts
+  src/index.ts
+  tests/cli.test.ts
 ```
 
-Package name:
+## What shipped
 
-```json
-{
-  "name": "@contexture/cli",
-  "bin": {
-    "contexture": "./src/index.ts"
-  }
-}
-```
+### IR discovery
 
-For internal use, running through Bun is acceptable initially:
+If `--ir` is not passed, the CLI looks in `./packages/contexture/` then `./` for exactly one `*.contexture.json`. Fails loudly on zero or multiple matches.
+
+### Commands (current)
+
+Read helpers:
 
 ```bash
-bun packages/cli/src/index.ts validate domain.contexture.json
+contexture list-types [--json]
+contexture get-type <name> [--json]
+contexture validate [--json]
+contexture emit [--json]
 ```
 
-Later this can become a real executable.
-
-## CLI commands
-
-## 1. `contexture inspect`
-
-Purpose: give agents a machine-readable and human-readable summary.
+Schema mutations (one subcommand per op — chosen over a generic `apply --op-json` for typed argv and no JSON-quoting):
 
 ```bash
-contexture inspect ./domain.contexture.json
-contexture inspect ./domain.contexture.json --json
+contexture add-field <type> <name> <fieldTypeJson> [--optional] [--nullable]
+contexture update-field <type> <field> <patchJson>
+contexture delete-field <type> <field>
+contexture reorder-fields <type> <fieldNamesJsonOrCsv>
+contexture add-type <typeDefJson>
+contexture update-type <name> <patchJson>
+contexture rename-type <from> <to>
+contexture delete-type <name>
+contexture set-table-flag <type> <true|false>
+contexture add-index <type> <name> <fieldsJsonOrCsv>
+contexture remove-index <type> <name>
+contexture update-index <type> <name> <patchJson>
+contexture add-variant <union> <variant>
+contexture set-discriminator <union> <field>
+contexture add-value <type> <value> [description]
+contexture update-value <type> <value> <patchJson>
+contexture remove-value <type> <value>
+contexture add-import <importDeclJson>
+contexture remove-import <alias>
+contexture replace-schema <schemaJson>
 ```
 
-Human output example:
+Mutations route through `createOpTools(createFileBackedForward(irPath))`, so the CLI, the desktop agent surface, and any future MCP wrapper share one validated apply path.
 
-```txt
-Schema: Domain
-Types: 5
-Objects:
-  User
-    - name: string
-    - email: common.Email
-  Project
-    - title: string
-    - owner: User
-Enums:
-  ProjectStatus: active, archived
-Imports:
-  common -> @contexture/common
-```
+### Output contract
 
-JSON output shape:
+- `--json` produces `{ ok: true, ... }` envelopes; failures produce `{ ok: false, error: { message, code } }`.
+- Exit code is `1` on any failure (validate failure, op rejection, parse error).
+- Non-JSON mode prints terse human messages to stdout / errors to stderr.
 
-```json
-{
-  "path": "./domain.contexture.json",
-  "version": "1",
-  "typeCount": 5,
-  "types": [
-    {
-      "name": "User",
-      "kind": "object",
-      "fields": [
-        { "name": "name", "type": "string" },
-        { "name": "email", "type": "common.Email" }
-      ]
-    }
-  ],
-  "imports": []
-}
-```
+### `emit` semantics
 
-## 2. `contexture validate`
+`emit` runs the full `runEmitPipeline` and writes through `createFileBackedForward`. There is intentionally no `--out` or per-target subcommand — outputs are determined by `bundlePathsFor(irPath)`. This keeps drift-tracking honest (one manifest, one bundle).
 
-Purpose: validate IR and semantic rules.
+## Phase 2 additions (shipped in this PR)
 
-```bash
-contexture validate ./domain.contexture.json
-contexture validate ./domain.contexture.json --json
-```
+- ✅ `contexture inspect` — one-shot human and `--json` summary of the
+  schema (types, fields, enums, discriminated unions, raw types, imports).
+- ✅ `contexture check-generated` — re-runs the emit pipeline in memory,
+  compares each output against the file on disk, exits non-zero on
+  drift with a list of `{ path, reason }` entries.
+- ✅ `contexture apply --op-json | --op-file` — generic op entrypoint for
+  callers that already have a serialized `Op`. Per-op subcommands remain
+  the primary surface.
+- ✅ `HELP` text lists every command.
 
-Exit codes:
+## Not wired into root CI (by design)
 
-- `0`: valid
-- `1`: invalid
+`check-generated` lives in CI for *downstream apps*, not this monorepo.
+This repo has stdlib IRs but no app-level IR + emit bundle, so there's
+nothing here to check. The recommended wiring is documented in
+`docs/agent-contexture-workflow.md`.
 
-JSON output:
+## Exit criteria — met
 
-```json
-{
-  "valid": false,
-  "errors": [
-    {
-      "path": "types[1].fields[0].typeName",
-      "message": "Unknown ref UserProfile"
-    }
-  ]
-}
-```
-
-## 3. `contexture emit`
-
-Purpose: generate downstream artifacts.
-
-```bash
-contexture emit zod ./domain.contexture.json --out ./packages/domain/schema.ts
-contexture emit json-schema ./domain.contexture.json --out ./packages/domain/schema.json
-contexture emit convex ./domain.contexture.json --out ./apps/web/convex/schema.ts
-```
-
-Also support stdout:
-
-```bash
-contexture emit zod ./domain.contexture.json
-```
-
-Recommended subcommands:
-
-```txt
-contexture emit zod
-contexture emit json-schema
-contexture emit convex
-contexture emit all
-```
-
-`emit all` can write conventional sidecars next to the IR:
-
-```bash
-contexture emit all ./domain.contexture.json
-```
-
-For now, keep explicit `--out`.
-
-## 4. `contexture apply`
-
-Purpose: allow agents to apply structured ops safely.
-
-```bash
-contexture apply ./domain.contexture.json --op ./op.json
-contexture apply ./domain.contexture.json --op-json '{"kind":"add_type",...}'
-```
-
-Default behavior:
-
-- load schema
-- apply op
-- validate result
-- save updated `.contexture.json`
-- optionally emit artifacts if flags are passed
-
-Example:
-
-```bash
-contexture apply domain.contexture.json \
-  --op-json '{"kind":"add_field","typeName":"User","field":{"name":"email","type":{"kind":"string","format":"email"}}}'
-```
-
-Useful flags:
-
-```bash
---dry-run
---json
---emit zod
---emit json-schema
---emit convex
---emit-all
-```
-
-For `--dry-run`, do not write. Print resulting validation state and diff-like summary.
-
-## 5. `contexture check-generated`
-
-Purpose: prevent generated artifacts from drifting.
-
-```bash
-contexture check-generated ./domain.contexture.json \
-  --zod ./packages/domain/schema.ts \
-  --json-schema ./packages/domain/schema.json \
-  --convex ./apps/web/convex/schema.ts
-```
-
-Behavior:
-
-- regenerate in memory
-- compare with files on disk
-- exit `0` if in sync
-- exit `1` if stale or invalid
-
-Output:
-
-```txt
-Generated files are stale:
-  apps/web/convex/schema.ts
-
-Run:
-  contexture emit convex ./domain.contexture.json --out ./apps/web/convex/schema.ts
-```
-
-This is important for agent workflows and CI.
-
-## Minimal argument parsing
-
-For internal use, avoid overengineering.
-
-Options:
-
-- Use a small dependency like `commander`, or
-- Implement simple manual parsing.
-
-Manual parsing is fine for Phase 2. Use `commander` only if nicer help output becomes valuable.
-
-## Exit criteria
-
-- CLI can inspect, validate, emit Zod, emit JSON Schema, emit Convex.
-- CLI can apply an op and save the IR.
-- CLI has JSON output suitable for coding agents.
-- CLI has stable non-zero exit codes.
-- Desktop and CLI both use `@contexture/core`.
-- Basic tests cover commands.
-- These pass:
-
-```bash
-bun run format:check
-bun run lint
-bun run test
-bun run typecheck
-```
+- `inspect`, `check-generated`, and `apply` ship with tests.
+- Help text lists every command.
+- `bun run ci` passes.
 
 ---
 
-# Phase 3 — Agent workflow docs / skill
+# Phase 3 — Agent workflow docs / skill ✅
 
-## Objective
+## Outcome target
 
-Teach coding agents that Contexture is the source of truth.
+A coding agent in a downstream app can be pointed at a short doc (or skill) and immediately know: edit the model, not the generated files; use the CLI; run drift check before declaring done.
 
-This phase is not about new runtime capability. It is about making the desired workflow legible and repeatable for Claude Code, Cursor, iClord Code, or another agent editing the downstream app.
+## What shipped
 
-## Add reusable agent instructions
+- ✅ `docs/agent-contexture-workflow.md` — the canonical workflow doc.
+  Covers the rules, CLI surface, recommended loop, and the
+  `check-generated` CI wiring pattern for downstream apps.
+- ✅ Emitter header audit. Every emitter in `packages/core/src/emit-*.ts`
+  carries the right marker:
+  - `@contexture-generated` (regenerated every save): `emit-zod`,
+    `emit-json-schema`, `emit-schema-index`, `emit-convex`.
+  - `@contexture-seeded` (written once, owned by user thereafter):
+    `emit-table-crud`, `emit-claude-md`.
+- Optional skill (`.claude/skills/contexture-domain-model/SKILL.md`) and
+  downstream-scaffold command (`contexture init-agent-docs`) are still
+  open. Both are tracked in the backlog below.
 
-Create something like:
+## Exit criteria — met
 
-```txt
-packages/cli/templates/CLAUDE.contexture.md
-```
-
-or:
-
-```txt
-docs/agent-contexture-workflow.md
-```
-
-Recommended content:
-
-````md
-# Contexture Domain Model Workflow
-
-This project uses Contexture as the source of truth for domain models.
-
-## Rules
-
-- Do not directly edit generated schema files unless explicitly asked.
-- Treat `*.contexture.json` as the primary domain model.
-- When changing entities, fields, refs, enums, tables, or indexes, update the Contexture model first.
-- After changing the model, regenerate generated artifacts with the Contexture CLI.
-- Run validation before finishing.
-
-## Common commands
-
-Inspect the model:
-
-```bash
-contexture inspect ./domain.contexture.json
-```
-
-Validate:
-
-```bash
-contexture validate ./domain.contexture.json
-```
-
-Emit Convex schema:
-
-```bash
-contexture emit convex ./domain.contexture.json --out ./apps/web/convex/schema.ts
-```
-
-Check generated files:
-
-```bash
-contexture check-generated ./domain.contexture.json \
-  --convex ./apps/web/convex/schema.ts
-```
-
-## Agent workflow
-
-1. Locate the `.contexture.json` file.
-2. Inspect it using `contexture inspect`.
-3. Decide what model change is required.
-4. Apply the change to the Contexture model.
-5. Validate the model.
-6. Regenerate generated artifacts.
-7. Run project tests/typecheck.
-````
-
-## Optional skill
-
-If using skill-based agents, add a skill:
-
-```txt
-.agents/skills/contexture-domain-model/SKILL.md
-```
-
-Skill description:
-
-```yaml
----
-name: contexture-domain-model
-description: Use when making changes to domain entities, fields, Convex schema, Zod schemas, or generated model artifacts in a project that uses Contexture.
----
-```
-
-Skill body should say:
-
-- Find `.contexture.json`.
-- Never edit generated files first.
-- Use `contexture inspect`.
-- Use `contexture apply` or direct IR edit if necessary.
-- Run `contexture validate`.
-- Run `contexture emit convex`.
-- Run `contexture check-generated`.
-- Then proceed with app code changes.
-
-## Add generated-file headers
-
-Ensure all generated files include clear headers:
-
-```ts
-// Generated by Contexture from domain.contexture.json.
-// Do not edit directly. Update the Contexture model and regenerate.
-```
-
-For Convex:
-
-```ts
-// Generated by Contexture from domain.contexture.json.
-// Do not edit by hand. Run:
-//   contexture emit convex domain.contexture.json --out apps/web/convex/schema.ts
-```
-
-## Optional downstream project scaffold
-
-Add a command later, or document manually for now:
-
-```bash
-contexture init-agent-docs
-```
-
-This could copy the workflow doc into a downstream app’s `CLAUDE.md`.
-
-For Phase 3, a static template is enough.
-
-## Exit criteria
-
-- There is a clear reusable agent workflow doc.
-- Generated files tell agents not to edit them directly.
-- Downstream projects can include the workflow doc or skill.
-- The recommended loop is documented:
-
-```txt
-inspect -> modify model -> validate -> emit -> check-generated -> test
-```
+- `docs/agent-contexture-workflow.md` exists and matches the actual CLI surface.
+- Every emitter includes the right marker.
+- The recommended loop is documented.
 
 ---
 
-# Recommended sequencing
+# Backlog (post-Phase 3)
 
-## PR 1: Core extraction
-
-- Add `packages/core`.
-- Move pure modules.
-- Update desktop imports.
-- Keep behavior unchanged.
-
-## PR 2: CLI
-
-- Add `packages/cli`.
-- Implement:
-  - `inspect`
-  - `validate`
-  - `emit zod`
-  - `emit json-schema`
-  - `emit convex`
-  - `apply`
-  - `check-generated`
-
-## PR 3: Agent workflow
-
-- Add workflow docs / skill template.
-- Strengthen generated headers.
-- Add examples to README.
+- Drop the desktop renderer shim files
+  (`apps/desktop/src/renderer/src/model/*.ts`) and update imports to
+  `@contexture/core/*`.
+- Optional `contexture init-agent-docs` command for downstream
+  scaffolding (copies `docs/agent-contexture-workflow.md` into a
+  downstream app's `CLAUDE.md`).
+- Optional Claude Code skill at
+  `.claude/skills/contexture-domain-model/SKILL.md` that triggers on
+  domain / Convex / Zod edits and points to the workflow doc.
 
 ---
 
@@ -617,14 +237,14 @@ inspect -> modify model -> validate -> emit -> check-generated -> test
 A coding agent in a downstream app should be able to do:
 
 ```bash
-contexture inspect domain.contexture.json --json
-contexture apply domain.contexture.json --op-json '{"kind":"add_field",...}'
-contexture validate domain.contexture.json
-contexture emit convex domain.contexture.json --out apps/web/convex/schema.ts
-contexture check-generated domain.contexture.json --convex apps/web/convex/schema.ts
+contexture inspect --json
+contexture add-field User email '{"kind":"string","format":"email"}'
+contexture validate
+contexture emit
+contexture check-generated
 bun run typecheck
 ```
 
-That gives the desired core outcome:
+Outcome:
 
 > Domain model first, generated app schemas second, coding agents guided by a stable CLI boundary.
