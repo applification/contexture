@@ -39,6 +39,7 @@ Read helpers:
   get-type <name> [--json]
   validate [--json]
   emit [--json]
+  check-generated [--json]
 
 Schema mutations:
   add-field <type> <name> <fieldTypeJson> [--optional] [--nullable]
@@ -503,6 +504,40 @@ async function run(argv: string[]): Promise<void> {
     const { emitted, manifest } = runEmitPipeline(schema, irPath);
     await createFileBackedForward(irPath)({ kind: 'replace_schema', schema });
     writeResult({ message: `Emitted ${emitted.length} files.`, manifest }, options.json);
+    return;
+  }
+
+  if (command === 'check-generated') {
+    const schema = await readSchema(irPath);
+    const { emitted } = runEmitPipeline(schema, irPath);
+    const stale: Array<{ path: string; reason: 'missing' | 'mismatch' }> = [];
+    for (const entry of emitted) {
+      let onDisk: string | undefined;
+      try {
+        onDisk = await Bun.file(entry.path).text();
+      } catch {
+        onDisk = undefined;
+      }
+      if (onDisk === undefined) stale.push({ path: entry.path, reason: 'missing' });
+      else if (onDisk !== entry.content) stale.push({ path: entry.path, reason: 'mismatch' });
+    }
+    if (stale.length > 0) {
+      process.exitCode = 1;
+      if (options.json) {
+        writeJson({ ok: false, stale });
+      } else {
+        process.stderr.write('Generated files are stale:\n');
+        for (const { path, reason } of stale) {
+          process.stderr.write(`  ${path} (${reason})\n`);
+        }
+        process.stderr.write('\nRun: contexture emit\n');
+      }
+      return;
+    }
+    writeResult(
+      { message: 'Generated files are up to date.', checked: emitted.length },
+      options.json,
+    );
     return;
   }
 

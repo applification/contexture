@@ -145,6 +145,50 @@ describe('@contexture/cli', () => {
     ).resolves.toContain('title');
   });
 
+  it('check-generated reports stale files when nothing is emitted', async () => {
+    const { dir } = await fixtureProject();
+    const result = await runCli(dir, ['check-generated', '--json']);
+    expect(result.exitCode).toBe(1);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.ok).toBe(false);
+    expect(Array.isArray(parsed.stale)).toBe(true);
+    expect(parsed.stale.length).toBeGreaterThan(0);
+    for (const entry of parsed.stale) {
+      expect(entry).toMatchObject({ reason: 'missing' });
+    }
+  });
+
+  it('check-generated passes after emit', async () => {
+    const { dir } = await fixtureProject();
+    const emitResult = await runCli(dir, ['emit', '--json']);
+    expect(emitResult.exitCode).toBe(0);
+
+    const checkResult = await runCli(dir, ['check-generated', '--json']);
+    expect(checkResult.exitCode).toBe(0);
+    expect(JSON.parse(checkResult.stdout)).toMatchObject({
+      ok: true,
+      message: expect.stringContaining('up to date'),
+    });
+  });
+
+  it('check-generated detects drift after manual edits', async () => {
+    const { dir } = await fixtureProject();
+    await runCli(dir, ['emit', '--json']);
+    const convexPath = join(dir, 'packages/contexture/convex/schema.ts');
+    const current = await readFile(convexPath, 'utf8');
+    await writeFile(convexPath, `${current}\n// drifted\n`, 'utf8');
+
+    const result = await runCli(dir, ['check-generated', '--json']);
+    expect(result.exitCode).toBe(1);
+    const parsed = JSON.parse(result.stdout);
+    expect(
+      parsed.stale.some(
+        (s: { path: string; reason: string }) =>
+          s.path.endsWith('convex/schema.ts') && s.reason === 'mismatch',
+      ),
+    ).toBe(true);
+  });
+
   it('exits non-zero with JSON when an op fails', async () => {
     const { dir } = await fixtureProject();
     const result = await runCli(dir, ['delete-field', 'Post', 'missing', '--json']);
