@@ -189,6 +189,51 @@ describe('@contexture/cli', () => {
     ).toBe(true);
   });
 
+  it('apply --op-json applies a serialized op', async () => {
+    const { dir, irPath } = await fixtureProject();
+    const op = JSON.stringify({
+      kind: 'add_field',
+      typeName: 'Post',
+      field: { name: 'title', type: { kind: 'string' } },
+    });
+    const result = await runCli(dir, ['apply', '--op-json', op, '--json']);
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      message: 'add_field applied.',
+    });
+    const ir = JSON.parse(await readFile(irPath, 'utf8'));
+    expect(ir.types[0].fields).toEqual([{ name: 'title', type: { kind: 'string' } }]);
+  });
+
+  it('apply --op-file reads the op from disk', async () => {
+    const { dir, irPath } = await fixtureProject();
+    const opPath = join(dir, 'op.json');
+    await writeFile(
+      opPath,
+      JSON.stringify({
+        kind: 'add_field',
+        typeName: 'Post',
+        field: { name: 'body', type: { kind: 'string' } },
+      }),
+    );
+    const result = await runCli(dir, ['apply', '--op-file', opPath, '--json']);
+    expect(result.exitCode).toBe(0);
+    const ir = JSON.parse(await readFile(irPath, 'utf8'));
+    expect(ir.types[0].fields).toEqual([{ name: 'body', type: { kind: 'string' } }]);
+  });
+
+  it('apply rejects ops with semantic errors', async () => {
+    const { dir } = await fixtureProject();
+    const op = JSON.stringify({ kind: 'remove_field', typeName: 'Post', fieldName: 'nope' });
+    const result = await runCli(dir, ['apply', '--op-json', op, '--json']);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: 'APPLY_FAILED' },
+    });
+  });
+
   it('exits non-zero with JSON when an op fails', async () => {
     const { dir } = await fixtureProject();
     const result = await runCli(dir, ['delete-field', 'Post', 'missing', '--json']);

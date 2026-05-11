@@ -17,6 +17,8 @@ import {
 interface CliOptions {
   json: boolean;
   irPath?: string;
+  opJson?: string;
+  opFile?: string;
   cwd: string;
 }
 
@@ -42,6 +44,7 @@ Read helpers:
   check-generated [--json]
 
 Schema mutations:
+  apply (--op-json <json> | --op-file <path>)
   add-field <type> <name> <fieldTypeJson> [--optional] [--nullable]
   update-field <type> <field> <patchJson>
   delete-field <type> <field>
@@ -61,8 +64,10 @@ Schema mutations:
   replace-schema <schemaJson>
 
 Options:
-  --ir <path>   Path to a .contexture.json file
-  --json        Emit machine-readable JSON
+  --ir <path>          Path to a .contexture.json file
+  --json               Emit machine-readable JSON
+  --op-json <json>     Inline op for \`apply\`
+  --op-file <path>     Path to a JSON op for \`apply\`
 `;
 
 function parseArgv(argv: string[], cwd = process.cwd()): ParsedArgs {
@@ -86,6 +91,28 @@ function parseArgv(argv: string[], cwd = process.cwd()): ParsedArgs {
     }
     if (arg?.startsWith('--ir=')) {
       options.irPath = resolve(cwd, arg.slice('--ir='.length));
+      continue;
+    }
+    if (arg === '--op-json') {
+      const value = args[i + 1];
+      if (!value) throw new Error('--op-json requires a JSON string');
+      options.opJson = value;
+      i += 1;
+      continue;
+    }
+    if (arg?.startsWith('--op-json=')) {
+      options.opJson = arg.slice('--op-json='.length);
+      continue;
+    }
+    if (arg === '--op-file') {
+      const value = args[i + 1];
+      if (!value) throw new Error('--op-file requires a path');
+      options.opFile = resolve(cwd, value);
+      i += 1;
+      continue;
+    }
+    if (arg?.startsWith('--op-file=')) {
+      options.opFile = resolve(cwd, arg.slice('--op-file='.length));
       continue;
     }
     rest.push(arg);
@@ -538,6 +565,41 @@ async function run(argv: string[]): Promise<void> {
       { message: 'Generated files are up to date.', checked: emitted.length },
       options.json,
     );
+    return;
+  }
+
+  if (command === 'apply') {
+    let opJson = options.opJson;
+    if (!opJson && options.opFile) {
+      opJson = await Bun.file(options.opFile).text();
+    }
+    if (!opJson) {
+      throw new Error('apply requires --op-json <json> or --op-file <path>');
+    }
+    const op = parseJsonArg<{ kind?: unknown }>(opJson, 'op');
+    if (!op || typeof op !== 'object' || typeof op.kind !== 'string') {
+      throw new Error('op must be an object with a string "kind" field');
+    }
+    const forward = createFileBackedForward(irPath);
+    type ForwardResult = Awaited<ReturnType<typeof forward>>;
+    let result: ForwardResult;
+    try {
+      result = await forward(op as Parameters<typeof forward>[0]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`apply failed: ${message}`);
+    }
+    if ('error' in result) {
+      process.exitCode = 1;
+      const error: JsonError = {
+        ok: false,
+        error: { message: result.error, code: 'APPLY_FAILED' },
+      };
+      if (options.json) writeJson(error);
+      else process.stderr.write(`${result.error}\n`);
+      return;
+    }
+    writeResult({ message: `${op.kind} applied.`, schema: result.schema }, options.json);
     return;
   }
 
