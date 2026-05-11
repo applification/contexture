@@ -6,10 +6,12 @@ import {
   createOpTools,
   type FieldDef,
   type FieldType,
+  type ImportDecl,
   IRSchema,
   load,
   runEmitPipeline,
   type Schema,
+  type TypeDef,
 } from '@contexture/core';
 
 interface CliOptions {
@@ -32,6 +34,7 @@ interface JsonError {
 const HELP = `contexture <command> [args]
 
 Read helpers:
+  inspect [--json]
   list-types [--json]
   get-type <name> [--json]
   validate [--json]
@@ -179,6 +182,147 @@ function fieldFromArgs(args: string[]): FieldDef {
   };
 }
 
+function fieldTypeToString(type: FieldType): string {
+  switch (type.kind) {
+    case 'string':
+      return type.format ? `string<${type.format}>` : 'string';
+    case 'number':
+      return type.int ? 'integer' : 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'date':
+      return 'date';
+    case 'literal':
+      return `literal(${JSON.stringify(type.value)})`;
+    case 'ref':
+      return type.typeName;
+    case 'array':
+      return `${fieldTypeToString(type.element)}[]`;
+  }
+}
+
+interface InspectJsonType {
+  name: string;
+  kind: TypeDef['kind'];
+  table?: boolean;
+  fieldCount?: number;
+  fields?: Array<{ name: string; type: string; optional?: boolean; nullable?: boolean }>;
+  values?: string[];
+  variants?: string[];
+  discriminator?: string;
+}
+
+interface InspectJson {
+  path: string;
+  version: '1';
+  name?: string;
+  typeCount: number;
+  types: InspectJsonType[];
+  imports: Array<{ kind: ImportDecl['kind']; alias: string; path: string }>;
+}
+
+function typeToInspectJson(type: TypeDef): InspectJsonType {
+  if (type.kind === 'object') {
+    return {
+      name: type.name,
+      kind: 'object',
+      ...(type.table ? { table: true } : {}),
+      fieldCount: type.fields.length,
+      fields: type.fields.map((field) => ({
+        name: field.name,
+        type: fieldTypeToString(field.type),
+        ...(field.optional ? { optional: true } : {}),
+        ...(field.nullable ? { nullable: true } : {}),
+      })),
+    };
+  }
+  if (type.kind === 'enum') {
+    return {
+      name: type.name,
+      kind: 'enum',
+      values: type.values.map((v) => v.value),
+    };
+  }
+  if (type.kind === 'discriminatedUnion') {
+    return {
+      name: type.name,
+      kind: 'discriminatedUnion',
+      discriminator: type.discriminator,
+      variants: type.variants,
+    };
+  }
+  return { name: type.name, kind: 'raw' };
+}
+
+function buildInspectJson(schema: Schema, irPath: string): InspectJson {
+  const types: InspectJsonType[] = schema.types.map(typeToInspectJson);
+
+  return {
+    path: irPath,
+    version: schema.version,
+    ...(schema.metadata?.name ? { name: schema.metadata.name } : {}),
+    typeCount: schema.types.length,
+    types,
+    imports: (schema.imports ?? []).map((imp) => ({
+      kind: imp.kind,
+      alias: imp.alias,
+      path: imp.path,
+    })),
+  };
+}
+
+function renderInspectText(summary: InspectJson): string {
+  const lines: string[] = [];
+  lines.push(`Schema: ${summary.name ?? '(unnamed)'}`);
+  lines.push(`Path: ${summary.path}`);
+  lines.push(`Types: ${summary.typeCount}`);
+
+  const byKind = (kind: TypeDef['kind']) => summary.types.filter((t) => t.kind === kind);
+
+  const objects = byKind('object');
+  if (objects.length > 0) {
+    lines.push('Objects:');
+    for (const obj of objects) {
+      lines.push(`  ${obj.name}${obj.table ? ' [table]' : ''}`);
+      for (const field of obj.fields ?? []) {
+        const marks = (field.optional ? '?' : '') + (field.nullable ? ' | null' : '');
+        lines.push(`    - ${field.name}: ${field.type}${marks}`);
+      }
+    }
+  }
+
+  const enums = byKind('enum');
+  if (enums.length > 0) {
+    lines.push('Enums:');
+    for (const en of enums) {
+      lines.push(`  ${en.name}: ${(en.values ?? []).join(', ')}`);
+    }
+  }
+
+  const unions = byKind('discriminatedUnion');
+  if (unions.length > 0) {
+    lines.push('Discriminated unions:');
+    for (const u of unions) {
+      lines.push(`  ${u.name} (on ${u.discriminator ?? '?'}): ${(u.variants ?? []).join(', ')}`);
+    }
+  }
+
+  const raws = byKind('raw');
+  if (raws.length > 0) {
+    lines.push('Raw:');
+    for (const r of raws) lines.push(`  ${r.name}`);
+  }
+
+  if (summary.imports.length > 0) {
+    lines.push('Imports:');
+    for (const imp of summary.imports) {
+      lines.push(`  ${imp.alias} -> ${imp.path}`);
+    }
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 function commandToToolInput(command: string, args: string[]): { tool: string; input: object } {
   switch (command) {
     case 'add-field': {
@@ -304,6 +448,14 @@ async function run(argv: string[]): Promise<void> {
   }
 
   const irPath = options.irPath ?? (await findIrPath(options.cwd));
+
+  if (command === 'inspect') {
+    const schema = await readSchema(irPath);
+    const summary = buildInspectJson(schema, irPath);
+    if (options.json) writeJson({ ok: true, ...summary });
+    else process.stdout.write(renderInspectText(summary));
+    return;
+  }
 
   if (command === 'list-types') {
     const schema = await readSchema(irPath);

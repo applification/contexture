@@ -38,6 +38,69 @@ async function runCli(cwd: string, args: string[]) {
 }
 
 describe('@contexture/cli', () => {
+  it('inspects schema as structured JSON', async () => {
+    const { dir, irPath } = await fixtureProject();
+    await writeFile(
+      irPath,
+      `${JSON.stringify({
+        version: '1',
+        metadata: { name: 'TestSchema' },
+        types: [
+          {
+            kind: 'object',
+            name: 'Post',
+            table: true,
+            fields: [
+              { name: 'title', type: { kind: 'string' } },
+              {
+                name: 'tags',
+                type: { kind: 'array', element: { kind: 'string' } },
+                optional: true,
+              },
+            ],
+          },
+          { kind: 'enum', name: 'Status', values: [{ value: 'draft' }, { value: 'live' }] },
+        ],
+        imports: [{ kind: 'stdlib', path: '@contexture/common', alias: 'common' }],
+      })}\n`,
+    );
+
+    const result = await runCli(dir, ['inspect', '--json']);
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed).toMatchObject({
+      ok: true,
+      version: '1',
+      name: 'TestSchema',
+      typeCount: 2,
+      imports: [{ kind: 'stdlib', alias: 'common', path: '@contexture/common' }],
+    });
+    expect(parsed.types[0]).toMatchObject({
+      name: 'Post',
+      kind: 'object',
+      table: true,
+      fieldCount: 2,
+      fields: [
+        { name: 'title', type: 'string' },
+        { name: 'tags', type: 'string[]', optional: true },
+      ],
+    });
+    expect(parsed.types[1]).toMatchObject({
+      name: 'Status',
+      kind: 'enum',
+      values: ['draft', 'live'],
+    });
+  });
+
+  it('inspects schema as human-readable text', async () => {
+    const { dir } = await fixtureProject();
+    const result = await runCli(dir, ['inspect']);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Types: 1');
+    expect(result.stdout).toContain('Objects:');
+    expect(result.stdout).toContain('Post [table]');
+  });
+
   it('lists types as structured JSON', async () => {
     const { dir } = await fixtureProject();
     const result = await runCli(dir, ['list-types', '--json']);
