@@ -66,6 +66,12 @@ obsidian append path="Products/Contexture/Contexture Future Direction.md" conten
 
 Note: the CLI converts `\n` to newlines in `content`. Quote the whole value.
 
+### In-place edits to existing `Products/Contexture/` docs
+
+When the user wants to **revise** existing content (not just append) — e.g. updating a section in `Contexture Future Direction.md` because the direction has shifted — use `Read` + `Edit` on the absolute path: `/Users/rufus/Documents/Applification Ltd/Products/Contexture/<file>.md`. Obsidian's file watcher picks up external disk changes automatically.
+
+Reserve `obsidian append` for genuine appends and `obsidian create` for new files. Even on in-place edits: bump the `updated:` frontmatter date, append a one-liner to `log.md` summarising the change, and confirm the proposed edit with the user before writing.
+
 ### When to create a new file instead
 
 Create a new file in `Products/Contexture/` when the decision is substantial and self-contained enough that it deserves its own page (e.g. a major architectural pivot, a new pricing model, a competitive positioning note). Choose a descriptive kebab-case filename, not a date-prefixed ADR slug.
