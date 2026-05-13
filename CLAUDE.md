@@ -8,6 +8,10 @@ Turborepo monorepo (Bun workspaces). See [README.md](README.md) for the app/pack
 
 Coding standards live in [.sandcastle/CODING_STANDARDS.md](.sandcastle/CODING_STANDARDS.md) — they apply to all contributors, not just AFK agents. Read them before writing code.
 
+## Business context (Obsidian vault)
+
+Contexture is one product within Applification Ltd. Strategic direction, prior decisions, and curated business/engineering knowledge live in an Obsidian vault named `Applification Ltd`. Access it through the [`applification-vault`](.claude/skills/applification-vault/SKILL.md) skill, which uses the `obsidian` CLI (resolved via `PATH`) and discovers the vault path dynamically with `obsidian vault info=path` — no machine-specific paths. Read first before product/architecture planning; write only to `Products/Contexture/` and `log.md`, and only after the user has agreed a decision should be recorded. If the CLI or vault isn't available on this machine, the skill stops and tells you.
+
 **No lint suppressions.** Never write `biome-ignore` or `eslint-disable`. If a rule fires, fix the underlying code. `bun run ci` enforces this with the `check:no-suppressions` script in [package.json](package.json).
 
 ## Commands
