@@ -188,6 +188,7 @@ export class CodexProviderRuntime implements ProviderRuntime {
         tools: { view_image: false },
       },
       developerInstructions: buildSchemaOnlyInstructions(),
+      dynamicTools: toCodexDynamicTools(this.#opToolDescriptors),
       excludeTurns: true,
       persistExtendedHistory: false,
     });
@@ -457,8 +458,8 @@ function mapCodexNotification(
   if (!params || typeof params !== 'object') return null;
   const threadId = (params as { threadId?: unknown }).threadId;
   if (threadId !== thread.threadId) return null;
-  const turnId = (params as { turnId?: unknown }).turnId;
-  if (currentTurnId && typeof turnId === 'string' && turnId !== currentTurnId) return null;
+  const turnId = readNotificationTurnId(params);
+  if (currentTurnId && turnId && turnId !== currentTurnId) return null;
 
   switch (message.method) {
     case 'item/agentMessage/delta':
@@ -506,6 +507,15 @@ function mapCodexNotification(
     default:
       return null;
   }
+}
+
+function readNotificationTurnId(params: object): string | null {
+  const turnId = (params as { turnId?: unknown }).turnId;
+  if (typeof turnId === 'string') return turnId;
+  const turn = (params as { turn?: unknown }).turn;
+  if (!turn || typeof turn !== 'object') return null;
+  const nestedTurnId = (turn as { id?: unknown }).id;
+  return typeof nestedTurnId === 'string' ? nestedTurnId : null;
 }
 
 function mapTurnCompleted(notification: TurnCompletedNotification): ProviderRuntimeEvent {

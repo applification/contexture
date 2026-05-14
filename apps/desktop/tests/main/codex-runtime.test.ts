@@ -537,6 +537,14 @@ describe('CodexProviderRuntime', () => {
     const runtime = new CodexProviderRuntime({
       execFile: supportedExec(),
       appServerFactory: vi.fn(() => fakeConnection(request)),
+      opToolDescriptors: [
+        {
+          name: 'add_type',
+          description: 'Add type.',
+          inputSchema: { payload: z.object({ name: z.string() }) },
+          handler: vi.fn(async () => ({ schema: { version: '1', types: [] } })),
+        },
+      ],
     });
 
     const resumed = await runtime.resumeThread({
@@ -562,6 +570,12 @@ describe('CodexProviderRuntime', () => {
           }),
         }),
         sandbox: 'read-only',
+        dynamicTools: [
+          expect.objectContaining({
+            namespace: CODEX_CONTEXTURE_TOOL_NAMESPACE,
+            name: 'add_type',
+          }),
+        ],
         excludeTurns: true,
         persistExtendedHistory: false,
       }),
@@ -835,6 +849,101 @@ describe('CodexProviderRuntime', () => {
       sandboxPolicy: { type: 'readOnly', networkAccess: false },
       model: null,
       effort: null,
+    });
+  });
+
+  it('ignores completion notifications for a different nested Codex turn id', async () => {
+    const request = vi.fn<CodexAppServerConnection['client']['request']>(async (method) => {
+      if (method === 'initialize') {
+        return {
+          userAgent: 'codex',
+          codexHome: '/tmp/codex',
+          platformFamily: 'unix',
+          platformOs: 'macos',
+        };
+      }
+      if (method === 'turn/start') {
+        return {
+          turn: {
+            id: 'turn-current',
+            items: [],
+            itemsView: 'complete',
+            status: 'inProgress',
+            error: null,
+            startedAt: 1,
+            completedAt: null,
+            durationMs: null,
+          },
+        };
+      }
+      throw new Error(`unexpected method ${method}`);
+    });
+    const connection = fakeConnection(request);
+    const runtime = new CodexProviderRuntime({
+      execFile: supportedExec(),
+      appServerFactory: vi.fn(() => connection),
+    });
+    const thread = { provider: 'codex' as const, threadId: 'thread-1' };
+    const iterator = runtime
+      .sendTurn({ thread, schema: { version: '1', types: [] }, message: 'hello' })
+      [Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'turn_started', thread },
+      done: false,
+    });
+    connection.emitNotification({
+      jsonrpc: '2.0',
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-1',
+        turn: {
+          id: 'turn-stale',
+          items: [],
+          itemsView: 'complete',
+          status: 'completed',
+          error: null,
+          startedAt: 1,
+          completedAt: 2,
+          durationMs: 1,
+        },
+      },
+    });
+    connection.emitNotification({
+      jsonrpc: '2.0',
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-current',
+        itemId: 'item-1',
+        delta: 'Still running',
+      },
+    });
+    connection.emitNotification({
+      jsonrpc: '2.0',
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-1',
+        turn: {
+          id: 'turn-current',
+          items: [],
+          itemsView: 'complete',
+          status: 'completed',
+          error: null,
+          startedAt: 3,
+          completedAt: 4,
+          durationMs: 1,
+        },
+      },
+    });
+
+    await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'assistant_delta', text: 'Still running' },
+      done: false,
+    });
+    await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'turn_completed' },
+      done: false,
     });
   });
 
