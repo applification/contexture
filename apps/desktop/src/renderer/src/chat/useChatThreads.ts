@@ -19,16 +19,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ChatMessage } from '../model/chat-history';
 
-export type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
+export type ProviderKind = 'codex' | 'claude';
 
 export interface ChatThread {
   id: string;
+  provider: ProviderKind;
   title: string;
   messages: ChatMessage[];
-  model: ModelId;
+  model?: string;
+  effort?: string;
   filePath: string | null;
+  providerThreadRef?: unknown;
   /** Agent SDK session id — set after the first turn. Undefined on a fresh thread. */
   sessionId?: string;
+  desynced?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -47,6 +51,7 @@ function loadThreads(): ChatThread[] {
     const threads: ChatThread[] = raw ? JSON.parse(raw) : [];
     // Defensive: older stored threads may be missing optional fields.
     for (const t of threads) {
+      if (t.provider === undefined) t.provider = 'claude';
       if (t.filePath === undefined) t.filePath = null;
       if (!Array.isArray(t.messages)) t.messages = [];
     }
@@ -81,7 +86,12 @@ export interface UseChatThreadsReturn {
   showThreadList: boolean;
   setShowThreadList: (show: boolean) => void;
   /** Create a new thread; returns the id. Sets it as active. */
-  createThread: (model: ModelId, filePath: string | null) => string;
+  createThread: (input: {
+    provider: ProviderKind;
+    model?: string;
+    effort?: string;
+    filePath: string | null;
+  }) => string;
   /** All threads for a given file, newest-first. */
   threadsForFile: (filePath: string | null) => ChatThread[];
   /** Switch active thread. Returns the newly-active thread for convenience. */
@@ -89,6 +99,8 @@ export interface UseChatThreadsReturn {
   deleteThread: (id: string) => void;
   updateThreadMessages: (id: string, messages: ChatMessage[]) => void;
   updateThreadSessionId: (id: string, sessionId: string) => void;
+  updateThreadProviderRef: (id: string, providerThreadRef: unknown) => void;
+  markThreadDesynced: (id: string) => void;
   getActiveThread: () => ChatThread | undefined;
   setActiveThreadId: (id: string | null) => void;
 }
@@ -111,14 +123,21 @@ export function useChatThreads(): UseChatThreadsReturn {
   }, []);
 
   const createThread = useCallback(
-    (model: ModelId, filePath: string | null): string => {
+    (input: {
+      provider: ProviderKind;
+      model?: string;
+      effort?: string;
+      filePath: string | null;
+    }): string => {
       const id = generateId();
       const thread: ChatThread = {
         id,
+        provider: input.provider,
         title: 'New chat',
         messages: [],
-        model,
-        filePath,
+        model: input.model,
+        effort: input.effort,
+        filePath: input.filePath,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -168,8 +187,26 @@ export function useChatThreads(): UseChatThreadsReturn {
   const updateThreadSessionId = useCallback((id: string, sessionId: string) => {
     setThreads((prev) =>
       prev.map((t) =>
-        t.id === id && t.sessionId !== sessionId ? { ...t, sessionId, updatedAt: Date.now() } : t,
+        t.id === id && t.sessionId !== sessionId
+          ? { ...t, provider: 'claude', sessionId, updatedAt: Date.now() }
+          : t,
       ),
+    );
+  }, []);
+
+  const updateThreadProviderRef = useCallback((id: string, providerThreadRef: unknown) => {
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === id && t.providerThreadRef !== providerThreadRef
+          ? { ...t, providerThreadRef, updatedAt: Date.now() }
+          : t,
+      ),
+    );
+  }, []);
+
+  const markThreadDesynced = useCallback((id: string) => {
+    setThreads((prev) =>
+      prev.map((t) => (t.id === id && !t.desynced ? { ...t, desynced: true } : t)),
     );
   }, []);
 
@@ -197,6 +234,8 @@ export function useChatThreads(): UseChatThreadsReturn {
     deleteThread,
     updateThreadMessages,
     updateThreadSessionId,
+    updateThreadProviderRef,
+    markThreadDesynced,
     getActiveThread,
     setActiveThreadId,
     threadsForFile,

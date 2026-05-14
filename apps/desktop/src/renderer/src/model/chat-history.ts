@@ -21,6 +21,10 @@ export interface ChatMessage {
 export interface ChatHistory {
   version: '1';
   messages: ChatMessage[];
+  provider?: 'codex' | 'claude';
+  providerThreadRef?: unknown;
+  model?: string;
+  effort?: string;
   /**
    * Agent SDK session id for this chat. Present after the first turn;
    * restored on app reopen so follow-up turns pass `resume: sessionId`
@@ -74,11 +78,22 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
   }
 
   const messages = sanitiseMessages(obj.messages);
+  const provider = obj.provider === 'codex' || obj.provider === 'claude' ? obj.provider : undefined;
+  const providerThreadRef =
+    obj.providerThreadRef && typeof obj.providerThreadRef === 'object'
+      ? obj.providerThreadRef
+      : undefined;
+  const model = typeof obj.model === 'string' ? obj.model : undefined;
+  const effort = typeof obj.effort === 'string' ? obj.effort : undefined;
   const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId : undefined;
   return {
     history: {
       version: CHAT_HISTORY_VERSION,
       messages,
+      ...(provider ? { provider } : {}),
+      ...(providerThreadRef ? { providerThreadRef } : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       ...(sessionId ? { sessionId } : {}),
     },
     warnings: [],

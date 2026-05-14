@@ -87,6 +87,56 @@ const chat = {
     ipcRenderer.invoke('chat:clear-session') as Promise<{ ok: boolean }>,
 };
 
+const schemaAgent = {
+  send: (message: string) =>
+    ipcRenderer.invoke('schema-agent:send', message) as Promise<{ ok: boolean; error?: string }>,
+  setIR: (ir: unknown) => ipcRenderer.send('schema-agent:set-ir', ir),
+  abort: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('schema-agent:abort') as Promise<{ ok: boolean; error?: string }>,
+  getStatus: () => ipcRenderer.invoke('schema-agent:get-status'),
+  listModels: () => ipcRenderer.invoke('schema-agent:list-models'),
+  setProvider: (provider: 'codex' | 'claude'): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('schema-agent:set-provider', provider) as Promise<{
+      ok: boolean;
+      error?: string;
+    }>,
+  setModelOptions: (options: { model?: string; effort?: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('schema-agent:set-model-options', options) as Promise<{ ok: boolean }>,
+  startLogin: (input: { mode: 'chatgpt' | 'api-key'; apiKey?: string }) =>
+    ipcRenderer.invoke('schema-agent:start-login', input),
+  cancelLogin: (input: { flowId: string }): Promise<void> =>
+    ipcRenderer.invoke('schema-agent:cancel-login', input) as Promise<void>,
+  logout: (): Promise<void> => ipcRenderer.invoke('schema-agent:logout') as Promise<void>,
+  threadSet: (thread: unknown): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('schema-agent:thread-set', thread) as Promise<{ ok: boolean }>,
+  threadClear: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('schema-agent:thread-clear') as Promise<{ ok: boolean }>,
+  replyTool: (id: string, result: unknown) =>
+    ipcRenderer.send('schema-agent:tool-reply', { id, result }),
+  onAssistantDelta: (listener: (payload: { text: string }) => void) =>
+    subscribe('schema-agent:assistant-delta', listener as (p: unknown) => void),
+  onAssistantFinal: (listener: (payload: { text: string }) => void) =>
+    subscribe('schema-agent:assistant-final', listener as (p: unknown) => void),
+  onToolCallStarted: (listener: (payload: { id: string; name: string; input?: unknown }) => void) =>
+    subscribe('schema-agent:tool-call-started', listener as (p: unknown) => void),
+  onToolCallFinished: (
+    listener: (payload: { id: string; name: string; ok: boolean; result?: unknown }) => void,
+  ) => subscribe('schema-agent:tool-call-finished', listener as (p: unknown) => void),
+  onError: (listener: (payload: { message: string }) => void) =>
+    subscribe('schema-agent:error', listener as (p: unknown) => void),
+  onStatusChanged: (listener: (payload: unknown) => void) =>
+    subscribe('schema-agent:status-changed', listener),
+  onThreadUpdated: (listener: (payload: { thread: unknown }) => void) =>
+    subscribe('schema-agent:thread-updated', listener as (p: unknown) => void),
+  onThreadDesynced: (listener: (payload: { thread: unknown; reason: string }) => void) =>
+    subscribe('schema-agent:thread-desynced', listener as (p: unknown) => void),
+  onToolRequest: (listener: (payload: { id: string; op: unknown }) => void) =>
+    subscribe('schema-agent:tool-request', listener as (p: unknown) => void),
+  onTurnBegin: (listener: () => void) => subscribe('turn:begin', listener),
+  onTurnCommit: (listener: () => void) => subscribe('turn:commit', listener),
+  onTurnRollback: (listener: () => void) => subscribe('turn:rollback', listener),
+};
+
 // Open results carry the full bundle (IR raw text + parsed sidecars).
 // The `.d.ts` declares the canonical `OpenedDocument` shape; here we
 // pass the IPC value through unchanged — the renderer sees the typed
@@ -193,7 +243,7 @@ const reconcile = {
     }>,
 };
 
-const contexture = { chat, file, scaffold, shell, project, drift, reconcile };
+const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, reconcile };
 
 /**
  * Legacy surface. Sidecar reads/writes use the preload process's

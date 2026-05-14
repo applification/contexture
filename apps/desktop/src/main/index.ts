@@ -14,6 +14,7 @@ import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
 import { registerProjectIpc } from './ipc/project';
 import { registerScaffoldIpc } from './ipc/scaffold';
+import { registerSchemaAgentIpc } from './ipc/schema-agent';
 import { registerShellIpc } from './ipc/shell';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
@@ -78,6 +79,7 @@ app.whenReady().then(() => {
   registerScaffoldIpc(mainWindow);
   registerShellIpc();
   registerProjectIpc();
+  registerSchemaAgentIpc(mainWindow);
   registerClaudeIpc(mainWindow);
   registerDriftIpc(mainWindow);
 

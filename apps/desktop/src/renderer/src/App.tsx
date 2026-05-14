@@ -25,6 +25,7 @@ import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { evalRootCandidates } from './chat/eval-prompt';
 import { useClaudeEval } from './chat/useClaudeEval';
 import { useClaudeSchemaChat } from './chat/useClaudeSchemaChat';
+import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
@@ -136,12 +137,24 @@ export default function App(): React.JSX.Element {
       .apply({ kind: 'replace_schema', schema: allotment as unknown as never });
   }, []);
 
-  const chat = useClaudeSchemaChat({
-    api:
-      typeof window !== 'undefined' && window.contexture?.chat
+  const schemaAgentAvailable = typeof window !== 'undefined' && !!window.contexture?.schemaAgent;
+  const schemaAgentApi = useMemo(
+    () =>
+      typeof window !== 'undefined' && window.contexture?.schemaAgent
+        ? window.contexture.schemaAgent
+        : noopSchemaAgentApi(),
+    [],
+  );
+  const chatApi = useMemo(
+    () =>
+      !schemaAgentAvailable && typeof window !== 'undefined' && window.contexture?.chat
         ? window.contexture.chat
         : noopChatApi(),
-  });
+    [schemaAgentAvailable],
+  );
+  const codexChat = useSchemaAgentChat({ api: schemaAgentApi });
+  const claudeChat = useClaudeSchemaChat({ api: chatApi });
+  const chat = schemaAgentAvailable ? codexChat : claudeChat;
 
   // Track positions + chat in refs so `useFileMenu` getters can read
   // the live values on save without re-subscribing on every change.
@@ -163,14 +176,37 @@ export default function App(): React.JSX.Element {
 
   const fileMenu = useFileMenu({
     getLayout: () => ({ version: '1', positions: positionsRef.current }),
-    getChat: () => ({ version: '1', messages: chatMessagesRef.current }),
+    getChat: () => ({
+      version: '1',
+      messages: chatMessagesRef.current,
+      provider: 'providerLabel' in chat ? 'codex' : 'claude',
+      ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
+      ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
+      ...('providerThreadRef' in chat && chat.providerThreadRef
+        ? { providerThreadRef: chat.providerThreadRef }
+        : {}),
+    }),
     onBundleLoaded: ({ layout, chat: loadedChat }) => {
       setPositions(layout.positions);
+      const modelSetter = (chat as { setModel?: unknown }).setModel;
+      if (loadedChat.model && typeof modelSetter === 'function') modelSetter(loadedChat.model);
+      const effortSetter = (chat as { setEffort?: unknown }).setEffort;
+      if (loadedChat.effort && typeof effortSetter === 'function') effortSetter(loadedChat.effort);
       chatHydrateRef.current(loadedChat.messages);
       if (loadedChat.sessionId) {
         void window.contexture?.chat.setSessionId(loadedChat.sessionId);
+        if (loadedChat.providerThreadRef) {
+          void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
+        } else {
+          void window.contexture?.schemaAgent?.threadClear();
+        }
       } else {
         void window.contexture?.chat.clearSession();
+        if (loadedChat.providerThreadRef) {
+          void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
+        } else {
+          void window.contexture?.schemaAgent?.threadClear();
+        }
       }
       // Capture a seeded first message for auto-send (set by onOpenProject).
       const first = loadedChat.messages[0];
@@ -188,12 +224,22 @@ export default function App(): React.JSX.Element {
       setPositions({});
       chatHydrateRef.current([]);
       void window.contexture?.chat.clearSession();
+      void window.contexture?.schemaAgent?.threadClear();
     },
   });
 
   useProjectAutoSave({
     getLayout: () => ({ version: '1', positions: positionsRef.current }),
-    getChat: () => ({ version: '1', messages: chatMessagesRef.current }),
+    getChat: () => ({
+      version: '1',
+      messages: chatMessagesRef.current,
+      provider: 'providerLabel' in chat ? 'codex' : 'claude',
+      ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
+      ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
+      ...('providerThreadRef' in chat && chat.providerThreadRef
+        ? { providerThreadRef: chat.providerThreadRef }
+        : {}),
+    }),
   });
 
   const sessionLayout = useMemo<Layout>(() => ({ version: '1', positions }), [positions]);
@@ -349,6 +395,7 @@ export default function App(): React.JSX.Element {
                   onOpenRecent={fileMenu.handleOpenPath}
                   isNewProject={documentMode === 'project'}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
+                  providerLabel={schemaAgentAvailable ? 'Codex' : 'Claude'}
                 />
               )}
             </div>
@@ -437,12 +484,14 @@ function EmptyState({
   onOpenRecent,
   isNewProject = false,
   projectName = null,
+  providerLabel,
 }: {
   onLoadSample: () => void;
   recentFiles: string[];
   onOpenRecent: (path: string) => void;
   isNewProject?: boolean;
   projectName?: string | null;
+  providerLabel: 'Codex' | 'Claude';
 }): React.JSX.Element {
   return (
     <div
@@ -456,8 +505,8 @@ function EmptyState({
             {projectName ?? 'New project'}
           </h1>
           <p className="text-sm">
-            Your project has been scaffolded. Claude is building your schema in the chat panel —
-            types will appear here as they're created.
+            Your project has been scaffolded. {providerLabel} is building your schema in the chat
+            panel — types will appear here as they're created.
           </p>
           <p className="text-xs text-muted-foreground/60">
             You can iterate on the schema by continuing the conversation, or edit types directly
@@ -470,7 +519,7 @@ function EmptyState({
           <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>
           <p className="text-sm mb-4">
             Open a <code className="text-xs">.contexture.json</code> file or start chatting with
-            Claude to create one.
+            {` ${providerLabel}`} to create one.
           </p>
           <Button onClick={onLoadSample}>Load allotment sample</Button>
 
@@ -509,6 +558,12 @@ function copyToClipboard(text: string): void {
   navigator.clipboard?.writeText(text).catch(() => undefined);
 }
 
+function readStringProp(value: unknown, key: string): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const prop = (value as Record<string, unknown>)[key];
+  return typeof prop === 'string' && prop.length > 0 ? prop : undefined;
+}
+
 function noopChatApi() {
   const unsub = () => undefined;
   return {
@@ -531,5 +586,36 @@ function noopChatApi() {
     onSession: () => unsub,
     setSessionId: async () => ({ ok: false }),
     clearSession: async () => ({ ok: false }),
+  };
+}
+
+function noopSchemaAgentApi() {
+  const unsub = () => undefined;
+  return {
+    send: async () => ({ ok: false, error: 'schema agent unavailable (no preload bridge)' }),
+    setIR: () => undefined,
+    abort: async () => ({ ok: false, error: 'schema agent unavailable' }),
+    getStatus: async () => ({ provider: 'codex', readiness: 'app_server_unavailable' }),
+    listModels: async () => [],
+    setProvider: async () => ({ ok: false, error: 'schema agent unavailable' }),
+    setModelOptions: async () => ({ ok: false }),
+    startLogin: async () => ({ id: '', mode: 'chatgpt' as const }),
+    cancelLogin: async () => undefined,
+    logout: async () => undefined,
+    threadSet: async () => ({ ok: false }),
+    threadClear: async () => ({ ok: false }),
+    replyTool: () => undefined,
+    onAssistantDelta: () => unsub,
+    onAssistantFinal: () => unsub,
+    onToolCallStarted: () => unsub,
+    onToolCallFinished: () => unsub,
+    onError: () => unsub,
+    onStatusChanged: () => unsub,
+    onThreadUpdated: () => unsub,
+    onThreadDesynced: () => unsub,
+    onToolRequest: () => unsub,
+    onTurnBegin: () => unsub,
+    onTurnCommit: () => unsub,
+    onTurnRollback: () => unsub,
   };
 }

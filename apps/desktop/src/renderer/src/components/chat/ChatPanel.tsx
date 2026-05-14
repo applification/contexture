@@ -26,6 +26,7 @@
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { type ModelId, type ThinkingBudget, useClaude } from '@renderer/chat/useClaude';
 import type { ClaudeSchemaChatState } from '@renderer/chat/useClaudeSchemaChat';
+import type { SchemaAgentChatState } from '@renderer/chat/useSchemaAgentChat';
 import type { ChatMessage } from '@renderer/model/chat-history';
 import { useDocumentStore } from '@renderer/store/document';
 import { code } from '@streamdown/code';
@@ -53,7 +54,7 @@ import { cn } from '@/lib/utils';
 import { ChatThreadList } from './ChatThreadList';
 
 export interface ChatPanelProps {
-  chat: ClaudeSchemaChatState;
+  chat: ClaudeSchemaChatState | SchemaAgentChatState;
 }
 
 export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
@@ -67,7 +68,22 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     clear,
     hydrate,
   } = chat;
-  const { authMode, isReady, model, setModel, thinkingBudget, setThinkingBudget } = useClaude();
+  const claude = useClaude();
+  const providerLabel = 'providerLabel' in chat ? chat.providerLabel : 'Claude';
+  const provider = providerLabel === 'Codex' ? 'codex' : 'claude';
+  const isCodex = provider === 'codex';
+  const authMode = claude.authMode;
+  const isReady = 'isReady' in chat ? chat.isReady : claude.isReady;
+  const model = isCodex && 'model' in chat ? chat.model : claude.model;
+  const setModel = isCodex && 'setModel' in chat ? chat.setModel : claude.setModel;
+  const thinkingBudget = isCodex && 'effort' in chat ? chat.effort : claude.thinkingBudget;
+  const setThinkingBudget =
+    isCodex && 'setEffort' in chat ? chat.setEffort : claude.setThinkingBudget;
+  const codexModels = isCodex && 'models' in chat ? chat.models : [];
+  const modelSelectValue = isCodex ? model || codexModels[0]?.id || 'models-unavailable' : model;
+  const unavailableMessage = 'unavailableMessage' in chat ? chat.unavailableMessage : null;
+  const providerThreadRef = 'providerThreadRef' in chat ? chat.providerThreadRef : undefined;
+  const desynced = 'desynced' in chat ? chat.desynced : false;
 
   const filePath = useDocumentStore((s) => s.filePath);
   const history = useChatThreads();
@@ -98,6 +114,9 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (thread.providerThreadRef)
+        void window.contexture?.schemaAgent?.threadSet(thread.providerThreadRef);
+      else void window.contexture?.schemaAgent?.threadClear();
     }
     prevMessagesRef.current = thread?.messages ?? [];
   }, [history, hydrate]);
@@ -125,11 +144,17 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (latest.providerThreadRef) {
+        void window.contexture?.schemaAgent?.threadSet(latest.providerThreadRef);
+      } else {
+        void window.contexture?.schemaAgent?.threadClear();
+      }
     } else {
       history.setActiveThreadId(null);
       clear();
       prevMessagesRef.current = [];
       void window.contexture?.chat?.clearSession?.();
+      void window.contexture?.schemaAgent?.threadClear();
     }
   }, [filePath, history, hydrate, clear]);
 
@@ -145,11 +170,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   // Auto-create a thread on the first appended message if none active.
   useEffect(() => {
     if (!history.activeThreadId && messages.length > 0) {
-      const id = history.createThread(model, filePath);
+      const id = history.createThread({ provider, model, effort: thinkingBudget, filePath });
       history.updateThreadMessages(id, messages);
       prevMessagesRef.current = messages;
     }
-  }, [messages, history, model, filePath]);
+  }, [messages, history, model, thinkingBudget, filePath, provider]);
 
   // Stamp the active thread with the SDK session id as it streams in.
   useEffect(() => {
@@ -161,6 +186,16 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       if (id) history.updateThreadSessionId(id, sessionId);
     });
   }, [history.activeThreadId, history.updateThreadSessionId]);
+
+  useEffect(() => {
+    if (!providerThreadRef || !history.activeThreadId) return;
+    history.updateThreadProviderRef(history.activeThreadId, providerThreadRef);
+  }, [providerThreadRef, history.activeThreadId, history.updateThreadProviderRef]);
+
+  useEffect(() => {
+    if (!desynced || !history.activeThreadId) return;
+    history.markThreadDesynced(history.activeThreadId);
+  }, [desynced, history.activeThreadId, history.markThreadDesynced]);
 
   const messageCount = messages.length;
   useEffect(() => {
@@ -175,7 +210,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
 
   const activeThread = history.getActiveThread();
   const headerTitle =
-    activeThread && activeThread.title !== 'New chat' ? activeThread.title : 'Claude';
+    activeThread && activeThread.title !== 'New chat' ? activeThread.title : providerLabel;
 
   const handleNewChat = useCallback(() => {
     // Don't save empty threads — recycle an already-empty one instead
@@ -183,15 +218,16 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     if (history.activeThreadId && messages.length === 0) {
       history.deleteThread(history.activeThreadId);
     }
-    history.createThread(model, filePath);
+    history.createThread({ provider, model, effort: thinkingBudget, filePath });
     clear();
     setInput('');
     prevMessagesRef.current = [];
     // Drop main's resume id so the SDK starts a brand-new session on
     // the next turn.
     void window.contexture?.chat?.clearSession?.();
+    void window.contexture?.schemaAgent?.threadClear();
     history.setShowThreadList(false);
-  }, [history, messages.length, model, filePath, clear]);
+  }, [history, messages.length, provider, model, thinkingBudget, filePath, clear]);
 
   const handleSwitchThread = useCallback(
     (id: string) => {
@@ -205,6 +241,9 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (thread.providerThreadRef)
+        void window.contexture?.schemaAgent?.threadSet(thread.providerThreadRef);
+      else void window.contexture?.schemaAgent?.threadClear();
     },
     [history, hydrate],
   );
@@ -224,10 +263,14 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
         prevMessagesRef.current = next.messages;
         if (next.sessionId) void window.contexture?.chat?.setSessionId?.(next.sessionId);
         else void window.contexture?.chat?.clearSession?.();
+        if (next.providerThreadRef)
+          void window.contexture?.schemaAgent?.threadSet(next.providerThreadRef);
+        else void window.contexture?.schemaAgent?.threadClear();
       } else {
         clear();
         prevMessagesRef.current = [];
         void window.contexture?.chat?.clearSession?.();
+        void window.contexture?.schemaAgent?.threadClear();
       }
     },
     [history, filePath, hydrate, clear],
@@ -255,8 +298,9 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   );
 
   const handleAbort = useCallback(() => {
-    void window.contexture?.chat?.abort?.();
-  }, []);
+    if ('abort' in chat) void chat.abort();
+    else void window.contexture?.chat?.abort?.();
+  }, [chat]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="chat-panel">
@@ -307,10 +351,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
                 </EmptyTitle>
                 <EmptyDescription className="text-xs">
                   {isReady
-                    ? 'Describe the schema you want — "add a Plot type with a name and location" — and Claude will build it on the canvas.'
-                    : authMode === 'max'
-                      ? 'Claude CLI not detected. Configure in toolbar.'
-                      : 'Set your API key in the toolbar to start chatting.'}
+                    ? `Describe the schema you want and ${providerLabel} will build it on the canvas.`
+                    : (unavailableMessage ??
+                      (authMode === 'max'
+                        ? 'Claude CLI not detected. Configure in toolbar.'
+                        : 'Set your API key in the toolbar to start chatting.'))}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -329,7 +374,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           {isStreaming && (
             <div className="flex gap-1 items-center text-xs text-muted-foreground">
               <span className="animate-pulse">●</span>
-              <span>Claude is thinking…</span>
+              <span>{providerLabel} is thinking…</span>
             </div>
           )}
           {authRequired && (
@@ -375,16 +420,32 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             data-testid="chat-input"
           />
           <div className="flex items-center gap-1.5 px-2 pb-2">
-            <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
+            <Select value={modelSelectValue} onValueChange={(v) => setModel(v as ModelId)}>
               <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Model</SelectLabel>
-                  <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
-                  <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
-                  <SelectItem value="claude-opus-4-6">Opus</SelectItem>
+                  {isCodex ? (
+                    codexModels.length > 0 ? (
+                      codexModels.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="models-unavailable" disabled>
+                        Models unavailable
+                      </SelectItem>
+                    )
+                  ) : (
+                    <>
+                      <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
+                      <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
+                      <SelectItem value="claude-opus-4-6">Opus</SelectItem>
+                    </>
+                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -398,9 +459,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Effort</SelectLabel>
-                  <SelectItem value="auto">Auto</SelectItem>
+                  {!isCodex && <SelectItem value="auto">Auto</SelectItem>}
                   <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="med">Med</SelectItem>
+                  <SelectItem value={isCodex ? 'medium' : 'med'}>
+                    {isCodex ? 'Medium' : 'Med'}
+                  </SelectItem>
                   <SelectItem value="high">High</SelectItem>
                 </SelectGroup>
               </SelectContent>

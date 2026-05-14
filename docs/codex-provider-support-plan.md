@@ -1,313 +1,484 @@
-# Codex Provider Support Plan
+# Codex-First Provider Runtime Plan
 
 - **Status:** Proposed
-- **Date:** 2026-05-02
+- **Date:** 2026-05-14
+
+## Context
+
+Contexture's existing schema chat implementation is Claude-shaped. It uses the Claude Agent SDK plus MCP op tools and assumes Claude Code CLI / Agent SDK behavior as the primary runtime.
+
+That priority has changed. Claude Code CLI / Agent SDK usage now draws from API tokens rather than the user's subscription, which makes it a poor default for Contexture's product goal. Codex has become the primary integration target because `codex app-server` supports ChatGPT-managed auth and gives Contexture a path to subscription-backed local agent use.
+
+There are no external users to preserve compatibility for. We can replace persisted chat/provider state, rename IPC and renderer hooks, and drop old Claude-only sessions without migration work. The old Claude implementation is useful as reference material, not as an incumbent architecture to protect.
 
 ## Goal
 
-Add Codex as a second chat provider in the desktop Electron app while preserving Contexture's current product contract:
+Rebuild Contexture's schema-agent chat around a provider-neutral runtime contract, with Codex as the primary and default implementation.
 
-- chat edits the in-memory schema through the closed-world op vocabulary
-- graph updates animate per op
-- one chat turn maps to one undoable transaction
-- stop / interrupt rolls back the whole in-flight turn
+The user-facing contract remains:
 
-The implementation should follow the same high-level separation used by `t3code`: one UI surface, separate provider runtimes, provider-specific auth/model state, and a provider-neutral renderer contract.
+- chat edits the in-memory schema only through Contexture's closed-world op vocabulary
+- graph updates animate incrementally per op
+- one assistant turn maps to one undoable transaction
+- stop / interrupt / failure rolls back the whole in-flight turn
+- provider credentials are owned by the provider runtime, not stored by Contexture
 
-## Agreed decisions
+Claude Agent SDK support remains desirable, but it is no longer on the critical path. It should be added later only if it fits the Codex-proven provider contract without distorting it.
 
-### Product and scope
+## Architectural Posture
 
-- Introduce multiple provider support now, starting with `Codex`.
-- Keep provider runtimes separate, not unified internally.
-- Start Codex in constrained schema-agent mode only.
-- Expose only Contexture schema op tools to Codex at first.
-- Defer broader coding-agent capabilities to a separate future surface.
-- Defer Codex support for reconcile/eval flows until the main schema chat path is proven.
+Use the `t3code` approach as the conceptual base: provider-neutral shell, provider-specific adapters, canonical runtime events, provider capabilities, and opaque provider resume state.
 
-### Runtime architecture
+But Contexture should keep a narrower product surface than `t3code`. We do not need T3Code's full coding-agent project/worktree/checkpoint machinery for schema chat. Contexture's v1 surface is a constrained schema agent, not a general repo mutation agent.
 
-- Refactor to a provider-neutral boundary before adding Codex behavior.
-- Keep the existing Claude implementation behind `ClaudeProviderRuntime`.
-- Implement Codex through `codex app-server`, not `codex exec`.
-- Run one long-lived Codex `app-server` child process per app window.
-- Wrap that process in a main-side runtime service that owns lifecycle, transport, thread mapping, auth polling, interrupt, and tool dispatch.
-- Keep the renderer isolated from provider processes.
+The right framing is:
 
-### Tooling and turn semantics
+- **provider-neutral contract now**
+- **Codex runtime first**
+- **Claude compatibility later**
+- **no backward-compat persistence migration**
 
-- Reuse `createOpTools()` as the single source of truth for both providers.
-- Claude continues using Agent SDK + MCP tools.
-- Codex uses dynamic tools generated from the same descriptors.
-- Reuse the existing `ChatTurnController` transaction envelope for both providers.
-- Preserve current stop semantics: partial tool effects are provisional until turn completion and are rolled back on interrupt or failure.
+## Non-Negotiable Product Invariants
 
-### Auth and readiness
+### Schema Ops Only
 
-- Use a unified auth popover with provider-specific content.
-- Keep auth state provider-specific.
-- Support Codex `ChatGPT subscription` login with `API key` fallback.
-- Use Codex as the source of truth for auth state.
-- Do not store Codex credentials in Contexture local storage.
-- Persist only lightweight UI preferences in Contexture.
-- Query provider auth/account state on startup and when the popover opens.
-- Show explicit readiness states instead of a single configured/unconfigured bit.
+The schema chat surface must expose only Contexture schema ops to the model.
 
-### Models and persistence
+No general filesystem, shell, repo mutation, browser, or network tools should be available from schema chat v1. If broader coding-agent features are added later, they should live in a separate surface with separate safety semantics.
 
-- Make models provider-specific and runtime-driven.
-- Replace the current thread persistence shape outright with a provider-aware format.
-- No backward-compat migration work is required.
-- Rename Claude-specific code paths and storage keys to provider-neutral names as part of the refactor.
+### Shared Op Registry
 
-### Versioning and protocol
+`createOpTools()` remains the single source of truth for agent-visible schema mutations.
 
-- Pin to a minimum supported Codex CLI version.
-- Hard-fail Codex into an unavailable state if the installed CLI is too old.
-- Updating the local Codex CLI to the pinned version is acceptable and expected.
-- Generate or vendor Codex app-server protocol types instead of hand-maintaining request shapes.
+Adapters may present those descriptors differently:
 
-## External references
+- Codex: dynamic tools or another app-server-compatible tool bridge
+- Claude: MCP tools if/when Claude support returns
+- CLI: existing `@contexture/cli` op commands
 
-- Codex auth docs: ChatGPT sign-in and API key sign-in are both supported for CLI/app/IDE.
-- Codex app-server docs: primary integration path for embedded clients.
-- Codex GitHub repo: local CLI releases move quickly, so version pinning matters.
-- `t3code`: useful reference for provider separation and unified UI shape.
+Do not create a second hand-maintained tool catalog.
 
-## Non-goals for v1
+### Turn Atomicity
 
-- No general filesystem, shell, or repository mutation from the Contexture chat surface.
-- No attempt to force Claude and Codex onto one lower-level runtime.
-- No backward-compat persistence migration for old Claude-only thread records.
-- No Codex parity for reconcile/eval before the main schema chat path works end to end.
+The existing `ChatTurnController` invariant survives the rewrite:
 
-## Target UX
+- `turn:begin` opens one renderer transaction
+- each accepted op applies and animates immediately
+- `turn:commit` creates one undo entry
+- `turn:rollback` discards all ops from that turn
 
-### Unified auth popover
+Codex must also roll back provider conversation state for failed/interrupted turns. If the renderer rolls back but Codex remembers successful tool calls, the next turn can become semantically desynced.
 
-One popover with:
+### Provider Conversation Rollback
 
-- provider switcher
-- provider-specific auth controls
-- provider-specific model selector
-- provider-specific effort selector
-- provider-specific readiness and error state
+Codex app-server supports provider-side thread rollback. The Codex runtime must call it when a Contexture turn rolls back.
+
+If provider rollback fails, the runtime should mark the provider thread as desynced and force a fresh Codex thread or inject the current IR as authoritative context on the next turn.
+
+## Runtime Contract
+
+Introduce a small provider runtime contract in Electron main. It should describe Contexture's needs, not mirror any one provider's protocol.
+
+Suggested shape:
+
+```ts
+type ProviderKind = "codex" | "claude";
+
+interface ProviderRuntime {
+  provider: ProviderKind;
+  capabilities: ProviderCapabilities;
+
+  getStatus(): Promise<ProviderStatus>;
+  listModels(): Promise<ModelInfo[]>;
+
+  startThread(input: StartThreadInput): Promise<ProviderThreadRef>;
+  sendTurn(input: SendTurnInput): AsyncIterable<ProviderRuntimeEvent>;
+  interruptTurn(input: InterruptTurnInput): Promise<void>;
+  rollbackThread(input: RollbackThreadInput): Promise<void>;
+
+  startLogin(input: StartLoginInput): Promise<LoginFlow>;
+  cancelLogin(input: CancelLoginInput): Promise<void>;
+  logout(): Promise<void>;
+}
+```
+
+Provider-native request payloads, notification names, thread ids, and auth details stay behind adapters.
+
+The renderer should see only:
+
+- provider status/readiness
+- available models and provider-specific option metadata
+- canonical chat events
+- canonical tool-call status
+- turn lifecycle events
+- provider-scoped thread references
+
+## Canonical Runtime Events
+
+Normalize provider-native events into a small Contexture event vocabulary:
+
+- `status_changed`
+- `auth_changed`
+- `thread_started`
+- `thread_resumed`
+- `turn_started`
+- `assistant_delta`
+- `assistant_final`
+- `tool_call_started`
+- `tool_call_finished`
+- `turn_completed`
+- `turn_failed`
+- `turn_interrupted`
+- `thread_desynced`
+
+Provider-specific event detail may be logged for debugging, but it should not leak into renderer state or shared chat logic.
+
+## Provider Capabilities
+
+Expose provider differences through capabilities rather than shared-code conditionals.
+
+Initial capabilities:
+
+- `authModes`: ChatGPT, API key, CLI/session, or none
+- `modelSource`: runtime-driven or static
+- `supportsThreadResume`
+- `supportsThreadRollback`
+- `supportsDynamicTools`
+- `supportsMcpTools`
+- `supportsInterrupt`
+- `supportsRateLimitStatus`
+- `supportsReasoningEffort`
+- `supportsSchemaOnlyMode`
+
+The Codex runtime should drive the contract. Claude can be fit into it later where possible.
+
+## Codex Runtime
+
+Implement `CodexProviderRuntime` in Electron main.
+
+Responsibilities:
+
+- detect `codex` CLI presence and version
+- enforce a minimum supported Codex CLI version
+- generate or vendor app-server protocol types for the pinned version
+- spawn and manage `codex app-server`
+- initialize JSON-RPC over stdio
+- route request/response ids
+- handle server-initiated requests, including tool calls and approvals if enabled
+- map app-server notifications into canonical runtime events
+- start, resume, interrupt, and roll back threads
+- read auth/account state from Codex
+- start/cancel ChatGPT and API-key login flows through Codex
+- list models from Codex where available
+- surface ChatGPT rate-limit state where available
+- restart or degrade cleanly when app-server exits
+
+Codex should be the default provider once it can complete schema chat turns end to end.
+
+## Codex Tool Strategy
+
+Start with a spike before committing to the full adapter.
+
+Spike goals:
+
+1. Generate protocol types from the pinned Codex CLI.
+2. Start `codex app-server`.
+3. Initialize with the required stable capabilities, and with experimental capability only if dynamic tools require it.
+4. Start a thread.
+5. Send a turn with one minimal Contexture dynamic tool.
+6. Confirm tool-call request/response behavior is reliable.
+7. Confirm interrupt and provider rollback behavior.
+
+Preferred v1 path:
+
+- generate Codex dynamic tool specs from `createOpTools()`
+- forward each tool call to the renderer op bridge
+- return the renderer `ApplyResult` to Codex
+
+Fallback path:
+
+- expose Contexture op tools through an MCP adapter if dynamic tools are not stable enough
+
+Either way, `createOpTools()` remains the source of truth.
+
+## Safety and Containment
+
+Schema chat must be constrained even though Codex is a coding agent.
+
+Implementation requirements:
+
+- run schema-chat turns with the strictest viable sandbox/profile
+- deny or omit shell, filesystem, browser, web, and repo mutation tools
+- do not enable full-access runtime modes in schema chat
+- add tests or live smoke checks proving attempts to read files, write files, or run commands are unavailable or rejected
+- treat hidden approval stalls or unsupported approval flows as runtime failures, not silent hangs
+
+If Contexture later adds a coding-agent surface, it should have a separate runtime mode, separate UI, and separate user expectations.
+
+## Auth and Readiness
+
+Codex is the source of truth for Codex auth state.
+
+Contexture should:
+
+- support ChatGPT managed auth as the preferred path
+- support API key fallback
+- not store Codex credentials in localStorage or sidecars
+- persist only lightweight UI preferences
+- call Codex account/status APIs on startup and when the provider popover opens
+- surface explicit readiness states
+- surface rate-limit state when available
 
 Codex readiness states:
 
 - CLI missing
 - CLI outdated
+- app-server unavailable
 - not signed in
 - authenticated with ChatGPT
 - authenticated with API key
+- authenticated but rate-limited
+- desynced thread
 
-Claude keeps equivalent provider-specific readiness states.
+Claude readiness can be added later as a secondary provider state.
 
-### Provider behavior
+## Models and Provider Options
 
-- The active provider is explicit in renderer state.
-- Threads are provider-scoped.
-- Session ids are provider-scoped.
-- Switching provider swaps available models and auth state presentation.
-- Claude remains the default selected provider until Codex reaches parity on the main schema chat flow.
+Models should be provider-specific and runtime-driven where possible.
 
-## Architecture plan
+Renderer state should store:
 
-### 1. Introduce provider-neutral contracts
-
-Create a minimal provider contract in main and preload. Normalize only the events Contexture actually needs:
-
-- `status`
-- `assistant_delta`
-- `assistant_final`
-- `tool_call_started`
-- `tool_call_finished`
-- `turn_started`
-- `turn_committed`
-- `turn_rolled_back`
-- `turn_failed`
-- `session_updated`
-- `auth_state_updated`
-
-Provider-native detail should stay behind the main-side runtime boundary unless the renderer actually needs it.
-
-### 2. Rename Claude-shaped plumbing
-
-Refactor existing Claude-specific names to provider-neutral ones first:
-
-- `claude:*` IPC channels
-- preload chat/auth methods
-- `useClaude*` hooks
-- Claude-specific store keys
-- provider-specific copy in shared chat components
-
-The goal is to keep behavior stable while changing the shape of the boundary.
-
-### 3. Adapt Claude to the new boundary
-
-Wrap the current Agent SDK + MCP integration in `ClaudeProviderRuntime`.
-
-Preserve:
-
-- current auth flow
-- current tool behavior
-- current turn transaction semantics
-- current interrupt rollback behavior
-
-This phase should not add new product behavior. It is a containment refactor.
-
-### 4. Add the Codex runtime service
-
-Implement `CodexProviderRuntime` in Electron main:
-
-- spawn `codex app-server`
-- perform initialize handshake
-- manage JSON-RPC request ids
-- map server notifications to normalized events
-- manage long-lived provider thread ids
-- support turn start and interrupt
-- support provider auth/account queries
-- support provider login/logout actions
-- enforce minimum CLI version
-
-This service should also handle process restart and degraded unavailable states cleanly.
-
-### 5. Reuse the shared op registry for dynamic tools
-
-Keep [`packages/core/src/op-tools.ts`](/Users/davehudson/Apps/Contexture/packages/core/src/op-tools.ts) as the single source of truth.
-
-Adapters:
-
-- Claude adapter: existing MCP `tool(...)` wrapping
-- Codex adapter: dynamic tool spec generation plus tool-call response handling
-
-Do not create a second hand-maintained tool catalog.
-
-### 6. Keep the existing turn transaction model
-
-Map both providers into the same `ChatTurnController` envelope so:
-
-- every completed turn commits as one undo entry
-- every interrupted or failed turn rolls back
-- per-op animation remains incremental
-
-This preserves the strongest user-facing invariant in the current product.
-
-### 7. Replace renderer/provider state
-
-Add explicit provider-aware renderer state:
-
-- `activeProvider`
-- provider-specific auth mode and readiness
+- active provider
 - provider-specific selected model
-- provider-specific effort setting
-- provider-specific session id
-- provider-aware thread records
+- provider-specific reasoning/effort option
+- provider-specific readiness
+- provider-specific thread reference
 
-The persistence format can be replaced outright because migration compatibility is not required.
+Do not hardcode a Claude-oriented model list into shared chat state.
 
-### 8. Land the unified auth popover
+## Persistence
 
-The popover should:
+Replace the old Claude-shaped persistence outright.
 
-- switch provider
-- show provider-specific readiness
-- initiate provider login/logout flows
-- allow Codex ChatGPT or API key auth selection
-- keep Contexture as the owner of UI state only, not credentials
+No migration is required for:
 
-Codex login/logout should be initiated through the Codex runtime where possible, with manual terminal instructions only as fallback copy.
+- Claude Agent SDK session ids
+- Claude auth mode localStorage keys
+- Claude model localStorage keys
+- Claude-only thread records
 
-## Suggested implementation order
+New thread records should be provider-aware:
 
-1. Pin and install the supported Codex CLI version locally.
-2. Add a new plan/protocol module for Codex app-server types and version checks.
-3. Introduce provider-neutral interfaces in main/preload.
-4. Rename Claude-specific renderer and preload surfaces to neutral names.
-5. Wrap the current Claude flow in `ClaudeProviderRuntime`.
-6. Add provider-aware renderer state and thread persistence.
-7. Add unified auth popover with provider switching.
-8. Implement the long-lived Codex runtime service.
-9. Generate Codex dynamic tools from `createOpTools()`.
-10. Connect Codex normalized events to the shared renderer contract.
-11. Add focused tests around the provider boundary.
-12. Verify Claude behavior still matches current semantics.
-13. Verify Codex can authenticate, stream text, call op tools, resume threads, and roll back on interrupt.
+```ts
+interface SchemaAgentThreadRecord {
+  id: string;
+  provider: ProviderKind;
+  providerThreadRef?: unknown;
+  title: string;
+  messages: ChatMessage[];
+  model?: string;
+  effort?: string;
+  filePath: string | null;
+  desynced?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+```
 
-## File touchpoints
+The provider thread reference is opaque outside the provider runtime.
 
-Expected high-change areas:
+## Renderer and IPC Rewrite
 
-- [`apps/desktop/src/main/ipc/claude.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/main/ipc/claude.ts)
-- [`apps/desktop/src/main/ipc/chat-driver.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/main/ipc/chat-driver.ts)
-- [`apps/desktop/src/main/ipc/chat-turn.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/main/ipc/chat-turn.ts)
-- [`apps/desktop/src/preload/index.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/preload/index.ts)
-- [`apps/desktop/src/preload/index.d.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/preload/index.d.ts)
-- [`apps/desktop/src/renderer/src/chat/useClaude.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/renderer/src/chat/useClaude.ts)
-- [`apps/desktop/src/renderer/src/chat/useClaudeSchemaChat.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/renderer/src/chat/useClaudeSchemaChat.ts)
-- [`apps/desktop/src/renderer/src/chat/useChatThreads.ts`](/Users/davehudson/Apps/Contexture/apps/desktop/src/renderer/src/chat/useChatThreads.ts)
-- [`apps/desktop/src/renderer/src/components/chat/ChatPanel.tsx`](/Users/davehudson/Apps/Contexture/apps/desktop/src/renderer/src/components/chat/ChatPanel.tsx)
-- [`packages/core/src/op-tools.ts`](/Users/davehudson/Apps/Contexture/packages/core/src/op-tools.ts)
+Replace Claude-named renderer and IPC surfaces rather than gradually renaming them for compatibility.
+
+Target names:
+
+- `registerSchemaAgentIpc`
+- `useSchemaAgentChat`
+- `useProviderSettings`
+- `useSchemaAgentThreads`
+- `SchemaAgentPanel`
+
+IPC should be provider-neutral:
+
+- `schema-agent:send`
+- `schema-agent:abort`
+- `schema-agent:set-ir`
+- `schema-agent:set-provider`
+- `schema-agent:set-model-options`
+- `schema-agent:get-status`
+- `schema-agent:list-models`
+- `schema-agent:start-login`
+- `schema-agent:cancel-login`
+- `schema-agent:logout`
+- `schema-agent:tool-reply`
+- `schema-agent:thread-set`
+- `schema-agent:thread-clear`
+
+Renderer event channels should likewise be provider-neutral:
+
+- `schema-agent:assistant-delta`
+- `schema-agent:assistant-final`
+- `schema-agent:tool-call-started`
+- `schema-agent:tool-call-finished`
+- `schema-agent:error`
+- `schema-agent:auth-required`
+- `schema-agent:status-changed`
+- `schema-agent:thread-updated`
+- `schema-agent:tool-request`
+- `turn:begin`
+- `turn:commit`
+- `turn:rollback`
+
+The old `claude:*` channels can be removed as part of the rewrite.
+
+## Claude Runtime
+
+Claude support is optional after Codex is stable.
+
+If restored, it should be implemented as `ClaudeProviderRuntime` behind the same provider contract. It should not force the shared contract to preserve Agent SDK-specific concepts such as Claude session ids, Claude-specific error classes, or Claude-specific model settings.
+
+Claude-specific limitations should be exposed through capabilities.
+
+If Claude cannot support provider-side conversation rollback, its runtime must either:
+
+- restart the Claude session after rollback and treat the current IR as authoritative, or
+- mark the thread desynced and require a fresh thread
+
+## Reconcile and Eval
+
+Codex support for reconcile/eval is out of scope for the first milestone.
+
+Options:
+
+- temporarily disable these features when Codex is active
+- keep the old Claude implementation locally while clearly marking it secondary
+- rebuild them after schema chat works end to end
+
+Do not block Codex schema chat on reconcile/eval parity.
+
+## Suggested Implementation Order
+
+1. Pin a supported Codex CLI version.
+2. Generate or vendor Codex app-server protocol types for that version.
+3. Run the Codex app-server spike: initialize, auth read, model list, thread start, turn start, one tool call, interrupt, rollback.
+4. Add provider-neutral main-side runtime interfaces and canonical events.
+5. Implement `CodexProviderRuntime`.
+6. Replace Claude-shaped IPC with `schema-agent:*` IPC.
+7. Replace `useClaude*` renderer hooks with schema-agent/provider hooks.
+8. Replace chat thread persistence with provider-aware records.
+9. Wire Codex auth/readiness/model UI.
+10. Generate the full Codex tool surface from `createOpTools()`.
+11. Connect Codex tool calls to the existing renderer op bridge.
+12. Preserve `ChatTurnController` turn atomicity and add provider rollback on failure/interrupt.
+13. Add containment tests for forbidden shell/filesystem behavior.
+14. Make Codex the default provider.
+15. Remove obsolete Claude localStorage keys/channels/tests that no longer apply.
+16. Reintroduce Claude as a secondary runtime only after Codex is stable.
+
+## File Touchpoints
+
+Expected high-change or replacement areas:
+
+- [`apps/desktop/src/main/ipc/claude.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/main/ipc/claude.ts)
+- [`apps/desktop/src/main/ipc/chat-driver.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/main/ipc/chat-driver.ts)
+- [`apps/desktop/src/main/ipc/chat-turn.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/main/ipc/chat-turn.ts)
+- [`apps/desktop/src/main/ipc/claude-bridge.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/main/ipc/claude-bridge.ts)
+- [`apps/desktop/src/main/ipc/op-tool-bridge.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/main/ipc/op-tool-bridge.ts)
+- [`apps/desktop/src/preload/index.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/preload/index.ts)
+- [`apps/desktop/src/preload/index.d.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/preload/index.d.ts)
+- [`apps/desktop/src/renderer/src/chat/useClaude.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/renderer/src/chat/useClaude.ts)
+- [`apps/desktop/src/renderer/src/chat/useClaudeSchemaChat.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/renderer/src/chat/useClaudeSchemaChat.ts)
+- [`apps/desktop/src/renderer/src/chat/useChatThreads.ts`](/Users/rufus/Apps/contexture/apps/desktop/src/renderer/src/chat/useChatThreads.ts)
+- [`apps/desktop/src/renderer/src/components/chat/ChatPanel.tsx`](/Users/rufus/Apps/contexture/apps/desktop/src/renderer/src/components/chat/ChatPanel.tsx)
+- [`packages/core/src/op-tools.ts`](/Users/rufus/Apps/contexture/packages/core/src/op-tools.ts)
 
 Expected new modules:
 
-- provider-neutral runtime interfaces
-- `ClaudeProviderRuntime`
+- provider runtime interfaces
+- provider runtime event types
+- provider capabilities
 - `CodexProviderRuntime`
-- Codex app-server transport/service
-- Codex protocol/version support modules
+- Codex app-server transport
+- Codex app-server protocol generated types
+- Codex auth/status service
+- Codex dynamic-tool adapter
+- schema-agent IPC registration
+- schema-agent renderer hooks
 
-## Testing strategy
+## Testing Strategy
 
-Focus first on the shared provider boundary rather than reproducing the full Claude test matrix for Codex immediately.
+Focus tests around the new provider boundary and Contexture invariants.
 
 Must-cover behaviors:
 
-- normalized event mapping
+- Codex CLI missing/outdated status
+- app-server initialize failure
 - auth state update flow
-- thread/session update flow
+- ChatGPT login flow event handling
+- model list normalization
+- thread start/resume
+- assistant delta/final mapping
+- dynamic tool call mapping
+- op result mapping
 - turn commit
 - turn rollback
+- provider-side thread rollback
 - interrupt behavior
-- tool call dispatch and result mapping
-- degraded unavailable state on missing/outdated Codex CLI
+- desynced-thread handling
+- forbidden shell/filesystem behavior
+- renderer transaction binding
+- provider-aware thread persistence
 
-Provider-specific tests should stay thinner under the shared contract.
+Use fake provider runtimes for shared contract tests. Keep Codex protocol translation tests adapter-specific.
 
-## Definition of done for first Codex milestone
+## Definition of Done for First Codex Milestone
 
 Codex is considered integrated when the desktop app can:
 
 - detect supported Codex CLI presence and version
-- show Codex auth/readiness in the unified popover
-- authenticate via ChatGPT or API key
-- start a schema chat turn
+- show Codex auth/readiness in the provider popover
+- authenticate via ChatGPT managed auth or API key
+- list/select Codex models
+- start a schema-agent chat turn
 - stream assistant text into the transcript
-- call Contexture op tools through dynamic tools
-- update the graph incrementally
+- call Contexture op tools through the shared op registry
+- update the graph incrementally as ops arrive
+- commit a completed turn as one undo entry
+- roll back renderer ops on interrupt/failure
+- roll back Codex provider conversation state on interrupt/failure
 - resume provider-scoped threads
-- roll back the whole turn on interrupt or failure
+- mark or recover from desynced provider threads
+- prevent schema chat from using shell/filesystem/repo mutation tools
 
 Everything else is out of scope for the first milestone.
 
-## Risks and watchpoints
+## Risks and Watchpoints
 
-### Protocol drift
+### Dynamic Tool Stability
 
-Codex CLI releases move quickly. The app-server protocol should be treated as versioned and pinned.
+If Codex dynamic tools require experimental app-server APIs or have protocol drift, validate them before wiring the full op catalog.
 
-### Strict request encoding
+### Provider/UI Desync
 
-The local probe already showed strict union decoding in app-server request payloads. Hand-rolled request bodies are likely to fail in subtle ways.
+Renderer rollback without provider rollback can corrupt the assistant's understanding of the schema. Treat provider rollback as part of the turn transaction.
 
-### Auth complexity
+### Hidden Approval Stalls
 
-Codex readiness is not just "binary exists." It depends on CLI version plus provider auth/account state from the runtime.
+If app-server can request approvals that the client cannot see or resolve, schema chat may hang. The constrained schema-agent profile should avoid approval-requiring built-ins entirely.
 
-### Refactor size
+### Protocol Drift
 
-The current chat stack is deeply Claude-shaped. The rename/extraction pass is real work and should not be minimized in planning.
+Codex CLI releases move quickly. Pin a supported version, generate protocol types from that version, and hard-fail unsupported versions.
 
-## Immediate next step
+### Auth Complexity
 
-Start with the provider-neutral rename and boundary extraction, then adapt Claude behind it before introducing any Codex runtime behavior.
+Codex readiness depends on CLI version, app-server availability, active account mode, token freshness, and rate limits. Avoid reducing this to a single configured/unconfigured boolean.
+
+### Over-Borrowing from T3Code
+
+T3Code is a good provider architecture reference, but Contexture should not import its whole coding-agent orchestration model into schema chat.
+
+## Immediate Next Step
+
+Run the Codex app-server spike against a pinned CLI version, then build the provider-neutral schema-agent contract around the successful Codex path.
