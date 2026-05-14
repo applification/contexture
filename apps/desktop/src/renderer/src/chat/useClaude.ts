@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AuthMode = 'max' | 'api-key';
 export type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
-export type ThinkingBudget = 'auto' | 'low' | 'med' | 'high';
+export type ThinkingBudget = 'auto' | 'low' | 'med' | 'high' | 'xhigh';
 
 interface UseClaudeReturn {
   authMode: AuthMode;

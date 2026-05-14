@@ -25,6 +25,7 @@ export interface ChatHistory {
   providerThreadRef?: unknown;
   model?: string;
   effort?: string;
+  modelOptions?: Record<string, string | boolean>;
   /**
    * Agent SDK session id for this chat. Present after the first turn;
    * restored on app reopen so follow-up turns pass `resume: sessionId`
@@ -85,6 +86,7 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
       : undefined;
   const model = typeof obj.model === 'string' ? obj.model : undefined;
   const effort = typeof obj.effort === 'string' ? obj.effort : undefined;
+  const modelOptions = sanitiseModelOptions(obj.modelOptions);
   const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId : undefined;
   return {
     history: {
@@ -94,6 +96,7 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
       ...(providerThreadRef ? { providerThreadRef } : {}),
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
+      ...(modelOptions ? { modelOptions } : {}),
       ...(sessionId ? { sessionId } : {}),
     },
     warnings: [],
@@ -106,6 +109,15 @@ export function saveChatHistory(history: ChatHistory): string {
 
 function defaults(): ChatHistory {
   return { version: CHAT_HISTORY_VERSION, messages: [] };
+}
+
+function sanitiseModelOptions(input: unknown): Record<string, string | boolean> | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const entries = Object.entries(input as Record<string, unknown>).filter(
+    (entry): entry is [string, string | boolean] =>
+      typeof entry[1] === 'string' || typeof entry[1] === 'boolean',
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function sanitiseMessages(input: unknown): ChatMessage[] {

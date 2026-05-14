@@ -22,6 +22,7 @@ export type ProviderReadiness =
   | 'cli_outdated'
   | 'app_server_unavailable'
   | 'not_signed_in'
+  | 'authenticated_cli'
   | 'authenticated_chatgpt'
   | 'authenticated_api_key'
   | 'rate_limited'
@@ -39,7 +40,27 @@ export interface ModelInfo {
   id: string;
   label: string;
   supportsReasoningEffort?: boolean;
+  optionDescriptors?: ModelOptionDescriptor[];
 }
+
+export type ModelOptionValue = string | boolean;
+export type ModelOptions = Record<string, ModelOptionValue>;
+
+export type ModelOptionDescriptor =
+  | {
+      id: string;
+      type: 'select';
+      label: string;
+      options: Array<{ id: string; label: string; isDefault?: boolean }>;
+      currentValue?: string;
+    }
+  | {
+      id: string;
+      type: 'boolean';
+      label: string;
+      defaultValue?: boolean;
+      currentValue?: boolean;
+    };
 
 export interface ProviderThreadRef {
   provider: ProviderKind;
@@ -50,6 +71,7 @@ export interface ProviderThreadRef {
 export interface StartThreadInput {
   model?: string;
   effort?: string;
+  options?: ModelOptions;
   schema: Schema;
 }
 
@@ -59,12 +81,14 @@ export interface SendTurnInput {
   schema: Schema;
   model?: string;
   effort?: string;
+  options?: ModelOptions;
 }
 
 export interface ResumeThreadInput {
   thread: ProviderThreadRef;
   model?: string;
   effort?: string;
+  options?: ModelOptions;
 }
 
 export interface InterruptTurnInput {
@@ -77,7 +101,7 @@ export interface RollbackThreadInput {
 }
 
 export interface StartLoginInput {
-  mode: Extract<ProviderAuthMode, 'chatgpt' | 'api-key'>;
+  mode: Extract<ProviderAuthMode, 'chatgpt' | 'api-key' | 'cli-session'>;
   apiKey?: string;
 }
 

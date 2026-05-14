@@ -2,8 +2,14 @@ import type { Schema } from '@renderer/model/ir';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { createOpTools } from '../ops';
+import { ClaudeProviderRuntime } from '../providers/claude/runtime';
 import { CodexProviderRuntime } from '../providers/codex/runtime';
-import type { ProviderRuntime, ProviderThreadRef } from '../providers/runtime';
+import type {
+  ModelOptions,
+  ProviderKind,
+  ProviderRuntime,
+  ProviderThreadRef,
+} from '../providers/runtime';
 import {
   SCHEMA_AGENT_ASSISTANT_DELTA,
   SCHEMA_AGENT_ASSISTANT_FINAL,
@@ -37,10 +43,21 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
 
   const forwardOp = makeIpcForwardOp(toolTransport);
   const opToolDescriptors = createOpTools(forwardOp);
-  const runtime = new CodexProviderRuntime({ opToolDescriptors });
+  const runtimes: Record<ProviderKind, ProviderRuntime> = {
+    codex: new CodexProviderRuntime({ opToolDescriptors }),
+    claude: new ClaudeProviderRuntime({ opToolDescriptors }),
+  };
+  let currentProvider: ProviderKind = 'codex';
+  const activeRuntime = (): ProviderRuntime => runtimes[currentProvider];
+  const runtimeForProvider = (provider: unknown): ProviderRuntime | null => {
+    if (provider !== 'codex' && provider !== 'claude') return null;
+    return runtimes[provider];
+  };
   const turnContext = new TurnContext();
-  let currentThread: ProviderThreadRef | undefined;
-  let currentModelOptions: { model?: string; effort?: string } = {};
+  const currentThreads: Partial<Record<ProviderKind, ProviderThreadRef>> = {};
+  const currentModelOptions: Partial<
+    Record<ProviderKind, { model?: string; effort?: string; options?: ModelOptions }>
+  > = {};
   const desyncedThreads = new Set<string>();
 
   const turnController = new ChatTurnController({
@@ -48,20 +65,20 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
   });
 
   const driver = new SchemaAgentDriver({
-    runtime,
+    getRuntime: activeRuntime,
     turnController,
     transport: {
       send: (channel, payload) => mainWindow.webContents.send(channel, payload),
     },
     getCurrentIR: () => turnContext.current(),
-    getThreadRef: () => currentThread,
+    getThreadRef: () => currentThreads[currentProvider],
     setThreadRef: (thread) => {
-      currentThread = thread;
+      currentThreads[currentProvider] = thread;
     },
     markThreadDesynced: (thread) => {
-      desyncedThreads.add(thread.threadId);
+      desyncedThreads.add(threadKey(thread));
     },
-    getModelOptions: () => currentModelOptions,
+    getModelOptions: () => currentModelOptions[currentProvider] ?? {},
   });
 
   ipcMain.on('schema-agent:set-ir', (_evt, ir: Schema) => {
@@ -79,9 +96,10 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
   });
 
   ipcMain.handle('schema-agent:abort', async () => {
+    const currentThread = currentThreads[currentProvider];
     if (!currentThread) return { ok: false, error: 'no active schema-agent thread' };
     try {
-      await runtime.interruptTurn({ thread: currentThread });
+      await activeRuntime().interruptTurn({ thread: currentThread });
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -89,64 +107,74 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     }
   });
 
-  ipcMain.handle('schema-agent:get-status', () => runtime.getStatus());
-  ipcMain.handle('schema-agent:list-models', () => runtime.listModels());
+  ipcMain.handle('schema-agent:get-status', () => activeRuntime().getStatus());
+  ipcMain.handle('schema-agent:list-models', (_evt, provider?: unknown) => {
+    const runtime = provider ? runtimeForProvider(provider) : activeRuntime();
+    if (!runtime) return [];
+    return runtime.listModels();
+  });
   ipcMain.handle('schema-agent:set-provider', (_evt, provider: unknown) => {
-    if (provider !== 'codex') {
-      return { ok: false, error: 'Only the Codex schema-agent provider is available' };
+    if (provider !== 'codex' && provider !== 'claude') {
+      return { ok: false, error: 'Unsupported schema-agent provider' };
     }
-    currentThread = undefined;
+    currentProvider = provider;
     return { ok: true };
   });
   ipcMain.handle(
     'schema-agent:set-model-options',
-    (_evt, options: { model?: string; effort?: string }) => {
-      currentModelOptions = {
+    (_evt, options: { model?: string; effort?: string; options?: ModelOptions }) => {
+      currentModelOptions[currentProvider] = {
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
+        ...(options.options ? { options: options.options } : {}),
       };
       return { ok: true };
     },
   );
   ipcMain.handle(
     'schema-agent:start-login',
-    (_evt, input: { mode: 'chatgpt' | 'api-key'; apiKey?: string }) => runtime.startLogin(input),
+    (_evt, input: { mode: 'chatgpt' | 'api-key' | 'cli-session'; apiKey?: string }) =>
+      activeRuntime().startLogin(input),
   );
   ipcMain.handle('schema-agent:cancel-login', (_evt, input: { flowId: string }) =>
-    runtime.cancelLogin(input),
+    activeRuntime().cancelLogin(input),
   );
-  ipcMain.handle('schema-agent:logout', () => runtime.logout());
+  ipcMain.handle('schema-agent:logout', () => activeRuntime().logout());
   ipcMain.handle('schema-agent:thread-clear', () => {
-    currentThread = undefined;
+    currentThreads[currentProvider] = undefined;
     return { ok: true };
   });
   ipcMain.handle('schema-agent:thread-set', async (_evt, thread: ProviderThreadRef) => {
-    if (desyncedThreads.has(thread.threadId)) {
+    const runtime = runtimes[thread.provider] ?? activeRuntime();
+    currentProvider = runtime.provider;
+    if (desyncedThreads.has(threadKey(thread))) {
       mainWindow.webContents.send(SCHEMA_AGENT_THREAD_DESYNCED, {
         thread,
         reason: 'thread was previously marked desynced',
       });
-      currentThread = undefined;
+      currentThreads[currentProvider] = undefined;
       return { ok: false, error: 'thread was previously marked desynced' };
     }
 
     try {
-      currentThread = runtime.capabilities.supportsThreadResume
-        ? await runtime.resumeThread({ thread, ...currentModelOptions })
+      currentThreads[currentProvider] = runtime.capabilities.supportsThreadResume
+        ? await runtime.resumeThread({ thread, ...(currentModelOptions[currentProvider] ?? {}) })
         : thread;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      desyncedThreads.add(thread.threadId);
-      currentThread = undefined;
+      desyncedThreads.add(threadKey(thread));
+      currentThreads[currentProvider] = undefined;
       mainWindow.webContents.send(SCHEMA_AGENT_THREAD_DESYNCED, { thread, reason });
       return { ok: false, error: reason };
     }
 
-    mainWindow.webContents.send(SCHEMA_AGENT_THREAD_UPDATED, { thread: currentThread });
+    mainWindow.webContents.send(SCHEMA_AGENT_THREAD_UPDATED, {
+      thread: currentThreads[currentProvider],
+    });
     return { ok: true };
   });
 
-  void runtime
+  void activeRuntime()
     .getStatus()
     .then((status) => {
       mainWindow.webContents.send(SCHEMA_AGENT_STATUS_CHANGED, status);
@@ -156,7 +184,11 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
       mainWindow.webContents.send(SCHEMA_AGENT_ERROR, { message });
     });
 
-  return { runtime, driver, turnContext };
+  return { runtime: activeRuntime(), driver, turnContext };
+}
+
+function threadKey(thread: ProviderThreadRef): string {
+  return `${thread.provider}:${thread.threadId}`;
 }
 
 export const SCHEMA_AGENT_CHANNELS = {

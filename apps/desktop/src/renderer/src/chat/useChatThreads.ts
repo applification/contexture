@@ -28,6 +28,7 @@ export interface ChatThread {
   messages: ChatMessage[];
   model?: string;
   effort?: string;
+  modelOptions?: Record<string, string | boolean>;
   filePath: string | null;
   providerThreadRef?: unknown;
   /** Agent SDK session id — set after the first turn. Undefined on a fresh thread. */
@@ -90,6 +91,7 @@ export interface UseChatThreadsReturn {
     provider: ProviderKind;
     model?: string;
     effort?: string;
+    modelOptions?: Record<string, string | boolean>;
     filePath: string | null;
   }) => string;
   /** All threads for a given file, newest-first. */
@@ -98,6 +100,15 @@ export interface UseChatThreadsReturn {
   switchThread: (id: string) => ChatThread | undefined;
   deleteThread: (id: string) => void;
   updateThreadMessages: (id: string, messages: ChatMessage[]) => void;
+  updateThreadSettings: (
+    id: string,
+    settings: {
+      provider: ProviderKind;
+      model?: string;
+      effort?: string;
+      modelOptions?: Record<string, string | boolean>;
+    },
+  ) => void;
   updateThreadSessionId: (id: string, sessionId: string) => void;
   updateThreadProviderRef: (id: string, providerThreadRef: unknown) => void;
   markThreadDesynced: (id: string) => void;
@@ -127,6 +138,7 @@ export function useChatThreads(): UseChatThreadsReturn {
       provider: ProviderKind;
       model?: string;
       effort?: string;
+      modelOptions?: Record<string, string | boolean>;
       filePath: string | null;
     }): string => {
       const id = generateId();
@@ -137,6 +149,7 @@ export function useChatThreads(): UseChatThreadsReturn {
         messages: [],
         model: input.model,
         effort: input.effort,
+        modelOptions: input.modelOptions,
         filePath: input.filePath,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -183,6 +196,34 @@ export function useChatThreads(): UseChatThreadsReturn {
       }),
     );
   }, []);
+
+  const updateThreadSettings = useCallback(
+    (
+      id: string,
+      settings: {
+        provider: ProviderKind;
+        model?: string;
+        effort?: string;
+        modelOptions?: Record<string, string | boolean>;
+      },
+    ) => {
+      setThreads((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          if (
+            t.provider === settings.provider &&
+            t.model === settings.model &&
+            t.effort === settings.effort &&
+            modelOptionsEqual(t.modelOptions, settings.modelOptions)
+          ) {
+            return t;
+          }
+          return { ...t, ...settings, updatedAt: Date.now() };
+        }),
+      );
+    },
+    [],
+  );
 
   const updateThreadSessionId = useCallback((id: string, sessionId: string) => {
     setThreads((prev) =>
@@ -233,6 +274,7 @@ export function useChatThreads(): UseChatThreadsReturn {
     switchThread,
     deleteThread,
     updateThreadMessages,
+    updateThreadSettings,
     updateThreadSessionId,
     updateThreadProviderRef,
     markThreadDesynced,
@@ -240,4 +282,15 @@ export function useChatThreads(): UseChatThreadsReturn {
     setActiveThreadId,
     threadsForFile,
   };
+}
+
+function modelOptionsEqual(
+  left: Record<string, string | boolean> | undefined,
+  right: Record<string, string | boolean> | undefined,
+): boolean {
+  if (left === right) return true;
+  const leftEntries = Object.entries(left ?? {});
+  const rightEntries = Object.entries(right ?? {});
+  if (leftEntries.length !== rightEntries.length) return false;
+  return leftEntries.every(([key, value]) => right?.[key] === value);
 }

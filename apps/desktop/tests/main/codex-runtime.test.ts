@@ -339,7 +339,7 @@ describe('CodexProviderRuntime', () => {
             {
               id: 'gpt-5.4-id',
               model: 'gpt-5.4',
-              displayName: 'GPT-5.4',
+              displayName: 'gpt-5.4',
               supportedReasoningEfforts: [{ reasoningEffort: 'high', description: 'High' }],
               upgrade: null,
               upgradeInfo: null,
@@ -366,7 +366,25 @@ describe('CodexProviderRuntime', () => {
     });
 
     await expect(runtime.listModels()).resolves.toEqual([
-      { id: 'gpt-5.4', label: 'GPT-5.4', supportsReasoningEffort: true },
+      {
+        id: 'gpt-5.4',
+        label: 'GPT-5.4',
+        supportsReasoningEffort: true,
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            type: 'select',
+            label: 'Effort',
+            options: [{ id: 'high', label: 'High', isDefault: true }],
+          },
+          {
+            id: 'fastMode',
+            type: 'boolean',
+            label: 'Fast',
+            defaultValue: false,
+          },
+        ],
+      },
     ]);
     expect(appServerFactory).toHaveBeenCalledWith('/opt/bin/codex');
     expect(request).toHaveBeenNthCalledWith(1, 'initialize', {
@@ -848,6 +866,7 @@ describe('CodexProviderRuntime', () => {
       },
       sandboxPolicy: { type: 'readOnly', networkAccess: false },
       model: null,
+      serviceTier: null,
       effort: null,
     });
   });

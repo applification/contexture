@@ -45,7 +45,7 @@ const chat = {
   /** Update the model + thinking-effort used by the next SDK query. */
   setModelOptions: (opts: {
     model?: string;
-    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high' | 'xhigh';
   }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('claude:set-model-options', opts) as Promise<{ ok: boolean }>,
   /** Interrupt the in-flight query (stop button). */
@@ -94,15 +94,20 @@ const schemaAgent = {
   abort: (): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('schema-agent:abort') as Promise<{ ok: boolean; error?: string }>,
   getStatus: () => ipcRenderer.invoke('schema-agent:get-status'),
-  listModels: () => ipcRenderer.invoke('schema-agent:list-models'),
+  listModels: (provider?: 'codex' | 'claude') =>
+    ipcRenderer.invoke('schema-agent:list-models', provider),
   setProvider: (provider: 'codex' | 'claude'): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('schema-agent:set-provider', provider) as Promise<{
       ok: boolean;
       error?: string;
     }>,
-  setModelOptions: (options: { model?: string; effort?: string }): Promise<{ ok: boolean }> =>
+  setModelOptions: (options: {
+    model?: string;
+    effort?: string;
+    options?: Record<string, string | boolean>;
+  }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('schema-agent:set-model-options', options) as Promise<{ ok: boolean }>,
-  startLogin: (input: { mode: 'chatgpt' | 'api-key'; apiKey?: string }) =>
+  startLogin: (input: { mode: 'chatgpt' | 'api-key' | 'cli-session'; apiKey?: string }) =>
     ipcRenderer.invoke('schema-agent:start-login', input),
   cancelLogin: (input: { flowId: string }): Promise<void> =>
     ipcRenderer.invoke('schema-agent:cancel-login', input) as Promise<void>,

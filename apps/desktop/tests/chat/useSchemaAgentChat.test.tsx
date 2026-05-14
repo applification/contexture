@@ -1,6 +1,6 @@
 import { useSchemaAgentChat } from '@renderer/chat/useSchemaAgentChat';
 import { useUndoStore } from '@renderer/store/undo';
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContextureSchemaAgentAPI } from '../../src/preload/index.d';
 
@@ -29,7 +29,24 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
     setIR,
     abort: vi.fn(async () => ({ ok: true })),
     getStatus: vi.fn(async () => status),
-    listModels: vi.fn(async () => []),
+    listModels: vi.fn(async () => [
+      {
+        id: 'gpt-5.4',
+        label: 'GPT-5.4',
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            type: 'select',
+            label: 'Reasoning',
+            options: [
+              { id: 'low', label: 'Low' },
+              { id: 'medium', label: 'Medium' },
+              { id: 'high', label: 'High', isDefault: true },
+            ],
+          },
+        ],
+      },
+    ]),
     setProvider: vi.fn(async () => ({ ok: true })),
     setModelOptions: vi.fn(async () => ({ ok: true })),
     startLogin: vi.fn(async () => ({ id: 'login-1', mode: 'chatgpt' })),
@@ -143,6 +160,7 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
 
 describe('useSchemaAgentChat', () => {
   beforeEach(() => {
+    localStorage.clear();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
   afterEach(cleanup);
@@ -250,6 +268,310 @@ describe('useSchemaAgentChat', () => {
 
     expect(result.current.isReady).toBe(false);
     expect(result.current.unavailableMessage).toBe('Codex CLI not detected.');
+  });
+
+  it('normalizes stored effort values for the selected provider', async () => {
+    localStorage.setItem('contexture-schema-agent-codex-effort', 'med');
+    const { api } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await act(async () => undefined);
+
+    expect(result.current.effort).toBe('medium');
+
+    act(() => {
+      result.current.setEffort('auto');
+    });
+
+    expect(result.current.effort).toBe('high');
+    expect(localStorage.getItem('contexture-schema-agent-codex-effort')).toBe('high');
+  });
+
+  it('switches schema-agent providers through the shared API', async () => {
+    const { api } = makeApi({ provider: 'claude', readiness: 'authenticated_cli' });
+    vi.mocked(api.listModels).mockResolvedValue([
+      { id: 'claude-sonnet-4-6', label: 'Sonnet', supportsReasoningEffort: true },
+    ]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await act(async () => undefined);
+    await act(async () => {
+      result.current.setProvider('claude');
+    });
+    await act(async () => undefined);
+
+    expect(result.current.provider).toBe('claude');
+    expect(result.current.providerLabel).toBe('Claude');
+    expect(result.current.isReady).toBe(true);
+    expect(api.setProvider).toHaveBeenCalledWith('claude');
+  });
+
+  it('selects the provider before loading that provider model list', async () => {
+    const { api } = makeApi();
+    const calls: string[] = [];
+    let providerReady = false;
+    vi.mocked(api.setProvider).mockImplementation(async (provider) => {
+      calls.push(`set:${provider}`);
+      await Promise.resolve();
+      providerReady = true;
+      return { ok: true };
+    });
+    vi.mocked(api.listModels).mockImplementation(async () => {
+      calls.push('list');
+      if (!providerReady) return [];
+      return [{ id: 'gpt-5.4', label: 'GPT-5.4', supportsReasoningEffort: true }];
+    });
+
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.models).toEqual([
+        { id: 'gpt-5.4', label: 'GPT-5.4', supportsReasoningEffort: true },
+      ]);
+    });
+    expect(api.listModels).toHaveBeenCalledWith('codex');
+    expect(calls).toContain('list');
+  });
+
+  it('loads models for the selected provider instead of the globally active runtime', async () => {
+    const { api } = makeApi({ provider: 'claude', readiness: 'authenticated_cli' });
+    vi.mocked(api.listModels).mockImplementation(async (provider) => {
+      if (provider !== 'claude') return [];
+      return [{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' }];
+    });
+
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await act(async () => {
+      result.current.setProvider('claude');
+    });
+
+    await waitFor(() => {
+      expect(result.current.models).toEqual([
+        { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+      ]);
+    });
+    expect(api.listModels).toHaveBeenCalledWith('claude');
+  });
+
+  it('does not expose stale Codex models while persisted Claude models load', async () => {
+    localStorage.setItem('contexture-schema-agent-provider', 'claude');
+    localStorage.setItem('contexture-schema-agent-claude-model', 'gpt-5.4');
+    const { api } = makeApi({ provider: 'claude', readiness: 'authenticated_cli' });
+    vi.mocked(api.listModels).mockImplementation(async (provider) =>
+      provider === 'claude'
+        ? [{ id: 'claude-opus-4-7', label: 'Opus 4.7' }]
+        : [{ id: 'gpt-5.4', label: 'GPT-5.4' }],
+    );
+
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    expect(result.current.provider).toBe('claude');
+    expect(result.current.models).toEqual([]);
+    await waitFor(() => {
+      expect(result.current.models).toEqual([{ id: 'claude-opus-4-7', label: 'Opus 4.7' }]);
+    });
+    expect(result.current.model).toBe('claude-opus-4-7');
+  });
+
+  it('defaults to the selected provider model when no model is stored on boot', async () => {
+    localStorage.setItem('contexture-schema-agent-provider', 'claude');
+    const { api } = makeApi({ provider: 'claude', readiness: 'authenticated_cli' });
+    vi.mocked(api.listModels).mockResolvedValue([
+      { id: 'claude-sonnet-4-6', label: 'Sonnet' },
+      { id: 'claude-opus-4-7', label: 'Opus 4.7' },
+    ]);
+
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    expect(result.current.model).toBe('');
+    expect(result.current.modelsLoading).toBe(true);
+    await waitFor(() => {
+      expect(result.current.model).toBe('claude-sonnet-4-6');
+    });
+    expect(result.current.modelsUnavailable).toBe(false);
+    expect(localStorage.getItem('contexture-schema-agent-claude-model')).toBe('claude-sonnet-4-6');
+    expect(api.setModelOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'claude-sonnet-4-6' }),
+    );
+  });
+
+  it('restores provider, model, effort, and options atomically', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockImplementation(async (provider) =>
+      provider === 'claude'
+        ? [{ id: 'opus', label: 'Opus' }]
+        : [{ id: 'gpt-5.4', label: 'GPT-5.4' }],
+    );
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.provider).toBe('codex');
+    });
+
+    act(() => {
+      result.current.restoreSettings({
+        provider: 'claude',
+        model: 'opus',
+        effort: 'xhigh',
+        modelOptions: { reasoningEffort: 'xhigh', fastMode: true },
+      });
+    });
+
+    expect(result.current.provider).toBe('claude');
+    expect(result.current.model).toBe('opus');
+    expect(result.current.effort).toBe('xhigh');
+    expect(result.current.modelOptions).toEqual({ reasoningEffort: 'xhigh', fastMode: true });
+    expect(localStorage.getItem('contexture-schema-agent-claude-model')).toBe('opus');
+    expect(localStorage.getItem('contexture-schema-agent-claude-effort')).toBe('xhigh');
+    expect(api.setProvider).toHaveBeenCalledWith('claude');
+  });
+
+  it('keeps loaded models when restoring the already-selected provider', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+    ]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.modelsLoading).toBe(false);
+    });
+    expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
+
+    act(() => {
+      result.current.setProvider('codex');
+    });
+
+    expect(result.current.modelsLoading).toBe(false);
+    expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
+  });
+
+  it('surfaces an empty model state instead of pretending a model is selected', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.modelsUnavailable).toBe(true);
+    });
+    expect(result.current.model).toBe('');
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(api.send).not.toHaveBeenCalled();
+    expect(result.current.unavailableMessage).toBe(
+      'No model is available for the selected provider.',
+    );
+  });
+
+  it('persists and pushes generic model options', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([
+      {
+        id: 'gpt-5.5',
+        label: 'GPT-5.5',
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            type: 'select',
+            label: 'Reasoning',
+            options: [
+              { id: 'low', label: 'Low' },
+              { id: 'medium', label: 'Medium', isDefault: true },
+              { id: 'high', label: 'High' },
+              { id: 'xhigh', label: 'Extra High' },
+            ],
+          },
+          { id: 'fastMode', type: 'boolean', label: 'Fast', defaultValue: false },
+        ],
+      },
+    ]);
+
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.modelOptions).toEqual({
+        reasoningEffort: 'medium',
+        fastMode: false,
+      });
+    });
+
+    act(() => {
+      result.current.setModelOption('fastMode', true);
+    });
+
+    await waitFor(() => {
+      expect(api.setModelOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-5.5',
+          options: { reasoningEffort: 'medium', fastMode: true },
+        }),
+      );
+    });
+  });
+
+  it('pushes the displayed default model before the first send', async () => {
+    const { api, calls } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([
+      {
+        id: 'gpt-5.5',
+        label: 'GPT-5.5',
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            type: 'select',
+            label: 'Reasoning',
+            options: [
+              { id: 'low', label: 'Low' },
+              { id: 'medium', label: 'Medium', isDefault: true },
+              { id: 'high', label: 'High' },
+              { id: 'xhigh', label: 'Extra High' },
+            ],
+          },
+          { id: 'fastMode', type: 'boolean', label: 'Fast', defaultValue: false },
+        ],
+      },
+      {
+        id: 'gpt-5.4',
+        label: 'GPT-5.4',
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            type: 'select',
+            label: 'Reasoning',
+            options: [
+              { id: 'low', label: 'Low' },
+              { id: 'medium', label: 'Medium' },
+              { id: 'high', label: 'High', isDefault: true },
+              { id: 'xhigh', label: 'Extra High' },
+            ],
+          },
+        ],
+      },
+    ]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.5');
+    });
+    vi.mocked(api.setModelOptions).mockClear();
+
+    await act(async () => {
+      await result.current.send('hello');
+    });
+
+    expect(api.setModelOptions).toHaveBeenCalledWith({
+      model: 'gpt-5.5',
+      effort: 'medium',
+      options: { reasoningEffort: 'medium', fastMode: false },
+    });
+    expect(vi.mocked(api.setModelOptions).mock.invocationCallOrder.at(-1)).toBeLessThan(
+      calls.send.mock.invocationCallOrder[0],
+    );
   });
 
   it('tracks provider thread refs and desync state from schema-agent events', () => {

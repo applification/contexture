@@ -179,19 +179,17 @@ export default function App(): React.JSX.Element {
     getChat: () => ({
       version: '1',
       messages: chatMessagesRef.current,
-      provider: 'providerLabel' in chat ? 'codex' : 'claude',
+      provider: readProviderProp(chat),
       ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
       ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
+      ...(readModelOptionsProp(chat) ? { modelOptions: readModelOptionsProp(chat) } : {}),
       ...('providerThreadRef' in chat && chat.providerThreadRef
         ? { providerThreadRef: chat.providerThreadRef }
         : {}),
     }),
     onBundleLoaded: ({ layout, chat: loadedChat }) => {
       setPositions(layout.positions);
-      const modelSetter = (chat as { setModel?: unknown }).setModel;
-      if (loadedChat.model && typeof modelSetter === 'function') modelSetter(loadedChat.model);
-      const effortSetter = (chat as { setEffort?: unknown }).setEffort;
-      if (loadedChat.effort && typeof effortSetter === 'function') effortSetter(loadedChat.effort);
+      restoreChatSettings(chat, loadedChat);
       chatHydrateRef.current(loadedChat.messages);
       if (loadedChat.sessionId) {
         void window.contexture?.chat.setSessionId(loadedChat.sessionId);
@@ -233,9 +231,10 @@ export default function App(): React.JSX.Element {
     getChat: () => ({
       version: '1',
       messages: chatMessagesRef.current,
-      provider: 'providerLabel' in chat ? 'codex' : 'claude',
+      provider: readProviderProp(chat),
       ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
       ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
+      ...(readModelOptionsProp(chat) ? { modelOptions: readModelOptionsProp(chat) } : {}),
       ...('providerThreadRef' in chat && chat.providerThreadRef
         ? { providerThreadRef: chat.providerThreadRef }
         : {}),
@@ -395,7 +394,7 @@ export default function App(): React.JSX.Element {
                   onOpenRecent={fileMenu.handleOpenPath}
                   isNewProject={documentMode === 'project'}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
-                  providerLabel={schemaAgentAvailable ? 'Codex' : 'Claude'}
+                  providerLabel={schemaAgentAvailable ? readProviderLabelProp(chat) : 'Claude'}
                 />
               )}
             </div>
@@ -562,6 +561,57 @@ function readStringProp(value: unknown, key: string): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const prop = (value as Record<string, unknown>)[key];
   return typeof prop === 'string' && prop.length > 0 ? prop : undefined;
+}
+
+function readProviderProp(value: unknown): 'codex' | 'claude' {
+  if (!value || typeof value !== 'object') return 'claude';
+  const provider = (value as { provider?: unknown }).provider;
+  return provider === 'codex' || provider === 'claude' ? provider : 'claude';
+}
+
+function readModelOptionsProp(value: unknown): Record<string, string | boolean> | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const modelOptions = (value as { modelOptions?: unknown }).modelOptions;
+  if (!modelOptions || typeof modelOptions !== 'object' || Array.isArray(modelOptions)) {
+    return undefined;
+  }
+  const entries = Object.entries(modelOptions as Record<string, unknown>).filter(
+    (entry): entry is [string, string | boolean] =>
+      typeof entry[1] === 'string' || typeof entry[1] === 'boolean',
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function readProviderLabelProp(value: unknown): 'Codex' | 'Claude' {
+  if (!value || typeof value !== 'object') return 'Claude';
+  const providerLabel = (value as { providerLabel?: unknown }).providerLabel;
+  return providerLabel === 'Codex' || providerLabel === 'Claude' ? providerLabel : 'Claude';
+}
+
+function restoreChatSettings(
+  chat: unknown,
+  loadedChat: {
+    provider?: 'codex' | 'claude';
+    model?: string;
+    effort?: string;
+    modelOptions?: Record<string, string | boolean>;
+  },
+): void {
+  const restorer = (chat as { restoreSettings?: unknown }).restoreSettings;
+  if (typeof restorer === 'function') {
+    restorer({
+      provider: loadedChat.provider,
+      model: loadedChat.model,
+      effort: loadedChat.effort,
+      modelOptions: loadedChat.modelOptions,
+    });
+    return;
+  }
+
+  const modelSetter = (chat as { setModel?: unknown }).setModel;
+  if (loadedChat.model && typeof modelSetter === 'function') modelSetter(loadedChat.model);
+  const effortSetter = (chat as { setEffort?: unknown }).setEffort;
+  if (loadedChat.effort && typeof effortSetter === 'function') effortSetter(loadedChat.effort);
 }
 
 function noopChatApi() {

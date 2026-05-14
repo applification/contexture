@@ -81,6 +81,10 @@ export interface ModelListResponse {
     model?: string | null;
     displayName?: string | null;
     supportedReasoningEfforts: unknown[];
+    defaultReasoningEffort?: string | null;
+    serviceTiers?: Array<{ id: string; name: string; description: string }>;
+    additionalSpeedTiers?: string[];
+    isDefault?: boolean;
   }>;
   nextCursor: string | null;
 }
@@ -92,10 +96,16 @@ export interface CodexThread {
 
 export interface ThreadStartResponse {
   thread: CodexThread;
+  model?: string;
+  modelProvider?: string;
+  serviceTier?: string | null;
 }
 
 export interface ThreadResumeResponse {
   thread: CodexThread;
+  model?: string;
+  modelProvider?: string;
+  serviceTier?: string | null;
 }
 
 export interface Turn {

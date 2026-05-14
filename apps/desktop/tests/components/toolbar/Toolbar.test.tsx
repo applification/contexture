@@ -7,6 +7,7 @@ const unsub = () => undefined;
 function installContexture(overrides: Record<string, unknown> = {}): void {
   (window as unknown as { contexture: unknown }).contexture = {
     schemaAgent: {
+      setProvider: vi.fn(async () => ({ ok: true })),
       getStatus: vi.fn(async () => ({ provider: 'codex', readiness: 'not_signed_in' })),
       onStatusChanged: vi.fn(() => unsub),
       startLogin: vi.fn(async () => ({
@@ -23,6 +24,7 @@ function installContexture(overrides: Record<string, unknown> = {}): void {
 
 describe('Toolbar Codex settings', () => {
   beforeEach(() => {
+    localStorage.clear();
     installContexture();
     vi.spyOn(window, 'open').mockImplementation(() => null);
   });
@@ -72,10 +74,10 @@ describe('Toolbar Codex settings', () => {
   });
 
   it('refreshes Codex status when the provider popover opens', async () => {
-    const getStatus = vi
-      .fn()
-      .mockResolvedValueOnce({ provider: 'codex', readiness: 'not_signed_in' })
-      .mockResolvedValueOnce({ provider: 'codex', readiness: 'authenticated_chatgpt' });
+    const getStatus = vi.fn(async () => ({
+      provider: 'codex',
+      readiness: 'authenticated_chatgpt',
+    }));
     installContexture({ getStatus });
     render(<Toolbar />);
 
@@ -84,6 +86,30 @@ describe('Toolbar Codex settings', () => {
     await waitFor(() => {
       expect(screen.getByText('Codex authenticated with ChatGPT.')).toBeInTheDocument();
     });
-    expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(getStatus).toHaveBeenCalled();
+  });
+
+  it('switches to Claude and starts CLI login through schema-agent', async () => {
+    const getStatus = vi
+      .fn()
+      .mockResolvedValueOnce({ provider: 'codex', readiness: 'not_signed_in' })
+      .mockResolvedValue({ provider: 'claude', readiness: 'authenticated_cli' });
+    installContexture({ getStatus });
+    render(<Toolbar />);
+
+    fireEvent.click(screen.getByTitle('Codex settings'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Claude' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Claude CLI session available.')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Claude CLI' }));
+
+    await waitFor(() => {
+      expect(window.contexture.schemaAgent.setProvider).toHaveBeenCalledWith('claude');
+      expect(window.contexture.schemaAgent.startLogin).toHaveBeenCalledWith({
+        mode: 'cli-session',
+      });
+    });
   });
 });

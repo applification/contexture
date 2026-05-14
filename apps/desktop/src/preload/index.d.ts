@@ -49,7 +49,7 @@ export interface ContextureChatAPI {
   ) => Promise<{ ok: boolean; error?: string }>;
   setModelOptions: (opts: {
     model?: string;
-    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high' | 'xhigh';
   }) => Promise<{ ok: boolean }>;
   abort: () => Promise<{ ok: boolean; error?: string }>;
   onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
@@ -73,13 +73,17 @@ export interface ContextureSchemaAgentAPI {
   setIR: (ir: unknown) => void;
   abort: () => Promise<{ ok: boolean; error?: string }>;
   getStatus: () => Promise<unknown>;
-  listModels: () => Promise<unknown>;
+  listModels: (provider?: 'codex' | 'claude') => Promise<unknown>;
   setProvider: (provider: 'codex' | 'claude') => Promise<{ ok: boolean; error?: string }>;
-  setModelOptions: (options: { model?: string; effort?: string }) => Promise<{ ok: boolean }>;
+  setModelOptions: (options: {
+    model?: string;
+    effort?: string;
+    options?: Record<string, string | boolean>;
+  }) => Promise<{ ok: boolean }>;
   startLogin: (input: {
-    mode: 'chatgpt' | 'api-key';
+    mode: 'chatgpt' | 'api-key' | 'cli-session';
     apiKey?: string;
-  }) => Promise<{ id: string; mode: 'chatgpt' | 'api-key'; url?: string }>;
+  }) => Promise<{ id: string; mode: 'chatgpt' | 'api-key' | 'cli-session'; url?: string }>;
   cancelLogin: (input: { flowId: string }) => Promise<void>;
   logout: () => Promise<void>;
   threadSet: (thread: unknown) => Promise<{ ok: boolean }>;

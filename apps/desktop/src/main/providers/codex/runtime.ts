@@ -1,10 +1,12 @@
 import { tmpdir } from 'node:os';
 import type { OpToolDescriptor } from '../../ops';
+import { overlayModelOptions } from '../model-registry';
 import type {
   CancelLoginInput,
   InterruptTurnInput,
   LoginFlow,
   ModelInfo,
+  ModelOptionDescriptor,
   ProviderCapabilities,
   ProviderRuntime,
   ProviderRuntimeEvent,
@@ -139,11 +141,18 @@ export class CodexProviderRuntime implements ProviderRuntime {
         includeHidden: false,
       });
       for (const model of response.data) {
-        models.push({
-          id: model.model || model.id,
-          label: model.displayName || model.model || model.id,
-          supportsReasoningEffort: model.supportedReasoningEfforts.length > 0,
-        });
+        models.push(
+          overlayModelOptions('codex', {
+            id: model.model || model.id,
+            label: codexModelLabel(model.displayName || model.model || model.id),
+            supportsReasoningEffort: model.supportedReasoningEfforts.length > 0,
+            optionDescriptors: codexOptionDescriptors(
+              model.supportedReasoningEfforts,
+              model.defaultReasoningEffort,
+              model.serviceTiers,
+            ),
+          }),
+        );
       }
       cursor = response.nextCursor;
     } while (cursor);
@@ -155,6 +164,7 @@ export class CodexProviderRuntime implements ProviderRuntime {
     const connection = await this.#ensureConnection();
     const response = await connection.client.request<ThreadStartResponse>('thread/start', {
       model: input.model ?? null,
+      serviceTier: codexServiceTier(input.options),
       cwd: SCHEMA_AGENT_CODEX_CWD,
       approvalPolicy: SCHEMA_AGENT_APPROVAL_POLICY,
       sandbox: 'read-only',
@@ -180,6 +190,7 @@ export class CodexProviderRuntime implements ProviderRuntime {
     const response = await connection.client.request<ThreadResumeResponse>('thread/resume', {
       threadId: input.thread.threadId,
       model: input.model ?? null,
+      serviceTier: codexServiceTier(input.options),
       cwd: SCHEMA_AGENT_CODEX_CWD,
       approvalPolicy: SCHEMA_AGENT_APPROVAL_POLICY,
       sandbox: 'read-only',
@@ -259,7 +270,8 @@ export class CodexProviderRuntime implements ProviderRuntime {
         approvalPolicy: SCHEMA_AGENT_APPROVAL_POLICY,
         sandboxPolicy: { type: 'readOnly', networkAccess: false },
         model: input.model ?? null,
-        effort: input.effort ?? null,
+        serviceTier: codexServiceTier(input.options),
+        effort: readStringOption(input.options, 'reasoningEffort') ?? input.effort ?? null,
       });
       turnId = response.turn.id;
       writeCurrentTurnId(input.thread, turnId);
@@ -429,6 +441,67 @@ export class CodexProviderRuntime implements ProviderRuntime {
   }
 }
 
+const CODEX_REASONING_LABELS: Record<string, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra High',
+};
+
+function codexOptionDescriptors(
+  supportedReasoningEfforts: unknown[],
+  defaultReasoningEffort?: string | null,
+  serviceTiers: Array<{ id: string; name: string; description: string }> = [],
+): ModelOptionDescriptor[] {
+  const options = supportedReasoningEfforts
+    .map(readReasoningEffortOption)
+    .filter((option): option is { id: string; label: string } => option !== null);
+  const descriptors: ModelOptionDescriptor[] = [];
+
+  const defaultId =
+    typeof defaultReasoningEffort === 'string' &&
+    options.some((option) => option.id === defaultReasoningEffort)
+      ? defaultReasoningEffort
+      : options.some((option) => option.id === 'high')
+        ? 'high'
+        : options[0]?.id;
+
+  if (options.length > 0) {
+    descriptors.push({
+      id: 'reasoningEffort',
+      type: 'select',
+      label: 'Effort',
+      options: options.map((option) => ({
+        ...option,
+        ...(option.id === defaultId ? { isDefault: true } : {}),
+      })),
+    });
+  }
+
+  if (serviceTiers.some((tier) => tier.id === 'priority')) {
+    descriptors.push({ id: 'fastMode', type: 'boolean', label: 'Fast', defaultValue: false });
+  }
+
+  return descriptors;
+}
+
+function readReasoningEffortOption(value: unknown): { id: string; label: string } | null {
+  if (typeof value === 'string' && value.trim()) {
+    const id = value.trim();
+    return { id, label: CODEX_REASONING_LABELS[id] ?? id };
+  }
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const rawId = record.reasoningEffort ?? record.id ?? record.value;
+  if (typeof rawId !== 'string' || !rawId.trim()) return null;
+  const id = rawId.trim();
+  return { id, label: CODEX_REASONING_LABELS[id] ?? id };
+}
+
+function codexModelLabel(label: string): string {
+  return label.replace(/^gpt-/i, 'GPT-');
+}
+
 function buildSchemaOnlyInstructions(): string {
   return [
     'You are Contexture schema chat.',
@@ -593,6 +666,18 @@ function readServerRequestTurnId(request: ServerRequest): string | null {
   if (!params || typeof params !== 'object') return null;
   const turnId = (params as { turnId?: unknown }).turnId;
   return typeof turnId === 'string' ? turnId : null;
+}
+
+function readStringOption(
+  options: Record<string, string | boolean> | undefined,
+  key: string,
+): string | null {
+  const value = options?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function codexServiceTier(options: Record<string, string | boolean> | undefined): string | null {
+  return options?.fastMode === true ? 'priority' : null;
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {

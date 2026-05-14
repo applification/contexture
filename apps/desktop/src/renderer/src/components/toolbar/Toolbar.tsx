@@ -9,6 +9,10 @@
  */
 
 import { useClaude } from '@renderer/chat/useClaude';
+import {
+  SCHEMA_AGENT_PROVIDER_CHANGED,
+  type SchemaAgentProvider,
+} from '@renderer/chat/useSchemaAgentChat';
 import { useDocumentStore } from '@renderer/store/document';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { Bot, ChevronDown, Code, Moon, PanelRight, Sun } from 'lucide-react';
@@ -27,9 +31,14 @@ export function Toolbar(): React.JSX.Element {
   const toggleSidebar = useUIChromeStore((s) => s.toggleSidebar);
   const { authMode, setAuthMode, apiKey, setApiKey, cliDetected, isReady } = useClaude();
   const schemaAgentAvailable = typeof window !== 'undefined' && !!window.contexture?.schemaAgent;
-  const [codexReady, setCodexReady] = useState(false);
-  const [codexStatus, setCodexStatus] = useState('Codex status unknown.');
-  const [codexApiKey, setCodexApiKey] = useState('');
+  const [provider, setProviderState] = useState<SchemaAgentProvider>(
+    () =>
+      (localStorage.getItem('contexture-schema-agent-provider') as SchemaAgentProvider | null) ??
+      'codex',
+  );
+  const [providerReady, setProviderReady] = useState(false);
+  const [providerStatus, setProviderStatus] = useState('Provider status unknown.');
+  const [providerApiKey, setProviderApiKey] = useState('');
   const [providerPopoverOpen, setProviderPopoverOpen] = useState(false);
   const filePath = useDocumentStore((s) => s.filePath);
   const documentMode = useDocumentStore((s) => s.mode);
@@ -38,50 +47,95 @@ export function Toolbar(): React.JSX.Element {
   const projectRoot =
     filePath && documentMode === 'project' ? filePath.split('/').slice(0, -3).join('/') : null;
 
-  const applyCodexStatus = useCallback((status: unknown): void => {
-    const readiness =
-      status && typeof status === 'object' ? (status as { readiness?: unknown }).readiness : null;
-    setCodexReady(readiness === 'authenticated_chatgpt' || readiness === 'authenticated_api_key');
-    setCodexStatus(codexStatusCopy(readiness));
+  const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
+
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const next = (event as CustomEvent<{ provider?: unknown }>).detail?.provider;
+      if (next !== 'codex' && next !== 'claude') return;
+      setProviderState(next);
+      localStorage.setItem('contexture-schema-agent-provider', next);
+    };
+    window.addEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
+    return () => window.removeEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
   }, []);
 
-  const refreshCodexStatus = useCallback(async (): Promise<void> => {
+  const applyProviderStatus = useCallback(
+    (status: unknown): void => {
+      const readiness =
+        status && typeof status === 'object' ? (status as { readiness?: unknown }).readiness : null;
+      setProviderReady(
+        readiness === 'authenticated_chatgpt' ||
+          readiness === 'authenticated_api_key' ||
+          readiness === 'authenticated_cli',
+      );
+      setProviderStatus(providerStatusCopy(provider, readiness));
+    },
+    [provider],
+  );
+
+  const refreshProviderStatus = useCallback(async (): Promise<void> => {
     if (!schemaAgentAvailable) return;
+    await window.contexture.schemaAgent.setProvider(provider);
     const status = await window.contexture.schemaAgent.getStatus();
-    applyCodexStatus(status);
-  }, [schemaAgentAvailable, applyCodexStatus]);
+    applyProviderStatus(status);
+  }, [schemaAgentAvailable, provider, applyProviderStatus]);
 
   useEffect(() => {
     if (!schemaAgentAvailable) return;
     let cancelled = false;
     window.contexture.schemaAgent
-      .getStatus()
+      .setProvider(provider)
+      .then(() => window.contexture.schemaAgent.getStatus())
       .then((status) => {
-        if (!cancelled) applyCodexStatus(status);
+        if (!cancelled) applyProviderStatus(status);
       })
       .catch((err) => {
-        if (!cancelled) setCodexStatus(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setProviderStatus(err instanceof Error ? err.message : String(err));
       });
-    const unsubscribe = window.contexture.schemaAgent.onStatusChanged(applyCodexStatus);
+    const unsubscribe = window.contexture.schemaAgent.onStatusChanged(applyProviderStatus);
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [schemaAgentAvailable, applyCodexStatus]);
+  }, [schemaAgentAvailable, provider, applyProviderStatus]);
 
-  const handleCodexChatGptLogin = async (): Promise<void> => {
+  const handleProviderChange = async (next: SchemaAgentProvider): Promise<void> => {
+    setProviderState(next);
+    localStorage.setItem('contexture-schema-agent-provider', next);
+    window.dispatchEvent(
+      new CustomEvent(SCHEMA_AGENT_PROVIDER_CHANGED, { detail: { provider: next } }),
+    );
+    await window.contexture.schemaAgent.setProvider(next);
+    const status = await window.contexture.schemaAgent.getStatus();
+    const readiness =
+      status && typeof status === 'object' ? (status as { readiness?: unknown }).readiness : null;
+    setProviderReady(
+      readiness === 'authenticated_chatgpt' ||
+        readiness === 'authenticated_api_key' ||
+        readiness === 'authenticated_cli',
+    );
+    setProviderStatus(providerStatusCopy(next, readiness));
+  };
+
+  const handleChatGptLogin = async (): Promise<void> => {
     const flow = await window.contexture.schemaAgent.startLogin({ mode: 'chatgpt' });
     if (flow.url) window.open(flow.url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleCodexApiKeyLogin = async (): Promise<void> => {
-    await window.contexture.schemaAgent.startLogin({ mode: 'api-key', apiKey: codexApiKey });
-    await refreshCodexStatus();
+  const handleCliLogin = async (): Promise<void> => {
+    await window.contexture.schemaAgent.startLogin({ mode: 'cli-session' });
+    await refreshProviderStatus();
   };
 
-  const handleCodexLogout = async (): Promise<void> => {
+  const handleApiKeyLogin = async (): Promise<void> => {
+    await window.contexture.schemaAgent.startLogin({ mode: 'api-key', apiKey: providerApiKey });
+    await refreshProviderStatus();
+  };
+
+  const handleLogout = async (): Promise<void> => {
     await window.contexture.schemaAgent.logout();
-    await refreshCodexStatus();
+    await refreshProviderStatus();
   };
 
   return (
@@ -121,29 +175,29 @@ export function Toolbar(): React.JSX.Element {
         open={providerPopoverOpen}
         onOpenChange={(open) => {
           setProviderPopoverOpen(open);
-          if (open) void refreshCodexStatus();
+          if (open) void refreshProviderStatus();
         }}
       >
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
             className="h-8 px-2 gap-1.5 text-muted-foreground hover:bg-icon-btn-hover"
-            title={schemaAgentAvailable ? 'Codex settings' : 'Claude settings'}
+            title={schemaAgentAvailable ? `${providerLabel} settings` : 'Claude settings'}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <Bot className="size-4" />
             <span
               className={cn(
                 'size-1.5 rounded-full',
-                (schemaAgentAvailable ? codexReady : isReady)
+                (schemaAgentAvailable ? providerReady : isReady)
                   ? 'bg-success'
                   : 'bg-muted-foreground/40',
               )}
               title={
                 schemaAgentAvailable
-                  ? codexReady
-                    ? 'Codex ready'
-                    : 'Codex not configured'
+                  ? providerReady
+                    ? `${providerLabel} ready`
+                    : `${providerLabel} not configured`
                   : isReady
                     ? 'Claude ready'
                     : 'Claude not configured'
@@ -155,20 +209,49 @@ export function Toolbar(): React.JSX.Element {
         <PopoverContent className="w-64 p-3 space-y-2" align="end">
           {schemaAgentAvailable ? (
             <>
-              <p className="text-xs text-muted-foreground">{codexStatus}</p>
               <div className="flex gap-1">
                 <Button
                   size="sm"
-                  variant="default"
-                  onClick={() => void handleCodexChatGptLogin()}
+                  variant={provider === 'codex' ? 'default' : 'secondary'}
+                  onClick={() => void handleProviderChange('codex')}
                   className="text-xs h-7 flex-1"
                 >
-                  ChatGPT
+                  Codex
                 </Button>
                 <Button
                   size="sm"
+                  variant={provider === 'claude' ? 'default' : 'secondary'}
+                  onClick={() => void handleProviderChange('claude')}
+                  className="text-xs h-7 flex-1"
+                >
+                  Claude
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{providerStatus}</p>
+              <div className="flex gap-1">
+                {provider === 'codex' ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => void handleChatGptLogin()}
+                    className="text-xs h-7 flex-1"
+                  >
+                    ChatGPT
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => void handleCliLogin()}
+                    className="text-xs h-7 flex-1"
+                  >
+                    Claude CLI
+                  </Button>
+                )}
+                <Button
+                  size="sm"
                   variant="secondary"
-                  onClick={() => void handleCodexLogout()}
+                  onClick={() => void handleLogout()}
                   className="text-xs h-7 flex-1"
                 >
                   Logout
@@ -177,16 +260,16 @@ export function Toolbar(): React.JSX.Element {
               <div className="space-y-1.5">
                 <Input
                   type="password"
-                  value={codexApiKey}
-                  onChange={(e) => setCodexApiKey(e.target.value)}
-                  placeholder="OPENAI_API_KEY"
+                  value={providerApiKey}
+                  onChange={(e) => setProviderApiKey(e.target.value)}
+                  placeholder={provider === 'codex' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'}
                   className="h-8 text-xs font-mono"
                 />
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!codexApiKey.trim()}
-                  onClick={() => void handleCodexApiKeyLogin()}
+                  disabled={!providerApiKey.trim()}
+                  onClick={() => void handleApiKeyLogin()}
                   className="text-xs h-7 w-full"
                 >
                   Use API key
@@ -256,13 +339,15 @@ export function Toolbar(): React.JSX.Element {
   );
 }
 
-function codexStatusCopy(readiness: unknown): string {
-  if (readiness === 'authenticated_chatgpt') return 'Codex authenticated with ChatGPT.';
-  if (readiness === 'authenticated_api_key') return 'Codex authenticated with API key.';
-  if (readiness === 'cli_missing') return 'Codex CLI not detected.';
-  if (readiness === 'cli_outdated') return 'Codex CLI is outdated.';
-  if (readiness === 'not_signed_in') return 'Codex is not signed in.';
-  if (readiness === 'rate_limited') return 'Codex is rate-limited.';
-  if (readiness === 'app_server_unavailable') return 'Codex app-server is unavailable.';
-  return 'Codex is not ready.';
+function providerStatusCopy(provider: SchemaAgentProvider, readiness: unknown): string {
+  const label = provider === 'codex' ? 'Codex' : 'Claude';
+  if (readiness === 'authenticated_chatgpt') return `${label} authenticated with ChatGPT.`;
+  if (readiness === 'authenticated_api_key') return `${label} authenticated with API key.`;
+  if (readiness === 'authenticated_cli') return `${label} CLI session available.`;
+  if (readiness === 'cli_missing') return `${label} CLI not detected.`;
+  if (readiness === 'cli_outdated') return `${label} CLI is outdated.`;
+  if (readiness === 'not_signed_in') return `${label} is not signed in.`;
+  if (readiness === 'rate_limited') return `${label} is rate-limited.`;
+  if (readiness === 'app_server_unavailable') return `${label} app-server is unavailable.`;
+  return `${label} is not ready.`;
 }

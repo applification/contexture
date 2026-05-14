@@ -1,7 +1,12 @@
 import { buildUserMessage } from '@renderer/chat/system-prompt';
 import type { Schema } from '@renderer/model/ir';
 import type { ChatTurnController } from '../ipc/chat-turn';
-import type { ProviderRuntime, ProviderRuntimeEvent, ProviderThreadRef } from './runtime';
+import type {
+  ModelOptions,
+  ProviderRuntime,
+  ProviderRuntimeEvent,
+  ProviderThreadRef,
+} from './runtime';
 
 export const SCHEMA_AGENT_ASSISTANT_DELTA = 'schema-agent:assistant-delta' as const;
 export const SCHEMA_AGENT_ASSISTANT_FINAL = 'schema-agent:assistant-final' as const;
@@ -17,14 +22,15 @@ export interface SchemaAgentTransport {
 }
 
 export interface SchemaAgentDriverDeps {
-  runtime: ProviderRuntime;
+  runtime?: ProviderRuntime;
+  getRuntime?: () => ProviderRuntime;
   transport: SchemaAgentTransport;
   turnController: ChatTurnController;
   getCurrentIR: () => Schema | null;
   getThreadRef: () => ProviderThreadRef | undefined;
   setThreadRef: (thread: ProviderThreadRef) => void;
   markThreadDesynced: (thread: ProviderThreadRef, reason: string) => void;
-  getModelOptions?: () => { model?: string; effort?: string };
+  getModelOptions?: () => { model?: string; effort?: string; options?: ModelOptions };
 }
 
 export class SchemaAgentDriver {
@@ -36,7 +42,8 @@ export class SchemaAgentDriver {
 
   async send(userMessage: string): Promise<void> {
     const {
-      runtime,
+      runtime: staticRuntime,
+      getRuntime,
       transport,
       turnController,
       getCurrentIR,
@@ -45,6 +52,8 @@ export class SchemaAgentDriver {
       markThreadDesynced,
       getModelOptions,
     } = this.#deps;
+    const runtime = getRuntime?.() ?? staticRuntime;
+    if (!runtime) throw new Error('No schema-agent provider runtime configured');
     const schema = getCurrentIR() ?? { version: '1', types: [] };
     const modelOptions = getModelOptions?.() ?? {};
     let thread = getThreadRef();

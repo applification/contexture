@@ -66,3 +66,51 @@ export async function invokeOpHandler(
     };
   }
 }
+
+/**
+ * Claude's Agent SDK/MCP bridge can hand tool args to local tools in a
+ * slightly flatter shape than our op descriptors advertise. Type-level
+ * Contexture tools intentionally expose `{ payload: unknown }`; when the
+ * SDK gives us `{ name: "SaleLineItem" }` for `delete_type`, normalize it
+ * back to `{ payload: { name: "SaleLineItem" } }` before the op handler
+ * validates it. Keep strict field-level tools untouched.
+ */
+export function normalizeOpToolArgs(
+  descriptor: OpToolDescriptor,
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  if ('payload' in args) {
+    const payload = args.payload;
+    if (isPayloadOnlyTool(descriptor) && isRecord(payload) && 'payload' in payload) {
+      return { payload: payload.payload };
+    }
+    if (descriptor.name === 'replace_schema' && isRecord(payload) && 'schema' in payload) {
+      return { schema: payload.schema };
+    }
+    if (descriptor.name === 'replace_schema' && isSchemaLike(payload)) {
+      return { schema: payload };
+    }
+    return args;
+  }
+
+  if (isPayloadOnlyTool(descriptor) && Object.keys(args).length > 0) {
+    return { payload: args };
+  }
+  if (descriptor.name === 'replace_schema' && isSchemaLike(args)) {
+    return { schema: args };
+  }
+  return args;
+}
+
+function isPayloadOnlyTool(descriptor: OpToolDescriptor): boolean {
+  const keys = Object.keys(descriptor.inputSchema);
+  return keys.length === 1 && keys[0] === 'payload';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSchemaLike(value: unknown): boolean {
+  return isRecord(value) && value.version === '1' && Array.isArray(value.types);
+}
