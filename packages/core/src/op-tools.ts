@@ -145,6 +145,42 @@ function lenientTool(
   };
 }
 
+function flexiblePayloadTool<Shape extends Record<string, ZodTypeAny>>(
+  name: string,
+  description: string,
+  shape: Shape,
+  toOp: (payload: unknown) => Op,
+  validate: (op: Op) => void,
+  forward: ForwardOp,
+): OpToolDescriptor {
+  return {
+    name,
+    description,
+    inputSchema: { ...shape, payload: z.unknown().optional() },
+    handler: async (args) => {
+      const payload = unwrapFlexiblePayload(args);
+      const op = toOp(payload);
+      validate(op);
+      return forward(op);
+    },
+  };
+}
+
+function unwrapFlexiblePayload(args: Record<string, unknown>): unknown {
+  const raw = 'payload' in args ? args.payload : args;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
+  }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'payload' in raw) {
+    return (raw as { payload: unknown }).payload;
+  }
+  return raw;
+}
+
 // ---- IR meta-schema checks for type-level payloads ---------------------
 
 const TypeDefItemSchema = IRSchemaObject.shape.types.element;
@@ -323,9 +359,10 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       (op) => assertTypeDef((op as Extract<Op, { kind: 'add_type' }>).type, 'add_type'),
       forward,
     ),
-    lenientTool(
+    flexiblePayloadTool(
       'update_type',
       "Update a TypeDef's top-level properties (excluding kind/name).",
+      { name: z.string().min(1).optional(), patch: z.record(z.string(), z.unknown()).optional() },
       (payload) => {
         const p = (payload ?? {}) as { name?: unknown; patch?: unknown };
         if (typeof p.name !== 'string')
@@ -339,9 +376,10 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       () => undefined,
       forward,
     ),
-    lenientTool(
+    flexiblePayloadTool(
       'rename_type',
       'Rename a TypeDef; refs and layout keys cascade.',
+      { from: z.string().min(1).optional(), to: z.string().min(1).optional() },
       (payload) => {
         const p = (payload ?? {}) as { from?: unknown; to?: unknown };
         if (typeof p.from !== 'string' || typeof p.to !== 'string') {
@@ -352,9 +390,10 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       () => undefined,
       forward,
     ),
-    lenientTool(
+    flexiblePayloadTool(
       'delete_type',
       'Delete a TypeDef by name.',
+      { name: z.string().min(1).optional() },
       (payload) => {
         const p = (payload ?? {}) as { name?: unknown };
         if (typeof p.name !== 'string')
@@ -385,9 +424,26 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
     {
       name: 'replace_schema',
       description: 'Bulk rewrite: replace the entire IR. Use only when surgical ops are awkward.',
-      inputSchema: { schema: z.unknown() },
+      inputSchema: {
+        schema: z.unknown().optional(),
+        payload: z.unknown().optional(),
+        version: z.literal('1').optional(),
+        types: z.array(z.unknown()).optional(),
+        imports: z.array(z.unknown()).optional(),
+        layout: z.unknown().optional(),
+      },
       handler: async (args) => {
-        const { schema } = args as { schema: unknown };
+        const rawSchema = 'schema' in args ? args.schema : 'payload' in args ? args.payload : args;
+        const schema =
+          typeof rawSchema === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(rawSchema) as unknown;
+                } catch {
+                  return rawSchema;
+                }
+              })()
+            : rawSchema;
         const res = IRSchema.safeParse(schema);
         if (!res.success) {
           throw new Error(

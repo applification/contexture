@@ -29,8 +29,11 @@ This is a Turborepo monorepo:
 # Install dependencies
 bun install
 
-# Run all apps in dev mode
+# Run the desktop app in dev mode
 bun run dev
+
+# Run every app in dev mode
+bun run dev:all
 
 # Build all apps
 bun run build

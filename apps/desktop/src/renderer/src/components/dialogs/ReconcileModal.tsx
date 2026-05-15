@@ -223,7 +223,18 @@ export function ReconcileModal(): React.JSX.Element {
       '```',
     ].join('\n');
 
-    const threadId = history.createThread('claude-sonnet-4-6', filePath);
+    const storedProvider = localStorage.getItem('contexture-schema-agent-provider');
+    const provider =
+      window.contexture?.schemaAgent && (storedProvider === 'codex' || storedProvider === 'claude')
+        ? storedProvider
+        : window.contexture?.schemaAgent
+          ? 'codex'
+          : 'claude';
+    const threadId = history.createThread({
+      provider,
+      ...(provider === 'claude' ? { model: 'claude-sonnet-4-6' } : {}),
+      filePath,
+    });
     history.updateThreadMessages(threadId, [
       {
         id: crypto.randomUUID(),

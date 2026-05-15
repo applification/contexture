@@ -9,9 +9,10 @@
  * This is the bridge layer Claude sees in-band per turn; false positives
  * here would make validation errors invisible to the model.
  */
-import { invokeOpHandler } from '@main/ipc/op-tool-bridge';
+import { invokeOpHandler, normalizeOpToolArgs } from '@main/ipc/op-tool-bridge';
 import type { OpToolDescriptor } from '@main/ops';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 describe('invokeOpHandler', () => {
   it('forwards a successful ApplyResult as JSON text', async () => {
@@ -50,5 +51,37 @@ describe('invokeOpHandler', () => {
     const result = await invokeOpHandler(handler, {});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe('boom');
+  });
+
+  it('normalizes flattened Claude args for payload-only op tools', () => {
+    const descriptor: OpToolDescriptor = {
+      name: 'delete_type',
+      description: 'Delete a type.',
+      inputSchema: { payload: z.unknown() },
+      handler: async () => ({ schema: { version: '1', types: [] } }),
+    };
+
+    expect(normalizeOpToolArgs(descriptor, { name: 'SaleLineItem' })).toEqual({
+      payload: { name: 'SaleLineItem' },
+    });
+    expect(
+      normalizeOpToolArgs(descriptor, { payload: { payload: { name: 'SaleLineItem' } } }),
+    ).toEqual({
+      payload: { name: 'SaleLineItem' },
+    });
+  });
+
+  it('normalizes flattened Claude args for replace_schema', () => {
+    const schema = { version: '1', types: [] };
+    const descriptor: OpToolDescriptor = {
+      name: 'replace_schema',
+      description: 'Replace schema.',
+      inputSchema: { schema: z.unknown() },
+      handler: async () => ({ schema }),
+    };
+
+    expect(normalizeOpToolArgs(descriptor, schema)).toEqual({ schema });
+    expect(normalizeOpToolArgs(descriptor, { payload: schema })).toEqual({ schema });
+    expect(normalizeOpToolArgs(descriptor, { payload: { schema } })).toEqual({ schema });
   });
 });

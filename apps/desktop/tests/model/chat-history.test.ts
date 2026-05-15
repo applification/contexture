@@ -52,6 +52,26 @@ describe('chat history sidecar', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('round-trips provider metadata and opaque provider thread refs', () => {
+    const history = {
+      version: '1' as const,
+      provider: 'codex' as const,
+      model: 'gpt-5.4',
+      effort: 'high',
+      providerThreadRef: {
+        provider: 'codex',
+        threadId: 'thread-1',
+        opaque: { currentTurnId: 't1' },
+      },
+      messages: [{ id: 'm1', role: 'user' as const, content: 'hi', createdAt: 1 }],
+    };
+    const raw = saveChatHistory(history);
+    const { history: round, warnings } = loadChatHistory(raw);
+
+    expect(round).toEqual(history);
+    expect(warnings).toEqual([]);
+  });
+
   it('treats sessionId as absent when not a string', () => {
     const raw = JSON.stringify({
       version: '1',

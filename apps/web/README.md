@@ -16,7 +16,7 @@ The Contexture marketing website built with Next.js.
 
 ```bash
 # From the monorepo root
-bun run dev
+bun run dev:web
 
 # Or directly
 cd apps/web

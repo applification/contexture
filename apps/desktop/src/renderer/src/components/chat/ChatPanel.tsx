@@ -23,9 +23,14 @@
  * live in `useClaude`. The panel stitches them together.
  */
 
-import { useChatThreads } from '@renderer/chat/useChatThreads';
+import { type ChatThread, useChatThreads } from '@renderer/chat/useChatThreads';
 import { type ModelId, type ThinkingBudget, useClaude } from '@renderer/chat/useClaude';
 import type { ClaudeSchemaChatState } from '@renderer/chat/useClaudeSchemaChat';
+import type {
+  SchemaAgentChatState,
+  SchemaAgentModelInfo,
+  SchemaAgentModelOptionDescriptor,
+} from '@renderer/chat/useSchemaAgentChat';
 import type { ChatMessage } from '@renderer/model/chat-history';
 import { useDocumentStore } from '@renderer/store/document';
 import { code } from '@streamdown/code';
@@ -33,6 +38,7 @@ import { ArrowUp, BotMessageSquare, List, Square, SquarePen } from 'lucide-react
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Empty,
   EmptyDescription,
@@ -53,7 +59,7 @@ import { cn } from '@/lib/utils';
 import { ChatThreadList } from './ChatThreadList';
 
 export interface ChatPanelProps {
-  chat: ClaudeSchemaChatState;
+  chat: ClaudeSchemaChatState | SchemaAgentChatState;
 }
 
 export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
@@ -67,7 +73,35 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     clear,
     hydrate,
   } = chat;
-  const { authMode, isReady, model, setModel, thinkingBudget, setThinkingBudget } = useClaude();
+  const claude = useClaude();
+  const isSchemaAgent = 'provider' in chat;
+  const providerLabel = isSchemaAgent ? chat.providerLabel : 'Claude';
+  const provider = isSchemaAgent ? chat.provider : 'claude';
+  const authMode = claude.authMode;
+  const isReady = isSchemaAgent ? chat.isReady : claude.isReady;
+  const model = isSchemaAgent ? chat.model : claude.model;
+  const setModel = isSchemaAgent ? chat.setModel : claude.setModel;
+  const thinkingBudget = isSchemaAgent ? chat.effort : claude.thinkingBudget;
+  const providerModels = isSchemaAgent ? chat.models : [];
+  const modelsLoading = isSchemaAgent ? chat.modelsLoading : false;
+  const modelsUnavailable = isSchemaAgent ? chat.modelsUnavailable : false;
+  const modelSelectValue = isSchemaAgent
+    ? model || providerModels[0]?.id || (modelsLoading ? 'models-loading' : 'models-unavailable')
+    : model;
+  const activeModel = isSchemaAgent
+    ? providerModels.find((option) => option.id === modelSelectValue)
+    : legacyClaudeModelInfo(model);
+  const modelOptionDescriptors = activeModel?.optionDescriptors ?? [];
+  const modelOptionValues = isSchemaAgent ? chat.modelOptions : { effort: thinkingBudget };
+  const currentModelOptions = isSchemaAgent ? chat.modelOptions : undefined;
+  const restoreSchemaAgentSettings = isSchemaAgent ? chat.restoreSettings : undefined;
+  const unavailableMessage = 'unavailableMessage' in chat ? chat.unavailableMessage : null;
+  const providerThreadRef = 'providerThreadRef' in chat ? chat.providerThreadRef : undefined;
+  const desynced = 'desynced' in chat ? chat.desynced : false;
+  const hasUsableModel =
+    !isSchemaAgent || providerModels.some((option) => option.id === modelSelectValue);
+  const canCompose =
+    isReady && !isStreaming && hasUsableModel && !modelsLoading && !modelsUnavailable;
 
   const filePath = useDocumentStore((s) => s.filePath);
   const history = useChatThreads();
@@ -83,14 +117,32 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   // trigger a spurious update).
   const prevMessagesRef = useRef<ChatMessage[] | null>(null);
 
+  const restoreThreadSettings = useCallback(
+    (thread: ChatThread) => {
+      if (restoreSchemaAgentSettings) {
+        restoreSchemaAgentSettings({
+          provider: thread.provider,
+          model: thread.model,
+          effort: thread.effort,
+          modelOptions: thread.modelOptions,
+        });
+        return;
+      }
+      if (thread.model) claude.setModel(thread.model as ModelId);
+      if (thread.effort) claude.setThinkingBudget(thread.effort as ThinkingBudget);
+    },
+    [claude.setModel, claude.setThinkingBudget, restoreSchemaAgentSettings],
+  );
+
   // Restore the active thread's messages on first mount.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
     const thread = history.getActiveThread();
-    if (thread && thread.messages.length > 0) {
-      hydrate(thread.messages);
+    if (thread) {
+      if (thread.messages.length > 0) hydrate(thread.messages);
+      restoreThreadSettings(thread);
       // Push the stored session id into main so the next turn resumes
       // this thread's prior SDK context.
       if (thread.sessionId) {
@@ -98,9 +150,12 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (thread.providerThreadRef)
+        void window.contexture?.schemaAgent?.threadSet(thread.providerThreadRef);
+      else void window.contexture?.schemaAgent?.threadClear();
     }
     prevMessagesRef.current = thread?.messages ?? [];
-  }, [history, hydrate]);
+  }, [history, hydrate, restoreThreadSettings]);
 
   // On schema-file change, switch to the most recent thread for that
   // file — or clear the transcript and the SDK session if this file
@@ -119,19 +174,26 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       const latest = fileThreads[0];
       history.switchThread(latest.id);
       hydrate(latest.messages);
+      restoreThreadSettings(latest);
       prevMessagesRef.current = latest.messages;
       if (latest.sessionId) {
         void window.contexture?.chat?.setSessionId?.(latest.sessionId);
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (latest.providerThreadRef) {
+        void window.contexture?.schemaAgent?.threadSet(latest.providerThreadRef);
+      } else {
+        void window.contexture?.schemaAgent?.threadClear();
+      }
     } else {
       history.setActiveThreadId(null);
       clear();
       prevMessagesRef.current = [];
       void window.contexture?.chat?.clearSession?.();
+      void window.contexture?.schemaAgent?.threadClear();
     }
-  }, [filePath, history, hydrate, clear]);
+  }, [filePath, history, hydrate, clear, restoreThreadSettings]);
 
   // Persist messages into the active thread whenever they change.
   useEffect(() => {
@@ -145,11 +207,34 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   // Auto-create a thread on the first appended message if none active.
   useEffect(() => {
     if (!history.activeThreadId && messages.length > 0) {
-      const id = history.createThread(model, filePath);
+      const id = history.createThread({
+        provider,
+        model,
+        effort: thinkingBudget,
+        modelOptions: currentModelOptions,
+        filePath,
+      });
       history.updateThreadMessages(id, messages);
       prevMessagesRef.current = messages;
     }
-  }, [messages, history, model, filePath]);
+  }, [messages, history, model, thinkingBudget, filePath, provider, currentModelOptions]);
+
+  useEffect(() => {
+    if (!history.activeThreadId) return;
+    history.updateThreadSettings(history.activeThreadId, {
+      provider,
+      model,
+      effort: thinkingBudget,
+      modelOptions: currentModelOptions,
+    });
+  }, [
+    history.activeThreadId,
+    history.updateThreadSettings,
+    provider,
+    model,
+    thinkingBudget,
+    currentModelOptions,
+  ]);
 
   // Stamp the active thread with the SDK session id as it streams in.
   useEffect(() => {
@@ -161,6 +246,16 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       if (id) history.updateThreadSessionId(id, sessionId);
     });
   }, [history.activeThreadId, history.updateThreadSessionId]);
+
+  useEffect(() => {
+    if (!providerThreadRef || !history.activeThreadId) return;
+    history.updateThreadProviderRef(history.activeThreadId, providerThreadRef);
+  }, [providerThreadRef, history.activeThreadId, history.updateThreadProviderRef]);
+
+  useEffect(() => {
+    if (!desynced || !history.activeThreadId) return;
+    history.markThreadDesynced(history.activeThreadId);
+  }, [desynced, history.activeThreadId, history.markThreadDesynced]);
 
   const messageCount = messages.length;
   useEffect(() => {
@@ -175,7 +270,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
 
   const activeThread = history.getActiveThread();
   const headerTitle =
-    activeThread && activeThread.title !== 'New chat' ? activeThread.title : 'Claude';
+    activeThread && activeThread.title !== 'New chat' ? activeThread.title : providerLabel;
 
   const handleNewChat = useCallback(() => {
     // Don't save empty threads — recycle an already-empty one instead
@@ -183,15 +278,31 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     if (history.activeThreadId && messages.length === 0) {
       history.deleteThread(history.activeThreadId);
     }
-    history.createThread(model, filePath);
+    history.createThread({
+      provider,
+      model,
+      effort: thinkingBudget,
+      modelOptions: currentModelOptions,
+      filePath,
+    });
     clear();
     setInput('');
     prevMessagesRef.current = [];
     // Drop main's resume id so the SDK starts a brand-new session on
     // the next turn.
     void window.contexture?.chat?.clearSession?.();
+    void window.contexture?.schemaAgent?.threadClear();
     history.setShowThreadList(false);
-  }, [history, messages.length, model, filePath, clear]);
+  }, [
+    history,
+    messages.length,
+    provider,
+    model,
+    thinkingBudget,
+    filePath,
+    clear,
+    currentModelOptions,
+  ]);
 
   const handleSwitchThread = useCallback(
     (id: string) => {
@@ -199,14 +310,18 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       if (!thread) return;
       history.switchThread(id);
       hydrate(thread.messages);
+      restoreThreadSettings(thread);
       prevMessagesRef.current = thread.messages;
       if (thread.sessionId) {
         void window.contexture?.chat?.setSessionId?.(thread.sessionId);
       } else {
         void window.contexture?.chat?.clearSession?.();
       }
+      if (thread.providerThreadRef)
+        void window.contexture?.schemaAgent?.threadSet(thread.providerThreadRef);
+      else void window.contexture?.schemaAgent?.threadClear();
     },
-    [history, hydrate],
+    [history, hydrate, restoreThreadSettings],
   );
 
   const handleDeleteThread = useCallback(
@@ -220,28 +335,33 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       if (remaining.length > 0) {
         const next = remaining[0];
         hydrate(next.messages);
+        restoreThreadSettings(next);
         history.setActiveThreadId(next.id);
         prevMessagesRef.current = next.messages;
         if (next.sessionId) void window.contexture?.chat?.setSessionId?.(next.sessionId);
         else void window.contexture?.chat?.clearSession?.();
+        if (next.providerThreadRef)
+          void window.contexture?.schemaAgent?.threadSet(next.providerThreadRef);
+        else void window.contexture?.schemaAgent?.threadClear();
       } else {
         clear();
         prevMessagesRef.current = [];
         void window.contexture?.chat?.clearSession?.();
+        void window.contexture?.schemaAgent?.threadClear();
       }
     },
-    [history, filePath, hydrate, clear],
+    [history, filePath, hydrate, clear, restoreThreadSettings],
   );
 
   const handleSubmit = useCallback(
     async (ev?: React.FormEvent) => {
       ev?.preventDefault();
       const text = input.trim();
-      if (!text || isStreaming || !isReady) return;
+      if (!text || !canCompose) return;
       setInput('');
       await send(text);
     },
-    [input, isStreaming, isReady, send],
+    [canCompose, input, send],
   );
 
   const handleKeyDown = useCallback(
@@ -255,8 +375,9 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   );
 
   const handleAbort = useCallback(() => {
-    void window.contexture?.chat?.abort?.();
-  }, []);
+    if ('abort' in chat) void chat.abort();
+    else void window.contexture?.chat?.abort?.();
+  }, [chat]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="chat-panel">
@@ -303,14 +424,25 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
                   </EmptyMedia>
                 )}
                 <EmptyTitle className="text-sm font-medium">
-                  {isReady ? 'Start a conversation' : 'Not connected'}
+                  {isReady
+                    ? modelsLoading
+                      ? 'Loading models'
+                      : modelsUnavailable
+                        ? 'No model available'
+                        : 'Start a conversation'
+                    : 'Not connected'}
                 </EmptyTitle>
                 <EmptyDescription className="text-xs">
-                  {isReady
-                    ? 'Describe the schema you want — "add a Plot type with a name and location" — and Claude will build it on the canvas.'
-                    : authMode === 'max'
-                      ? 'Claude CLI not detected. Configure in toolbar.'
-                      : 'Set your API key in the toolbar to start chatting.'}
+                  {isReady && modelsLoading
+                    ? `Loading ${providerLabel} models.`
+                    : isReady && modelsUnavailable
+                      ? `${providerLabel} did not return any models for this session.`
+                      : isReady
+                        ? `Describe the schema you want and ${providerLabel} will build it on the canvas.`
+                        : (unavailableMessage ??
+                          (authMode === 'max'
+                            ? 'Claude CLI not detected. Configure in toolbar.'
+                            : 'Set your API key in the toolbar to start chatting.'))}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -329,7 +461,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           {isStreaming && (
             <div className="flex gap-1 items-center text-xs text-muted-foreground">
               <span className="animate-pulse">●</span>
-              <span>Claude is thinking…</span>
+              <span>{providerLabel} is thinking…</span>
             </div>
           )}
           {authRequired && (
@@ -364,7 +496,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             onChange={(ev) => setInput(ev.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isReady ? 'Ask anything…' : 'Configure auth first…'}
-            disabled={!isReady || isStreaming}
+            disabled={!canCompose}
             rows={1}
             className={cn(
               'w-full resize-none bg-transparent px-3 pt-3 pb-2 text-sm leading-5',
@@ -375,36 +507,96 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             data-testid="chat-input"
           />
           <div className="flex items-center gap-1.5 px-2 pb-2">
-            <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
+            <Select value={modelSelectValue} onValueChange={(v) => setModel(v as ModelId)}>
               <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Model</SelectLabel>
-                  <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
-                  <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
-                  <SelectItem value="claude-opus-4-6">Opus</SelectItem>
+                  {isSchemaAgent ? (
+                    modelsLoading ? (
+                      <SelectItem value="models-loading" disabled>
+                        Loading models
+                      </SelectItem>
+                    ) : providerModels.length > 0 ? (
+                      providerModels.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="models-unavailable" disabled>
+                        Models unavailable
+                      </SelectItem>
+                    )
+                  ) : (
+                    <>
+                      <SelectItem value="claude-haiku-4-5-20251001">Haiku</SelectItem>
+                      <SelectItem value="claude-sonnet-4-6">Sonnet</SelectItem>
+                      <SelectItem value="claude-opus-4-6">Opus</SelectItem>
+                    </>
+                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <Select
-              value={thinkingBudget}
-              onValueChange={(v) => setThinkingBudget(v as ThinkingBudget)}
-            >
-              <SelectTrigger className="w-20 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Effort</SelectLabel>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="med">Med</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            {modelOptionDescriptors.map((descriptor) =>
+              descriptor.type === 'select' ? (
+                <Select
+                  key={descriptor.id}
+                  value={resolveSelectValue(
+                    descriptor.options,
+                    readStringOption(modelOptionValues, descriptor.id),
+                  )}
+                  onValueChange={(value) => {
+                    if (isSchemaAgent) chat.setModelOption(descriptor.id, value);
+                    else claude.setThinkingBudget(value as ThinkingBudget);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label={descriptor.label}
+                    title={descriptor.label}
+                    className={cn(
+                      'h-7 shrink-0 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5',
+                      descriptor.id === 'contextWindow' ? 'w-16' : 'w-20',
+                    )}
+                    data-testid={
+                      isEffortDescriptor(descriptor)
+                        ? 'chat-effort-select'
+                        : `chat-model-option-${descriptor.id}`
+                    }
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>{descriptor.label}</SelectLabel>
+                      {descriptor.options.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div
+                  key={descriptor.id}
+                  className="flex h-7 shrink-0 items-center gap-1.5 px-1.5 text-xs text-muted-foreground"
+                  data-testid={`chat-model-option-${descriptor.id}`}
+                >
+                  <Checkbox
+                    aria-label={descriptor.label}
+                    className="size-3.5"
+                    checked={readBooleanOption(modelOptionValues, descriptor.id, descriptor)}
+                    onCheckedChange={(value) => {
+                      if (isSchemaAgent) chat.setModelOption(descriptor.id, value === true);
+                    }}
+                  />
+                  {descriptor.label}
+                </div>
+              ),
+            )}
             <div className="ml-auto">
               {isStreaming ? (
                 <button
@@ -418,10 +610,10 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               ) : (
                 <button
                   type="submit"
-                  disabled={!isReady || !input.trim()}
+                  disabled={!canCompose || !input.trim()}
                   className={cn(
                     'size-7 rounded-lg flex items-center justify-center transition-colors',
-                    isReady && input.trim()
+                    canCompose && input.trim()
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                       : 'bg-muted text-muted-foreground cursor-not-allowed',
                   )}
@@ -472,4 +664,56 @@ function MessageBubble({ message }: { message: ChatMessage }): React.JSX.Element
       <Streamdown plugins={{ code }}>{message.content}</Streamdown>
     </div>
   );
+}
+
+const LEGACY_CLAUDE_EFFORT_DESCRIPTOR: Extract<
+  SchemaAgentModelOptionDescriptor,
+  { type: 'select' }
+> = {
+  id: 'effort',
+  type: 'select',
+  label: 'Effort',
+  options: [
+    { id: 'auto', label: 'Auto', isDefault: true },
+    { id: 'low', label: 'Low' },
+    { id: 'med', label: 'Medium' },
+    { id: 'high', label: 'High' },
+    { id: 'xhigh', label: 'Extra High' },
+  ],
+};
+
+function legacyClaudeModelInfo(model: string): SchemaAgentModelInfo {
+  return {
+    id: model,
+    label: model,
+    optionDescriptors: [LEGACY_CLAUDE_EFFORT_DESCRIPTOR],
+  };
+}
+
+function resolveSelectValue(
+  options: Array<{ id: string; label: string; isDefault?: boolean }>,
+  value: string,
+): string {
+  if (options.some((option) => option.id === value)) return value;
+  return options.find((option) => option.isDefault)?.id ?? options[0]?.id ?? '';
+}
+
+function isEffortDescriptor(descriptor: SchemaAgentModelOptionDescriptor): boolean {
+  return descriptor.id === 'effort' || descriptor.id === 'reasoningEffort';
+}
+
+function readStringOption(options: Record<string, string | boolean>, key: string): string {
+  const value = options[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function readBooleanOption(
+  options: Record<string, string | boolean>,
+  key: string,
+  descriptor: Extract<SchemaAgentModelOptionDescriptor, { type: 'boolean' }>,
+): boolean {
+  const value = options[key];
+  return typeof value === 'boolean'
+    ? value
+    : (descriptor.currentValue ?? descriptor.defaultValue ?? false);
 }

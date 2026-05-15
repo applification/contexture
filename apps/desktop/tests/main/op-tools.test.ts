@@ -199,6 +199,23 @@ describe('createOpTools', () => {
     expect((forwardedOp as { schema: unknown }).schema).toEqual(schema);
   });
 
+  it('replace_schema accepts Claude-style payload and direct schema shapes', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const replace = toolNamed(tools, 'replace_schema');
+    const schema = { version: '1', types: [{ kind: 'object', name: 'X', fields: [] }] };
+
+    await replace.handler({ payload: schema });
+    await replace.handler(schema);
+    await replace.handler({ payload: JSON.stringify(schema) });
+
+    expect(forwardSpy.mock.calls.map((call) => call[0])).toEqual([
+      { kind: 'replace_schema', schema },
+      { kind: 'replace_schema', schema },
+      { kind: 'replace_schema', schema },
+    ]);
+  });
+
   it('replace_schema rejects an invalid IR before forwarding', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
@@ -254,6 +271,22 @@ describe('createOpTools', () => {
       typeName: 'Role',
       value: 'admin',
     });
+  });
+
+  it('delete_type accepts top-level and payload-wrapped Claude shapes', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'delete_type');
+
+    await tool.handler({ name: 'SaleLineItem' });
+    await tool.handler({ payload: { name: 'SaleLineItem' } });
+    await tool.handler({ payload: JSON.stringify({ name: 'SaleLineItem' }) });
+
+    expect(forwardSpy.mock.calls.map((call) => call[0])).toEqual([
+      { kind: 'delete_type', name: 'SaleLineItem' },
+      { kind: 'delete_type', name: 'SaleLineItem' },
+      { kind: 'delete_type', name: 'SaleLineItem' },
+    ]);
   });
 
   it('propagates ApplyResult errors back to the SDK caller', async () => {

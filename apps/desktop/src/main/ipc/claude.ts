@@ -28,7 +28,7 @@ import {
   TurnContext,
 } from './claude-bridge';
 import { ChatCancelledError } from './claude-errors';
-import { invokeOpHandler } from './op-tool-bridge';
+import { invokeOpHandler, normalizeOpToolArgs } from './op-tool-bridge';
 
 const execFileAsync = promisify(execFile);
 
@@ -70,12 +70,13 @@ type ChatAuth = { mode: 'max' } | { mode: 'api-key'; key: string };
 let currentAuth: ChatAuth = { mode: 'max' };
 
 type ModelId = 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
-type ThinkingBudget = 'auto' | 'low' | 'med' | 'high';
+type ThinkingBudget = 'auto' | 'low' | 'med' | 'high' | 'xhigh';
 const THINKING_TOKENS: Record<ThinkingBudget, number | undefined> = {
   auto: undefined,
   low: 2048,
   med: 8192,
   high: 16000,
+  xhigh: 32000,
 };
 let currentModel: ModelId = 'claude-sonnet-4-6';
 let currentThinkingBudget: ThinkingBudget = 'auto';
@@ -474,7 +475,10 @@ function resolveSkillsPluginPath(): string | null {
 
 function toSdkTool(descriptor: OpToolDescriptor) {
   return tool(descriptor.name, descriptor.description, descriptor.inputSchema, (args) =>
-    invokeOpHandler(descriptor.handler, args as Record<string, unknown>),
+    invokeOpHandler(
+      descriptor.handler,
+      normalizeOpToolArgs(descriptor, args as Record<string, unknown>),
+    ),
   );
 }
 

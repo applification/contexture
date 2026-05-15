@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=@contexture/desktop",
+    "dev:all": "turbo dev",
+    "dev:web": "turbo dev --filter=@contexture/web",
     "build": "turbo build",
     "test": "turbo test",
     "typecheck": "turbo typecheck",

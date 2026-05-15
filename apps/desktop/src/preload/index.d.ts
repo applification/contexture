@@ -49,7 +49,7 @@ export interface ContextureChatAPI {
   ) => Promise<{ ok: boolean; error?: string }>;
   setModelOptions: (opts: {
     model?: string;
-    thinkingBudget?: 'auto' | 'low' | 'med' | 'high';
+    thinkingBudget?: 'auto' | 'low' | 'med' | 'high' | 'xhigh';
   }) => Promise<{ ok: boolean }>;
   abort: () => Promise<{ ok: boolean; error?: string }>;
   onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
@@ -66,6 +66,47 @@ export interface ContextureChatAPI {
   onSession: (listener: (payload: { sessionId: string }) => void) => Unsubscribe;
   setSessionId: (sessionId: string) => Promise<{ ok: boolean }>;
   clearSession: () => Promise<{ ok: boolean }>;
+}
+
+export interface ContextureSchemaAgentAPI {
+  send: (message: string) => Promise<{ ok: boolean; error?: string }>;
+  setIR: (ir: unknown) => void;
+  abort: () => Promise<{ ok: boolean; error?: string }>;
+  getStatus: () => Promise<unknown>;
+  listModels: (provider?: 'codex' | 'claude') => Promise<unknown>;
+  setProvider: (provider: 'codex' | 'claude') => Promise<{ ok: boolean; error?: string }>;
+  setModelOptions: (options: {
+    model?: string;
+    effort?: string;
+    options?: Record<string, string | boolean>;
+  }) => Promise<{ ok: boolean }>;
+  startLogin: (input: {
+    mode: 'chatgpt' | 'api-key' | 'cli-session';
+    apiKey?: string;
+  }) => Promise<{ id: string; mode: 'chatgpt' | 'api-key' | 'cli-session'; url?: string }>;
+  cancelLogin: (input: { flowId: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  threadSet: (thread: unknown) => Promise<{ ok: boolean }>;
+  threadClear: () => Promise<{ ok: boolean }>;
+  replyTool: (id: string, result: unknown) => void;
+  onAssistantDelta: (listener: (payload: { text: string }) => void) => Unsubscribe;
+  onAssistantFinal: (listener: (payload: { text: string }) => void) => Unsubscribe;
+  onToolCallStarted: (
+    listener: (payload: { id: string; name: string; input?: unknown }) => void,
+  ) => Unsubscribe;
+  onToolCallFinished: (
+    listener: (payload: { id: string; name: string; ok: boolean; result?: unknown }) => void,
+  ) => Unsubscribe;
+  onError: (listener: (payload: { message: string }) => void) => Unsubscribe;
+  onStatusChanged: (listener: (payload: unknown) => void) => Unsubscribe;
+  onThreadUpdated: (listener: (payload: { thread: unknown }) => void) => Unsubscribe;
+  onThreadDesynced: (
+    listener: (payload: { thread: unknown; reason: string }) => void,
+  ) => Unsubscribe;
+  onToolRequest: (listener: (payload: { id: string; op: unknown }) => void) => Unsubscribe;
+  onTurnBegin: (listener: () => void) => Unsubscribe;
+  onTurnCommit: (listener: () => void) => Unsubscribe;
+  onTurnRollback: (listener: () => void) => Unsubscribe;
 }
 
 export interface OpenWarning {
@@ -93,6 +134,10 @@ export interface OpenedDocument {
       content: string;
       createdAt: number;
     }>;
+    provider?: 'codex' | 'claude';
+    providerThreadRef?: unknown;
+    model?: string;
+    effort?: string;
     sessionId?: string;
   };
   /** Sidecar warnings (not IR — those come from renderer-side `load()`). */
@@ -195,6 +240,7 @@ export interface ContextureReconcileAPI {
 
 export interface ContextureAPI {
   chat: ContextureChatAPI;
+  schemaAgent: ContextureSchemaAgentAPI;
   file: ContextureFileAPI;
   scaffold: ContextureScaffoldAPI;
   shell: ContextureShellAPI;
