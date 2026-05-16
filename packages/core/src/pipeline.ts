@@ -46,6 +46,10 @@ function sha256(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex');
 }
 
+function outputEnabled(schema: Schema, target: 'zod' | 'jsonSchema' | 'schemaIndex' | 'convex') {
+  return schema.outputs?.[target]?.enabled !== false;
+}
+
 export function buildManifest(entries: ReadonlyArray<FileEntry>): EmittedManifest {
   const files: Record<string, string> = {};
   for (const { path, content } of entries) files[path] = sha256(content);
@@ -65,17 +69,27 @@ export function runEmitPipeline(
     emitSchemaIndex: emitSchemaIndexImpl = emitSchemaIndex,
     emitConvex: emitConvexImpl = emitConvexSchema,
   } = deps;
-  const schemaTs = emitZodImpl(schema, irPath);
-  const schemaJson = `${JSON.stringify(emitJsonSchemaImpl(schema, irPath), null, 2)}\n`;
-  const schemaIndex = emitSchemaIndexImpl(baseNameFor(irPath), irPath);
-  const convexSource = emitConvexImpl(schema, irPath);
 
-  const emitted: FileEntry[] = [
-    { path: paths.schemaTs, content: schemaTs },
-    { path: paths.schemaJson, content: schemaJson },
-    { path: paths.schemaIndex, content: schemaIndex },
-    { path: paths.convex, content: convexSource },
-  ];
+  const emitted: FileEntry[] = [];
+
+  if (outputEnabled(schema, 'zod')) {
+    emitted.push({ path: paths.schemaTs, content: emitZodImpl(schema, irPath) });
+  }
+  if (outputEnabled(schema, 'jsonSchema')) {
+    emitted.push({
+      path: paths.schemaJson,
+      content: `${JSON.stringify(emitJsonSchemaImpl(schema, irPath), null, 2)}\n`,
+    });
+  }
+  if (outputEnabled(schema, 'schemaIndex')) {
+    emitted.push({
+      path: paths.schemaIndex,
+      content: emitSchemaIndexImpl(baseNameFor(irPath), irPath),
+    });
+  }
+  if (outputEnabled(schema, 'convex')) {
+    emitted.push({ path: paths.convex, content: emitConvexImpl(schema, irPath) });
+  }
 
   return { emitted, manifest: buildManifest(emitted) };
 }

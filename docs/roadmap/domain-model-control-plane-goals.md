@@ -137,8 +137,20 @@ Completion evidence:
 
 ## Goal 6 — Opt-In Output Config
 
+**Status:** Done.
+
 Add the IR shape for target-specific emit configuration. Existing outputs
 should preserve current behavior; new AI-pipeline outputs should be opt-in.
+
+Completion evidence:
+
+- The IR accepts an optional top-level `outputs` config with current emit target
+  switches and future AI-pipeline target slots.
+- Omitted output config preserves the existing emitted bundle.
+- Current generated targets can be disabled explicitly and are removed from the
+  emitted manifest/drift surface.
+- AI-pipeline target slots round-trip through load/save but do not emit files
+  until Goal 7 adds the first opt-in emitter.
 
 ## Goal 7 — First AI-Pipeline Emitter
 
