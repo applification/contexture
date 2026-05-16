@@ -3,14 +3,29 @@ productName: Contexture
 directories:
   buildResources: build
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-asarUnpack:
-  - resources/**
+  - out/**
+  - package.json
+  - '!node_modules/@anthropic-ai/claude-agent-sdk-*/**'
+  - '!**/.turbo/**'
+  - '!**/.vite/**'
+  - '!**/.vscode/**'
+  - '!**/.storybook/**'
+  - '!**/__tests__/**'
+  - '!**/__snapshots__/**'
+  - '!**/coverage/**'
+  - '!**/demo/**'
+  - '!**/docs/**'
+  - '!**/e2e/**'
+  - '!**/examples/**'
+  - '!**/test/**'
+  - '!**/tests/**'
+  - '!**/*.d.ts'
+  - '!**/*.d.mts'
+  - '!**/*.map'
+  - '!**/CHANGELOG*'
+  - '!**/README*'
+  - '!**/*.ts'
+  - '!**/*.tsx'
 extraResources:
   # Stdlib IR sidecars — read at app startup so qualified refs
   # (e.g. `common.Email`) resolve without depending on the published
