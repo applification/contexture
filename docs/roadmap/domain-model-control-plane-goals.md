@@ -171,9 +171,26 @@ Completion evidence:
 
 ## Goal 8 — Dogfood One Real Product
 
+**Status:** Done.
+
 Use Contexture CLI/MCP to make one real schema change in an Applification
 product. The change should start from the IR, regenerate artifacts, pass
 drift checks, and feed sharp edges back into Contexture.
+
+Completion evidence:
+
+- Dogfooded against Recordshop's `packages/contexture/recordshop.contexture.json`.
+- Used the Contexture CLI to add `Release.discogsReleaseId` and a
+  `by_discogs_release_id` Convex index from the IR.
+- Regenerated Recordshop's Zod, JSON Schema, index, Convex schema, and emitted
+  manifest artifacts.
+- Recordshop passes `validate` and the strengthened `check-generated` drift
+  check.
+- Fed back one Contexture sharp edge: CLI/MCP drift checks now include
+  `.contexture/emitted.json`, so stale manifests cannot silently narrow the
+  desktop watcher surface.
+- Product typecheck was attempted, but Recordshop's top-level
+  `packageManager: "bun"` currently blocks Turbo before TypeScript runs.
 
 ## Goal 9 — Marketing Rewrite
 

@@ -14,6 +14,7 @@ import {
 } from './ir';
 import { load } from './load';
 import type { Op } from './ops';
+import { bundlePathsFor } from './paths';
 import { runEmitPipeline } from './pipeline';
 import { checkSemantic } from './semantic-validation';
 
@@ -397,10 +398,15 @@ async function checkContextureDrift(
   irPath: string,
 ): Promise<z.infer<z.ZodObject<typeof CheckContextureDriftOutput>>> {
   const { schema } = await readContextureFile(irPath);
-  const { emitted } = runEmitPipeline(schema, irPath);
+  const { emitted, manifest } = runEmitPipeline(schema, irPath);
+  const paths = bundlePathsFor(irPath);
+  const expectedFiles = [
+    ...emitted,
+    { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
+  ];
   const files: Array<{ path: string; status: GeneratedFileStatus }> = [];
 
-  for (const entry of emitted) {
+  for (const entry of expectedFiles) {
     let onDisk: string | undefined;
     try {
       onDisk = await readFile(entry.path, 'utf8');
