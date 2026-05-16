@@ -18,7 +18,7 @@ jobs:
           node-version: 24
       - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
           gh release create "$TAG_NAME" \
@@ -69,7 +69,7 @@ jobs:
       - name: Package and publish (macOS)
         if: matrix.platform == 'mac'
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -81,13 +81,13 @@ jobs:
       - name: Package and publish (Windows)
         if: matrix.platform == 'win'
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: bunx electron-builder --win --publish always
         working-directory: apps/desktop
 
       - name: Package and publish (Linux)
         if: matrix.platform == 'linux'
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: bunx electron-builder --linux --publish always
         working-directory: apps/desktop
