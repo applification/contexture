@@ -63,9 +63,10 @@ export function useDrift(): void {
 
     void driftApi.watch({ emittedJsonPath });
 
-    const unDetected = driftApi.onDetected((payload) =>
-      useDriftStore.getState().setDrifted(payload.paths),
-    );
+    const unDetected = driftApi.onDetected((payload) => {
+      if (payload.files) useDriftStore.getState().setDetected(payload.files);
+      else useDriftStore.getState().setDrifted(payload.paths);
+    });
     const unResolved = driftApi.onResolved(() => useDriftStore.getState().setResolved());
 
     function onFocus(): void {

@@ -25,6 +25,11 @@ export interface DriftResult {
   status: 'match' | 'drifted' | 'unreadable';
 }
 
+export interface DriftProblem {
+  path: string;
+  status: 'drifted' | 'unreadable';
+}
+
 export async function detectDrift(
   emittedJsonPath: string,
   readFile: (path: string) => Promise<string> = (p) => fsPromises.readFile(p, 'utf-8'),
@@ -72,6 +77,7 @@ export interface DriftWatcher {
 export interface DriftWatcherOptions {
   emittedJsonPath: string;
   onDrift: (paths: string[]) => void;
+  onStatus?: (problems: DriftProblem[]) => void;
   onResolved: () => void;
   debounceMs?: number;
   readFile?: (path: string) => Promise<string>;
@@ -81,6 +87,7 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   const {
     emittedJsonPath,
     onDrift,
+    onStatus,
     onResolved,
     debounceMs = 300,
     readFile = (p) => fsPromises.readFile(p, 'utf-8'),
@@ -89,26 +96,28 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   let watchers: FSWatcher[] = [];
   let watchedPaths: string[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let driftedSet: Set<string> = new Set();
+  let problemSet: Set<string> = new Set();
   let stopped = false;
 
   async function doCheck(): Promise<void> {
     const results = await detectDrift(emittedJsonPath, readFile);
     if (stopped || results.length === 0) return;
 
-    const nowDrifted = results.filter((r) => r.status === 'drifted').map((r) => r.path);
-    const wasDrifted = driftedSet.size > 0;
-    const isDrifted = nowDrifted.length > 0;
+    const problems = results.filter((r): r is DriftProblem => r.status !== 'match');
+    const nowProblems = problems.map(problemKey);
+    const wasProblematic = problemSet.size > 0;
+    const isProblematic = problems.length > 0;
 
-    if (isDrifted) {
+    if (isProblematic) {
       const changed =
-        nowDrifted.length !== driftedSet.size || nowDrifted.some((p) => !driftedSet.has(p));
-      driftedSet = new Set(nowDrifted);
-      if (!wasDrifted || changed) {
-        onDrift(nowDrifted);
+        nowProblems.length !== problemSet.size || nowProblems.some((p) => !problemSet.has(p));
+      problemSet = new Set(nowProblems);
+      if (!wasProblematic || changed) {
+        if (onStatus) onStatus(problems);
+        else onDrift(problems.map((p) => p.path));
       }
-    } else if (wasDrifted) {
-      driftedSet = new Set();
+    } else if (wasProblematic) {
+      problemSet = new Set();
       onResolved();
     }
 
@@ -150,11 +159,15 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
         clearTimeout(timer);
         timer = null;
       }
-      driftedSet = new Set();
+      problemSet = new Set();
     },
     check: doCheck,
     resetDrifted() {
-      driftedSet = new Set();
+      problemSet = new Set();
     },
   };
+}
+
+function problemKey(problem: DriftProblem): string {
+  return `${problem.status}:${problem.path}`;
 }
