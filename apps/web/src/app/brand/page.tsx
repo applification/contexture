@@ -316,7 +316,7 @@ export default function BrandPage() {
               font="font-sans"
               name="Geist Sans"
               weights="100 — 900 (variable)"
-              example="Design the schemas that power your LLM pipelines."
+              example="Design your domain once. Ship it everywhere."
             />
             <TypeSpecimen
               font="font-mono"
@@ -408,28 +408,30 @@ export default function BrandPage() {
               Key phrases
             </h3>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-2 text-sm">
-              <p className="text-foreground">&ldquo;Where schemas take shape.&rdquo;</p>
               <p className="text-foreground">
-                &ldquo;Design the schemas that power your LLM pipelines.&rdquo;
+                &ldquo;Design your domain once. Ship it everywhere.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;From natural language to typed Zod in minutes.&rdquo;
-              </p>
-              <p className="text-foreground">&ldquo;See your schema as a living graph.&rdquo;</p>
-              <p className="text-foreground">
-                &ldquo;The schema editor built for LLM pipelines.&rdquo;
+                &ldquo;The domain-model control plane for AI-native TypeScript apps.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;Zod + JSON Schema emitted side-by-side — no runtime lock-in.&rdquo;
+                &ldquo;One source-of-truth IR for apps, databases, and agents.&rdquo;
+              </p>
+              <p className="text-foreground">&ldquo;Change the model, not the contract.&rdquo;</p>
+              <p className="text-foreground">
+                &ldquo;Emit Zod, JSON Schema, Convex, MCP, and AI tool schemas.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;Closed-world schemas for structured output you can trust.&rdquo;
+                &ldquo;Manifest-backed drift checks for every generated surface.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;Eval your schema with realistic data before you ship the prompt.&rdquo;
+                &ldquo;Closed-world ops agents can use safely.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;One schema, many products — import the generated Zod directly.&rdquo;
+                &ldquo;Inspect, mutate, emit, and validate through CLI or MCP.&rdquo;
+              </p>
+              <p className="text-foreground">
+                &ldquo;One model, many products — import the generated contracts directly.&rdquo;
               </p>
             </div>
           </div>
@@ -515,7 +517,7 @@ export default function BrandPage() {
           </h3>
           <div className="flex flex-wrap gap-3 mb-10">
             <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-accent/20 bg-accent/5 text-accent">
-              Multi-model AI
+              Agent-safe by design
             </span>
             <span className="inline-flex items-center text-xs font-medium px-3 py-1 rounded-full border border-border/60 text-muted-foreground">
               v0.1.0

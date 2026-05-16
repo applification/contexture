@@ -6,18 +6,19 @@ import { PostHogProvider } from '@/components/providers/posthog-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Contexture — Visual Zod schema editor',
+  title: 'Contexture — Design your domain once. Ship it everywhere.',
   description:
-    'Visual Zod schema editor with multi-model AI support. Chat with any LLM to build closed-world schemas; emit Zod + JSON Schema for your structured-output pipelines.',
+    'Contexture is the domain-model control plane for AI-native TypeScript apps. Design one source-of-truth IR, then emit Zod, JSON Schema, Convex, MCP, and AI tool schemas.',
   keywords: [
-    'Zod schema editor',
-    'visual schema builder',
+    'domain model control plane',
+    'TypeScript domain model',
+    'Contexture',
+    'Zod schema generator',
+    'Convex schema generator',
+    'MCP server',
     'LLM structured output',
     'JSON Schema editor',
-    'TypeScript schema tool',
-    'multi-model AI',
-    'schema design',
-    'AI agents',
+    'AI tool schemas',
   ],
   icons: {
     icon: [
@@ -27,9 +28,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Contexture — Visual Zod schema editor',
+    title: 'Contexture — Design your domain once. Ship it everywhere.',
     description:
-      'Chat with any LLM to build closed-world Zod schemas. Emit Zod + JSON Schema for your structured-output pipelines.',
+      'Design one source-of-truth domain model and emit the typed surfaces your apps, agents, and databases need.',
     type: 'website',
     siteName: 'Contexture',
     images: [
@@ -43,9 +44,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Contexture — Visual Zod schema editor',
-    description:
-      'Chat to build closed-world Zod schemas; emit Zod + JSON Schema for LLM structured-output pipelines.',
+    title: 'Contexture — Design your domain once. Ship it everywhere.',
+    description: 'The domain-model control plane for AI-native TypeScript apps.',
     images: ['/images/hero-graph.png'],
   },
 };

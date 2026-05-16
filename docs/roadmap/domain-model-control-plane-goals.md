@@ -194,6 +194,20 @@ Completion evidence:
 
 ## Goal 9 — Marketing Rewrite
 
+**Status:** Done.
+
 Rewrite public positioning only after the trust layer, agent loop, and at
 least one AI-pipeline output are credible. The site should sell: "Design
 your domain once. Ship it everywhere."
+
+Completion evidence:
+
+- Rewrote the homepage hero around "Design your domain once. Ship it
+  everywhere."
+- Shifted public positioning from "visual Zod schema editor" to
+  "domain-model control plane for AI-native TypeScript apps."
+- Updated homepage sections to cover source-of-truth IR, closed-world agent
+  ops, app-ready emit targets, MCP, AI tool schemas, manifest-backed drift
+  checks, and Recordshop dogfooding.
+- Updated site metadata, brand phrase guidance, README copy, and homepage smoke
+  tests to match the new positioning.
