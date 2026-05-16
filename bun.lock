@@ -22,7 +22,7 @@
     },
     "apps/desktop": {
       "name": "@contexture/desktop",
-      "version": "0.14.0",
+      "version": "0.15.1",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.83",
         "@contexture/core": "workspace:*",

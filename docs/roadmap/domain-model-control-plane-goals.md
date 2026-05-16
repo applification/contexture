@@ -87,6 +87,32 @@ Completion evidence:
 - Tests exercise the MCP server with an in-memory MCP client, independent
   of the desktop app.
 
+## Goal 4.5 — Packaged MCP Entry Point
+
+**Status:** Next.
+
+Make the MCP server accessible from an installed Contexture app, not just
+from a source checkout. Agents need one stable, centrally installed command
+to register after the user has created a `.contexture.json` file.
+
+Target registration shape:
+
+```bash
+codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp
+```
+
+Completion evidence:
+
+- The packaged macOS app can launch the MCP stdio server via `--mcp`
+  without opening the desktop window.
+- The MCP runtime does not require `bun`, a source checkout, or dev-only
+  TypeScript execution.
+- The registered installed-app command exposes the same
+  `inspect_contexture` and `validate_contexture` tools as Goal 4.
+- Tests or packaging verification cover the installed-app launch path.
+- Developer docs explain how agents register and smoke-test the installed
+  MCP server.
+
 ## Goal 5 — MCP Mutation/Emit Loop
 
 Let agents mutate the IR through the closed-world op vocabulary, emit the
