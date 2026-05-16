@@ -12,12 +12,13 @@
  *
  * Apply selected → run checked ops through the undo store as one
  * transaction, mark drift resolved, close.
- * Discard on-disk → overwrite the target file with the current emit.
+ * Regenerate from IR → overwrite the generated target with the
+ * current Contexture emit, without applying any proposed ops.
  * Open in chat → seed a new chat thread with IR + source + proposed ops.
- * Cancel → leave drift state alone.
+ * Leave dirty → close the modal and leave drift state alone.
  */
 
-import { baseNameFor } from '@contexture/core/paths';
+import { baseNameFor, bundlePathsFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useClaudeReconcile } from '@renderer/hooks/useClaudeReconcile';
@@ -30,7 +31,12 @@ import { STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';
-import { type ReconcileOp, targetKindFor, useReconcileStore } from '@renderer/store/reconcile';
+import {
+  type ReconcileOp,
+  type TargetKind,
+  targetKindFor,
+  useReconcileStore,
+} from '@renderer/store/reconcile';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { diffLines } from 'diff';
@@ -54,8 +60,12 @@ interface EmitResult {
   error: string | null;
 }
 
-function safeEmitForTarget(schema: Schema, targetPath: string, irPath: string | null): EmitResult {
-  const kind = targetKindFor(targetPath);
+function safeEmitForTarget(
+  schema: Schema,
+  targetPath: string,
+  irPath: string | null,
+  kind: TargetKind = targetKindFor(targetPath),
+): EmitResult {
   try {
     let source: string;
     switch (kind) {
@@ -125,6 +135,20 @@ function shortPath(fullPath: string): string {
   return slash === -1 ? fullPath : fullPath.slice(slash + 1);
 }
 
+function generatedTargetKindFor(targetPath: string | null, irPath: string | null): TargetKind {
+  if (!targetPath || !irPath) return 'unknown';
+  try {
+    const paths = bundlePathsFor(irPath);
+    if (targetPath === paths.convex) return 'convex';
+    if (targetPath === paths.schemaTs) return 'zod';
+    if (targetPath === paths.schemaJson) return 'json-schema';
+    if (targetPath === paths.schemaIndex) return 'schema-index';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 export function ReconcileModal(): React.JSX.Element {
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
@@ -150,6 +174,7 @@ export function ReconcileModal(): React.JSX.Element {
   const filePath = useDocumentStore((s) => s.filePath);
 
   const displayName = targetPath ? shortPath(targetPath) : 'generated file';
+  const targetKind = generatedTargetKindFor(targetPath, filePath);
 
   // Recompute the would-be emit each time the user toggles an op.
   // Cheap (pure function, < 10ms even on large schemas), so a
@@ -157,9 +182,14 @@ export function ReconcileModal(): React.JSX.Element {
   const projection = useMemo(() => {
     if (!targetPath) return { schema, error: null, emit: { source: '', error: 'No target.' } };
     const projected = applySelectedOps(schema, proposedOps, selectedIndices);
-    const emit = safeEmitForTarget(projected.schema, targetPath, filePath);
+    const emit = safeEmitForTarget(projected.schema, targetPath, filePath, targetKind);
     return { ...projected, emit };
-  }, [schema, proposedOps, selectedIndices, targetPath, filePath]);
+  }, [schema, proposedOps, selectedIndices, targetPath, filePath, targetKind]);
+
+  const currentEmit = useMemo(() => {
+    if (!targetPath) return { source: '', error: 'No target.' };
+    return safeEmitForTarget(schema, targetPath, filePath, targetKind);
+  }, [schema, targetPath, filePath, targetKind]);
 
   const residualLines = useMemo(() => {
     if (onDiskSource === null) return 0;
@@ -186,20 +216,19 @@ export function ReconcileModal(): React.JSX.Element {
     close();
   }, [proposedOps, selectedIndices, setApplying, setError, close]);
 
-  const handleDiscard = useCallback(() => {
-    if (!targetPath || !projection.emit.source || projection.emit.error) return;
+  const handleRegenerate = useCallback(() => {
+    if (!targetPath || targetKind === 'unknown' || !currentEmit.source || currentEmit.error) return;
     void window.api
-      ?.saveFile(targetPath, projection.emit.source)
-      .then(() => {
-        useDriftStore.getState().setResolved();
-        void window.contexture?.drift.dismiss();
+      ?.saveFile(targetPath, currentEmit.source)
+      .then(async () => {
+        await window.contexture?.drift.check();
         close();
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         setError(`Failed to overwrite file: ${message}`);
       });
-  }, [targetPath, projection, close, setError]);
+  }, [targetPath, targetKind, currentEmit, close, setError]);
 
   const handleOpenInChat = useCallback(() => {
     const irJson = JSON.stringify(schema, null, 2);
@@ -255,8 +284,8 @@ export function ReconcileModal(): React.JSX.Element {
   const applyDisabled =
     status !== 'ready' || selectedIndices.size === 0 || proposedOps.length === 0;
 
-  const discardDisabled =
-    status !== 'ready' || !targetPath || !!projection.emit.error || !projection.emit.source;
+  const regenerateDisabled =
+    !targetPath || targetKind === 'unknown' || !!currentEmit.error || !currentEmit.source;
 
   return (
     <Dialog
@@ -269,9 +298,9 @@ export function ReconcileModal(): React.JSX.Element {
         <DialogHeader>
           <DialogTitle>Reconcile changes</DialogTitle>
           <DialogDescription>
-            <code className="font-mono">{displayName}</code> was edited outside Contexture. Select
-            the ops to bring the IR in line with the file, or open the proposal in chat for
-            iteration.
+            <code className="font-mono">{displayName}</code> differs from Contexture's generated
+            output. Regenerate it from the current IR, leave it dirty, or use the proposal tools to
+            fold changes back into the model.
           </DialogDescription>
         </DialogHeader>
 
@@ -396,15 +425,15 @@ export function ReconcileModal(): React.JSX.Element {
 
         <DialogFooter>
           <Button variant="ghost" onClick={close}>
-            Cancel
+            Leave dirty
           </Button>
           <Button
             variant="outline"
-            onClick={handleDiscard}
-            disabled={discardDisabled}
-            title="Overwrite the on-disk file with what Contexture would emit"
+            onClick={handleRegenerate}
+            disabled={regenerateDisabled}
+            title="Overwrite this generated file with what Contexture emits from the current IR"
           >
-            Discard on-disk changes
+            Regenerate from IR
           </Button>
           <Button
             variant="outline"
