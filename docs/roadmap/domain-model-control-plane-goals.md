@@ -89,7 +89,7 @@ Completion evidence:
 
 ## Goal 4.5 — Packaged MCP Entry Point
 
-**Status:** Next.
+**Status:** Done.
 
 Make the MCP server accessible from an installed Contexture app, not just
 from a source checkout. Agents need one stable, centrally installed command
@@ -105,11 +105,14 @@ Completion evidence:
 
 - The packaged macOS app can launch the MCP stdio server via `--mcp`
   without opening the desktop window.
-- The MCP runtime does not require `bun`, a source checkout, or dev-only
-  TypeScript execution.
+- The Electron main entrypoint routes `--mcp` to the shared
+  `@contexture/core/mcp-server` factory before loading the desktop UI.
+- The built `apps/desktop/out/main/index.js --mcp` runtime does not require
+  `bun` or dev-only TypeScript execution.
 - The registered installed-app command exposes the same
   `inspect_contexture` and `validate_contexture` tools as Goal 4.
-- Tests or packaging verification cover the installed-app launch path.
+- Tests cover the `--mcp` launch flag, CLI MCP compatibility, and a built
+  main-process smoke test against `inspect_contexture`.
 - Developer docs explain how agents register and smoke-test the installed
   MCP server.
 
