@@ -170,6 +170,38 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('returns structured failures for malformed mutation ops', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: { kind: 'add_field', typeName: 'Plot' },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: false,
+        opKind: 'add_field',
+        error: expect.stringContaining('invalid op'),
+      });
+      expect((result.structuredContent as { error?: string }).error).toContain('field');
+    });
+  });
+
   it('applies an op, emits generated files, and reports generated drift', async () => {
     const irPath = await fixtureIr({
       version: '1',
