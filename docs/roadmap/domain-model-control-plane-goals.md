@@ -74,8 +74,18 @@ Completion evidence:
 
 ## Goal 4 — MCP Inspect/Validate Server
 
+**Status:** Done.
+
 Ship a minimal MCP surface over `@contexture/core` that can inspect and
 validate a `.contexture.json` file without the desktop app running.
+
+Completion evidence:
+
+- `@contexture/cli` now ships a `contexture-mcp` stdio server.
+- The server exposes read-only `inspect_contexture` and
+  `validate_contexture` tools backed by `@contexture/core`.
+- Tests exercise the MCP server with an in-memory MCP client, independent
+  of the desktop app.
 
 ## Goal 5 — MCP Mutation/Emit Loop
 

@@ -5,10 +5,12 @@
   "description": "Command-line schema editing tools for Contexture projects.",
   "type": "module",
   "bin": {
-    "contexture": "./src/index.ts"
+    "contexture": "./src/index.ts",
+    "contexture-mcp": "./src/mcp.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./mcp-server": "./src/mcp-server.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -17,6 +19,7 @@
   },
   "dependencies": {
     "@contexture/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
