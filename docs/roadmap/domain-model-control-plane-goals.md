@@ -154,9 +154,20 @@ Completion evidence:
 
 ## Goal 7 — First AI-Pipeline Emitter
 
+**Status:** Done.
+
 Add one high-value opt-in generated target for AI engineers, such as
 tool-call schema helpers or structured-output helper definitions. The new
 target must participate in the emit manifest and drift detection.
+
+Completion evidence:
+
+- `outputs.aiPipeline.toolSchemas.enabled` emits
+  `.contexture/ai-tool-schemas.json`.
+- The generated document contains provider-neutral per-type tool definitions
+  backed by JSON Schema parameters.
+- The new file participates in the emitted manifest and existing drift checks.
+- The target remains omitted unless explicitly enabled.
 
 ## Goal 8 — Dogfood One Real Product
 

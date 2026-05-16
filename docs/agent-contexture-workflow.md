@@ -101,8 +101,19 @@ schema index, and Convex schema. Existing targets can be disabled explicitly:
 }
 ```
 
-Future AI-pipeline targets live under `outputs.aiPipeline` and are opt-in.
-Goal 7 will attach the first emitter to this shape.
+AI-pipeline targets live under `outputs.aiPipeline` and are opt-in. Enabling
+tool schemas emits `.contexture/ai-tool-schemas.json`, a provider-neutral list
+of per-type JSON Schema tool definitions:
+
+```json
+{
+  "outputs": {
+    "aiPipeline": {
+      "toolSchemas": { "enabled": true }
+    }
+  }
+}
+```
 
 ## Standard agent loop
 

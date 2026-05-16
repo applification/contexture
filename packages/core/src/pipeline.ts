@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { emitAiToolSchemas } from './emit-ai-tool-schemas';
 import { emitConvexSchema } from './emit-convex';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import { emit as emitSchemaIndex } from './emit-schema-index';
@@ -40,6 +41,7 @@ export interface EmitPipelineDeps {
   emitJsonSchema?: (schema: Schema, sourcePath?: string) => unknown;
   emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
+  emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
 }
 
 function sha256(content: string): string {
@@ -48,6 +50,10 @@ function sha256(content: string): string {
 
 function outputEnabled(schema: Schema, target: 'zod' | 'jsonSchema' | 'schemaIndex' | 'convex') {
   return schema.outputs?.[target]?.enabled !== false;
+}
+
+function aiOutputEnabled(schema: Schema, target: 'toolSchemas') {
+  return schema.outputs?.aiPipeline?.[target]?.enabled === true;
 }
 
 export function buildManifest(entries: ReadonlyArray<FileEntry>): EmittedManifest {
@@ -68,6 +74,7 @@ export function runEmitPipeline(
       emitJsonSchema(s, undefined, sp),
     emitSchemaIndex: emitSchemaIndexImpl = emitSchemaIndex,
     emitConvex: emitConvexImpl = emitConvexSchema,
+    emitAiToolSchemas: emitAiToolSchemasImpl = emitAiToolSchemas,
   } = deps;
 
   const emitted: FileEntry[] = [];
@@ -89,6 +96,12 @@ export function runEmitPipeline(
   }
   if (outputEnabled(schema, 'convex')) {
     emitted.push({ path: paths.convex, content: emitConvexImpl(schema, irPath) });
+  }
+  if (aiOutputEnabled(schema, 'toolSchemas')) {
+    emitted.push({
+      path: paths.aiToolSchemas,
+      content: `${JSON.stringify(emitAiToolSchemasImpl(schema, irPath), null, 2)}\n`,
+    });
   }
 
   return { emitted, manifest: buildManifest(emitted) };

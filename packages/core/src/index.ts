@@ -1,3 +1,4 @@
+export { emitAiToolSchemas } from './emit-ai-tool-schemas';
 export { emit as emitClaudeMd } from './emit-claude-md';
 export { emitConvexSchema } from './emit-convex';
 export { emit as emitJsonSchema } from './emit-json-schema';
