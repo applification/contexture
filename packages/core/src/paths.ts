@@ -4,6 +4,7 @@ export const SCHEMA_JSON_SUFFIX = '.schema.json';
 export const LAYOUT_FILE = 'layout.json';
 export const CHAT_FILE = 'chat.json';
 export const EMITTED_FILE = 'emitted.json';
+export const AI_TOOL_SCHEMAS_FILE = 'ai-tool-schemas.json';
 
 export interface BundlePaths {
   ir: string;
@@ -14,6 +15,7 @@ export interface BundlePaths {
   schemaJson: string;
   schemaIndex: string;
   convex: string;
+  aiToolSchemas: string;
 }
 
 export function contextureDirFor(irPath: string): string {
@@ -53,5 +55,6 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
     schemaIndex: `${dir}/index.ts`,
     convex: `${dir}/convex/schema.ts`,
+    aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
   };
 }

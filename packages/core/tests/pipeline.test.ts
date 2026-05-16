@@ -45,12 +45,11 @@ describe('runEmitPipeline output config', () => {
     ]);
   });
 
-  it('round-trips opt-in future AI-pipeline output slots without emitting them yet', () => {
+  it('omits AI-pipeline outputs until they are explicitly enabled', () => {
     const schema: Schema = {
       ...baseSchema,
       outputs: {
         aiPipeline: {
-          toolSchemas: { enabled: true },
           structuredOutputs: { enabled: false },
         },
       },
@@ -66,5 +65,30 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/index.ts',
       '/repo/packages/contexture/convex/schema.ts',
     ]);
+  });
+
+  it('emits opt-in AI tool schemas and tracks them in the manifest', () => {
+    const schema: Schema = {
+      ...baseSchema,
+      outputs: {
+        aiPipeline: {
+          toolSchemas: { enabled: true },
+        },
+      },
+    };
+
+    const { emitted, manifest } = runEmitPipeline(
+      schema,
+      '/repo/packages/contexture/app.contexture.json',
+    );
+
+    expect(emitted.map((file) => file.path)).toContain(
+      '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
+    );
+    const toolSchemas = emitted.find((file) => file.path.endsWith('ai-tool-schemas.json'));
+    expect(toolSchemas?.content).toContain('submit_post');
+    expect(manifest.files).toHaveProperty(
+      '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
+    );
   });
 });
