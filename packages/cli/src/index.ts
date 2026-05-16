@@ -33,6 +33,13 @@ interface JsonError {
   error: { message: string; code: string };
 }
 
+type GeneratedFileStatus = 'clean' | 'drifted' | 'unreadable';
+
+interface GeneratedFileCheck {
+  path: string;
+  status: GeneratedFileStatus;
+}
+
 const HELP = `contexture <command> [args]
 
 Read helpers:
@@ -537,7 +544,7 @@ async function run(argv: string[]): Promise<void> {
   if (command === 'check-generated') {
     const schema = await readSchema(irPath);
     const { emitted } = runEmitPipeline(schema, irPath);
-    const stale: Array<{ path: string; reason: 'missing' | 'mismatch' }> = [];
+    const files: GeneratedFileCheck[] = [];
     for (const entry of emitted) {
       let onDisk: string | undefined;
       try {
@@ -545,24 +552,31 @@ async function run(argv: string[]): Promise<void> {
       } catch {
         onDisk = undefined;
       }
-      if (onDisk === undefined) stale.push({ path: entry.path, reason: 'missing' });
-      else if (onDisk !== entry.content) stale.push({ path: entry.path, reason: 'mismatch' });
+      if (onDisk === undefined) files.push({ path: entry.path, status: 'unreadable' });
+      else if (onDisk !== entry.content) files.push({ path: entry.path, status: 'drifted' });
+      else files.push({ path: entry.path, status: 'clean' });
     }
-    if (stale.length > 0) {
+    const drift = files.filter((file) => file.status !== 'clean');
+    if (drift.length > 0) {
       process.exitCode = 1;
+      const stale = drift.map((file) => ({
+        path: file.path,
+        reason: file.status === 'drifted' ? 'mismatch' : 'missing',
+        status: file.status,
+      }));
       if (options.json) {
-        writeJson({ ok: false, stale });
+        writeJson({ ok: false, checked: files.length, files, drift, stale });
       } else {
-        process.stderr.write('Generated files are stale:\n');
-        for (const { path, reason } of stale) {
-          process.stderr.write(`  ${path} (${reason})\n`);
+        process.stderr.write('Generated files are not up to date:\n');
+        for (const { path, status } of drift) {
+          process.stderr.write(`  ${path} (${status})\n`);
         }
         process.stderr.write('\nRun: contexture emit\n');
       }
       return;
     }
     writeResult(
-      { message: 'Generated files are up to date.', checked: emitted.length },
+      { message: 'Generated files are up to date.', checked: files.length, files },
       options.json,
     );
     return;

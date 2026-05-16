@@ -58,9 +58,19 @@ Notes:
 
 ## Goal 3 — CLI/Agent Drift Contract
 
+**Status:** Done.
+
 Expose machine-readable drift status for CI and coding agents. The CLI
 should report path, status, and a non-zero exit when generated files drift
 or become unreadable.
+
+Completion evidence:
+
+- `contexture check-generated --json` reports every generated target as
+  `{ path, status }`, where status is `clean`, `drifted`, or `unreadable`.
+- Drifted or unreadable generated targets set a non-zero exit code.
+- The older `stale` JSON field remains for compatibility while agents can
+  consume the new `files` and `drift` arrays directly.
 
 ## Goal 4 — MCP Inspect/Validate Server
 
