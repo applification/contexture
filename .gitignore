@@ -30,6 +30,9 @@ playwright-report/
 # Paperclip agent worktrees and local state
 .paperclip/
 
+# Codex Desktop local state
+.codex/
+
 # Claude Code scheduled-task runtime artefacts
 .claude/scheduled_tasks.lock
 
