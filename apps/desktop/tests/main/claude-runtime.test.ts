@@ -199,4 +199,54 @@ describe('ClaudeProviderRuntime', () => {
       }),
     );
   });
+
+  it('runs one-shot text generation without MCP tools for reconcile proposals', async () => {
+    const queryFn = interruptibleQuery([
+      {
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'text', text: '[{"op":{"kind":"add_type"},"label":"Add","lossy":false}]' },
+          ],
+        },
+      },
+      { type: 'result', subtype: 'success', is_error: false },
+    ]);
+    const runtime = new ClaudeProviderRuntime({
+      execFile: supportedExec(),
+      queryFn,
+      opToolDescriptors: [descriptor()],
+      skillsPluginPath: null,
+    });
+
+    await expect(
+      runtime.generateText({
+        systemPrompt: 'Return JSON.',
+        message: 'reconcile',
+        schema: { version: '1', types: [] },
+        model: 'claude-sonnet-4-6',
+        effort: 'high',
+      }),
+    ).resolves.toContain('"label":"Add"');
+
+    expect(queryFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'reconcile',
+        options: expect.objectContaining({
+          systemPrompt: 'Return JSON.',
+          allowedTools: [],
+          disallowedTools: expect.arrayContaining(['Read', 'Write', 'Bash']),
+          model: 'claude-sonnet-4-6',
+          effort: 'high',
+        }),
+      }),
+    );
+    expect(queryFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.objectContaining({
+          mcpServers: expect.anything(),
+        }),
+      }),
+    );
+  });
 });

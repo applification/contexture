@@ -10,8 +10,8 @@ vi.mock('@pierre/diffs/react', () => ({
   MultiFileDiff: () => <div data-testid="reconcile-diff" />,
 }));
 
-vi.mock('@renderer/hooks/useClaudeReconcile', () => ({
-  useClaudeReconcile: () => undefined,
+vi.mock('@renderer/hooks/useSchemaAgentReconcile', () => ({
+  useSchemaAgentReconcile: () => undefined,
 }));
 
 const IR_PATH = '/repo/packages/contexture/garden.contexture.json';

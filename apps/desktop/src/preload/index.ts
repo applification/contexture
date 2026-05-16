@@ -232,16 +232,15 @@ const drift = {
 
 const reconcile = {
   /**
-   * Fire a one-shot Claude query that returns reconcile ops for the
-   * current IR + on-disk source of any emitted file. Used by the
-   * reconcile modal to populate its op checklist.
+   * Fire a one-shot schema-agent query that returns reconcile ops for
+   * the current IR + on-disk source of any emitted file.
    */
   query: (payload: {
     irJson: string;
     onDiskSource: string;
     targetKind: string;
   }): Promise<{ ok: boolean; ops?: unknown[]; error?: string }> =>
-    ipcRenderer.invoke('reconcile:query', payload) as Promise<{
+    ipcRenderer.invoke('schema-agent:reconcile', payload) as Promise<{
       ok: boolean;
       ops?: unknown[];
       error?: string;

@@ -21,7 +21,7 @@
 import { baseNameFor, bundlePathsFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
-import { useClaudeReconcile } from '@renderer/hooks/useClaudeReconcile';
+import { useSchemaAgentReconcile } from '@renderer/hooks/useSchemaAgentReconcile';
 import { emitConvexSchema } from '@renderer/model/emit-convex';
 import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
@@ -167,8 +167,8 @@ export function ReconcileModal(): React.JSX.Element {
 
   const history = useChatThreads();
 
-  // Drives the Claude query when the modal enters the loading state.
-  useClaudeReconcile();
+  // Drives proposal generation when the modal enters the loading state.
+  useSchemaAgentReconcile();
 
   const schema = useUndoStore((s) => s.schema);
   const filePath = useDocumentStore((s) => s.filePath);

@@ -694,6 +694,134 @@ describe('CodexProviderRuntime', () => {
     );
   });
 
+  it('runs one-shot text generation without Contexture dynamic tools', async () => {
+    let connection: FakeConnection;
+    const request = vi.fn<CodexAppServerConnection['client']['request']>(async (method) => {
+      if (method === 'initialize') {
+        return {
+          userAgent: 'codex',
+          codexHome: '/tmp/codex',
+          platformFamily: 'unix',
+          platformOs: 'macos',
+        };
+      }
+      if (method === 'thread/start') {
+        return {
+          thread: {
+            id: 'thread-123',
+            sessionId: 'session-123',
+            forkedFromId: null,
+            preview: '',
+            ephemeral: false,
+            modelProvider: 'openai',
+            createdAt: 1,
+            updatedAt: 1,
+            status: 'idle',
+            path: null,
+            cwd: '/tmp',
+            cliVersion: '0.130.0',
+            source: 'appServer',
+            threadSource: null,
+            agentNickname: null,
+            agentRole: null,
+            gitInfo: null,
+            name: null,
+            turns: [],
+          },
+          model: 'gpt-5.4',
+          modelProvider: 'openai',
+          serviceTier: null,
+          cwd: '/tmp',
+          instructionSources: [],
+          approvalPolicy: 'never',
+          approvalsReviewer: 'user',
+          sandbox: { type: 'readOnly', networkAccess: false },
+          permissionProfile: null,
+          activePermissionProfile: null,
+          reasoningEffort: null,
+        };
+      }
+      if (method === 'turn/start') {
+        queueMicrotask(() => {
+          connection.emitNotification({
+            jsonrpc: '2.0',
+            method: 'item/agentMessage/delta',
+            params: { threadId: 'thread-123', turnId: 'turn-1', itemId: 'item-1', delta: '[]' },
+          });
+          connection.emitNotification({
+            jsonrpc: '2.0',
+            method: 'turn/completed',
+            params: {
+              threadId: 'thread-123',
+              turn: {
+                id: 'turn-1',
+                items: [],
+                itemsView: 'complete',
+                status: 'completed',
+                error: null,
+                startedAt: 1,
+                completedAt: 2,
+                durationMs: 1,
+              },
+            },
+          });
+        });
+        return {
+          turn: {
+            id: 'turn-1',
+            items: [],
+            itemsView: 'complete',
+            status: 'inProgress',
+            error: null,
+            startedAt: 1,
+            completedAt: null,
+            durationMs: null,
+          },
+        };
+      }
+      throw new Error(`unexpected method ${method}`);
+    });
+    connection = fakeConnection(request);
+    const runtime = new CodexProviderRuntime({
+      execFile: supportedExec(),
+      appServerFactory: vi.fn(() => connection),
+      opToolDescriptors: [
+        {
+          name: 'add_type',
+          description: 'Add type.',
+          inputSchema: { payload: z.object({ name: z.string() }) },
+          handler: vi.fn(async () => ({ schema: { version: '1', types: [] } })),
+        },
+      ],
+    });
+
+    await expect(
+      runtime.generateText({
+        systemPrompt: 'Return JSON only.',
+        message: 'reconcile',
+        schema: { version: '1', types: [] },
+        model: 'gpt-5.4',
+        effort: 'high',
+      }),
+    ).resolves.toBe('[]');
+
+    expect(request).toHaveBeenCalledWith(
+      'thread/start',
+      expect.objectContaining({
+        developerInstructions: 'Return JSON only.',
+        dynamicTools: [],
+      }),
+    );
+    expect(request).toHaveBeenCalledWith(
+      'turn/start',
+      expect.objectContaining({
+        input: [{ type: 'text', text: 'reconcile', text_elements: [] }],
+        model: 'gpt-5.4',
+        effort: 'high',
+      }),
+    );
+  });
+
   it('interrupts only when a Codex turn id is available', async () => {
     const request = vi.fn<CodexAppServerConnection['client']['request']>(async (method) => {
       if (method === 'initialize') {
