@@ -151,10 +151,17 @@ describe('@contexture/cli', () => {
     expect(result.exitCode).toBe(1);
     const parsed = JSON.parse(result.stdout);
     expect(parsed.ok).toBe(false);
+    expect(parsed.checked).toBeGreaterThan(0);
+    expect(parsed.files.every((entry: { status: string }) => entry.status === 'unreadable')).toBe(
+      true,
+    );
+    expect(parsed.drift.every((entry: { status: string }) => entry.status === 'unreadable')).toBe(
+      true,
+    );
     expect(Array.isArray(parsed.stale)).toBe(true);
     expect(parsed.stale.length).toBeGreaterThan(0);
     for (const entry of parsed.stale) {
-      expect(entry).toMatchObject({ reason: 'missing' });
+      expect(entry).toMatchObject({ reason: 'missing', status: 'unreadable' });
     }
   });
 
@@ -168,6 +175,12 @@ describe('@contexture/cli', () => {
     expect(JSON.parse(checkResult.stdout)).toMatchObject({
       ok: true,
       message: expect.stringContaining('up to date'),
+      files: expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining('packages/contexture/convex/schema.ts'),
+          status: 'clean',
+        }),
+      ]),
     });
   });
 
@@ -181,10 +194,26 @@ describe('@contexture/cli', () => {
     const result = await runCli(dir, ['check-generated', '--json']);
     expect(result.exitCode).toBe(1);
     const parsed = JSON.parse(result.stdout);
+    expect(parsed.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining('packages/contexture/convex/schema.ts'),
+          status: 'drifted',
+        }),
+      ]),
+    );
+    expect(parsed.drift).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining('packages/contexture/convex/schema.ts'),
+          status: 'drifted',
+        }),
+      ]),
+    );
     expect(
       parsed.stale.some(
-        (s: { path: string; reason: string }) =>
-          s.path.endsWith('convex/schema.ts') && s.reason === 'mismatch',
+        (s: { path: string; reason: string; status: string }) =>
+          s.path.endsWith('convex/schema.ts') && s.reason === 'mismatch' && s.status === 'drifted',
       ),
     ).toBe(true);
   });
