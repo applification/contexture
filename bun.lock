@@ -22,7 +22,7 @@
     },
     "apps/desktop": {
       "name": "@contexture/desktop",
-      "version": "0.15.1",
+      "version": "0.15.2",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.83",
         "@contexture/core": "workspace:*",
@@ -30,6 +30,7 @@
         "@contexture/stdlib": "workspace:*",
         "@electron-toolkit/preload": "^3.0.1",
         "@electron-toolkit/utils": "^4.0.0",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "@pierre/diffs": "^1.1.19",
         "@radix-ui/react-checkbox": "^1.3.3",
         "@radix-ui/react-context-menu": "^2.2.16",
@@ -154,6 +155,7 @@
       "name": "@contexture/core",
       "version": "0.0.0",
       "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "zod": "^4.3.6",
       },
       "devDependencies": {

@@ -16,6 +16,7 @@
     "./file-forward": "./src/file-forward.ts",
     "./ir": "./src/ir.ts",
     "./load": "./src/load.ts",
+    "./mcp-server": "./src/mcp-server.ts",
     "./migrations": "./src/migrations/index.ts",
     "./ops": "./src/ops.ts",
     "./op-tools": "./src/op-tools.ts",
@@ -28,6 +29,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
