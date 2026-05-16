@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ZodError, z } from 'zod';
+import { createFileBackedForward } from './file-forward';
 import type { FieldType, Schema, TypeDef } from './ir';
 import { load } from './load';
+import type { Op } from './ops';
+import { runEmitPipeline } from './pipeline';
 import { checkSemantic } from './semantic-validation';
 
 const VERSION = '0.0.0';
@@ -60,6 +63,48 @@ const ValidateOutput = {
   errors: z.array(ValidationIssueSchema),
 };
 
+const ApplyContextureOpInput = {
+  irPath: IrPathInput.irPath,
+  op: z.record(z.string(), z.unknown()).describe('A Contexture closed-world Op object.'),
+};
+
+const ApplyContextureOpOutput = {
+  path: z.string(),
+  applied: z.boolean(),
+  opKind: z.string(),
+  error: z.string().optional(),
+  typeCount: z.number().optional(),
+};
+
+const EmitContextureOutput = {
+  path: z.string(),
+  emitted: z.array(z.string()),
+  manifest: z.object({
+    version: z.literal('1'),
+    files: z.record(z.string(), z.string()),
+  }),
+};
+
+const GeneratedFileStatusSchema = z.enum(['clean', 'drifted', 'unreadable']);
+
+const CheckContextureDriftOutput = {
+  path: z.string(),
+  clean: z.boolean(),
+  checked: z.number(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      status: GeneratedFileStatusSchema,
+    }),
+  ),
+  drift: z.array(
+    z.object({
+      path: z.string(),
+      status: GeneratedFileStatusSchema,
+    }),
+  ),
+};
+
 export function createContextureMcpServer(): McpServer {
   const server = new McpServer({ name: 'contexture-core', version: VERSION });
 
@@ -103,6 +148,66 @@ export function createContextureMcpServer(): McpServer {
     },
   );
 
+  server.registerTool(
+    'apply_contexture_op',
+    {
+      title: 'Apply Contexture Op',
+      description:
+        'Mutate a .contexture.json file by applying one Contexture closed-world Op, then rewrite generated artifacts.',
+      inputSchema: ApplyContextureOpInput,
+      outputSchema: ApplyContextureOpOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      },
+    },
+    async ({ irPath, op }) => {
+      const structuredContent = await applyContextureOp(irPath, op);
+      return jsonToolResult(structuredContent);
+    },
+  );
+
+  server.registerTool(
+    'emit_contexture',
+    {
+      title: 'Emit Contexture Bundle',
+      description:
+        'Regenerate Contexture artifacts from a .contexture.json file without changing the schema.',
+      inputSchema: IrPathInput,
+      outputSchema: EmitContextureOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ irPath }) => {
+      const structuredContent = await emitContextureBundle(irPath);
+      return jsonToolResult(structuredContent);
+    },
+  );
+
+  server.registerTool(
+    'check_contexture_drift',
+    {
+      title: 'Check Contexture Generated Drift',
+      description:
+        'Compare generated Contexture artifacts on disk with the current .contexture.json file.',
+      inputSchema: IrPathInput,
+      outputSchema: CheckContextureDriftOutput,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ irPath }) => {
+      const structuredContent = await checkContextureDrift(irPath);
+      return jsonToolResult(structuredContent);
+    },
+  );
+
   return server;
 }
 
@@ -131,6 +236,81 @@ async function validateContextureFile(
       errors: normalizeValidationError(err),
     };
   }
+}
+
+async function applyContextureOp(
+  irPath: string,
+  op: Record<string, unknown>,
+): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
+  const opKind = typeof op.kind === 'string' ? op.kind : 'unknown';
+  if (typeof op.kind !== 'string') {
+    return {
+      path: irPath,
+      applied: false,
+      opKind,
+      error: 'op.kind must be a string',
+    };
+  }
+
+  const result = await createFileBackedForward(irPath)(op as Op);
+  if ('error' in result) {
+    return { path: irPath, applied: false, opKind, error: result.error };
+  }
+  return {
+    path: irPath,
+    applied: true,
+    opKind,
+    typeCount: result.schema.types.length,
+  };
+}
+
+async function emitContextureBundle(
+  irPath: string,
+): Promise<z.infer<z.ZodObject<typeof EmitContextureOutput>>> {
+  const { schema } = await readContextureFile(irPath);
+  const { emitted, manifest } = runEmitPipeline(schema, irPath);
+  const result = await createFileBackedForward(irPath)({
+    kind: 'replace_schema',
+    schema,
+  });
+  if ('error' in result) throw new Error(result.error);
+  return {
+    path: irPath,
+    emitted: emitted.map((file) => file.path),
+    manifest,
+  };
+}
+
+type GeneratedFileStatus = z.infer<typeof GeneratedFileStatusSchema>;
+
+async function checkContextureDrift(
+  irPath: string,
+): Promise<z.infer<z.ZodObject<typeof CheckContextureDriftOutput>>> {
+  const { schema } = await readContextureFile(irPath);
+  const { emitted } = runEmitPipeline(schema, irPath);
+  const files: Array<{ path: string; status: GeneratedFileStatus }> = [];
+
+  for (const entry of emitted) {
+    let onDisk: string | undefined;
+    try {
+      onDisk = await readFile(entry.path, 'utf8');
+    } catch {
+      onDisk = undefined;
+    }
+
+    if (onDisk === undefined) files.push({ path: entry.path, status: 'unreadable' });
+    else if (onDisk !== entry.content) files.push({ path: entry.path, status: 'drifted' });
+    else files.push({ path: entry.path, status: 'clean' });
+  }
+
+  const drift = files.filter((file) => file.status !== 'clean');
+  return {
+    path: irPath,
+    clean: drift.length === 0,
+    checked: files.length,
+    files,
+    drift,
+  };
 }
 
 function normalizeValidationError(err: unknown): Array<z.infer<typeof ValidationIssueSchema>> {

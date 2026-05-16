@@ -1,9 +1,10 @@
 # Agent MCP Server
 
-Contexture exposes a read-only MCP server for agents that need to inspect or
-validate `.contexture.json` files. The source-checkout command is still
-available as `contexture-mcp`, but installed app users should register the
-packaged app entrypoint so every agent uses the same central install.
+Contexture exposes an MCP server for agents that need to inspect, validate,
+mutate, emit, and check drift for `.contexture.json` files. The source-checkout
+command is still available as `contexture-mcp`, but installed app users should
+register the packaged app entrypoint so every agent uses the same central
+install.
 
 ## Register the Installed App
 
@@ -24,6 +25,32 @@ known `.contexture.json` file. The server should expose:
 
 - `inspect_contexture`
 - `validate_contexture`
+- `apply_contexture_op`
+- `emit_contexture`
+- `check_contexture_drift`
+
+The intended agent loop is:
+
+1. `inspect_contexture`
+2. `apply_contexture_op`
+3. `validate_contexture`
+4. `emit_contexture`
+5. `check_contexture_drift`
+
+`apply_contexture_op` accepts one closed-world Contexture `Op` object, such as:
+
+```json
+{
+  "kind": "add_field",
+  "typeName": "Customer",
+  "field": { "name": "email", "type": { "kind": "string", "format": "email" } }
+}
+```
+
+The apply tool writes the IR and generated bundle through the same file-backed
+op path as the CLI. `emit_contexture` is available when the agent only needs to
+regenerate artifacts from the current IR, and `check_contexture_drift` verifies
+that generated files still match the IR.
 
 For local release verification before packaging, build the desktop app and start
 the built main entrypoint with the same flag:
