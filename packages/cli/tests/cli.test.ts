@@ -218,6 +218,33 @@ describe('@contexture/cli', () => {
     ).toBe(true);
   });
 
+  it('check-generated detects stale emitted manifest files', async () => {
+    const { dir } = await fixtureProject();
+    await runCli(dir, ['emit', '--json']);
+    const emittedPath = join(dir, 'packages/contexture/.contexture/emitted.json');
+    await writeFile(emittedPath, `${JSON.stringify({ version: '1', files: {} }, null, 2)}\n`);
+
+    const result = await runCli(dir, ['check-generated', '--json']);
+    expect(result.exitCode).toBe(1);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining('packages/contexture/.contexture/emitted.json'),
+          status: 'drifted',
+        }),
+      ]),
+    );
+    expect(parsed.stale).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringContaining('packages/contexture/.contexture/emitted.json'),
+          reason: 'mismatch',
+        }),
+      ]),
+    );
+  });
+
   it('apply --op-json applies a serialized op', async () => {
     const { dir, irPath } = await fixtureProject();
     const op = JSON.stringify({

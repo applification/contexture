@@ -2,6 +2,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
+  bundlePathsFor,
   createFileBackedForward,
   createOpTools,
   type FieldDef,
@@ -543,9 +544,14 @@ async function run(argv: string[]): Promise<void> {
 
   if (command === 'check-generated') {
     const schema = await readSchema(irPath);
-    const { emitted } = runEmitPipeline(schema, irPath);
+    const { emitted, manifest } = runEmitPipeline(schema, irPath);
+    const paths = bundlePathsFor(irPath);
+    const expectedFiles = [
+      ...emitted,
+      { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
+    ];
     const files: GeneratedFileCheck[] = [];
-    for (const entry of emitted) {
+    for (const entry of expectedFiles) {
       let onDisk: string | undefined;
       try {
         onDisk = await Bun.file(entry.path).text();
