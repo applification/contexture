@@ -1,11 +1,12 @@
 # Contexture
 
-Visual Zod schema editor with LLM support. Chat to Claude about a domain;
-Claude edits a closed-world schema via a small op vocabulary; the graph
-animates per op. Generate `.schema.ts` (Zod) and `.schema.json` alongside
-the source-of-truth `.contexture.json` for downstream products to import.
+Contexture is the domain-model control plane for AI-native TypeScript apps.
+Design your domain once in source-of-truth `.contexture.json`, then emit the
+typed surfaces your products and agents need: Zod, JSON Schema, Convex schemas,
+schema indexes, MCP tools, and opt-in AI tool definitions.
 
-Built for engineers shipping LLM structured-output pipelines.
+Built for engineers who want humans and agents to change the model, regenerate
+artifacts, and prove drift is gone before the code ships.
 
 ## Repository Structure
 

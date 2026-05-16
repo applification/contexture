@@ -1,4 +1,14 @@
-import { ArrowRight, Brain, Download, GitGraph, Layers, Network, Shield, Zap } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  Brain,
+  Database,
+  Download,
+  GitGraph,
+  Network,
+  Shield,
+  Zap,
+} from 'lucide-react';
 import { DownloadButton } from '@/components/download-button';
 import { TrackedLink } from '@/components/tracked-link';
 import { AnimatedGraph } from '@/components/ui/animated-graph';
@@ -54,39 +64,39 @@ function GithubIcon({ className }: { className?: string }) {
 const features = [
   {
     icon: GitGraph,
-    title: 'Visual schema editor',
+    title: 'Source-of-truth IR',
     description:
-      'See every type as a node, every field as a sub-row, every ref as an edge. Drag, select, and refine your schema on an interactive canvas.',
+      'Keep `*.contexture.json` as the canonical domain model. The graph is an editor for the truth, not another drawing to keep in sync.',
   },
   {
     icon: Brain,
-    title: 'Chat-driven authoring',
+    title: 'Closed-world agent ops',
     description:
-      'Describe a domain and your LLM edits the schema via a small op vocabulary. Every turn animates on the graph so you can follow what changed.',
+      'Codex and Claude change schemas through explicit Contexture operations, so every AI edit is reviewable, undoable, and constrained.',
   },
   {
     icon: Network,
-    title: 'Zod + JSON Schema outputs',
+    title: 'App-ready emit targets',
     description:
-      '`.contexture.json` is the source of truth; `.schema.ts` and `.schema.json` are emitted alongside and git-checked for downstream products to import.',
+      'Emit Zod, JSON Schema, schema indexes, and Convex schemas from the same model, then commit the generated surface your app imports.',
   },
   {
-    icon: Zap,
-    title: 'Eval panel',
+    icon: Bot,
+    title: 'Agent-ready surfaces',
     description:
-      'Generate sample data — realistic, minimal, edge-case, or adversarial — against any root type. Zod-validate the output and save fixtures.',
+      'Opt into provider-neutral AI tool schemas and expose the same model over MCP so coding agents can inspect, mutate, emit, and check drift.',
   },
   {
     icon: Shield,
-    title: 'Curated stdlib',
+    title: 'Drift you can trust',
     description:
-      'Email, URL, UUID, Address, Money, PhoneE164 — 19 types across 5 namespaces, published as `@contexture/runtime` for your generated code to import.',
+      'Generated files carry a manifest. Contexture tells you when Zod, JSON Schema, Convex, or agent outputs no longer match the IR.',
   },
   {
-    icon: Layers,
-    title: 'Open source & free',
+    icon: Database,
+    title: 'Dogfooded on real apps',
     description:
-      'MIT licensed and free forever. Built in the open by engineers who believe schema tooling should be accessible to everyone.',
+      'The workflow is already being used on Applification products: start from the IR, regenerate artifacts, and let drift checks prove it.',
   },
 ];
 
@@ -137,27 +147,20 @@ export default function Home() {
           <AnimatedGraph />
         </div>
 
-        {/* Gradient orbs */}
-        <div className="hidden sm:block absolute top-20 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/[0.07] blur-[100px] animate-float-slow pointer-events-none" />
-        <div className="hidden sm:block absolute top-40 right-1/4 w-[400px] h-[400px] rounded-full bg-accent/[0.05] blur-[100px] animate-float-slower pointer-events-none" />
-
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-accent font-medium mb-6 tracking-widest uppercase">
-            Visual Zod schema editor with LLM support
+            Domain-model control plane
           </p>
           <h1 className="animate-fade-in-up-delay-1 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
-            Design the schemas that power{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-              your LLM pipelines.
-            </span>
+            Design your domain once. Ship it everywhere.
           </h1>
           <p className="animate-fade-in-up-delay-2 text-lg text-accent font-medium mb-3">
-            Where schemas take shape.
+            One model for your app, database, and agents.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Contexture pairs a visual graph editor with your choice of LLM — chat to describe a
-            domain, watch the graph assemble, and emit Zod + JSON Schema your products can import
-            directly.
+            Contexture turns a source-of-truth IR into Zod, JSON Schema, Convex schemas, MCP tools,
+            and AI tool definitions. Humans and agents edit the same domain model; drift checks keep
+            the emitted code honest.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <TrackedLink
@@ -208,16 +211,15 @@ export default function Home() {
         id="features"
         className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
       >
-        <div className="hidden sm:block absolute top-1/2 left-0 w-[300px] h-[300px] rounded-full bg-primary/[0.04] blur-[80px] animate-float-slower pointer-events-none" />
-
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-12 sm:mb-20">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              The schema editor built for LLM pipelines
+              The control plane for AI-native TypeScript apps
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Design the closed-world schemas your structured-output prompts depend on. Built for
-              engineers shipping products with any LLM — Claude, GPT, Gemini, and more.
+              Model the domain once, then emit the contracts every runtime needs. Contexture keeps
+              visual editing, agent mutation, generated code, and drift detection tied to one
+              explicit source of truth.
             </p>
           </div>
 
@@ -254,25 +256,19 @@ export default function Home() {
 
       {/* AI Section — two-column layout with panel screenshot */}
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="hidden sm:block absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full bg-accent/[0.04] blur-[100px] animate-float-slow pointer-events-none" />
-        <div className="hidden sm:block absolute bottom-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/[0.05] blur-[80px] animate-float-slower pointer-events-none" />
-
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
             <div className="inline-flex items-center gap-2 text-sm text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
               <Brain className="size-4" />
-              Multi-model AI
+              Agent-safe by design
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-5">
-              Describe your domain.{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-                Watch your schema emerge.
-              </span>
+              Let agents change the model, not the contract.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Build schemas through conversation, not configuration. Your LLM edits via a small op
-              vocabulary — add_type, add_field, set_discriminator, rename — so every turn is an
-              atomic change you can undo or refine.
+              Contexture exposes a narrow mutation vocabulary through chat, CLI, and MCP. Codex or
+              Claude can inspect a schema, apply one closed-world op, regenerate artifacts, and
+              prove the repo is still clean.
             </p>
           </div>
 
@@ -289,11 +285,13 @@ export default function Home() {
               />
             </div>
             <div className="sm:col-span-3 space-y-6">
-              <h3 className="text-2xl font-bold tracking-tight">Eval your schema with real data</h3>
+              <h3 className="text-2xl font-bold tracking-tight">
+                Emit contracts your pipeline can actually use
+              </h3>
               <p className="text-muted-foreground leading-relaxed">
-                Pick a root type, pick a generation mode, and get a JSON sample that — by
-                construction — parses against your schema. Test realism, edge cases, or adversarial
-                input before you ship the prompt.
+                The same IR can serve product code, database definitions, structured output, and
+                agent tools. Opt-in AI pipeline targets generate provider-neutral tool schemas
+                without forcing a runtime choice.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -301,7 +299,7 @@ export default function Home() {
                     <Zap className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Four modes: realistic, minimal, edge-case, adversarial
+                    Zod, JSON Schema, schema indexes, and Convex schema from one IR
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -309,7 +307,7 @@ export default function Home() {
                     <Shield className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Post-generation Zod validation with field-level errors
+                    Manifest-backed drift checks for every emitted target
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -317,7 +315,7 @@ export default function Home() {
                     <Brain className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Save fixtures alongside the schema for test reuse
+                    MCP access for agents that need to inspect, mutate, emit, and validate
                   </span>
                 </div>
               </div>
@@ -330,13 +328,12 @@ export default function Home() {
               You:
             </div>
             <div className="text-foreground mb-6">
-              Add a Harvest type for my allotment schema with a date, quantity (kg), and a ref to
-              the Crop it came from.
+              Add a Discogs release ID to my Release model and make it queryable.
             </div>
             <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">AI:</div>
             <div className="text-muted-foreground">
-              add_type Harvest (object) · add_field Harvest.date (date) · add_field
-              Harvest.quantityKg (number, min=0) · add_field Harvest.crop (ref → Crop)
+              add_field Release.discogsReleaseId (string, optional) · add_index Release
+              by_discogs_release_id · emit · check_generated clean
             </div>
           </div>
         </div>
@@ -344,16 +341,14 @@ export default function Home() {
 
       {/* Use Cases */}
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="hidden sm:block absolute top-1/2 right-1/4 w-[350px] h-[350px] rounded-full bg-accent/[0.04] blur-[80px] animate-float-slow pointer-events-none" />
-
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              Structured output is only as good as the schema behind it
+              Ship every surface from the same domain model
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Contexture lets you design, visualise, and evaluate the closed-world schemas your LLM
-              pipelines parse against.
+              Contexture is deliberately narrow: it owns the model boundary, then gets out of the
+              way. Your app, agent, and database code consume generated artifacts.
             </p>
           </div>
 
@@ -363,27 +358,26 @@ export default function Home() {
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Emit Zod at build time; your prompt runner hands the same schema to any LLM —
-                Claude, GPT, Gemini — for typed, validated responses. Parse failures become
-                compile-time errors.
+                Generate JSON Schema and AI tool definitions from the same type graph your app
+                imports. The prompt surface and TypeScript surface stop drifting apart.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                Data ingestion
+                App schemas
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Shape what your LLM extracts from PDFs, emails, or transcripts. The IR ships in the
-                prompt so every tool call targets a known, named type.
+                Emit Zod and Convex schema files for the product repo. Generated markers and the
+                manifest make review and drift detection part of normal git flow.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                Shared models
+                Agent workflows
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Reference types across projects with relative imports or pull from the curated
-                `@contexture/runtime` stdlib. One schema, many products.
+                Let Codex or Claude work through CLI and MCP instead of hand-editing generated
+                files. Agents update the IR, regenerate artifacts, and report whether drift remains.
               </p>
             </div>
           </div>
@@ -395,17 +389,16 @@ export default function Home() {
         id="download"
         className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
       >
-        <div className="hidden sm:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-primary/[0.06] blur-[120px] pointer-events-none" />
-
         <div className="relative max-w-3xl mx-auto text-center">
           <p className="text-sm text-accent font-medium mb-4 tracking-widest uppercase">
             Open source & free
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-            Start designing your schemas
+            Start with your source-of-truth model
           </h2>
           <p className="text-muted-foreground mb-10">
-            Free and open source. Available for macOS, Windows, and Linux.
+            Free and open source. Build visually, collaborate with agents, and ship generated
+            contracts from the desktop app for macOS, Windows, and Linux.
           </p>
           <DownloadButton
             location="footer_cta"

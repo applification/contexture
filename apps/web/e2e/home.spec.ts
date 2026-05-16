@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Home page', () => {
   test('loads and displays hero section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Design the schemas that power');
+    await expect(page.locator('h1')).toContainText('Design your domain once. Ship it everywhere.');
     await expect(page.locator('nav')).toBeVisible();
   });
 
@@ -17,7 +17,9 @@ test.describe('Home page', () => {
     await page.goto('/');
     const features = page.locator('#features');
     await expect(features).toBeVisible();
-    await expect(features.locator('h2')).toContainText('schema editor built for LLM pipelines');
+    await expect(features.locator('h2')).toContainText(
+      'control plane for AI-native TypeScript apps',
+    );
   });
 
   test('download section has CTA link', async ({ page }) => {
@@ -33,14 +35,14 @@ test.describe('Home page', () => {
     await expect(cards).toHaveCount(6);
   });
 
-  test('AI section promotes model independence', async ({ page }) => {
+  test('AI section promotes agent-safe model changes', async ({ page }) => {
     await page.goto('/');
     const aiSection = page.locator('section', {
-      has: page.locator('h2:has-text("Describe your domain")'),
+      has: page.locator('h2:has-text("Let agents change the model")'),
     });
     await expect(aiSection).toBeVisible();
     await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);
-    await expect(aiSection.locator('text=Multi-model AI')).toBeVisible();
+    await expect(aiSection.locator('text=Agent-safe by design')).toBeVisible();
   });
 
   test('footer contains expected links', async ({ page }) => {
