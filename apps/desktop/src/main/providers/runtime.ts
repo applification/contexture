@@ -84,6 +84,15 @@ export interface SendTurnInput {
   options?: ModelOptions;
 }
 
+export interface GenerateTextInput {
+  systemPrompt: string;
+  message: string;
+  schema: Schema;
+  model?: string;
+  effort?: string;
+  options?: ModelOptions;
+}
+
 export interface ResumeThreadInput {
   thread: ProviderThreadRef;
   model?: string;
@@ -140,6 +149,7 @@ export interface ProviderRuntime {
   startThread(input: StartThreadInput): Promise<ProviderThreadRef>;
   resumeThread(input: ResumeThreadInput): Promise<ProviderThreadRef>;
   sendTurn(input: SendTurnInput): AsyncIterable<ProviderRuntimeEvent>;
+  generateText(input: GenerateTextInput): Promise<string>;
   interruptTurn(input: InterruptTurnInput): Promise<void>;
   rollbackThread(input: RollbackThreadInput): Promise<void>;
 

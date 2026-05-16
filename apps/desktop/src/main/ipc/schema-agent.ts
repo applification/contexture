@@ -21,6 +21,7 @@ import {
   SCHEMA_AGENT_TOOL_CALL_STARTED,
   SchemaAgentDriver,
 } from '../providers/schema-agent-driver';
+import { generateReconcileProposal, type ReconcileProposalInput } from '../reconcile/proposals';
 import { ChatTurnController } from './chat-turn';
 import { type BridgeTransport, makeIpcForwardOp, TurnContext } from './claude-bridge';
 
@@ -94,6 +95,15 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
       return { ok: false, error: message };
     }
   });
+
+  ipcMain.handle('schema-agent:reconcile', async (_evt, payload: ReconcileProposalInput) =>
+    generateReconcileProposal({
+      runtime: activeRuntime(),
+      schema: turnContext.current() ?? parseSchemaPayload(payload.irJson),
+      modelOptions: currentModelOptions[currentProvider],
+      payload,
+    }),
+  );
 
   ipcMain.handle('schema-agent:abort', async () => {
     const currentThread = currentThreads[currentProvider];
@@ -189,6 +199,17 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
 
 function threadKey(thread: ProviderThreadRef): string {
   return `${thread.provider}:${thread.threadId}`;
+}
+
+function parseSchemaPayload(irJson: string): Schema {
+  try {
+    const parsed = JSON.parse(irJson);
+    if (parsed && typeof parsed === 'object') return parsed as Schema;
+  } catch {
+    // Fall through to an empty schema. The prompt still carries the raw IR
+    // string, so this only protects provider runtimes that require a schema.
+  }
+  return { version: '1', types: [] };
 }
 
 export const SCHEMA_AGENT_CHANNELS = {

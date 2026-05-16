@@ -231,8 +231,8 @@ export interface DriftDetectedPayload {
 
 export interface ContextureReconcileAPI {
   /**
-   * Fire a one-shot Claude query that proposes IR ops to align the
-   * current schema with the user's hand-edited on-disk source. The
+   * Fire a one-shot schema-agent query that proposes IR ops to align
+   * the current schema with the user's hand-edited on-disk source. The
    * returned `ops` array is raw — the renderer validates each entry
    * via the op-applier before showing it in the modal.
    */

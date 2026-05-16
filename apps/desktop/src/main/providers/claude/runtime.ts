@@ -10,6 +10,7 @@ import type { OpToolDescriptor } from '../../ops';
 import { CLAUDE_FALLBACK_MODELS, claudeModelFromSdk } from '../model-registry';
 import type {
   CancelLoginInput,
+  GenerateTextInput,
   InterruptTurnInput,
   LoginFlow,
   ModelInfo,
@@ -205,6 +206,46 @@ export class ClaudeProviderRuntime implements ProviderRuntime {
       this.#cancelRequested = false;
       this.#currentQuery = null;
     }
+  }
+
+  async generateText(input: GenerateTextInput): Promise<string> {
+    const thinking = claudeThinkingConfig(input.options);
+    const effort = claudeEffort(input.options, input.effort);
+    const fastMode = readBooleanOption(input.options, 'fastMode');
+    const model = claudeModelWithContext(
+      input.model ?? CLAUDE_FALLBACK_MODELS[0].id,
+      input.options,
+    );
+    const iterator = this.#query({
+      prompt: input.message,
+      options: {
+        systemPrompt: input.systemPrompt,
+        allowedTools: [],
+        disallowedTools: DISALLOWED_BUILTINS,
+        model,
+        pathToClaudeCodeExecutable:
+          this.#auth.mode === 'cli-session' ? (this.#auth.cliPath ?? 'claude') : 'claude',
+        ...(thinking ? { thinking } : {}),
+        ...(effort ? { effort } : {}),
+        ...(fastMode !== null ? { settings: { fastMode, fastModePerSessionOptIn: true } } : {}),
+        ...(this.#auth.mode === 'api-key' ? { env: { ANTHROPIC_API_KEY: this.#auth.key } } : {}),
+      },
+    });
+
+    let buffered = '';
+    try {
+      for await (const message of iterator) {
+        const event = mapClaudeMessage(message);
+        if (event?.type === 'assistant_delta') buffered += event.text;
+        if (event?.type === 'tool_call_started') {
+          throw new Error(`Claude reconcile proposal requested forbidden tool: ${event.name}`);
+        }
+        if (event?.type === 'turn_failed') throw new Error(event.message);
+      }
+    } finally {
+      iterator.close?.();
+    }
+    return buffered;
   }
 
   async interruptTurn(_input: InterruptTurnInput): Promise<void> {

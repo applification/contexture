@@ -3,6 +3,7 @@ import type { OpToolDescriptor } from '../../ops';
 import { overlayModelOptions } from '../model-registry';
 import type {
   CancelLoginInput,
+  GenerateTextInput,
   InterruptTurnInput,
   LoginFlow,
   ModelInfo,
@@ -87,6 +88,7 @@ export class CodexProviderRuntime implements ProviderRuntime {
   #connection: CodexAppServerConnection | null = null;
   #initializePromise: Promise<InitializeResponse> | null = null;
   #lastAuthenticatedReadiness: ProviderStatus['readiness'] = 'not_signed_in';
+  #textGenerationThreads = new Set<string>();
 
   constructor(options: CodexProviderRuntimeOptions = {}) {
     this.#execFile = options.execFile;
@@ -161,6 +163,19 @@ export class CodexProviderRuntime implements ProviderRuntime {
   }
 
   async startThread(input: StartThreadInput): Promise<ProviderThreadRef> {
+    return this.#startThread(input, {
+      developerInstructions: buildSchemaOnlyInstructions(),
+      dynamicTools: toCodexDynamicTools(this.#opToolDescriptors),
+    });
+  }
+
+  async #startThread(
+    input: StartThreadInput,
+    options: {
+      developerInstructions: string;
+      dynamicTools: ReturnType<typeof toCodexDynamicTools>;
+    },
+  ): Promise<ProviderThreadRef> {
     const connection = await this.#ensureConnection();
     const response = await connection.client.request<ThreadStartResponse>('thread/start', {
       model: input.model ?? null,
@@ -173,8 +188,8 @@ export class CodexProviderRuntime implements ProviderRuntime {
         web_search: 'disabled',
         tools: { view_image: false },
       },
-      developerInstructions: buildSchemaOnlyInstructions(),
-      dynamicTools: toCodexDynamicTools(this.#opToolDescriptors),
+      developerInstructions: options.developerInstructions,
+      dynamicTools: options.dynamicTools,
       experimentalRawEvents: false,
       persistExtendedHistory: false,
     });
@@ -252,6 +267,13 @@ export class CodexProviderRuntime implements ProviderRuntime {
       if (request.method !== 'item/tool/call') return false;
       const params = request.params as DynamicToolCallParams;
       if (params.threadId !== input.thread.threadId) return false;
+      if (this.#textGenerationThreads.has(input.thread.threadId)) {
+        const message = `Codex requested forbidden reconcile proposal tool: ${params.tool}`;
+        client.respondError(request.id, -32000, message);
+        queue.push({ type: 'turn_failed', message });
+        queue.close();
+        return true;
+      }
       handleCodexDynamicToolCall(params, this.#opToolDescriptors)
         .then((result) => client.respond(request.id, result))
         .catch((err) => {
@@ -284,6 +306,30 @@ export class CodexProviderRuntime implements ProviderRuntime {
       offNotification();
       offServerRequest();
     }
+  }
+
+  async generateText(input: GenerateTextInput): Promise<string> {
+    const thread = await this.#startThread(input, {
+      developerInstructions: input.systemPrompt,
+      dynamicTools: [],
+    });
+    let buffered = '';
+    this.#textGenerationThreads.add(thread.threadId);
+    try {
+      for await (const event of this.sendTurn({ ...input, thread })) {
+        if (event.type === 'assistant_delta') buffered += event.text;
+        if (event.type === 'tool_call_started') {
+          throw new Error(`Codex reconcile proposal requested forbidden tool: ${event.name}`);
+        }
+        if (event.type === 'turn_failed') throw new Error(event.message);
+        if (event.type === 'turn_interrupted') {
+          throw new Error(event.message ?? 'Codex reconcile proposal was interrupted');
+        }
+      }
+    } finally {
+      this.#textGenerationThreads.delete(thread.threadId);
+    }
+    return buffered;
   }
 
   async interruptTurn(input: InterruptTurnInput): Promise<void> {

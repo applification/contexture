@@ -1,13 +1,13 @@
 /**
- * `useClaudeReconcile` — fires the one-shot Claude reconcile query
- * when the modal opens and feeds the result into the reconcile store.
+ * `useSchemaAgentReconcile` fires the one-shot schema-agent reconcile
+ * query when the modal opens and feeds the result into the store.
  *
  * Sequence:
  *   1. Read the on-disk source for the target path via the legacy preload
  *      helper `window.api.readFileSilent` (already wired to Node fs).
  *   2. Snapshot the current IR from the undo store.
  *   3. Derive the target kind from the file path.
- *   4. Round-trip via `window.contexture.reconcile.query`.
+ *   4. Round-trip via the provider-neutral reconcile bridge.
  *   5. Validate each returned op by attempting to apply it to a copy
  *      of the schema — invalid entries are dropped with a console
  *      warning rather than failing the whole load.
@@ -35,7 +35,7 @@ function isRawEntry(value: unknown): value is RawReconcileEntry {
   return typeof v.label === 'string' && typeof v.lossy === 'boolean' && typeof v.op === 'object';
 }
 
-export function useClaudeReconcile(): void {
+export function useSchemaAgentReconcile(): void {
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
 
@@ -87,13 +87,13 @@ export function useClaudeReconcile(): void {
       } catch (err) {
         if (cancelledRef.current) return;
         const message = err instanceof Error ? err.message : String(err);
-        reconcileStore.setError(`Claude query failed: ${message}`);
+        reconcileStore.setError(`Reconcile proposal failed: ${message}`);
         return;
       }
       if (cancelledRef.current) return;
 
       if (!result.ok) {
-        reconcileStore.setError(result.error ?? 'Claude query failed.');
+        reconcileStore.setError(result.error ?? 'Reconcile proposal failed.');
         return;
       }
 

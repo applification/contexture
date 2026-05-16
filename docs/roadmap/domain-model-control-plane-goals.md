@@ -30,7 +30,7 @@ Completion evidence:
 
 ## Goal 2.5 — Provider-Neutral Reconcile Proposals
 
-**Status:** Next.
+**Status:** Done.
 
 Move reconcile proposals off the Claude-only IPC path and onto the active
 schema-agent provider. The reconcile modal should use the same selected
@@ -46,6 +46,15 @@ Completion evidence:
   explicitly while `Regenerate from IR` and `Leave dirty` remain usable.
 - Tests cover Codex routing, Claude routing, and unavailable-provider
   fallback behavior.
+
+Notes:
+
+- The preload `contexture.reconcile.query` bridge now invokes
+  `schema-agent:reconcile`, preserving the renderer API while removing
+  the Claude-only IPC handler.
+- Provider runtimes expose a no-tools `generateText` path for isolated
+  proposal generation. Normal schema chat still uses provider threads and
+  Contexture op tools.
 
 ## Goal 3 — CLI/Agent Drift Contract
 

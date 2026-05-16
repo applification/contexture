@@ -56,6 +56,7 @@ function makeRuntime(events: ProviderRuntimeEvent[]): ProviderRuntime {
     sendTurn: vi.fn(async function* () {
       for (const event of events) yield event;
     }),
+    generateText: vi.fn(async () => ''),
     interruptTurn: vi.fn(),
     rollbackThread: vi.fn(),
     startLogin: vi.fn(),
