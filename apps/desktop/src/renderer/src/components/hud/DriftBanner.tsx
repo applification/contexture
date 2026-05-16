@@ -1,7 +1,7 @@
 /**
  * `DriftBanner` — non-blocking banner shown at the top of the graph
- * view when any `@contexture-generated` file has been hand-edited
- * outside Contexture (drift detected by the main-process watcher).
+ * view when any `@contexture-generated` file has drifted from the
+ * emitted manifest or can no longer be read.
  *
  * Single-file drift shows the file path; multi-file drift shows a count.
  * "Review changes" opens the reconcile modal for the first drifted file;
@@ -22,29 +22,50 @@ function shortPath(fullPath: string): string {
 }
 
 export function DriftBanner(): React.JSX.Element | null {
+  const files = useDriftStore((s) => s.files);
   const driftedPaths = useDriftStore((s) => s.driftedPaths);
   const dismiss = useDriftStore((s) => s.dismiss);
   const openReconcile = useReconcileStore((s) => s.open);
 
   const message = useMemo(() => {
-    if (driftedPaths.length === 0) return null;
-    if (driftedPaths.length === 1) {
+    const statuses =
+      files.length > 0 ? files : driftedPaths.map((path) => ({ path, status: 'drifted' as const }));
+    if (statuses.length === 0) return null;
+    const unreadableCount = statuses.filter((file) => file.status === 'unreadable').length;
+    if (statuses.length === 1) {
+      const file = statuses[0];
+      if (!file) return null;
+      if (file.status === 'unreadable') {
+        return (
+          <>
+            <code className="font-mono">{shortPath(file.path)}</code> is missing or unreadable.
+          </>
+        );
+      }
       return (
         <>
-          <code className="font-mono">{shortPath(driftedPaths[0])}</code> was modified outside
-          Contexture.
+          <code className="font-mono">{shortPath(file.path)}</code> was modified outside Contexture.
         </>
       );
     }
-    return <>{driftedPaths.length} generated files were modified outside Contexture.</>;
-  }, [driftedPaths]);
+    if (unreadableCount > 0) {
+      return (
+        <>
+          {statuses.length} generated files need attention, including {unreadableCount} missing or
+          unreadable.
+        </>
+      );
+    }
+    return <>{statuses.length} generated files were modified outside Contexture.</>;
+  }, [files, driftedPaths]);
 
   if (!message) return null;
 
   // For multi-file drift, review the first drifted file. The user can
   // dismiss and let the banner re-appear for subsequent files, or use
   // the per-file list that drift detection surfaces.
-  const reviewTarget = driftedPaths[0];
+  const reviewTarget =
+    (files.find((file) => file.status === 'drifted') ?? files[0])?.path ?? driftedPaths[0];
 
   return (
     <div

@@ -220,8 +220,13 @@ export interface ContextureDriftAPI {
   check: () => Promise<{ ok: boolean }>;
   /** Reset the main-side drifted flag after user dismisses the banner. */
   dismiss: () => Promise<{ ok: boolean }>;
-  onDetected: (listener: (payload: { paths: string[] }) => void) => Unsubscribe;
+  onDetected: (listener: (payload: DriftDetectedPayload) => void) => Unsubscribe;
   onResolved: (listener: () => void) => Unsubscribe;
+}
+
+export interface DriftDetectedPayload {
+  paths: string[];
+  files?: Array<{ path: string; status: 'drifted' | 'unreadable' }>;
 }
 
 export interface ContextureReconcileAPI {

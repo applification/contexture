@@ -21,6 +21,11 @@ export function registerDriftIpc(mainWindow: BrowserWindow): void {
     activeWatcher = createDriftWatcher({
       emittedJsonPath: payload.emittedJsonPath,
       onDrift: (paths) => mainWindow.webContents.send('drift:detected', { paths }),
+      onStatus: (problems) =>
+        mainWindow.webContents.send('drift:detected', {
+          paths: problems.map((p) => p.path),
+          files: problems,
+        }),
       onResolved: () => mainWindow.webContents.send('drift:resolved'),
     });
     activeWatcher.start();

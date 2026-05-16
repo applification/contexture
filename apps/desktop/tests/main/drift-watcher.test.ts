@@ -42,16 +42,22 @@ function makeWatcher(
   files: Record<string, string>,
   {
     onDrift = vi.fn(),
+    onStatus,
     onResolved = vi.fn(),
-  }: { onDrift?: ReturnType<typeof vi.fn>; onResolved?: ReturnType<typeof vi.fn> } = {},
+  }: {
+    onDrift?: ReturnType<typeof vi.fn>;
+    onStatus?: ReturnType<typeof vi.fn>;
+    onResolved?: ReturnType<typeof vi.fn>;
+  } = {},
 ) {
   const watcher = createDriftWatcher({
     emittedJsonPath: EMITTED,
     onDrift,
+    onStatus,
     onResolved,
     readFile: makeReadFile(files),
   });
-  return { watcher, onDrift, onResolved };
+  return { watcher, onDrift, onStatus, onResolved };
 }
 
 // ─── detectDrift (pure function) ─────────────────────────────────────
@@ -192,14 +198,40 @@ describe('createDriftWatcher', () => {
     expect(onResolved).not.toHaveBeenCalled();
   });
 
-  it('does not call onDrift when the watched file cannot be read', async () => {
+  it('calls onDrift when a manifest file cannot be read', async () => {
     const { watcher, onDrift } = makeWatcher({
       [EMITTED]: makeManifestSingleHash('somehash'),
-      // WATCHED is absent → ENOENT → unreadable → not drifted
+      // WATCHED is absent → ENOENT → unreadable → needs attention
     });
 
     await watcher.check();
+    expect(onDrift).toHaveBeenCalledWith([WATCHED]);
+  });
+
+  it('calls onStatus with drifted and unreadable file statuses', async () => {
+    const convex = 'defineSchema({})';
+    const editedConvex = 'defineSchema({ posts: defineTable({}) })';
+    const onDrift = vi.fn();
+    const onStatus = vi.fn();
+    const { watcher } = makeWatcher(
+      {
+        [WATCHED]: editedConvex,
+        [EMITTED]: makeManifest({
+          [WATCHED]: convex,
+          [SCHEMA_TS]: 'missing zod',
+        }),
+      },
+      { onDrift, onStatus },
+    );
+
+    await watcher.check();
+
     expect(onDrift).not.toHaveBeenCalled();
+    expect(onStatus).toHaveBeenCalledOnce();
+    expect(onStatus).toHaveBeenCalledWith([
+      { path: WATCHED, status: 'drifted' },
+      { path: SCHEMA_TS, status: 'unreadable' },
+    ]);
   });
 
   it('does not call onDrift when the emitted manifest cannot be read', async () => {
