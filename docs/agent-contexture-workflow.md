@@ -86,6 +86,24 @@ contexture emit [--json]
 Writes the full bundle (Zod schema, JSON Schema, schema-index barrel,
 Convex schema) to the locations resolved by `bundlePathsFor(irPath)`.
 
+### Output Config
+
+The IR may include an optional top-level `outputs` block. When omitted,
+Contexture emits the existing bundle exactly as before: Zod, JSON Schema,
+schema index, and Convex schema. Existing targets can be disabled explicitly:
+
+```json
+{
+  "outputs": {
+    "jsonSchema": { "enabled": false },
+    "convex": { "enabled": false }
+  }
+}
+```
+
+Future AI-pipeline targets live under `outputs.aiPipeline` and are opt-in.
+Goal 7 will attach the first emitter to this shape.
+
 ## Standard agent loop
 
 ```

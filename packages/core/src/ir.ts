@@ -173,6 +173,31 @@ const MetadataSchema = z.object({
   description: z.string().optional(),
 });
 
+const OutputTargetConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+});
+
+export type OutputTargetConfig = z.infer<typeof OutputTargetConfigSchema>;
+
+const AiPipelineOutputsSchema = z.object({
+  toolSchemas: OutputTargetConfigSchema.optional(),
+  structuredOutputs: OutputTargetConfigSchema.optional(),
+  mcpDefinitions: OutputTargetConfigSchema.optional(),
+  formValidators: OutputTargetConfigSchema.optional(),
+});
+
+export type AiPipelineOutputs = z.infer<typeof AiPipelineOutputsSchema>;
+
+const OutputsConfigSchema = z.object({
+  zod: OutputTargetConfigSchema.optional(),
+  jsonSchema: OutputTargetConfigSchema.optional(),
+  schemaIndex: OutputTargetConfigSchema.optional(),
+  convex: OutputTargetConfigSchema.optional(),
+  aiPipeline: AiPipelineOutputsSchema.optional(),
+});
+
+export type OutputsConfig = z.infer<typeof OutputsConfigSchema>;
+
 // Raw object schema — exposes `.shape` for callers that need to pick
 // a specific field's schema (`src/main/ops/index.ts` narrows to
 // `types.element` and `imports.element`). The public `IRSchema` is cast
@@ -182,6 +207,7 @@ export const IRSchemaObject = z.object({
   types: z.array(TypeDefSchema),
   imports: z.array(ImportDeclSchema).optional(),
   metadata: MetadataSchema.optional(),
+  outputs: OutputsConfigSchema.optional(),
 });
 
 export type Schema = {
@@ -189,6 +215,7 @@ export type Schema = {
   types: TypeDef[];
   imports?: ImportDecl[];
   metadata?: { name?: string; description?: string };
+  outputs?: OutputsConfig;
 };
 
 export const IRSchema = IRSchemaObject as unknown as z.ZodType<Schema>;
