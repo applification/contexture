@@ -37,15 +37,29 @@ function slugToolName(name: string): string {
 }
 
 export function emitAiToolSchemas(schema: Schema, sourcePath?: string): AiToolSchemasDocument {
-  return {
-    $contexture_generated: generatedMarker(sourcePath),
-    version: '1',
-    tools: schema.types.map((type) => ({
-      name: `submit_${slugToolName(type.name)}`,
+  const toolNames = new Map<string, string>();
+  const tools = schema.types.map((type) => {
+    const name = `submit_${slugToolName(type.name)}`;
+    const existing = toolNames.get(name);
+    if (existing) {
+      throw new Error(
+        `AI tool schema name collision: "${existing}" and "${type.name}" both emit "${name}".`,
+      );
+    }
+    toolNames.set(name, type.name);
+
+    return {
+      name,
       description: type.description
         ? `Submit a ${type.name}: ${type.description}`
         : `Submit a ${type.name} object.`,
       parameters: emitJsonSchema(schema, type.name, sourcePath),
-    })),
+    };
+  });
+
+  return {
+    $contexture_generated: generatedMarker(sourcePath),
+    version: '1',
+    tools,
   };
 }

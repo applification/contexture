@@ -55,4 +55,18 @@ describe('emitAiToolSchemas', () => {
       ],
     });
   });
+
+  it('rejects generated tool name collisions', () => {
+    const collidingSchema: Schema = {
+      ...schema,
+      types: [
+        { kind: 'object', name: 'CustomerProfile', fields: [] },
+        { kind: 'object', name: 'Customer_Profile', fields: [] },
+      ],
+    };
+
+    expect(() => emitAiToolSchemas(collidingSchema)).toThrow(
+      'AI tool schema name collision: "CustomerProfile" and "Customer_Profile" both emit "submit_customer_profile".',
+    );
+  });
 });
