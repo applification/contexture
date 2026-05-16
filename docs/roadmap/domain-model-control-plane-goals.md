@@ -118,9 +118,22 @@ Completion evidence:
 
 ## Goal 5 — MCP Mutation/Emit Loop
 
+**Status:** Done.
+
 Let agents mutate the IR through the closed-world op vocabulary, emit the
 bundle, and check drift. The agent loop should be: inspect, apply op,
 validate, emit, check drift.
+
+Completion evidence:
+
+- The shared MCP server exposes `apply_contexture_op`, `emit_contexture`, and
+  `check_contexture_drift` alongside inspect/validate.
+- `apply_contexture_op` writes through `createFileBackedForward`, so MCP
+  mutations use the same closed-world op reducer and generated bundle path as
+  the CLI.
+- MCP tests exercise the full inspect/apply/emit/check loop against a temporary
+  `.contexture.json` project.
+- Agent docs describe the registered tool loop and example op payload.
 
 ## Goal 6 — Opt-In Output Config
 

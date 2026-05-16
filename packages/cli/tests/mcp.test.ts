@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -28,18 +28,45 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
 }
 
 describe('Contexture MCP server', () => {
-  it('lists read-only inspect and validate tools', async () => {
+  it('lists inspect, validate, mutation, emit, and drift tools', async () => {
     await withClient(async (client) => {
       const { tools } = await client.listTools();
       expect(tools).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             name: 'inspect_contexture',
-            annotations: expect.objectContaining({ readOnlyHint: true, destructiveHint: false }),
+            annotations: expect.objectContaining({
+              readOnlyHint: true,
+              destructiveHint: false,
+            }),
           }),
           expect.objectContaining({
             name: 'validate_contexture',
-            annotations: expect.objectContaining({ readOnlyHint: true, destructiveHint: false }),
+            annotations: expect.objectContaining({
+              readOnlyHint: true,
+              destructiveHint: false,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'apply_contexture_op',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'emit_contexture',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: false,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'check_contexture_drift',
+            annotations: expect.objectContaining({
+              readOnlyHint: true,
+              destructiveHint: false,
+            }),
           }),
         ]),
       );
@@ -115,7 +142,10 @@ describe('Contexture MCP server', () => {
   });
 
   it('reports structural validation errors as data instead of requiring desktop IPC', async () => {
-    const irPath = await fixtureIr({ version: '1', types: [{ kind: 'object', name: '' }] });
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [{ kind: 'object', name: '' }],
+    });
 
     await withClient(async (client) => {
       const result = await client.callTool({
@@ -136,6 +166,127 @@ describe('Contexture MCP server', () => {
             message: expect.any(String),
           }),
         ],
+      });
+    });
+  });
+
+  it('returns structured failures for malformed mutation ops', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: { kind: 'add_field', typeName: 'Plot' },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: false,
+        opKind: 'add_field',
+        error: expect.stringContaining('invalid op'),
+      });
+      expect((result.structuredContent as { error?: string }).error).toContain('field');
+    });
+  });
+
+  it('applies an op, emits generated files, and reports generated drift', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const applyResult = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'size', type: { kind: 'number', int: true } },
+          },
+        },
+      });
+
+      expect(applyResult.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_field',
+      });
+
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ name: string; fields?: Array<{ name: string }> }>;
+      };
+      expect(updatedIr.types[0]?.fields?.map((field) => field.name)).toEqual(['name', 'size']);
+
+      const cleanResult = await client.callTool({
+        name: 'check_contexture_drift',
+        arguments: { irPath },
+      });
+      expect(cleanResult.structuredContent).toMatchObject({
+        path: irPath,
+        clean: true,
+        checked: 4,
+        drift: [],
+      });
+
+      await writeFile(
+        irPath.replace(/\.contexture\.json$/, '.schema.json'),
+        '{"stale":true}\n',
+        'utf8',
+      );
+
+      const driftResult = await client.callTool({
+        name: 'check_contexture_drift',
+        arguments: { irPath },
+      });
+      expect(driftResult.structuredContent).toMatchObject({
+        path: irPath,
+        clean: false,
+        drift: [
+          expect.objectContaining({
+            path: irPath.replace(/\.contexture\.json$/, '.schema.json'),
+            status: 'drifted',
+          }),
+        ],
+      });
+
+      const emitResult = await client.callTool({
+        name: 'emit_contexture',
+        arguments: { irPath },
+      });
+      expect(emitResult.structuredContent).toMatchObject({
+        path: irPath,
+        emitted: expect.arrayContaining([irPath.replace(/\.contexture\.json$/, '.schema.json')]),
+      });
+
+      const cleanAgainResult = await client.callTool({
+        name: 'check_contexture_drift',
+        arguments: { irPath },
+      });
+      expect(cleanAgainResult.structuredContent).toMatchObject({
+        clean: true,
+        drift: [],
       });
     });
   });
