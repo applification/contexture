@@ -3,18 +3,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ZodError, z } from 'zod';
 import { createFileBackedForward, nodeFileBackedFs } from './file-forward';
 import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-writer';
-import {
-  FieldDefSchema,
-  type FieldType,
-  IndexDefSchema,
-  IRSchema,
-  IRSchemaObject,
-  type Schema,
-  type TypeDef,
-  TypeDefSchema,
-} from './ir';
+import type { FieldType, Schema, TypeDef } from './ir';
 import { load } from './load';
-import type { Op } from './ops';
+import { OpSchema } from './ops';
 import { assertContextureIrPath, assertWritableContextureProjectIrPath } from './paths';
 import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
@@ -118,97 +109,6 @@ const CheckContextureDriftOutput = {
     }),
   ),
 };
-
-const ImportDeclSchema = (
-  IRSchemaObject.shape.imports as z.ZodOptional<z.ZodArray<z.ZodType>>
-).unwrap().element;
-
-const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('add_type'), type: TypeDefSchema }),
-  z.object({
-    kind: z.literal('update_type'),
-    name: z.string().min(1),
-    patch: z.record(z.string(), z.unknown()),
-  }),
-  z.object({ kind: z.literal('rename_type'), from: z.string().min(1), to: z.string().min(1) }),
-  z.object({ kind: z.literal('delete_type'), name: z.string().min(1) }),
-  z.object({
-    kind: z.literal('add_field'),
-    typeName: z.string().min(1),
-    field: FieldDefSchema,
-    index: z.number().int().optional(),
-  }),
-  z.object({
-    kind: z.literal('update_field'),
-    typeName: z.string().min(1),
-    fieldName: z.string().min(1),
-    patch: FieldDefSchema.partial(),
-  }),
-  z.object({
-    kind: z.literal('remove_field'),
-    typeName: z.string().min(1),
-    fieldName: z.string().min(1),
-  }),
-  z.object({
-    kind: z.literal('add_value'),
-    typeName: z.string().min(1),
-    value: z.string().min(1),
-    description: z.string().optional(),
-  }),
-  z.object({
-    kind: z.literal('update_value'),
-    typeName: z.string().min(1),
-    value: z.string().min(1),
-    patch: z.object({
-      value: z.string().min(1).optional(),
-      description: z.string().optional(),
-    }),
-  }),
-  z.object({
-    kind: z.literal('remove_value'),
-    typeName: z.string().min(1),
-    value: z.string().min(1),
-  }),
-  z.object({
-    kind: z.literal('reorder_fields'),
-    typeName: z.string().min(1),
-    order: z.array(z.string().min(1)),
-  }),
-  z.object({
-    kind: z.literal('add_variant'),
-    typeName: z.string().min(1),
-    variant: z.string().min(1),
-  }),
-  z.object({
-    kind: z.literal('set_discriminator'),
-    typeName: z.string().min(1),
-    discriminator: z.string().min(1),
-  }),
-  z.object({ kind: z.literal('add_import'), import: ImportDeclSchema }),
-  z.object({ kind: z.literal('remove_import'), alias: z.string().min(1) }),
-  z.object({
-    kind: z.literal('set_table_flag'),
-    typeName: z.string().min(1),
-    table: z.boolean(),
-  }),
-  z.object({
-    kind: z.literal('add_index'),
-    typeName: z.string().min(1),
-    index: IndexDefSchema,
-  }),
-  z.object({
-    kind: z.literal('remove_index'),
-    typeName: z.string().min(1),
-    name: z.string().min(1),
-  }),
-  z.object({
-    kind: z.literal('update_index'),
-    typeName: z.string().min(1),
-    name: z.string().min(1),
-    patch: IndexDefSchema.partial(),
-  }),
-  z.object({ kind: z.literal('replace_schema'), schema: IRSchema }),
-]) as z.ZodType<Op>;
 
 export function createContextureMcpServer(options: ContextureMcpServerOptions = {}): McpServer {
   const server = new McpServer({ name: 'contexture-core', version: VERSION });

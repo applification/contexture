@@ -8,9 +8,10 @@
  *   - Create is disabled until name is valid AND parent is chosen AND
  *     at least one app is selected.
  */
-import { STAGE } from '@main/scaffold/scaffold-project';
+
 import { NewProjectDialog } from '@renderer/components/dialogs/NewProjectDialog';
 import { useNewProjectStore } from '@renderer/store/new-project';
+import { STAGE } from '@shared/scaffold-stages';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

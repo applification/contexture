@@ -47,6 +47,7 @@
     "esbuild"
   ],
   "overrides": {
+    "@anthropic-ai/sdk": "0.95.1",
     "@next/env": "npm:@varlock/nextjs-integration@^1.1.0",
     "mermaid": "11.15.0",
     "postcss": "^8.5.14"

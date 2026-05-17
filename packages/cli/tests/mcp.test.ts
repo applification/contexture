@@ -252,6 +252,30 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('rejects update_type identity changes at the shared op boundary', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Plot', fields: [] }],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: { kind: 'update_type', name: 'Plot', patch: { name: 'Garden' } },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: false,
+        opKind: 'update_type',
+        error: expect.stringContaining('rename_type'),
+      });
+    });
+  });
+
   it('applies an op, emits generated files, and reports generated drift', async () => {
     const irPath = await fixtureIr({
       version: '1',

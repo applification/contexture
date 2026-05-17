@@ -11,16 +11,15 @@
  * Event fan-out: a single `scaffold.onEvent` subscription mutates the
  * store; components below re-render off those store slices.
  */
-import { deriveStages } from '@main/scaffold/scaffold-project';
 import { type PreflightError, preflightErrorCopy } from '@renderer/model/preflight-error-copy';
 import { labelForStage } from '@renderer/model/scaffold-stage-labels';
 import { validateProjectName } from '@renderer/model/validate-project-name';
 import {
-  type AppKind,
   type StageStatus,
   type StartingPoint,
   useNewProjectStore,
 } from '@renderer/store/new-project';
+import { type AppKind, deriveStages } from '@shared/scaffold-stages';
 import { FileJson, Folder } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';

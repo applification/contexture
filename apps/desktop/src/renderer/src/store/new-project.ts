@@ -10,9 +10,9 @@
  * Closing resets everything so reopening doesn't show stale state.
  */
 import type { PreflightError } from '@renderer/model/preflight-error-copy';
+import type { AppKind } from '@shared/scaffold-stages';
 import { create } from 'zustand';
 
-export type AppKind = 'web' | 'mobile' | 'desktop';
 export type NewProjectPhase = 'form' | 'running' | 'done' | 'failed';
 export type StageStatus = 'pending' | 'running' | 'done' | 'failed';
 export type StartingPoint = 'new' | 'promote';

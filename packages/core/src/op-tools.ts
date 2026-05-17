@@ -25,7 +25,7 @@
 
 import { type ZodTypeAny, z } from 'zod';
 import { IRSchema, IRSchemaObject } from './ir';
-import type { ApplyResult, Op } from './ops';
+import { type ApplyResult, type Op, OpSchema } from './ops';
 
 /**
  * Bridge that sends an `Op` to the renderer and awaits its `ApplyResult`.
@@ -210,6 +210,17 @@ function assertImportDecl(value: unknown, opName: string): void {
   }
 }
 
+function assertOp(value: Op, opName: string): void {
+  const res = OpSchema.safeParse(value);
+  if (!res.success) {
+    throw new Error(
+      `${opName}: payload is not a valid Op — ${res.error.issues
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')}`,
+    );
+  }
+}
+
 // ---- Registry ----------------------------------------------------------
 
 export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
@@ -373,7 +384,7 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
           patch: (p.patch ?? {}) as Record<string, unknown>,
         };
       },
-      () => undefined,
+      (op) => assertOp(op, 'update_type'),
       forward,
     ),
     flexiblePayloadTool(
