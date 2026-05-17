@@ -11,7 +11,7 @@
  * feed a canned stream without booting the SDK.
  */
 
-import type { EvalMode } from '@renderer/chat/eval-prompt';
+import type { EvalMode } from '@shared/eval-prompt';
 import { type RunWithRetryOptions, readClassification, runWithRetry } from './claude-errors';
 
 export interface EvalSdkMessage {

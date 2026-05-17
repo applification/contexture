@@ -16,8 +16,9 @@
  * Drops state updates after the modal closes (re-mounts on next
  * `open()` get a fresh effect run).
  */
+
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useEffect, useRef } from 'react';
-import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { useDocumentStore } from '../store/document';
 import { type ApplyResult, apply, type Op } from '../store/ops';
 import { type ReconcileOp, targetKindFor, useReconcileStore } from '../store/reconcile';

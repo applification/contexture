@@ -9,7 +9,8 @@ schema, JSON Schema, the schema-index barrel) is regenerated from it.
 - **Do not edit generated schema files.** They carry a
   `@contexture-generated` header and will be overwritten on the next
   regenerate. Files marked `@contexture-seeded` (e.g. table CRUD
-  scaffolds, root `CLAUDE.md`) are seeded once and owned by you after that.
+  scaffolds, root `AGENTS.md` / `CLAUDE.md`) are seeded once and owned by
+  you after that.
 - **Treat `*.contexture.json` as the primary domain model.** Add or change
   entities, fields, refs, enums, indexes, and table flags there first.
 - **Regenerate after every model change.** Run `contexture emit`.

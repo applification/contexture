@@ -15,9 +15,9 @@
 
 import { createDocumentStore, type DocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
-import type { ChatHistory } from '@renderer/model/chat-history';
 import type { Schema } from '@renderer/model/ir';
-import type { Layout } from '@renderer/model/layout';
+import type { ChatHistory } from '@shared/chat-history';
+import type { Layout } from '@shared/layout';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';
@@ -228,7 +228,7 @@ describe('DocumentStore', () => {
     expect(source).toContain(`export * from './garden.schema';`);
   });
 
-  it('project-mode open writes CLAUDE.md at the project root if missing, with {{PROJECT_NAME}} substituted', async () => {
+  it('project-mode open writes AGENTS.md and CLAUDE.md at the project root when missing', async () => {
     const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(sampleIR),
@@ -236,21 +236,28 @@ describe('DocumentStore', () => {
     });
     const bundle = await store.open(monorepoIrPath);
     expect(bundle.mode).toBe('project');
+    expect(fs.exists('/proj/AGENTS.md')).toBe(true);
     expect(fs.exists('/proj/CLAUDE.md')).toBe(true);
+    const agents = await fs.readFile('/proj/AGENTS.md');
     const claude = await fs.readFile('/proj/CLAUDE.md');
+    expect(agents).toContain('my-app');
+    expect(agents).not.toContain('{{PROJECT_NAME}}');
     expect(claude).toContain('my-app');
     expect(claude).not.toContain('{{PROJECT_NAME}}');
   });
 
-  it('project-mode open never overwrites an existing CLAUDE.md', async () => {
+  it('project-mode open never overwrites existing agent docs', async () => {
     const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(sampleIR),
       '/proj/packages/contexture/.contexture/.keep': '',
+      '/proj/AGENTS.md': '# user-owned agent notes\n',
       '/proj/CLAUDE.md': '# user-owned notes\n',
     });
     await store.open(monorepoIrPath);
+    const agents = await fs.readFile('/proj/AGENTS.md');
     const claude = await fs.readFile('/proj/CLAUDE.md');
+    expect(agents).toBe('# user-owned agent notes\n');
     expect(claude).toBe('# user-owned notes\n');
   });
 
@@ -364,12 +371,13 @@ describe('DocumentStore', () => {
     expect(fs.exists('/work/packages/contexture/convex/Post.ts')).toBe(false);
   });
 
-  it('scratch-mode open does not write CLAUDE.md', async () => {
+  it('scratch-mode open does not write root agent docs', async () => {
     const { store, fs } = setup({ [irPath]: JSON.stringify(sampleIR) });
     await store.open(irPath);
     // No standard project root for scratch files — the parent-parent dir
     // would be `/`, and scratch IR by definition has no project layout
-    // so CLAUDE.md must not appear anywhere.
+    // so agent docs must not appear anywhere.
+    expect(fs.exists('/AGENTS.md')).toBe(false);
     expect(fs.exists('/CLAUDE.md')).toBe(false);
   });
 

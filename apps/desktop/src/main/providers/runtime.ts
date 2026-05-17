@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/ir';
+import type { Schema } from '@contexture/core';
 
 export type ProviderKind = 'codex' | 'claude';
 

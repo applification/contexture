@@ -14,8 +14,9 @@
  * The panel is pure UI over the hook's state; tests can exercise the
  * hook directly without rendering.
  */
+
+import type { EvalMode } from '@shared/eval-prompt';
 import { useState } from 'react';
-import type { EvalMode } from '../../chat/eval-prompt';
 import type { useClaudeEval } from '../../chat/useClaudeEval';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';

@@ -2,7 +2,7 @@
  * `useProjectAutoSave` — debounced auto-save for project-mode documents.
  *
  * In project mode the document lives in a scaffolded monorepo where
- * emitted artefacts (`schema.ts`, the Zod mirror, CLAUDE.md, …) have to
+ * emitted artefacts (`schema.ts`, the Zod mirror, agent docs, …) have to
  * stay in sync with the IR. Every IR edit flushes to disk 500ms after
  * the last change so downstream tools see a recent bundle without the
  * user hitting Cmd-S.

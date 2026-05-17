@@ -1,21 +1,21 @@
 /**
  * Eval system-prompt builder — pure.
  *
- * The Eval surface is deliberately separated from the schema-design
- * chat: different system prompt, different tool set, different history.
- * This module emits the prompt handed to Claude when the user clicks
- * "Generate" in the Eval panel.
+ * The Eval surface is deliberately separated from the schema-design chat:
+ * different system prompt, different tool set, different history. This module
+ * emits the prompt handed to Claude when the user clicks "Generate" in the Eval
+ * panel.
  *
  * Contents, in order:
  *   1. Role / mission header — "you are generating sample data".
- *   2. The selected mode with a short explanation so Claude doesn't need
- *      to re-derive it from the `generate-sample` skill's arg.
+ *   2. The selected mode with a short explanation so Claude doesn't need to
+ *      re-derive it from the `generate-sample` skill's arg.
  *   3. Hard rules Claude must follow regardless of mode.
- *   4. The root type's JSON Schema, pretty-printed. Claude uses this as
- *      the parse contract and as the `emit_sample` tool's input schema.
+ *   4. The root type's JSON Schema, pretty-printed. Claude uses this as the
+ *      parse contract and as the `emit_sample` tool's input schema.
  */
 
-import type { Schema } from '../model/ir';
+import type { Schema } from '@contexture/core';
 
 export type EvalMode = 'realistic' | 'minimal' | 'edge-case' | 'adversarial';
 

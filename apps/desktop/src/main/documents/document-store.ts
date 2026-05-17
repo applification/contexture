@@ -19,22 +19,24 @@
 import {
   bundlePathsFor,
   contextureDirFor,
+  emitAgentMd as defaultEmitAgentMd,
+  emitClaudeMd as defaultEmitClaudeMd,
+  emitJsonSchema as defaultEmitJsonSchema,
+  emitSchemaIndex as defaultEmitSchemaIndex,
+  emitTableCrud as defaultEmitTableCrud,
+  emitZod as defaultEmitZod,
   type FileEntry,
   IR_SUFFIX,
+  load as loadIR,
   projectRootFor,
+  type Schema,
+  save as saveIR,
   writeFilesAtomic,
   writeGeneratedBundle,
 } from '@contexture/core';
-import { NAMESPACES as STDLIB_NAMESPACES } from '@contexture/stdlib/registry';
-import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
-import { emit as defaultEmitClaudeMd } from '@renderer/model/emit-claude-md';
-import { emit as defaultEmitJsonSchema } from '@renderer/model/emit-json-schema';
-import { emit as defaultEmitSchemaIndex } from '@renderer/model/emit-schema-index';
-import { emitTableCrud as defaultEmitTableCrud } from '@renderer/model/emit-table-crud';
-import { emit as defaultEmitZod } from '@renderer/model/emit-zod';
-import type { Schema } from '@renderer/model/ir';
-import { type Layout, loadLayout, saveLayout } from '@renderer/model/layout';
-import { load as loadIR, save as saveIR } from '@renderer/model/load';
+import { type ChatHistory, loadChatHistory, saveChatHistory } from '@shared/chat-history';
+import { type Layout, loadLayout, saveLayout } from '@shared/layout';
+import { STDLIB_NAMESPACES } from '@shared/stdlib-registry';
 
 /** Layout + chat now live inside `.contexture/` as implementation sidecars. */
 /** Hash manifest of every @contexture-generated artefact, used for drift detection. */
@@ -114,6 +116,8 @@ export interface DocumentStoreDeps {
   emitJsonSchema?: (schema: Schema, sourcePath?: string) => unknown;
   /** Override for tests — defaults to the real schema-index emitter. */
   emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
+  /** Override for tests — defaults to the real AGENTS.md emitter. */
+  emitAgentMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real CLAUDE.md emitter. */
   emitClaudeMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
@@ -142,6 +146,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     emitJsonSchema = (s: Schema, sp?: string) =>
       defaultEmitJsonSchema(s, undefined, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
     emitSchemaIndex = defaultEmitSchemaIndex,
+    emitAgentMd = defaultEmitAgentMd,
     emitClaudeMd = defaultEmitClaudeMd,
     emitConvex,
     emitTableCrud = defaultEmitTableCrud,
@@ -206,9 +211,14 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     if (mode === 'project') {
       const root = projectRootFor(irPath);
       if (root) {
+        const projectName = baseNameFor(irPath);
+        const agentsPath = `${root}/AGENTS.md`;
+        if (!(await fs.fileExists(agentsPath))) {
+          await fs.writeFile(agentsPath, emitAgentMd(projectName));
+        }
         const claudePath = `${root}/CLAUDE.md`;
         if (!(await fs.fileExists(claudePath))) {
-          await fs.writeFile(claudePath, emitClaudeMd(baseNameFor(irPath)));
+          await fs.writeFile(claudePath, emitClaudeMd(projectName));
         }
         // Seed one `packages/contexture/convex/<table>.ts` per table-flagged
         // object. Written only if missing — these are `@contexture-seeded`,

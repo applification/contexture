@@ -22,10 +22,11 @@
  * need O(1) undo restore; replaying ops would also force us to re-run
  * every validation pass.
  */
+
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { create } from 'zustand';
 import type { Schema } from '../model/ir';
 import { load, save } from '../model/load';
-import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
 export interface UndoableState {

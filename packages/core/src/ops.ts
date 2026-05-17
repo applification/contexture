@@ -14,10 +14,10 @@
  *     local refs and discriminated-union variants. Qualified refs
  *     (`alias.Name`) are left alone — they point at external modules.
  *   - `replace_schema` runs the Zod meta-schema so obviously broken inputs
- *     are caught here. When `apply()` is called with a `StdlibCatalog`,
- *     a delta semantic check (refs, imports, duplicates) gates *every*
- *     op — including `replace_schema` — so the chat cannot land an IR
- *     that introduces new unresolved refs or unknown stdlib imports.
+ *     are caught here. A delta semantic check gates *every* op — including
+ *     `replace_schema` — so callers cannot land an IR that introduces new
+ *     semantic issues. A `StdlibCatalog` enriches the gate with bundled
+ *     stdlib namespace awareness when the caller has one.
  */
 
 import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from './ir';
@@ -62,19 +62,15 @@ export type ApplyResult = { schema: Schema } | { error: string };
  * Apply an `Op` to `schema` and return the next schema or a structured
  * error.
  *
- * When `catalog` is provided, the result is gated by a *delta* semantic
- * check: any new unresolved-ref / bad-import / duplicate-name issue
- * introduced by this op rejects the op with a chat-friendly error
- * (including the `hint` text from `checkSemantic`). Issues that already
- * existed in `schema` are not blamed on the new op — the chat can fix
- * them incrementally without the gate getting in the way.
- *
- * Without a catalog, this is structural-only (the historical behaviour).
+ * The result is gated by a *delta* semantic check: any newly introduced
+ * issue rejects the op with a chat-friendly error (including the `hint`
+ * text from `checkSemantic`). Issues that already existed in `schema` are
+ * not blamed on the new op — the chat can fix them incrementally without
+ * the gate getting in the way.
  */
 export function apply(schema: Schema, op: Op, catalog?: StdlibCatalog): ApplyResult {
   const result = applyStructural(schema, op);
   if ('error' in result) return result;
-  if (!catalog) return result;
   const introduced = newIssues(
     checkSemantic(schema, catalog),
     checkSemantic(result.schema, catalog),

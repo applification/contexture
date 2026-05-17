@@ -14,7 +14,7 @@ export const SCAFFOLD_STAGE_LABELS: Readonly<Record<number, string>> = {
   [STAGE.CONVEX_INIT]: 'Provisioning Convex',
   [STAGE.SCHEMA_PACKAGE]: 'Emitting schema package',
   [STAGE.CONVEX_EMIT]: 'Emitting Convex schema + seeds',
-  [STAGE.WORKSPACE_STITCH]: 'Stitching workspace + CLAUDE.md',
+  [STAGE.WORKSPACE_STITCH]: 'Stitching workspace + agent docs',
   [STAGE.BUN_INSTALL]: 'Installing dependencies',
   [STAGE.LLM_SEED]: 'Seeding initial IR',
 };

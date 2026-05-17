@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/ir';
+import type { Schema } from '@contexture/core';
 import type { ModelOptions, ProviderRuntime } from '../providers/runtime';
 
 export interface ReconcileProposalInput {

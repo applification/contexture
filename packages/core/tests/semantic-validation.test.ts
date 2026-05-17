@@ -189,3 +189,79 @@ describe('checkSemantic — duplicates', () => {
     expect(issues.some((i) => i.code === 'duplicate_type_name')).toBe(true);
   });
 });
+
+describe('checkSemantic — discriminated unions', () => {
+  it('passes when all variants are objects with the discriminator', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Click',
+          fields: [
+            { name: 'type', type: { kind: 'literal', value: 'click' } },
+            { name: 'x', type: { kind: 'number' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Hover',
+          fields: [
+            { name: 'type', type: { kind: 'literal', value: 'hover' } },
+            { name: 'target', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Click', 'Hover'],
+        },
+      ],
+    };
+    expect(
+      checkSemantic(schema, STDLIB).filter((i) => i.code.startsWith('discriminator_')),
+    ).toEqual([]);
+  });
+
+  it('rejects missing, non-object, and missing-discriminator variants', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'enum', name: 'Color', values: [{ value: 'red' }] },
+        { kind: 'object', name: 'Click', fields: [{ name: 'x', type: { kind: 'number' } }] },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Missing', 'Color', 'Click'],
+        },
+      ],
+    };
+    expect(checkSemantic(schema, STDLIB).map((i) => i.code)).toEqual([
+      'discriminator_variant_not_found',
+      'discriminator_variant_not_object',
+      'discriminator_missing_on_variant',
+    ]);
+  });
+});
+
+describe('checkSemantic — enums', () => {
+  it('rejects empty enums and duplicate enum values', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'enum', name: 'Empty', values: [] },
+        {
+          kind: 'enum',
+          name: 'Role',
+          values: [{ value: 'admin' }, { value: 'member' }, { value: 'admin' }],
+        },
+      ],
+    };
+    expect(checkSemantic(schema, STDLIB).map((i) => i.code)).toEqual([
+      'enum_empty',
+      'enum_duplicate_value',
+    ]);
+  });
+});

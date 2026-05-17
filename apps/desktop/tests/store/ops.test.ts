@@ -62,7 +62,11 @@ describe('apply', () => {
     const s1: Schema = {
       version: '1',
       types: [
-        { kind: 'object', name: 'Author', fields: [] },
+        {
+          kind: 'object',
+          name: 'Author',
+          fields: [{ name: 'type', type: { kind: 'literal', value: 'author' } }],
+        },
         {
           kind: 'object',
           name: 'Post',
@@ -241,6 +245,16 @@ describe('apply', () => {
       version: '1',
       types: [
         {
+          kind: 'object',
+          name: 'Click',
+          fields: [{ name: 'type', type: { kind: 'literal', value: 'click' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Hover',
+          fields: [{ name: 'type', type: { kind: 'literal', value: 'hover' } }],
+        },
+        {
           kind: 'discriminatedUnion',
           name: 'Event',
           discriminator: 'type',
@@ -249,7 +263,7 @@ describe('apply', () => {
       ],
     };
     const s1 = ok(apply(base, { kind: 'add_variant', typeName: 'Event', variant: 'Hover' }));
-    const du = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'discriminatedUnion' }>;
+    const du = s1.types[2] as Extract<(typeof s1.types)[number], { kind: 'discriminatedUnion' }>;
     expect(du.variants).toEqual(['Click', 'Hover']);
   });
 
@@ -616,8 +630,7 @@ describe('apply', () => {
     ).toBe(true);
   });
 
-  // replace_schema is agnostic about semantic errors (unresolved refs etc.)
-  it('replace_schema: accepts structurally-valid IR with semantic issues (validator reports them)', () => {
+  it('replace_schema: rejects structurally-valid IR with semantic issues', () => {
     const next: Schema = {
       version: '1',
       types: [
@@ -628,7 +641,7 @@ describe('apply', () => {
         },
       ],
     };
-    const s1 = ok(apply(empty, { kind: 'replace_schema', schema: next }));
-    expect(s1).toEqual(next);
+    const res = apply(empty, { kind: 'replace_schema', schema: next });
+    expect('error' in res && res.error).toContain('Unresolved ref "MissingType"');
   });
 });

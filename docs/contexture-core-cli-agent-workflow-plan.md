@@ -38,6 +38,7 @@ packages/core/
     emit-convex.ts
     emit-schema-index.ts
     emit-table-crud.ts
+    emit-agent-md.ts
     emit-claude-md.ts
   tests/
     apply-semantic-gate.test.ts
@@ -49,7 +50,7 @@ packages/core/
 ### Divergences from the original draft (kept on purpose)
 
 - `validation.ts` was renamed to `semantic-validation.ts` to make the layer obvious.
-- The original draft listed only Zod / JSON Schema / Convex emitters. Reality ships more: `emit-schema-index`, `emit-table-crud`, `emit-claude-md`.
+- The original draft listed only Zod / JSON Schema / Convex emitters. Reality ships more: `emit-schema-index`, `emit-table-crud`, `emit-agent-md`, `emit-claude-md`.
 - Two additional modules exist beyond the draft:
   - `pipeline.ts` — `runEmitPipeline(schema, irPath)` runs all emitters and returns a hashed `EmittedManifest` for drift detection.
   - `paths.ts` — single source of truth for bundle paths (`*.schema.ts`, `*.schema.json`, `convex/schema.ts`, `.contexture/{layout,chat,emitted}.json`).
@@ -72,7 +73,7 @@ import {
 } from '@contexture/core';
 ```
 
-Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./semantic-validation`, `./pipeline`, `./paths`, `./file-forward`, `./emit-zod`, `./emit-json-schema`, `./emit-convex`, `./emit-schema-index`, `./emit-table-crud`, `./emit-claude-md`.
+Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./semantic-validation`, `./pipeline`, `./paths`, `./file-forward`, `./emit-zod`, `./emit-json-schema`, `./emit-convex`, `./emit-schema-index`, `./emit-table-crud`, `./emit-agent-md`, `./emit-claude-md`.
 
 ## Desktop integration
 
@@ -205,7 +206,7 @@ A coding agent in a downstream app can be pointed at a short doc (or skill) and 
   - `@contexture-generated` (regenerated every save): `emit-zod`,
     `emit-json-schema`, `emit-schema-index`, `emit-convex`.
   - `@contexture-seeded` (written once, owned by user thereafter):
-    `emit-table-crud`, `emit-claude-md`.
+    `emit-table-crud`, `emit-agent-md`, `emit-claude-md`.
 - Optional skill (`.claude/skills/contexture-domain-model/SKILL.md`) and
   downstream-scaffold command (`contexture init-agent-docs`) are still
   open. Both are tracked in the backlog below.
@@ -225,7 +226,7 @@ A coding agent in a downstream app can be pointed at a short doc (or skill) and 
   `@contexture/core/*`.
 - Optional `contexture init-agent-docs` command for downstream
   scaffolding (copies `docs/agent-contexture-workflow.md` into a
-  downstream app's `CLAUDE.md`).
+  downstream app's root agent docs).
 - Optional Claude Code skill at
   `.claude/skills/contexture-domain-model/SKILL.md` that triggers on
   domain / Convex / Zod edits and points to the workflow doc.

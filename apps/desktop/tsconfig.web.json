@@ -15,6 +15,7 @@
     "paths": {
       "@renderer/*": ["./src/renderer/src/*"],
       "@main/*": ["./src/main/*"],
+      "@shared/*": ["./src/shared/*"],
       "@/*": ["./src/renderer/src/*"]
     }
   }

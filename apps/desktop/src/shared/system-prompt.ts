@@ -1,27 +1,27 @@
 /**
  * System prompt builder — pure.
  *
- * Emits the *append* body handed to the Agent SDK on every chat turn
- * via `{ type: 'preset', preset: 'claude_code', append }`. Using the
- * preset keeps the SDK's default framing intact so plugin-loaded skills
- * (`model-domain`, `use-stdlib`, `generate-sample`) auto-trigger on
- * description match. A raw-string systemPrompt would replace that
- * framing and silently disable skill loading.
+ * Emits the *append* body handed to the Agent SDK on every chat turn via
+ * `{ type: 'preset', preset: 'claude_code', append }`. Using the preset keeps
+ * the SDK's default framing intact so plugin-loaded skills (`model-domain`,
+ * `use-stdlib`, `generate-sample`) auto-trigger on description match. A
+ * raw-string systemPrompt would replace that framing and silently disable skill
+ * loading.
  *
  * Contents, in order:
- *   1. Imperative role/mission header — push tool use; forbid prose
- *      schemas; name the available skills.
+ *   1. Imperative role/mission header — push tool use; forbid prose schemas;
+ *      name the available skills.
  *   2. Op vocabulary — every op name with a one-line shape summary.
  *   3. Stdlib enumeration — `namespace.Name — description`, alphabetised.
  *
- * The current IR is NOT in the system prompt: it's injected into each
- * user message via `buildUserMessage` so that `resume`-based sessions
- * (which re-use the original system prompt) still see the latest
- * schema. Same inputs → same bytes, with stdlib entries sorted so
- * registry reordering doesn't churn the cache key.
+ * The current IR is NOT in the system prompt: it's injected into each user
+ * message via `buildUserMessage` so that `resume`-based sessions (which re-use
+ * the original system prompt) still see the latest schema. Same inputs → same
+ * bytes, with stdlib entries sorted so registry reordering doesn't churn the
+ * cache key.
  */
 
-import type { Schema } from '../model/ir';
+import type { Schema } from '@contexture/core/ir';
 
 export interface StdlibEntry {
   /** Namespace path, e.g. `'common'` or `'place'`. */
@@ -61,10 +61,9 @@ export interface BuildUserMessageInput {
 }
 
 /**
- * Wraps the user's message with a `<current_ir>` block carrying the
- * latest IR snapshot. Called per turn so that even when `resume` is
- * used (and the SDK replays the original system prompt) Claude always
- * sees the current schema.
+ * Wraps the user's message with a `<current_ir>` block carrying the latest IR
+ * snapshot. Called per turn so that even when `resume` is used (and the SDK
+ * replays the original system prompt) Claude always sees the current schema.
  */
 export function buildUserMessage(input: BuildUserMessageInput): string {
   return [

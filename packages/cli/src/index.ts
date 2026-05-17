@@ -5,6 +5,7 @@ import {
   assertContextureIrPath,
   assertWritableContextureProjectIrPath,
   checkGeneratedBundle,
+  checkSemantic,
   createFileBackedForward,
   createOpTools,
   type FieldDef,
@@ -524,6 +525,24 @@ async function run(argv: string[]): Promise<void> {
           message: issue.message,
         })),
       });
+      return;
+    }
+    const errors = checkSemantic(parsed.data).map((issue) => ({
+      code: issue.code,
+      path: issue.path,
+      message: issue.message,
+      ...(issue.hint ? { hint: issue.hint } : {}),
+    }));
+    if (errors.length > 0) {
+      process.exitCode = 1;
+      if (options.json) {
+        writeJson({ ok: false, errors });
+      } else {
+        process.stderr.write('Validation failed:\n');
+        for (const error of errors) {
+          process.stderr.write(`  ${error.path}: ${error.message}\n`);
+        }
+      }
       return;
     }
     writeResult({ valid: true, errors: [] }, options.json);

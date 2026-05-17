@@ -138,13 +138,31 @@ describe('apply() — delta semantic gate', () => {
     expect('schema' in result).toBe(true);
   });
 
-  it('without a catalog, behaves structurally (today’s behaviour)', () => {
+  it('without a catalog, still rejects unresolved local refs', () => {
     const op: Op = {
       kind: 'add_field',
       typeName: 'Order',
       field: { name: 'country', type: { kind: 'ref', typeName: 'CountryCode' } },
     };
     const result = apply(baseSchema, op);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('Unresolved ref "CountryCode"');
+      expect(result.error).not.toContain('Did you mean');
+    }
+  });
+
+  it('without a catalog, accepts qualified refs when the alias is imported', () => {
+    const start: Schema = {
+      ...baseSchema,
+      imports: [{ kind: 'stdlib', path: '@contexture/place', alias: 'place' }],
+    };
+    const op: Op = {
+      kind: 'add_field',
+      typeName: 'Order',
+      field: { name: 'country', type: { kind: 'ref', typeName: 'place.CountryCode' } },
+    };
+    const result = apply(start, op);
     expect('schema' in result).toBe(true);
   });
 });

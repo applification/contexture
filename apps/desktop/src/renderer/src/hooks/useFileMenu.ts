@@ -25,11 +25,12 @@
  * wires `onMenuNew` / `onMenuOpen` / `onMenuSave` / `onMenuSaveAs`
  * subscriptions in a single `useEffect`.
  */
+
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChatHistory } from '../model/chat-history';
 import type { Layout } from '../model/layout';
 import { load } from '../model/load';
-import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { validate } from '../services/validation';
 import { useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';

@@ -14,15 +14,18 @@ If both consumers reach into the same package directly, the published surface bl
 
 ## Decision
 
-`packages/stdlib` owns all implementation — the Zod schemas, IR JSON for each module, registry, and helper data (countries, currencies). `packages/runtime` is a thin re-export layer published to npm. Dependencies flow strictly one way: `apps/* → runtime → stdlib`. Apps never import `stdlib` directly.
+`packages/stdlib` owns all implementation — the Zod schemas, IR JSON for each module, registry, and helper data (countries, currencies). `packages/runtime` is a thin re-export layer published to npm. Generated/user runtime code imports stdlib types only through `@contexture/runtime`.
 
-This is enforced as a coding standard (`.sandcastle/CODING_STANDARDS.md`) and visible in the package layout — `packages/runtime/src` only re-exports the subset users need.
+Editor-only stdlib metadata is intentionally not re-exported from `runtime`. The desktop app may read that metadata through exactly one adapter: `apps/desktop/src/shared/stdlib-registry.ts`. App code must not import `@contexture/stdlib/*` directly anywhere else.
+
+This is enforced as a coding standard (`.sandcastle/CODING_STANDARDS.md`) and visible in the package layout — `packages/runtime/src` only re-exports the subset users need, while the desktop adapter owns the private editor catalog Interface.
 
 ## Consequences
 
 - The published npm surface is small and intentional; editor-only data (e.g. registry metadata for the chat system prompt) doesn't leak to consumers.
-- Renaming or restructuring inside stdlib is safe — only `runtime`'s re-exports are public API.
-- One extra hop for editor code, but the indirection is mechanical (a re-export line) and pays for itself the first time we add internal-only stdlib utilities.
+- Renaming or restructuring runtime types inside stdlib is safe — only `runtime`'s re-exports are public API.
+- Editor-only registry churn has one locality point in the desktop shared adapter.
+- One extra hop for editor code, but the indirection is mechanical and pays for itself the first time we add internal-only stdlib utilities.
 
 ## Alternatives considered
 

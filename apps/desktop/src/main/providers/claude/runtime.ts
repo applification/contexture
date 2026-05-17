@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk';
-import { buildSystemPromptAppend } from '@renderer/chat/system-prompt';
-import { SYSTEM_PROMPT_STDLIB } from '@renderer/services/stdlib-registry';
+import { SYSTEM_PROMPT_STDLIB } from '@shared/stdlib-registry';
+import { buildSystemPromptAppend } from '@shared/system-prompt';
 import { app } from 'electron';
 import { ChatCancelledError } from '../../ipc/claude-errors';
 import { invokeOpHandler, normalizeOpToolArgs } from '../../ipc/op-tool-bridge';

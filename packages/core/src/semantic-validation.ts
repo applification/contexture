@@ -1,10 +1,10 @@
 /**
- * Semantic validation of an IR — refs, imports, duplicates.
+ * Semantic validation of an IR.
  *
  * Structural validation (zod meta-schema) lives in `ir.ts`. This module
- * checks the things zod can't: unresolved refs, unknown stdlib namespaces,
- * stdlib alias mismatches, duplicate aliases / type names. It is the
- * source of truth consumed by both:
+ * checks the things zod can't: unresolved refs, import consistency,
+ * duplicate aliases / type names, discriminated-union invariants, and enum
+ * invariants. It is the source of truth consumed by both:
  *
  *   1. `apply()` in `ops.ts`, which uses it to delta-reject any op whose
  *      result would introduce a *new* issue (the chat-tool-call gate).
@@ -33,7 +33,12 @@ export type SemanticIssueCode =
   | 'unknown_stdlib_namespace'
   | 'stdlib_alias_mismatch'
   | 'duplicate_alias'
-  | 'duplicate_type_name';
+  | 'duplicate_type_name'
+  | 'discriminator_variant_not_found'
+  | 'discriminator_variant_not_object'
+  | 'discriminator_missing_on_variant'
+  | 'enum_empty'
+  | 'enum_duplicate_value';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
@@ -49,6 +54,8 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkImports(schema, catalog),
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
+    ...checkDiscriminatedUnions(schema),
+    ...checkEnums(schema),
   ];
 }
 
@@ -156,6 +163,71 @@ function checkDuplicateTypeNames(schema: Schema): SemanticIssue[] {
     } else {
       seen.add(type.name);
     }
+  });
+  return issues;
+}
+
+function checkDiscriminatedUnions(schema: Schema): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  const byName = new Map(schema.types.map((t) => [t.name, t]));
+
+  schema.types.forEach((type, ti) => {
+    if (type.kind !== 'discriminatedUnion') return;
+    type.variants.forEach((variantName, vi) => {
+      const path = `types.${ti}.variants.${vi}`;
+      const variant = byName.get(variantName);
+      if (!variant) {
+        issues.push({
+          code: 'discriminator_variant_not_found',
+          path,
+          message: `Discriminated union variant "${variantName}" is not defined.`,
+        });
+        return;
+      }
+      if (variant.kind !== 'object') {
+        issues.push({
+          code: 'discriminator_variant_not_object',
+          path,
+          message: `Discriminated union variant "${variantName}" must be an object type.`,
+        });
+        return;
+      }
+      if (!variant.fields.some((f) => f.name === type.discriminator)) {
+        issues.push({
+          code: 'discriminator_missing_on_variant',
+          path,
+          message: `Variant "${variantName}" is missing discriminator field "${type.discriminator}".`,
+        });
+      }
+    });
+  });
+  return issues;
+}
+
+function checkEnums(schema: Schema): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  schema.types.forEach((type, ti) => {
+    if (type.kind !== 'enum') return;
+    if (type.values.length === 0) {
+      issues.push({
+        code: 'enum_empty',
+        path: `types.${ti}.values`,
+        message: `Enum "${type.name}" must have at least one value.`,
+      });
+      return;
+    }
+    const seen = new Set<string>();
+    type.values.forEach((value, vi) => {
+      if (seen.has(value.value)) {
+        issues.push({
+          code: 'enum_duplicate_value',
+          path: `types.${ti}.values.${vi}`,
+          message: `Duplicate enum value "${value.value}" in "${type.name}".`,
+        });
+      } else {
+        seen.add(value.value);
+      }
+    });
   });
   return issues;
 }

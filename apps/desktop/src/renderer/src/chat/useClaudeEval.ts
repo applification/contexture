@@ -19,9 +19,9 @@
  * the SDK.
  */
 
+import { buildEvalPrompt, type EvalMode } from '@shared/eval-prompt';
 import { useCallback, useState } from 'react';
 import type { Schema } from '../model/ir';
-import { buildEvalPrompt, type EvalMode } from './eval-prompt';
 
 export interface EvalAPI {
   generate: (args: {

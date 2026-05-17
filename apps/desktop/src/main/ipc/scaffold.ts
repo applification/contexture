@@ -7,7 +7,7 @@
  * Kept callback-shaped so tests can drive it without Electron;
  * `registerScaffoldIpc` binds it to `webContents.send`.
  */
-import { IRSchema } from '@renderer/model/ir';
+import { IRSchema } from '@contexture/core';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import type { FsAdapter } from '../documents/document-store';
