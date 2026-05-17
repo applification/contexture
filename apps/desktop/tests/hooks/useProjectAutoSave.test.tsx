@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 function mockFileBridge(): { save: ReturnType<typeof vi.fn> } {
   const save = vi.fn(async () => undefined);
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {},
     file: {
       save,
       openDialog: vi.fn(),

@@ -21,7 +21,6 @@ function mockFileBridge(): {
   const openRecent = vi.fn(async () => null);
   const getRecentFiles = vi.fn(async () => [] as string[]);
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {},
     file: {
       openDialog,
       saveAsDialog,
@@ -176,7 +175,7 @@ describe('useFileMenu', () => {
       chat: {
         version: '1',
         messages: [{ id: 'm1', role: 'user', content: 'hi', createdAt: 1 }],
-        sessionId: 'sess-42',
+        providerThreadRef: { provider: 'codex', threadId: 'thread-42' },
       },
       warnings: [],
     });
@@ -191,7 +190,9 @@ describe('useFileMenu', () => {
     });
     expect(onBundleLoaded).toHaveBeenCalledWith({
       layout: { version: '1', positions: { Plot: { x: 10, y: 20 } } },
-      chat: expect.objectContaining({ sessionId: 'sess-42' }),
+      chat: expect.objectContaining({
+        providerThreadRef: { provider: 'codex', threadId: 'thread-42' },
+      }),
     });
   });
 

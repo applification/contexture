@@ -1,32 +1,14 @@
 /**
  * ChatPanel — minimal rendering + submit behaviour over the injected
- * chat state. `useClaude` is a dependency; we mock the preload bridge
- * so it reports a ready Max session by default, which lets the input
- * accept typing. Tests that want the "not connected" path construct
- * the bridge with `{ installed: false }`.
+ * schema-agent chat state.
  */
 
-import type { ClaudeSchemaChatState } from '@renderer/chat/useClaudeSchemaChat';
 import type { SchemaAgentChatState } from '@renderer/chat/useSchemaAgentChat';
 import { ChatPanel } from '@renderer/components/chat/ChatPanel';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function makeChat(overrides: Partial<ClaudeSchemaChatState> = {}): ClaudeSchemaChatState {
-  return {
-    messages: [],
-    isStreaming: false,
-    liveAssistant: '',
-    authRequired: false,
-    clearAuthRequired: vi.fn(),
-    send: vi.fn().mockResolvedValue(undefined),
-    hydrate: vi.fn(),
-    clear: vi.fn(),
-    ...overrides,
-  };
-}
-
-function makeSchemaAgentChat(overrides: Partial<SchemaAgentChatState> = {}): SchemaAgentChatState {
+function makeChat(overrides: Partial<SchemaAgentChatState> = {}): SchemaAgentChatState {
   return {
     provider: 'codex',
     providerLabel: 'Codex',
@@ -77,23 +59,18 @@ function makeSchemaAgentChat(overrides: Partial<SchemaAgentChatState> = {}): Sch
   };
 }
 
-function mockBridge(installed: boolean): void {
+function mockBridge(): void {
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {
-      detectClaudeCli: vi.fn(async () => ({
-        installed,
-        path: installed ? '/usr/local/bin/claude' : null,
-      })),
-      setAuth: vi.fn(async () => ({ ok: true })),
-      setModelOptions: vi.fn(async () => ({ ok: true })),
-      abort: vi.fn(async () => ({ ok: true })),
+    schemaAgent: {
+      threadSet: vi.fn(async () => ({ ok: true })),
+      threadClear: vi.fn(async () => ({ ok: true })),
     },
   };
 }
 
 beforeEach(() => {
   localStorage.clear();
-  mockBridge(true);
+  mockBridge();
 });
 
 afterEach(() => {
@@ -104,13 +81,11 @@ afterEach(() => {
 describe('ChatPanel', () => {
   it('renders the empty-state "Start a conversation" when ready with no messages', async () => {
     render(<ChatPanel chat={makeChat()} />);
-    // cliDetected is async — wait for the happy-path copy.
     await waitFor(() => expect(screen.getByText(/Start a conversation/i)).toBeInTheDocument());
   });
 
-  it('renders the "Not connected" empty state when neither CLI nor key is configured', async () => {
-    mockBridge(false);
-    render(<ChatPanel chat={makeChat()} />);
+  it('renders the "Not connected" empty state when provider auth is not ready', async () => {
+    render(<ChatPanel chat={makeChat({ isReady: false })} />);
     await waitFor(() => expect(screen.getByText(/Not connected/i)).toBeInTheDocument());
   });
 
@@ -128,13 +103,12 @@ describe('ChatPanel', () => {
 
   it('shows the streaming indicator while isStreaming is true', () => {
     render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
-    expect(screen.getByText(/Claude is thinking/i)).toBeInTheDocument();
+    expect(screen.getByText(/Codex is thinking/i)).toBeInTheDocument();
   });
 
   it('Enter in the textarea calls chat.send with the trimmed draft', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     render(<ChatPanel chat={makeChat({ send })} />);
-    // Wait for useClaude to report ready so the textarea accepts input.
     await waitFor(() => {
       const ta = screen.getByTestId('chat-input') as HTMLTextAreaElement;
       expect(ta.disabled).toBe(false);
@@ -165,20 +139,20 @@ describe('ChatPanel', () => {
   });
 
   it('keeps the effort control visible for schema-agent chats', () => {
-    render(<ChatPanel chat={makeSchemaAgentChat()} />);
+    render(<ChatPanel chat={makeChat()} />);
     expect(screen.getByTestId('chat-effort-select')).toHaveTextContent(/High/i);
     expect(screen.getByTestId('chat-effort-select')).toHaveAttribute('title', 'Reasoning');
   });
 
   it('falls back to a provider default when schema-agent effort is empty', () => {
-    render(<ChatPanel chat={makeSchemaAgentChat({ effort: '' })} />);
+    render(<ChatPanel chat={makeChat({ effort: '' })} />);
     expect(screen.getByTestId('chat-effort-select')).toHaveTextContent(/High/i);
   });
 
   it('renders model-provided effort options instead of hard-coded provider values', () => {
     render(
       <ChatPanel
-        chat={makeSchemaAgentChat({
+        chat={makeChat({
           effort: 'xhigh',
           modelOptions: { reasoningEffort: 'xhigh' },
         })}
@@ -208,7 +182,7 @@ describe('ChatPanel', () => {
       ]),
     );
 
-    render(<ChatPanel chat={makeSchemaAgentChat({ restoreSettings })} />);
+    render(<ChatPanel chat={makeChat({ restoreSettings })} />);
 
     expect(restoreSettings).toHaveBeenCalledWith({
       provider: 'claude',

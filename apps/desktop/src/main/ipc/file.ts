@@ -14,16 +14,18 @@
  */
 
 import { join } from 'node:path';
-import type { Schema } from '@contexture/core';
+import { IRSchema, type Schema } from '@contexture/core';
 import type { ChatHistory } from '@shared/chat-history';
 import type { Layout } from '@shared/layout';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
+import { z } from 'zod';
 import {
   createDocumentStore,
   type DocumentMode,
   type DocumentStore,
 } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
+import { IpcString, parseIpcPayload } from './validation';
 
 // Electron's FileFilter.extensions is a list of bare extensions (no dot,
 // no multi-segment values). The double-extension `.contexture.json` is
@@ -42,6 +44,15 @@ export interface HandleSaveInput {
   layout: Layout;
   chat: ChatHistory;
 }
+
+const SavePayloadSchema = z
+  .object({
+    irPath: IpcString,
+    schema: IRSchema,
+    layout: z.unknown(),
+    chat: z.unknown(),
+  })
+  .strict() as z.ZodType<HandleSaveInput>;
 
 export interface OpenWarning {
   message: string;
@@ -153,29 +164,20 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     return result.filePath;
   });
 
-  ipcMain.handle(
-    'file:save',
-    async (
-      _evt,
-      payload: {
-        irPath: string;
-        schema: Schema;
-        layout: Layout;
-        chat: ChatHistory;
-      },
-    ) => {
-      await handleSave(payload);
-    },
-  );
+  ipcMain.handle('file:save', async (_evt, payload: unknown) => {
+    await handleSave(parseIpcPayload('file:save', SavePayloadSchema, payload));
+  });
 
-  ipcMain.handle('file:read', async (_evt, irPath: string) => handleOpen(irPath));
+  ipcMain.handle('file:read', async (_evt, irPath: unknown) =>
+    handleOpen(parseIpcPayload('file:read', IpcString, irPath)),
+  );
 
   ipcMain.handle('file:recent-files', async () => {
     const recents = await getStore().recentFiles();
     return recents.map((r) => r.path);
   });
 
-  ipcMain.handle('file:open-recent', async (_evt, filePath: string) => {
-    return handleOpen(filePath);
+  ipcMain.handle('file:open-recent', async (_evt, filePath: unknown) => {
+    return handleOpen(parseIpcPayload('file:open-recent', IpcString, filePath));
   });
 }

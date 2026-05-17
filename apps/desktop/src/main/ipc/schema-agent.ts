@@ -1,6 +1,7 @@
-import type { Schema } from '@contexture/core';
+import { IRSchema, type Schema } from '@contexture/core';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
+import { z } from 'zod';
 import { createOpTools } from '../ops';
 import { ClaudeProviderRuntime } from '../providers/claude/runtime';
 import { CodexProviderRuntime } from '../providers/codex/runtime';
@@ -23,13 +24,65 @@ import {
 } from '../providers/schema-agent-driver';
 import { generateReconcileProposal, type ReconcileProposalInput } from '../reconcile/proposals';
 import { ChatTurnController } from './chat-turn';
-import { type BridgeTransport, makeIpcForwardOp, TurnContext } from './claude-bridge';
+import { type BridgeTransport, makeIpcForwardOp, TurnContext } from './op-bridge';
+import { IpcString, parseIpcPayload } from './validation';
 
 export interface SchemaAgentIpc {
   runtime: ProviderRuntime;
   driver: SchemaAgentDriver;
   turnContext: TurnContext;
 }
+
+const ProviderKindSchema = z.enum(['codex', 'claude']);
+const ProviderOrUndefinedSchema = z.union([ProviderKindSchema, z.undefined()]);
+const ModelOptionValueSchema = z.union([z.string(), z.boolean()]);
+const ModelOptionsPayloadSchema = z
+  .object({
+    model: z.string().optional(),
+    effort: z.string().optional(),
+    options: z.record(z.string(), ModelOptionValueSchema).optional(),
+  })
+  .strict();
+const ToolReplySchema = z
+  .object({
+    id: IpcString,
+    result: z.unknown(),
+  })
+  .strict();
+const StartLoginPayloadSchema = z
+  .object({
+    mode: z.enum(['chatgpt', 'api-key', 'cli-session']),
+    apiKey: z.string().min(1).optional(),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    if (input.mode === 'api-key' && !input.apiKey) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['apiKey'],
+        message: 'API key is required for api-key login.',
+      });
+    }
+  });
+const CancelLoginPayloadSchema = z
+  .object({
+    flowId: IpcString,
+  })
+  .strict();
+const ProviderThreadRefSchema = z
+  .object({
+    provider: ProviderKindSchema,
+    threadId: IpcString,
+    opaque: z.unknown().optional(),
+  })
+  .strict();
+const ReconcileProposalPayloadSchema = z
+  .object({
+    irJson: z.string(),
+    onDiskSource: z.string(),
+    targetKind: IpcString,
+  })
+  .strict() as z.ZodType<ReconcileProposalInput>;
 
 export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIpc {
   const toolTransport: BridgeTransport = {
@@ -38,8 +91,18 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     },
   };
 
-  ipcMain.on('schema-agent:tool-reply', (_evt, message: { id: string; result: unknown }) => {
-    toolTransport.onReply?.(message.id, message.result);
+  const reportValidationError = (err: unknown): void => {
+    const message = err instanceof Error ? err.message : String(err);
+    mainWindow.webContents.send(SCHEMA_AGENT_ERROR, { message });
+  };
+
+  ipcMain.on('schema-agent:tool-reply', (_evt, message: unknown) => {
+    try {
+      const parsed = parseIpcPayload('schema-agent:tool-reply', ToolReplySchema, message);
+      toolTransport.onReply?.(parsed.id, parsed.result);
+    } catch (err) {
+      reportValidationError(err);
+    }
   });
 
   const forwardOp = makeIpcForwardOp(toolTransport);
@@ -82,13 +145,17 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     getModelOptions: () => currentModelOptions[currentProvider] ?? {},
   });
 
-  ipcMain.on('schema-agent:set-ir', (_evt, ir: Schema) => {
-    turnContext.pushIR(ir);
+  ipcMain.on('schema-agent:set-ir', (_evt, ir: unknown) => {
+    try {
+      turnContext.pushIR(parseIpcPayload('schema-agent:set-ir', IRSchema, ir));
+    } catch (err) {
+      reportValidationError(err);
+    }
   });
 
-  ipcMain.handle('schema-agent:send', async (_evt, userMessage: string) => {
+  ipcMain.handle('schema-agent:send', async (_evt, userMessage: unknown) => {
     try {
-      await driver.send(userMessage);
+      await driver.send(parseIpcPayload('schema-agent:send', IpcString, userMessage));
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -96,14 +163,19 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     }
   });
 
-  ipcMain.handle('schema-agent:reconcile', async (_evt, payload: ReconcileProposalInput) =>
-    generateReconcileProposal({
-      runtime: activeRuntime(),
-      schema: turnContext.current() ?? parseSchemaPayload(payload.irJson),
-      modelOptions: currentModelOptions[currentProvider],
+  ipcMain.handle('schema-agent:reconcile', async (_evt, payload: unknown) => {
+    const parsed = parseIpcPayload(
+      'schema-agent:reconcile',
+      ReconcileProposalPayloadSchema,
       payload,
-    }),
-  );
+    );
+    return generateReconcileProposal({
+      runtime: activeRuntime(),
+      schema: turnContext.current() ?? parseSchemaPayload(parsed.irJson),
+      modelOptions: currentModelOptions[currentProvider],
+      payload: parsed,
+    });
+  });
 
   ipcMain.handle('schema-agent:abort', async () => {
     const currentThread = currentThreads[currentProvider];
@@ -119,42 +191,53 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
 
   ipcMain.handle('schema-agent:get-status', () => activeRuntime().getStatus());
   ipcMain.handle('schema-agent:list-models', (_evt, provider?: unknown) => {
-    const runtime = provider ? runtimeForProvider(provider) : activeRuntime();
+    const parsedProvider = parseIpcPayload(
+      'schema-agent:list-models',
+      ProviderOrUndefinedSchema,
+      provider,
+    );
+    const runtime = parsedProvider ? runtimeForProvider(parsedProvider) : activeRuntime();
     if (!runtime) return [];
     return runtime.listModels();
   });
   ipcMain.handle('schema-agent:set-provider', (_evt, provider: unknown) => {
-    if (provider !== 'codex' && provider !== 'claude') {
+    const parsed = ProviderKindSchema.safeParse(provider);
+    if (!parsed.success) {
       return { ok: false, error: 'Unsupported schema-agent provider' };
     }
-    currentProvider = provider;
+    currentProvider = parsed.data;
     return { ok: true };
   });
-  ipcMain.handle(
-    'schema-agent:set-model-options',
-    (_evt, options: { model?: string; effort?: string; options?: ModelOptions }) => {
-      currentModelOptions[currentProvider] = {
-        ...(options.model ? { model: options.model } : {}),
-        ...(options.effort ? { effort: options.effort } : {}),
-        ...(options.options ? { options: options.options } : {}),
-      };
-      return { ok: true };
-    },
+  ipcMain.handle('schema-agent:set-model-options', (_evt, options: unknown) => {
+    const parsed = parseIpcPayload(
+      'schema-agent:set-model-options',
+      ModelOptionsPayloadSchema,
+      options,
+    );
+    currentModelOptions[currentProvider] = {
+      ...(parsed.model ? { model: parsed.model } : {}),
+      ...(parsed.effort ? { effort: parsed.effort } : {}),
+      ...(parsed.options ? { options: parsed.options } : {}),
+    };
+    return { ok: true };
+  });
+  ipcMain.handle('schema-agent:start-login', (_evt, input: unknown) =>
+    activeRuntime().startLogin(
+      parseIpcPayload('schema-agent:start-login', StartLoginPayloadSchema, input),
+    ),
   );
-  ipcMain.handle(
-    'schema-agent:start-login',
-    (_evt, input: { mode: 'chatgpt' | 'api-key' | 'cli-session'; apiKey?: string }) =>
-      activeRuntime().startLogin(input),
-  );
-  ipcMain.handle('schema-agent:cancel-login', (_evt, input: { flowId: string }) =>
-    activeRuntime().cancelLogin(input),
+  ipcMain.handle('schema-agent:cancel-login', (_evt, input: unknown) =>
+    activeRuntime().cancelLogin(
+      parseIpcPayload('schema-agent:cancel-login', CancelLoginPayloadSchema, input),
+    ),
   );
   ipcMain.handle('schema-agent:logout', () => activeRuntime().logout());
   ipcMain.handle('schema-agent:thread-clear', () => {
     currentThreads[currentProvider] = undefined;
     return { ok: true };
   });
-  ipcMain.handle('schema-agent:thread-set', async (_evt, thread: ProviderThreadRef) => {
+  ipcMain.handle('schema-agent:thread-set', async (_evt, input: unknown) => {
+    const thread = parseIpcPayload('schema-agent:thread-set', ProviderThreadRefSchema, input);
     const runtime = runtimes[thread.provider] ?? activeRuntime();
     currentProvider = runtime.provider;
     if (desyncedThreads.has(threadKey(thread))) {
@@ -204,7 +287,8 @@ function threadKey(thread: ProviderThreadRef): string {
 function parseSchemaPayload(irJson: string): Schema {
   try {
     const parsed = JSON.parse(irJson);
-    if (parsed && typeof parsed === 'object') return parsed as Schema;
+    const schema = IRSchema.safeParse(parsed);
+    if (schema.success) return schema.data;
   } catch {
     // Fall through to an empty schema. The prompt still carries the raw IR
     // string, so this only protects provider runtimes that require a schema.

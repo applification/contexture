@@ -1,5 +1,5 @@
 /**
- * Regression coverage for legacy scratch-mode fixtures.
+ * Regression coverage for scratch-mode fixtures.
  *
  * `samples/allotment.contexture.json` is the canonical bare-IR bundle
  * shipped inside the app — no `.contexture/` sidecar, no emitted
@@ -16,7 +16,7 @@ import allotment from '../../src/renderer/src/samples/allotment.contexture.json'
 
 const IR_PATH = '/work/allotment.contexture.json';
 
-describe('legacy scratch-mode fixture', () => {
+describe('scratch-mode fixture', () => {
   it('opens the allotment sample as scratch', async () => {
     const fs = createMemFsAdapter({ [IR_PATH]: JSON.stringify(allotment) });
     const store = createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' });

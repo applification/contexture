@@ -3,10 +3,7 @@
  * errors popover, token estimate against the emitted Zod source, and
  * the analytics opt-out toggle.
  *
- * Dirty-doc colour driven by `useDocumentStore.isDirty`. The
- * pre-pivot app also surfaced file-format ("Turtle" / "RDF/XML" /
- * "JSON-LD"); Contexture only has `.contexture.json` so that row is
- * gone.
+ * Dirty-doc colour is driven by `useDocumentStore.isDirty`.
  */
 
 import { emit as emitZod } from '@contexture/core/emit-zod';
@@ -55,8 +52,7 @@ export function StatusBar(): React.JSX.Element {
 
   const errors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
   // Validation surfaces a single severity today ("error"), but the bar
-  // mirrors the pre-pivot counters so future warning-level rules drop
-  // in cleanly.
+  // keeps a warning slot so future warning-level rules drop in cleanly.
   const errorCount = errors.length;
   const warnCount = 0;
 
@@ -95,8 +91,7 @@ export function StatusBar(): React.JSX.Element {
     >
       <TooltipProvider delayDuration={300}>
         {/* Save-state dot — amber while the document has unsaved edits,
-            green once clean. Mirrors the pre-pivot status bar so the
-            save indicator sits in the same spot users already scan. */}
+            green once clean. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="flex items-center gap-1.5">

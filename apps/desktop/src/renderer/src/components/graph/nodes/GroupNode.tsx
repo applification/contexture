@@ -1,5 +1,5 @@
 /**
- * GroupNode — visual grouping container retained from the pre-pivot canvas.
+ * GroupNode — visual grouping container.
  *
  * Groups are purely presentational: they don't live in the IR and have no
  * effect on validation, emitters, or refs. Layout sidecar persists them

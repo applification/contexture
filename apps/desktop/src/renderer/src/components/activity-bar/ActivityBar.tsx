@@ -7,12 +7,6 @@ interface ActivityBarProps {
   onTabChange: (tab: SidebarTab) => void;
 }
 
-/**
- * The `metrics` tab from the pre-pivot app isn't surfaced here —
- * Contexture has no `MetricsPanel` equivalent yet. `SidebarTab` still
- * accepts `'metrics'` so persisted UI state doesn't crash; the bar
- * just doesn't render a button for it until a metrics panel lands.
- */
 const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
   { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },

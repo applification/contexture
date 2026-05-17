@@ -11,15 +11,24 @@
  */
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
+import { z } from 'zod';
 import { createDriftWatcher, type DriftWatcher } from '../documents/drift-watcher';
+import { IpcString, parseIpcPayload } from './validation';
 
 let activeWatcher: DriftWatcher | null = null;
 
+const WatchPayloadSchema = z
+  .object({
+    emittedJsonPath: IpcString,
+  })
+  .strict();
+
 export function registerDriftIpc(mainWindow: BrowserWindow): void {
-  ipcMain.handle('drift:watch', (_evt, payload: { emittedJsonPath: string }) => {
+  ipcMain.handle('drift:watch', (_evt, payload: unknown) => {
+    const parsed = parseIpcPayload('drift:watch', WatchPayloadSchema, payload);
     activeWatcher?.stop();
     activeWatcher = createDriftWatcher({
-      emittedJsonPath: payload.emittedJsonPath,
+      emittedJsonPath: parsed.emittedJsonPath,
       onDrift: (paths) => mainWindow.webContents.send('drift:detected', { paths }),
       onStatus: (problems) =>
         mainWindow.webContents.send('drift:detected', {

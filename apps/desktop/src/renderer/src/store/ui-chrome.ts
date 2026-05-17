@@ -2,13 +2,13 @@
  * UI chrome store — theme, sidebar, and active sidebar tab.
  *
  * Ephemeral window-local state; never touches the sidecar. Split out of
- * the old `useUIStore` so that components which only care about e.g.
- * the sidebar tab don't re-render on unrelated selection changes.
+ * the graph selection store so components that only care about e.g. the
+ * sidebar tab don't re-render on unrelated selection changes.
  */
 import { create } from 'zustand';
 
 export type Theme = 'dark' | 'light';
-export type SidebarTab = 'properties' | 'chat' | 'schema' | 'eval' | 'metrics';
+export type SidebarTab = 'properties' | 'chat' | 'schema' | 'eval';
 
 interface UIChromeStoreShape {
   theme: Theme;

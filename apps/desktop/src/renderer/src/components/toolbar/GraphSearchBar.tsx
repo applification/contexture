@@ -2,14 +2,12 @@
  * Canvas search bar — focuses a type by name.
  *
  * Contexture IRs only have `TypeDef`s (objects / enums / discriminated
- * unions / raw) — no OWL classes, individuals, object/datatype
- * properties. So the search surface is simpler than the pre-pivot
- * `GraphSearchBar`: we match against `TypeDef.name` and
+ * unions / raw), so we match against `TypeDef.name` and
  * `TypeDef.description`. Results route via the selection store's
  * `focus(id)` which `GraphCanvas` watches to recentre the view.
  *
- * Keybindings mirror the pre-pivot app: Cmd/Ctrl+F focuses the input;
- * ↑/↓ navigate; Enter picks; Escape clears.
+ * Keybindings: Cmd/Ctrl+F focuses the input; ↑/↓ navigate; Enter picks;
+ * Escape clears.
  */
 
 import { useGraphSelectionStore } from '@renderer/store/selection';

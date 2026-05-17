@@ -1,5 +1,5 @@
 /**
- * Chat history sidecar I/O (`<name>.contexture.chat.json`).
+ * Chat history sidecar I/O (`.contexture/chat.json`).
  *
  * Like the layout sidecar, chat history is disposable and version-tombstoned
  * with `version: '1'`. Unrecognised versions are discarded with a warning
@@ -26,13 +26,6 @@ export interface ChatHistory {
   model?: string;
   effort?: string;
   modelOptions?: Record<string, string | boolean>;
-  /**
-   * Agent SDK session id for this chat. Present after the first turn; restored
-   * on app reopen so follow-up turns pass `resume: sessionId` and the SDK
-   * threads prior conversation context. Additive field — absence is OK; invalid
-   * types are discarded.
-   */
-  sessionId?: string;
 }
 
 export interface LoadChatHistoryResult {
@@ -87,7 +80,6 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
   const model = typeof obj.model === 'string' ? obj.model : undefined;
   const effort = typeof obj.effort === 'string' ? obj.effort : undefined;
   const modelOptions = sanitiseModelOptions(obj.modelOptions);
-  const sessionId = typeof obj.sessionId === 'string' ? obj.sessionId : undefined;
   return {
     history: {
       version: CHAT_HISTORY_VERSION,
@@ -97,7 +89,6 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
       ...(modelOptions ? { modelOptions } : {}),
-      ...(sessionId ? { sessionId } : {}),
     },
     warnings: [],
   };

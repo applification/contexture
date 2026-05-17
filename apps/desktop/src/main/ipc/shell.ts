@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ipcMain, shell } from 'electron';
+import { IpcString, parseIpcPayload } from './validation';
 
 export type CliRunner = (args: readonly string[]) => Promise<void>;
 
@@ -41,10 +42,10 @@ function spawnCode(args: readonly string[]): Promise<void> {
 }
 
 export function registerShellIpc(): void {
-  ipcMain.handle('shell:reveal', (_evt, path: string) => {
-    shell.showItemInFolder(assertSafeShellPath(path));
+  ipcMain.handle('shell:reveal', (_evt, path: unknown) => {
+    shell.showItemInFolder(assertSafeShellPath(parseIpcPayload('shell:reveal', IpcString, path)));
   });
-  ipcMain.handle('shell:open-in-editor', async (_evt, path: string) => {
-    await openInEditor(path, spawnCode);
+  ipcMain.handle('shell:open-in-editor', async (_evt, path: unknown) => {
+    await openInEditor(parseIpcPayload('shell:open-in-editor', IpcString, path), spawnCode);
   });
 }

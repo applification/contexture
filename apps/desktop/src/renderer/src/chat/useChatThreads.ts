@@ -1,14 +1,13 @@
 /**
  * `useChatThreads` — localStorage-backed chat-thread store.
  *
- * Mirrors the pre-pivot (`main` branch) UX where the user can keep
- * multiple conversations per schema file and switch between them from
- * a list in the chat panel. Each `ChatThread` carries its own Agent
- * SDK `sessionId` so switching resumes that thread's prior context.
+ * Stores multiple conversations per schema file and lets the user switch
+ * between them from the chat panel. Each `ChatThread` can carry a
+ * provider-owned thread ref so switching resumes that thread's prior context.
  *
  * Storage is localStorage — the chat transcript is disposable by
  * design (see `plans/pivot.md` §sidecars) and shipping the full thread
- * collection in the git-tracked `.contexture.chat.json` would bloat
+ * collection in the git-tracked `.contexture/chat.json` would bloat
  * diffs. Threads are keyed by schema file path; "no file yet" threads
  * live under a `null` filePath bucket.
  *
@@ -31,8 +30,6 @@ export interface ChatThread {
   modelOptions?: Record<string, string | boolean>;
   filePath: string | null;
   providerThreadRef?: unknown;
-  /** Agent SDK session id — set after the first turn. Undefined on a fresh thread. */
-  sessionId?: string;
   desynced?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -109,7 +106,6 @@ export interface UseChatThreadsReturn {
       modelOptions?: Record<string, string | boolean>;
     },
   ) => void;
-  updateThreadSessionId: (id: string, sessionId: string) => void;
   updateThreadProviderRef: (id: string, providerThreadRef: unknown) => void;
   markThreadDesynced: (id: string) => void;
   getActiveThread: () => ChatThread | undefined;
@@ -225,16 +221,6 @@ export function useChatThreads(): UseChatThreadsReturn {
     [],
   );
 
-  const updateThreadSessionId = useCallback((id: string, sessionId: string) => {
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === id && t.sessionId !== sessionId
-          ? { ...t, provider: 'claude', sessionId, updatedAt: Date.now() }
-          : t,
-      ),
-    );
-  }, []);
-
   const updateThreadProviderRef = useCallback((id: string, providerThreadRef: unknown) => {
     setThreads((prev) =>
       prev.map((t) =>
@@ -275,7 +261,6 @@ export function useChatThreads(): UseChatThreadsReturn {
     deleteThread,
     updateThreadMessages,
     updateThreadSettings,
-    updateThreadSessionId,
     updateThreadProviderRef,
     markThreadDesynced,
     getActiveThread,

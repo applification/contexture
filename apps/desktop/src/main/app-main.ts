@@ -9,7 +9,6 @@ syncShellEnvironment();
 
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
-import { registerClaudeIpc } from './ipc/claude';
 import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
 import { registerProjectIpc } from './ipc/project';
@@ -89,7 +88,6 @@ app.whenReady().then(() => {
   registerProjectIpc();
   registerReconcileIpc();
   registerSchemaAgentIpc(mainWindow);
-  registerClaudeIpc(mainWindow);
   registerDriftIpc(mainWindow);
 
   app.on('activate', () => {

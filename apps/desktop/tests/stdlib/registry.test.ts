@@ -53,9 +53,8 @@ describe('validate() with stdlib registry', () => {
 
   it('without stdlib: qualified refs without imports fail to resolve', () => {
     const errors = validate(schemaWithStdlibRef);
-    // Legacy behaviour: unrecognised alias → unresolved_ref for both.
-    // (Both legacy and new code require the alias to be known somehow —
-    // without a registry and without imports it's nowhere.)
+    // Unrecognised aliases have nowhere to resolve without a registry
+    // or an explicit import.
     const resolveErrors = errors.filter((e) => e.code === 'unresolved_ref');
     expect(resolveErrors).toHaveLength(2);
   });

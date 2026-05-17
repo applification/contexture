@@ -10,9 +10,11 @@
 import { lstat, rm } from 'node:fs/promises';
 import { ipcMain } from 'electron';
 import { assertSafeRecursiveDeleteTarget } from '../security';
+import { IpcString, parseIpcPayload } from './validation';
 
-export async function deleteProjectDirectory(path: string): Promise<void> {
-  const target = assertSafeRecursiveDeleteTarget(path);
+export async function deleteProjectDirectory(path: unknown): Promise<void> {
+  const parsedPath = parseIpcPayload('project:delete-directory', IpcString, path);
+  const target = assertSafeRecursiveDeleteTarget(parsedPath);
   try {
     const stat = await lstat(target);
     if (!stat.isDirectory()) throw new Error('Delete target must be a directory.');
@@ -23,7 +25,7 @@ export async function deleteProjectDirectory(path: string): Promise<void> {
 }
 
 export function registerProjectIpc(): void {
-  ipcMain.handle('project:delete-directory', async (_evt, path: string) => {
+  ipcMain.handle('project:delete-directory', async (_evt, path: unknown) => {
     await deleteProjectDirectory(path);
   });
 }
