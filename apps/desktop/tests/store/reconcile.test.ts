@@ -18,6 +18,17 @@ describe('targetKindFor', () => {
     expect(targetKindFor('/proj/packages/contexture/index.ts')).toBe('schema-index');
   });
 
+  it('uses the core generated target registry when the open IR path is known', () => {
+    const irPath = '/proj/packages/contexture/garden.contexture.json';
+    expect(
+      targetKindFor('/proj/packages/contexture/.contexture/ai-tool-schemas.json', irPath),
+    ).toBe('ai-tool-schemas');
+    expect(targetKindFor('/proj/packages/contexture/form-validators.ts', irPath)).toBe(
+      'form-validators',
+    );
+    expect(targetKindFor('/proj/packages/contexture/src/index.ts', irPath)).toBe('unknown');
+  });
+
   it('returns unknown for unrecognised paths', () => {
     expect(targetKindFor('/proj/packages/contexture/CLAUDE.md')).toBe('unknown');
   });

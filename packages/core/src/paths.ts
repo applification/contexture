@@ -24,6 +24,21 @@ export interface BundlePaths {
   formValidators: string;
 }
 
+export type GeneratedTargetKind =
+  | 'zod'
+  | 'json-schema'
+  | 'schema-index'
+  | 'convex'
+  | 'ai-tool-schemas'
+  | 'structured-output-schemas'
+  | 'mcp-definitions'
+  | 'form-validators';
+
+export interface GeneratedTarget {
+  kind: GeneratedTargetKind;
+  path: string;
+}
+
 export function contextureDirFor(irPath: string): string {
   const slash = irPath.lastIndexOf('/');
   const dir = slash === -1 ? '' : irPath.slice(0, slash);
@@ -84,6 +99,25 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     mcpDefinitions: `${ctxDir}/${MCP_DEFINITIONS_FILE}`,
     formValidators: `${dir}/${FORM_VALIDATORS_FILE}`,
   };
+}
+
+export function generatedTargetsFor(irPath: string): GeneratedTarget[] {
+  const paths = bundlePathsFor(irPath);
+  return [
+    { kind: 'zod', path: paths.schemaTs },
+    { kind: 'json-schema', path: paths.schemaJson },
+    { kind: 'schema-index', path: paths.schemaIndex },
+    { kind: 'convex', path: paths.convex },
+    { kind: 'ai-tool-schemas', path: paths.aiToolSchemas },
+    { kind: 'structured-output-schemas', path: paths.structuredOutputSchemas },
+    { kind: 'mcp-definitions', path: paths.mcpDefinitions },
+    { kind: 'form-validators', path: paths.formValidators },
+  ];
+}
+
+export function generatedTargetForPath(irPath: string, targetPath: string): GeneratedTarget | null {
+  const target = normalizeContexturePath(targetPath);
+  return generatedTargetsFor(irPath).find((candidate) => candidate.path === target) ?? null;
 }
 
 function normalizeContexturePath(path: string): string {

@@ -85,7 +85,7 @@ export function useSchemaAgentReconcile(): void {
         return;
       }
 
-      const targetKind = targetKindFor(targetPath);
+      const targetKind = targetKindFor(targetPath, irPath);
 
       let result: { ok: boolean; ops?: unknown[]; error?: string };
       try {

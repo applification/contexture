@@ -9,6 +9,7 @@ export function electronLaunchOptions() {
       ...process.env,
       // Ensure DISPLAY is set; xvfb-run exports it but guard for safety
       DISPLAY: process.env.DISPLAY ?? ':99',
+      E2E: '1',
       NODE_ENV: 'test',
     },
   };

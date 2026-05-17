@@ -21,6 +21,34 @@ const baseSchema: Schema = {
 };
 
 describe('apply() — delta semantic gate', () => {
+  it('returns an error instead of throwing when an update_type patch breaks IR structure', () => {
+    const result = apply(baseSchema, {
+      kind: 'update_type',
+      name: 'Order',
+      patch: { fields: 'not an array' },
+    } as unknown as Op);
+
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('update_type');
+      expect(result.error).toContain('invalid Contexture IR');
+      expect(result.error).toContain('types.0.fields');
+    }
+  });
+
+  it('returns an error instead of throwing when malformed op payloads hit reducer helpers', () => {
+    const result = apply(baseSchema, {
+      kind: 'add_index',
+      typeName: 'Order',
+      index: { name: 'by_missing_shape' },
+    } as unknown as Op);
+
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('add_index');
+    }
+  });
+
   it('rejects add_field with a bare ref that matches a stdlib type', () => {
     const op: Op = {
       kind: 'add_field',

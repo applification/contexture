@@ -3,9 +3,8 @@
  * popover, theme toggle, sidebar-visibility toggle.
  *
  * The Claude popover lets the user flip between Max (Claude CLI / OAuth)
- * and raw API-key modes. Auth settings round-trip through the preload
- * surface and live in localStorage (`useClaude`) so they survive
- * restarts; the main process re-reads them per SDK `query()` call.
+ * and raw API-key modes. Non-secret auth preferences round-trip through
+ * the preload surface; API keys stay transient in memory.
  */
 
 import { useClaude } from '@renderer/chat/useClaude';
@@ -315,7 +314,7 @@ export function Toolbar(): React.JSX.Element {
                     className="h-8 text-xs font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Stored locally. Used to call the Claude API directly.
+                    Kept in memory for this app session.
                   </p>
                 </div>
               )}

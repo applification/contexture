@@ -25,6 +25,12 @@ describe('main security guards', () => {
     expect(assertGeneratedTargetForIr(irPath, '/repo/packages/contexture/convex/schema.ts')).toBe(
       '/repo/packages/contexture/convex/schema.ts',
     );
+    expect(
+      assertGeneratedTargetForIr(
+        irPath,
+        '/repo/packages/contexture/.contexture/mcp-definitions.json',
+      ),
+    ).toBe('/repo/packages/contexture/.contexture/mcp-definitions.json');
   });
 
   it('rejects user-owned paths that are not generated targets for the IR', () => {

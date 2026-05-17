@@ -2,8 +2,8 @@
  * `useClaude` — chat-session settings that live on the renderer side.
  *
  * Owns the user-facing knobs the pre-pivot app surfaced in the toolbar
- * popover + prompt input: auth mode, api key, selected model, and
- * thinking-effort. Each knob is persisted to localStorage and pushed
+ * popover + prompt input: auth mode, transient API key, selected model, and
+ * thinking-effort. Non-secret preferences are persisted to localStorage and pushed
  * to main (`window.contexture.chat.setAuth` / `setModelOptions`) so the
  * next SDK `query()` call reads the latest state.
  *
@@ -30,7 +30,6 @@ interface UseClaudeReturn {
   setThinkingBudget: (budget: ThinkingBudget) => void;
 }
 
-const API_KEY_STORAGE = 'contexture-claude-api-key';
 const AUTH_MODE_STORAGE = 'contexture-claude-auth-mode';
 const MODEL_STORAGE = 'contexture-claude-model';
 const THINKING_STORAGE = 'contexture-claude-thinking-budget';
@@ -51,9 +50,7 @@ export function useClaude(): UseClaudeReturn {
   const [authMode, setAuthModeState] = useState<AuthMode>(
     () => (localStorage.getItem(AUTH_MODE_STORAGE) as AuthMode | null) ?? 'max',
   );
-  const [apiKey, setApiKeyState] = useState<string>(
-    () => localStorage.getItem(API_KEY_STORAGE) ?? '',
-  );
+  const [apiKey, setApiKeyState] = useState<string>('');
   const [cliDetected, setCliDetected] = useState<boolean>(false);
   const [model, setModelState] = useState<ModelId>(
     () => (localStorage.getItem(MODEL_STORAGE) as ModelId | null) ?? 'claude-sonnet-4-6',
@@ -103,8 +100,6 @@ export function useClaude(): UseClaudeReturn {
   const setApiKey = useCallback(
     (key: string) => {
       setApiKeyState(key);
-      if (key) localStorage.setItem(API_KEY_STORAGE, key);
-      else localStorage.removeItem(API_KEY_STORAGE);
       if (authMode === 'api-key') pushAuth({ mode: 'api-key', key });
     },
     [authMode],
