@@ -23,16 +23,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 const irPath = '/work/garden.contexture.json';
 // In project mode, layout and chat live inside the `.contexture/` marker
 // directory (they're implementation sidecars, not part of the document
-// package API). The old `<name>.contexture.layout.json` naming from the
-// scratch era is no longer used.
+// package API).
 const layoutPath = '/work/.contexture/layout.json';
 const chatPath = '/work/.contexture/chat.json';
 const schemaTsPath = '/work/garden.schema.ts';
 const schemaJsonPath = '/work/garden.schema.json';
-// Old per-IR sidecar paths — kept only so the "no leftovers" regression
-// test can assert they do *not* get created in either mode.
-const legacyLayoutPath = '/work/garden.contexture.layout.json';
-const legacyChatPath = '/work/garden.contexture.chat.json';
 
 const sampleIR: Schema = {
   version: '1',
@@ -477,7 +472,7 @@ describe('DocumentStore', () => {
     expect(fs.exists('/work/index.ts')).toBe(false);
   });
 
-  it('project-mode save writes layout + chat into .contexture/, not next to the IR', async () => {
+  it('project-mode save writes layout + chat into .contexture/', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -486,10 +481,6 @@ describe('DocumentStore', () => {
     });
     expect(harness.fs.exists('/work/.contexture/layout.json')).toBe(true);
     expect(harness.fs.exists('/work/.contexture/chat.json')).toBe(true);
-    // The legacy sibling locations must not be populated — they were the
-    // scratch-era layout/chat paths and are no longer used.
-    expect(harness.fs.exists(legacyLayoutPath)).toBe(false);
-    expect(harness.fs.exists(legacyChatPath)).toBe(false);
   });
 
   it('scratch-mode save writes only the IR file — no layout/chat/mirrors', async () => {

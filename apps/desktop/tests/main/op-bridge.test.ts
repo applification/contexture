@@ -1,4 +1,4 @@
-import { type BridgeTransport, makeIpcForwardOp, TurnContext } from '@main/ipc/claude-bridge';
+import { type BridgeTransport, makeIpcForwardOp, TurnContext } from '@main/ipc/op-bridge';
 import type { Op } from '@renderer/store/ops';
 import { describe, expect, it } from 'vitest';
 

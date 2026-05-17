@@ -1,11 +1,10 @@
 /**
  * `ChatThreadList` — thread picker surface for the chat panel.
  *
- * Ported from the pre-pivot (main) branch. Each entry shows the
- * thread title (first user message or "New chat"), relative timestamp,
- * and message count. The active thread is marked with a dot; hovering
- * reveals a delete button with a confirm-step to avoid accidental
- * loss.
+ * Each entry shows the thread title (first user message or "New chat"),
+ * relative timestamp, and message count. The active thread is marked
+ * with a dot; hovering reveals a delete button with a confirm-step to
+ * avoid accidental loss.
  */
 
 import type { ChatThread } from '@renderer/chat/useChatThreads';

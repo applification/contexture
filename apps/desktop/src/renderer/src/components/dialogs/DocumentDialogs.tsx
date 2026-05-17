@@ -5,9 +5,7 @@
  *     (migrations applied, missing sidecar, etc.).
  *   - Unknown format: shown when the open path doesn't look like a
  *     `.contexture.json` or the JSON fails to parse against the IR
- *     meta-schema. Repurposed from the pre-pivot "cannot determine
- *     format" dialog — Contexture only has one format, so the message
- *     is specific to that.
+ *     meta-schema.
  *   - Save-with-errors: shown when the user tries to save but the
  *     semantic validators surfaced errors. Offers "Save anyway" +
  *     "Cancel"; the caller stores the prompt with an `id` so it can

@@ -4,10 +4,9 @@
  * Subscribes to the `turn:begin` / `turn:commit` / `turn:rollback`
  * messages that `ChatTurnController` emits from main, and drives an
  * undo store's transaction API so an entire chat turn collapses into
- * one undo entry. Per-op animation still happens live: each `add_type`
- * (etc.) arrives via the existing `claude:op-request` channel and is
- * applied to the store individually — the transaction only controls
- * how the undo stack groups those mutations.
+ * one undo entry. Per-op animation still happens live as Provider
+ * runtime tool requests are applied to the store individually; the
+ * transaction only controls how the undo stack groups those mutations.
  *
  * Kept transport- and store-agnostic so it can be exercised in Vitest
  * without Electron or Zustand; the chat UI (issue #98) supplies the

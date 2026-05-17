@@ -28,6 +28,7 @@ Format: Context → Decision → Consequences → Alternatives. Status is `Propo
 | [0020](0020-shadcn-tailwind-v4-oklch.md) | shadcn/ui + Tailwind v4 + OKLCH design tokens | Accepted |
 | [0021](0021-varlock-infisical-env-secrets.md) | varlock + Infisical for env and secrets management | Accepted |
 | [0022](0022-contexture-domain-model-control-plane.md) | Contexture is the domain-model control plane, not an app builder | Accepted |
+| [0023](0023-features-enter-through-core-domain-modules.md) | Features enter through core domain Modules before adapters | Accepted |
 
 ## Adding a new ADR
 

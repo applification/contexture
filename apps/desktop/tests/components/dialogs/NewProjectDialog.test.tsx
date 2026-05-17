@@ -29,7 +29,6 @@ function mockFileBridge(pickResult: string | null = null): {
   const projectDeleteDir = vi.fn(async () => undefined);
   let captured: ((event: unknown) => void) | null = null;
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {},
     file: {
       openDialog: vi.fn(),
       saveAsDialog: vi.fn(),

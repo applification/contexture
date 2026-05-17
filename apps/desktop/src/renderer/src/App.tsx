@@ -1,7 +1,7 @@
 /**
  * Contexture app shell.
  *
- * Layout (mirrors the pre-pivot app, minus OWL-only surfaces):
+ * Primary desktop layout:
  *
  *   ┌───────────────────────── Toolbar ─────────────────────────┐
  *   ├──────────────────────────────────────────┬────────────────┤
@@ -28,7 +28,6 @@ import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-rea
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { useClaudeEval } from './chat/useClaudeEval';
-import { useClaudeSchemaChat } from './chat/useClaudeSchemaChat';
 import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
@@ -137,7 +136,6 @@ export default function App(): React.JSX.Element {
       .apply({ kind: 'replace_schema', schema: allotment as unknown as never });
   }, []);
 
-  const schemaAgentAvailable = typeof window !== 'undefined' && !!window.contexture?.schemaAgent;
   const schemaAgentApi = useMemo(
     () =>
       typeof window !== 'undefined' && window.contexture?.schemaAgent
@@ -145,16 +143,7 @@ export default function App(): React.JSX.Element {
         : noopSchemaAgentApi(),
     [],
   );
-  const chatApi = useMemo(
-    () =>
-      !schemaAgentAvailable && typeof window !== 'undefined' && window.contexture?.chat
-        ? window.contexture.chat
-        : noopChatApi(),
-    [schemaAgentAvailable],
-  );
-  const codexChat = useSchemaAgentChat({ api: schemaAgentApi });
-  const claudeChat = useClaudeSchemaChat({ api: chatApi });
-  const chat = schemaAgentAvailable ? codexChat : claudeChat;
+  const chat = useSchemaAgentChat({ api: schemaAgentApi });
 
   // Track positions + chat in refs so `useFileMenu` getters can read
   // the live values on save without re-subscribing on every change.
@@ -191,20 +180,10 @@ export default function App(): React.JSX.Element {
       setPositions(layout.positions);
       restoreChatSettings(chat, loadedChat);
       chatHydrateRef.current(loadedChat.messages);
-      if (loadedChat.sessionId) {
-        void window.contexture?.chat.setSessionId(loadedChat.sessionId);
-        if (loadedChat.providerThreadRef) {
-          void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
-        } else {
-          void window.contexture?.schemaAgent?.threadClear();
-        }
+      if (loadedChat.providerThreadRef) {
+        void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
       } else {
-        void window.contexture?.chat.clearSession();
-        if (loadedChat.providerThreadRef) {
-          void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
-        } else {
-          void window.contexture?.schemaAgent?.threadClear();
-        }
+        void window.contexture?.schemaAgent?.threadClear();
       }
       // Capture a seeded first message for auto-send (set by onOpenProject).
       const first = loadedChat.messages[0];
@@ -221,7 +200,6 @@ export default function App(): React.JSX.Element {
     onNew: () => {
       setPositions({});
       chatHydrateRef.current([]);
-      void window.contexture?.chat.clearSession();
       void window.contexture?.schemaAgent?.threadClear();
     },
   });
@@ -394,7 +372,7 @@ export default function App(): React.JSX.Element {
                   onOpenRecent={fileMenu.handleOpenPath}
                   isNewProject={documentMode === 'project'}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
-                  providerLabel={schemaAgentAvailable ? readProviderLabelProp(chat) : 'Claude'}
+                  providerLabel={readProviderLabelProp(chat)}
                 />
               )}
             </div>
@@ -612,31 +590,6 @@ function restoreChatSettings(
   if (loadedChat.model && typeof modelSetter === 'function') modelSetter(loadedChat.model);
   const effortSetter = (chat as { setEffort?: unknown }).setEffort;
   if (loadedChat.effort && typeof effortSetter === 'function') effortSetter(loadedChat.effort);
-}
-
-function noopChatApi() {
-  const unsub = () => undefined;
-  return {
-    send: async () => ({ ok: false, error: 'chat unavailable (no preload bridge)' }),
-    setIR: () => undefined,
-    detectClaudeCli: async () => ({ installed: false, path: null }),
-    setAuth: async () => ({ ok: false, error: 'chat unavailable' }),
-    setModelOptions: async () => ({ ok: false }),
-    abort: async () => ({ ok: false, error: 'chat unavailable' }),
-    replyOp: () => undefined,
-    onAssistant: () => unsub,
-    onToolUse: () => unsub,
-    onResult: () => unsub,
-    onError: () => unsub,
-    onAuthRequired: () => unsub,
-    onTurnBegin: () => unsub,
-    onTurnCommit: () => unsub,
-    onTurnRollback: () => unsub,
-    onOpRequest: () => unsub,
-    onSession: () => unsub,
-    setSessionId: async () => ({ ok: false }),
-    clearSession: async () => ({ ok: false }),
-  };
 }
 
 function noopSchemaAgentApi() {

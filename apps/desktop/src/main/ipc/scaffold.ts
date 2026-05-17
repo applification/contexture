@@ -10,6 +10,7 @@
 import { IRSchema } from '@contexture/core';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
+import { z } from 'zod';
 import type { FsAdapter } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 import { createCompositeStageRunner } from '../scaffold/composite-runner';
@@ -22,6 +23,7 @@ import {
   scaffoldProject,
 } from '../scaffold/scaffold-project';
 import type { Spawner } from '../scaffold/spawn-runner';
+import { IpcString, parseIpcPayload } from './validation';
 
 export type ScaffoldEvent = StageEvent | { kind: 'preflight-failed'; error: PreflightError };
 
@@ -34,11 +36,24 @@ export interface ScaffoldHandlerDeps {
   writeLog?: (path: string, content: string) => Promise<void>;
 }
 
+const AppKindSchema = z.enum(['web', 'mobile', 'desktop']);
+
+const ScaffoldConfigSchema = z
+  .object({
+    targetDir: IpcString,
+    projectName: IpcString,
+    apps: z.array(AppKindSchema).min(1),
+    description: z.string().optional(),
+    scratchPath: IpcString.optional(),
+  })
+  .strict() as z.ZodType<ScaffoldConfig>;
+
 export async function handleScaffoldStart(
-  config: ScaffoldConfig,
+  input: unknown,
   deps: ScaffoldHandlerDeps,
 ): Promise<void> {
   const { fs, spawner, preflight, emit, writeLog } = deps;
+  const config = parseIpcPayload('scaffold:start', ScaffoldConfigSchema, input);
 
   // Validate the scratch IR before running any stages so we can surface
   // the error inline in the dialog (same preflight-failed channel).
@@ -50,7 +65,15 @@ export async function handleScaffoldStart(
       emit({ kind: 'preflight-failed', error: { kind: 'scratch-unreadable' } });
       return;
     }
-    const parsed = IRSchema.safeParse(JSON.parse(raw));
+    let scratchIr: unknown;
+    try {
+      scratchIr = JSON.parse(raw);
+    } catch {
+      emit({ kind: 'preflight-failed', error: { kind: 'scratch-invalid-ir' } });
+      return;
+    }
+
+    const parsed = IRSchema.safeParse(scratchIr);
     if (!parsed.success) {
       emit({ kind: 'preflight-failed', error: { kind: 'scratch-invalid-ir' } });
       return;
@@ -73,7 +96,7 @@ export async function handleScaffoldStart(
 }
 
 export function registerScaffoldIpc(mainWindow: BrowserWindow): void {
-  ipcMain.handle('scaffold:start', async (_evt, config: ScaffoldConfig) => {
+  ipcMain.handle('scaffold:start', async (_evt, config: unknown) => {
     await handleScaffoldStart(config, {
       fs: nodeFsAdapter,
       spawner: nodeSpawner,

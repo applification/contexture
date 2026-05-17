@@ -8,34 +8,6 @@ export type UpdateState =
   | { status: 'ready'; version?: string }
   | { status: 'error'; message?: string };
 
-export interface ContextureChatAPI {
-  send: (message: string) => Promise<{ ok: boolean; error?: string }>;
-  setIR: (ir: unknown) => void;
-  detectClaudeCli: () => Promise<{ installed: boolean; path: string | null }>;
-  setAuth: (
-    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
-  ) => Promise<{ ok: boolean; error?: string }>;
-  setModelOptions: (opts: {
-    model?: string;
-    thinkingBudget?: 'auto' | 'low' | 'med' | 'high' | 'xhigh';
-  }) => Promise<{ ok: boolean }>;
-  abort: () => Promise<{ ok: boolean; error?: string }>;
-  onAssistant: (listener: (payload: { text: string }) => void) => Unsubscribe;
-  onToolUse: (listener: (payload: { name: string; input: unknown }) => void) => Unsubscribe;
-  onResult: (listener: (payload: { ok: boolean; error?: string }) => void) => Unsubscribe;
-  onError: (listener: (payload: { message: string }) => void) => Unsubscribe;
-  /** Auth failure subscription — renderer surfaces re-auth CTA. */
-  onAuthRequired: (listener: (payload: { message: string }) => void) => Unsubscribe;
-  onTurnBegin: (listener: () => void) => Unsubscribe;
-  onTurnCommit: (listener: () => void) => Unsubscribe;
-  onTurnRollback: (listener: () => void) => Unsubscribe;
-  replyOp: (id: string, result: unknown) => void;
-  onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) => Unsubscribe;
-  onSession: (listener: (payload: { sessionId: string }) => void) => Unsubscribe;
-  setSessionId: (sessionId: string) => Promise<{ ok: boolean }>;
-  clearSession: () => Promise<{ ok: boolean }>;
-}
-
 export interface ContextureSchemaAgentAPI {
   send: (message: string) => Promise<{ ok: boolean; error?: string }>;
   setIR: (ir: unknown) => void;
@@ -106,7 +78,6 @@ export interface OpenedDocument {
     providerThreadRef?: unknown;
     model?: string;
     effort?: string;
-    sessionId?: string;
   };
   /** Sidecar warnings (not IR — those come from renderer-side `load()`). */
   warnings: OpenWarning[];
@@ -227,7 +198,6 @@ export interface ContextureUpdateAPI {
 }
 
 export interface ContextureAPI {
-  chat: ContextureChatAPI;
   schemaAgent: ContextureSchemaAgentAPI;
   file: ContextureFileAPI;
   scaffold: ContextureScaffoldAPI;

@@ -12,27 +12,6 @@ beforeEach(() => {
   while (useUndoStore.getState().canUndo) useUndoStore.getState().undo();
   useGraphSelectionStore.getState().clear();
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {
-      send: vi.fn(async () => ({ ok: false })),
-      setIR: vi.fn(),
-      detectClaudeCli: vi.fn(async () => ({ installed: false, path: null })),
-      setAuth: vi.fn(async () => ({ ok: true })),
-      setModelOptions: vi.fn(async () => ({ ok: true })),
-      abort: vi.fn(async () => ({ ok: true })),
-      replyOp: vi.fn(),
-      onAssistant: () => unsub,
-      onToolUse: () => unsub,
-      onResult: () => unsub,
-      onError: () => unsub,
-      onAuthRequired: () => unsub,
-      onTurnBegin: () => unsub,
-      onTurnCommit: () => unsub,
-      onTurnRollback: () => unsub,
-      onOpRequest: () => unsub,
-      onSession: () => unsub,
-      setSessionId: vi.fn(async () => ({ ok: true })),
-      clearSession: vi.fn(async () => ({ ok: true })),
-    },
     schemaAgent: {
       send: vi.fn(async () => ({ ok: true })),
       setIR: vi.fn(),

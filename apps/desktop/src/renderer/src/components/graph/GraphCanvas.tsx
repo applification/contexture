@@ -11,8 +11,7 @@
  *    flicker / stack on top of each other before ELK's result landed.
  * 2. **ELK gates on `useNodesInitialized`.** XYFlow measures node DOM
  *    *after* the first paint; running ELK before that yields
- *    zero-sized nodes and a collapsed layout. The pre-pivot canvas
- *    used the same gate.
+ *    zero-sized nodes and a collapsed layout.
  * 3. **Structure changes trigger re-layout.** When the set of type
  *    names changes (schema op), we mark layout pending and let the
  *    initialisation-gated effect run ELK again, merging with any
@@ -292,8 +291,6 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   );
 
   // Double-click a node → focus its properties in the sidebar.
-  // Mirrors the pre-pivot behaviour: selects the node, expands the
-  // sidebar (if collapsed), and flips to the `properties` tab.
   const onNodeDoubleClick: ReactFlowProps['onNodeDoubleClick'] = useCallback(
     (_event, node) => {
       click(node.id, 'replace');

@@ -17,18 +17,19 @@
  */
 
 import {
+  buildSeededArtifacts,
+  buildSidecarEntries,
   bundlePathsFor,
-  contextureDirFor,
+  type DocumentMode,
   emitAgentMd as defaultEmitAgentMd,
   emitClaudeMd as defaultEmitClaudeMd,
   emitJsonSchema as defaultEmitJsonSchema,
   emitSchemaIndex as defaultEmitSchemaIndex,
   emitTableCrud as defaultEmitTableCrud,
   emitZod as defaultEmitZod,
+  detectDocumentMode,
   type FileEntry,
-  IR_SUFFIX,
   load as loadIR,
-  projectRootFor,
   type Schema,
   save as saveIR,
   writeFilesAtomic,
@@ -44,27 +45,19 @@ export {
   bundlePathsFor,
   CHAT_FILE,
   contextureDirFor,
+  type DocumentMode,
   EMITTED_FILE,
   type EmittedManifest,
   IR_SUFFIX,
   LAYOUT_FILE,
-  projectRootFor,
   SCHEMA_JSON_SUFFIX,
   SCHEMA_TS_SUFFIX,
 } from '@contexture/core';
-
-// Legacy sibling-file names — kept exported so `main/ipc/file.ts` can
-// continue to read pre-project-mode documents without hard-breaking a
-// user's scratch round-trip. Project-mode save no longer writes these.
-export const LAYOUT_SUFFIX = '.contexture.layout.json';
-export const CHAT_SUFFIX = '.contexture.chat.json';
 
 export interface LoadWarning {
   message: string;
   severity: 'warning' | 'error';
 }
-
-export type DocumentMode = 'scratch' | 'project';
 
 export interface DocumentBundle {
   irPath: string;
@@ -130,13 +123,6 @@ export interface DocumentStoreDeps {
 
 const MAX_RECENT = 10;
 
-/** IR file base name — `/work/garden.contexture.json` → `garden`. */
-function baseNameFor(irPath: string): string {
-  const slash = irPath.lastIndexOf('/');
-  const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
-  return leaf.slice(0, -IR_SUFFIX.length);
-}
-
 export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   const {
     fs,
@@ -180,9 +166,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   async function open(irPath: string): Promise<DocumentBundle> {
     const paths = bundlePathsFor(irPath);
     const warnings: LoadWarning[] = [];
-    const mode: DocumentMode = (await fs.dirExists(contextureDirFor(irPath)))
-      ? 'project'
-      : 'scratch';
+    const mode = await detectDocumentMode(irPath, fs);
 
     const irRaw = await fs.readFile(paths.ir);
     const { schema, warnings: irWarnings } = loadIR(irRaw);
@@ -209,27 +193,13 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     }
 
     if (mode === 'project') {
-      const root = projectRootFor(irPath);
-      if (root) {
-        const projectName = baseNameFor(irPath);
-        const agentsPath = `${root}/AGENTS.md`;
-        if (!(await fs.fileExists(agentsPath))) {
-          await fs.writeFile(agentsPath, emitAgentMd(projectName));
-        }
-        const claudePath = `${root}/CLAUDE.md`;
-        if (!(await fs.fileExists(claudePath))) {
-          await fs.writeFile(claudePath, emitClaudeMd(projectName));
-        }
-        // Seed one `packages/contexture/convex/<table>.ts` per table-flagged
-        // object. Written only if missing — these are `@contexture-seeded`,
-        // owned by the user/coding agent from first write on.
-        const schemaDir = contextureDirFor(irPath).slice(0, -'/.contexture'.length);
-        for (const type of schema.types) {
-          if (type.kind !== 'object' || type.table !== true) continue;
-          const crudPath = `${schemaDir}/convex/${type.name}.ts`;
-          if (!(await fs.fileExists(crudPath))) {
-            await fs.writeFile(crudPath, emitTableCrud(schema, type.name));
-          }
+      for (const artifact of buildSeededArtifacts(schema, irPath, {
+        emitAgentMd,
+        emitClaudeMd,
+        emitTableCrud,
+      })) {
+        if (!(await fs.fileExists(artifact.path))) {
+          await fs.writeFile(artifact.path, artifact.content);
         }
       }
     }
@@ -240,9 +210,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
   async function saveImpl(irPath: string, input: SaveInput): Promise<void> {
     const paths = bundlePathsFor(irPath);
-    const mode: DocumentMode = (await fs.dirExists(contextureDirFor(irPath)))
-      ? 'project'
-      : 'scratch';
+    const mode = await detectDocumentMode(irPath, fs);
 
     // Scratch mode: the IR file is the whole document. No sidecars, no
     // mirrors — users who want persistent layout/chat or generated Convex
@@ -256,10 +224,10 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
 
     // Project mode: full bundle. Emit first — a throwing emitter must
     // abort before any write touches disk.
-    const sidecars: FileEntry[] = [
-      { path: paths.layout, content: saveLayout(input.layout) },
-      { path: paths.chat, content: saveChatHistory(input.chat) },
-    ];
+    const sidecars: FileEntry[] = buildSidecarEntries(paths, {
+      layout: saveLayout(input.layout),
+      chat: saveChatHistory(input.chat),
+    });
 
     await writeGeneratedBundle({
       irPath,

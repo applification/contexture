@@ -23,66 +23,6 @@ function subscribe(channel: string, listener: (payload: unknown) => void): Unsub
   };
 }
 
-const chat = {
-  send: (message: string) =>
-    ipcRenderer.invoke('chat:send', message) as Promise<{ ok: boolean; error?: string }>,
-  setIR: (ir: unknown) => ipcRenderer.send('claude:turn-start-ir', ir),
-  /** Is the `claude` CLI binary on PATH? Used by the auth popover. */
-  detectClaudeCli: () =>
-    ipcRenderer.invoke('claude:detect-cli') as Promise<{
-      installed: boolean;
-      path: string | null;
-    }>,
-  /** Swap between Max (CLI / OAuth) and api-key auth. */
-  setAuth: (
-    auth: { mode: 'max' } | { mode: 'api-key'; key: string },
-  ): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('claude:set-auth', auth) as Promise<{ ok: boolean; error?: string }>,
-  /** Update the model + thinking-effort used by the next SDK query. */
-  setModelOptions: (opts: {
-    model?: string;
-    thinkingBudget?: 'auto' | 'low' | 'med' | 'high' | 'xhigh';
-  }): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('claude:set-model-options', opts) as Promise<{ ok: boolean }>,
-  /** Interrupt the in-flight query (stop button). */
-  abort: (): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('chat:abort') as Promise<{ ok: boolean; error?: string }>,
-  onAssistant: (listener: (payload: { text: string }) => void) =>
-    subscribe('chat:assistant', listener as (p: unknown) => void),
-  onToolUse: (listener: (payload: { name: string; input: unknown }) => void) =>
-    subscribe('chat:tool-use', listener as (p: unknown) => void),
-  onResult: (listener: (payload: { ok: boolean; error?: string }) => void) =>
-    subscribe('chat:result', listener as (p: unknown) => void),
-  onError: (listener: (payload: { message: string }) => void) =>
-    subscribe('chat:error', listener as (p: unknown) => void),
-  /**
-   * Emitted when the SDK reports an authentication failure (401 /
-   * expired Claude Max token / missing API key). The renderer surfaces
-   * a re-auth CTA rather than a generic error bubble.
-   */
-  onAuthRequired: (listener: (payload: { message: string }) => void) =>
-    subscribe('chat:auth-required', listener as (p: unknown) => void),
-  onTurnBegin: (listener: () => void) => subscribe('turn:begin', listener),
-  onTurnCommit: (listener: () => void) => subscribe('turn:commit', listener),
-  onTurnRollback: (listener: () => void) => subscribe('turn:rollback', listener),
-  replyOp: (id: string, result: unknown) => ipcRenderer.send('claude:op-reply', { id, result }),
-  onOpRequest: (listener: (payload: { id: string; op: unknown }) => void) =>
-    subscribe('claude:op-request', listener as (p: unknown) => void),
-  /**
-   * Stream of Agent SDK session ids — emitted from main on every SDK
-   * message that carries one. The renderer persists the last-seen id
-   * to the chat sidecar so follow-up turns can `resume` it.
-   */
-  onSession: (listener: (payload: { sessionId: string }) => void) =>
-    subscribe('chat:session', listener as (p: unknown) => void),
-  /** Restore a persisted sessionId into main (on sidecar hydrate). */
-  setSessionId: (sessionId: string): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('chat:set-session-id', sessionId) as Promise<{ ok: boolean }>,
-  /** Forget the current sessionId (start a fresh conversation). */
-  clearSession: (): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('chat:clear-session') as Promise<{ ok: boolean }>,
-};
-
 const schemaAgent = {
   send: (message: string) =>
     ipcRenderer.invoke('schema-agent:send', message) as Promise<{ ok: boolean; error?: string }>,
@@ -264,7 +204,7 @@ const update = {
   },
 };
 
-const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, reconcile, update };
+const contexture = { schemaAgent, file, scaffold, shell, project, drift, reconcile, update };
 
 if (process.contextIsolated) {
   try {

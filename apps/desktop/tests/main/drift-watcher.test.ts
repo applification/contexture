@@ -26,7 +26,7 @@ function makeManifest(files: Record<string, string>): string {
   return JSON.stringify({ version: '1', files: hashed }, null, 2);
 }
 
-// Legacy single-file helper for backward-compat tests
+// Single-file helper for focused drift tests.
 function makeManifestSingleHash(hash: string): string {
   return JSON.stringify({ version: '1', files: { [WATCHED]: hash } }, null, 2);
 }

@@ -9,6 +9,7 @@ Contexture is the domain-model control plane for AI-native TypeScript apps. Thes
 - **Op**: One closed-world mutation in the Contexture op vocabulary, such as `add_type`, `add_field`, or `rename_type`. Ops are the only supported way for agents and UI controls to mutate a Schema.
 - **Op applier**: The pure reducer that applies one Op to a Schema and returns either the next Schema or a user/model-safe error string.
 - **Semantic gate**: The validation step that rejects newly introduced semantic issues after an Op, while allowing users or agents to repair pre-existing issues incrementally.
+- **Feature entry seam**: The deepest existing Contexture Module where a new capability should attach before UI, IPC, provider, or renderer Adapter code is added. Schema mutations enter through Ops, generated outputs enter through core emitters and generated target metadata, provider behavior enters through Provider runtimes, and file/project behavior enters through the Document bundle.
 
 ## Document Bundle
 

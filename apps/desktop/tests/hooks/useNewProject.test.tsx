@@ -13,7 +13,6 @@ function mockFileBridge(): { fire: () => void; unsubscribe: ReturnType<typeof vi
   let captured: (() => void) | null = null;
   const unsubscribe = vi.fn();
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {},
     file: {
       openDialog: vi.fn(),
       saveAsDialog: vi.fn(),

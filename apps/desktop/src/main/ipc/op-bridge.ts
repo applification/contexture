@@ -1,5 +1,5 @@
 /**
- * Main↔renderer bridge for Claude chat-driven ops.
+ * Main↔renderer bridge for schema-agent op dispatch.
  *
  * Two concerns live here:
  *
@@ -12,9 +12,8 @@
  *     so the system prompt builder always has the latest schema without
  *     a round-trip per request.
  *
- * The higher-level `registerClaudeIpc` — which wires this bridge onto an
- * actual `BrowserWindow` + `ipcMain` + the Agent SDK's MCP server — sits
- * on top of these primitives and is intentionally kept thin.
+ * The higher-level schema-agent IPC wiring binds this bridge to an
+ * actual `BrowserWindow` + `ipcMain` and the selected Provider runtime.
  */
 
 import type { ApplyResult, Op, Schema } from '@contexture/core';

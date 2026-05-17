@@ -1,7 +1,7 @@
 /**
  * TypeNode — renders one Contexture `TypeDef` on the canvas.
  *
- * Visual language mirrors the pre-pivot `ClassNode`:
+ * Visual language:
  *   - Glassmorphic body with backdrop-blur so edges behind show through.
  *   - Coloured header strip (primary accent for object / DU, chart
  *     colours for enum / raw) so different TypeDef kinds read at a

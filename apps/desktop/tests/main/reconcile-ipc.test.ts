@@ -33,4 +33,13 @@ describe('reconcile generated-target IPC helpers', () => {
       }),
     ).rejects.toThrow(/not a generated Contexture artifact/);
   });
+
+  it('rejects malformed write payloads at the IPC boundary', async () => {
+    await expect(
+      writeGeneratedTarget({
+        irPath: '/repo/packages/contexture/garden.contexture.json',
+        targetPath: '/repo/packages/contexture/garden.schema.ts',
+      }),
+    ).rejects.toThrow(/Invalid reconcile:write-generated-target payload: contents:/);
+  });
 });

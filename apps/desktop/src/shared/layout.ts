@@ -1,5 +1,5 @@
 /**
- * Layout sidecar I/O (`<name>.contexture.layout.json`).
+ * Layout sidecar I/O (`.contexture/layout.json`).
  *
  * The layout sidecar is disposable: it carries per-type canvas positions,
  * optional group frames, and the last viewport. It is version-tombstoned with

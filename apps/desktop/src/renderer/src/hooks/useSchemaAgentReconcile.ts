@@ -3,8 +3,8 @@
  * query when the modal opens and feeds the result into the store.
  *
  * Sequence:
- *   1. Read the on-disk source for the target path via the legacy preload
- *      helper `window.contexture.reconcile.readGeneratedTarget`.
+ *   1. Read the on-disk source for the target path via
+ *      `window.contexture.reconcile.readGeneratedTarget`.
  *   2. Snapshot the current IR from the undo store.
  *   3. Derive the target kind from the file path.
  *   4. Round-trip via the provider-neutral reconcile bridge.

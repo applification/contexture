@@ -96,4 +96,18 @@ describe('handleScaffoldStart', () => {
     expect(events[0].kind).toBe('preflight-failed');
     expect((events[0].error as { kind: string }).kind).toBe('scratch-invalid-ir');
   });
+
+  it('rejects malformed scaffold payloads before preflight', async () => {
+    await expect(
+      handleScaffoldStart(
+        { ...config, apps: [] },
+        {
+          fs,
+          spawner: passThroughSpawner(),
+          preflight: alwaysOkPreflight(),
+          emit: () => undefined,
+        },
+      ),
+    ).rejects.toThrow(/Invalid scaffold:start payload: apps:/);
+  });
 });

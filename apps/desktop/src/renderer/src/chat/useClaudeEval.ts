@@ -1,7 +1,7 @@
 /**
  * `useClaudeEval` — Eval panel's session hook.
  *
- * Deliberately separate from `useClaudeSchemaChat`: the Eval surface
+ * Deliberately separate from schema-agent chat: the Eval surface
  * has its own history (not persisted in v1), its own system prompt,
  * and a single tool (`emit_sample`). Schema edits are out of scope —
  * Eval never dispatches ops into the IR store.

@@ -9,6 +9,8 @@ import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const unsub = () => undefined;
+
 beforeEach(() => {
   // Reset every backing store to a clean slate so each test stands alone.
   useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
@@ -16,22 +18,32 @@ beforeEach(() => {
   while (useUndoStore.getState().canUndo) useUndoStore.getState().undo();
   useGraphSelectionStore.getState().clear();
   (window as unknown as { contexture: unknown }).contexture = {
-    chat: {
-      send: vi.fn(async () => ({ ok: false })),
+    schemaAgent: {
+      send: vi.fn(async () => ({ ok: true })),
       setIR: vi.fn(),
-      detectClaudeCli: vi.fn(async () => ({ installed: false, path: null })),
-      setAuth: vi.fn(async () => ({ ok: true })),
-      setModelOptions: vi.fn(async () => ({ ok: true })),
       abort: vi.fn(async () => ({ ok: true })),
-      replyOp: vi.fn(),
-      onAssistant: () => () => undefined,
-      onToolUse: () => () => undefined,
-      onResult: () => () => undefined,
-      onError: () => () => undefined,
-      onTurnBegin: () => () => undefined,
-      onTurnCommit: () => () => undefined,
-      onTurnRollback: () => () => undefined,
-      onOpRequest: () => () => undefined,
+      getStatus: vi.fn(async () => ({ provider: 'codex', readiness: 'authenticated_chatgpt' })),
+      listModels: vi.fn(async () => [{ id: 'gpt-5.4', label: 'GPT-5.4' }]),
+      setProvider: vi.fn(async () => ({ ok: true })),
+      setModelOptions: vi.fn(async () => ({ ok: true })),
+      startLogin: vi.fn(async () => ({ id: 'login-1', mode: 'chatgpt' })),
+      cancelLogin: vi.fn(async () => undefined),
+      logout: vi.fn(async () => undefined),
+      threadSet: vi.fn(async () => ({ ok: true })),
+      threadClear: vi.fn(async () => ({ ok: true })),
+      replyTool: vi.fn(),
+      onAssistantDelta: () => unsub,
+      onAssistantFinal: () => unsub,
+      onToolCallStarted: () => unsub,
+      onToolCallFinished: () => unsub,
+      onError: () => unsub,
+      onStatusChanged: () => unsub,
+      onThreadUpdated: () => unsub,
+      onThreadDesynced: () => unsub,
+      onToolRequest: () => unsub,
+      onTurnBegin: () => unsub,
+      onTurnCommit: () => unsub,
+      onTurnRollback: () => unsub,
     },
   };
 });
