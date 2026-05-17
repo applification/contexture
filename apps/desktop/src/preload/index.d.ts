@@ -152,7 +152,7 @@ export interface ContextureProjectAPI {
 
 export interface ContextureDriftAPI {
   /** Start watching all manifest files for drift against emitted.json. */
-  watch: (payload: { emittedJsonPath: string }) => Promise<{ ok: boolean }>;
+  watch: (payload: { irPath: string }) => Promise<{ ok: boolean }>;
   /** Stop the active watcher. */
   unwatch: () => Promise<{ ok: boolean }>;
   /** Trigger a manual hash check (window focus). */

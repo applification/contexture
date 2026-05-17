@@ -8,7 +8,8 @@ import { createHash } from 'node:crypto';
 import { createDriftWatcher, detectDrift } from '@main/documents/drift-watcher';
 import { describe, expect, it, vi } from 'vitest';
 
-const WATCHED = '/proj/apps/web/convex/schema.ts';
+const IR_PATH = '/proj/packages/contexture/garden.contexture.json';
+const WATCHED = '/proj/packages/contexture/convex/schema.ts';
 const SCHEMA_TS = '/proj/packages/contexture/garden.schema.ts';
 const SCHEMA_JSON = '/proj/packages/contexture/garden.schema.json';
 const SCHEMA_INDEX = '/proj/packages/contexture/index.ts';
@@ -51,7 +52,7 @@ function makeWatcher(
   } = {},
 ) {
   const watcher = createDriftWatcher({
-    emittedJsonPath: EMITTED,
+    irPath: IR_PATH,
     onDrift,
     onStatus,
     onResolved,
@@ -137,6 +138,23 @@ describe('detectDrift', () => {
     const results = await detectDrift(EMITTED, makeReadFile(files));
     expect(results).toEqual([]);
   });
+
+  it('ignores manifest entries outside the allowed generated target set', async () => {
+    const files: Record<string, string> = {
+      [WATCHED]: 'defineSchema({})',
+      '/etc/passwd': 'root',
+      [EMITTED]: makeManifest({
+        [WATCHED]: 'defineSchema({})',
+        '/etc/passwd': 'edited root',
+      }),
+    };
+
+    const results = await detectDrift(EMITTED, makeReadFile(files), {
+      allowedPaths: [WATCHED],
+    });
+
+    expect(results).toEqual([{ path: WATCHED, status: 'match' }]);
+  });
 });
 
 // ─── createDriftWatcher (multi-file) ─────────────────────────────────
@@ -170,7 +188,7 @@ describe('createDriftWatcher', () => {
     const onDrift = vi.fn();
     const onResolved = vi.fn();
     const watcher = createDriftWatcher({
-      emittedJsonPath: EMITTED,
+      irPath: IR_PATH,
       onDrift,
       onResolved,
       readFile,
@@ -294,7 +312,7 @@ describe('createDriftWatcher', () => {
     const onDrift = vi.fn();
     const onResolved = vi.fn();
     const watcher = createDriftWatcher({
-      emittedJsonPath: EMITTED,
+      irPath: IR_PATH,
       onDrift,
       onResolved,
       readFile,
@@ -327,7 +345,7 @@ describe('createDriftWatcher', () => {
     const onDrift = vi.fn();
     const onResolved = vi.fn();
     const watcher = createDriftWatcher({
-      emittedJsonPath: EMITTED,
+      irPath: IR_PATH,
       onDrift,
       onResolved,
       readFile,
@@ -386,7 +404,7 @@ describe('createDriftWatcher', () => {
     const onDrift = vi.fn();
     const onResolved = vi.fn();
     const watcher = createDriftWatcher({
-      emittedJsonPath: EMITTED,
+      irPath: IR_PATH,
       onDrift,
       onResolved,
       readFile,

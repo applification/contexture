@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, parse, resolve } from 'node:path';
-import { generatedTargetsFor } from '@contexture/core/paths';
+import { assertContextureIrPath, generatedTargetsFor } from '@contexture/core/paths';
 
 const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'mailto:']);
 
@@ -25,6 +25,16 @@ export function assertGeneratedTargetForIr(irPath: string, targetPath: string): 
     throw new Error('Target is not a generated Contexture artifact for this IR.');
   }
   return target;
+}
+
+export function assertSafeContextureIrPath(inputPath: string): string {
+  if (typeof inputPath !== 'string' || inputPath.trim() === '') {
+    throw new Error('Contexture IR path must be a non-empty path.');
+  }
+  if (!isAbsolute(inputPath)) {
+    throw new Error('Contexture IR path must be absolute.');
+  }
+  return assertContextureIrPath(inputPath);
 }
 
 export function assertSafeRecursiveDeleteTarget(inputPath: string): string {

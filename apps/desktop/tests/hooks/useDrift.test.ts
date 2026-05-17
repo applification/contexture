@@ -1,24 +1,14 @@
-import { convexPathFor, emittedPathFor } from '@renderer/hooks/useDrift';
-import { describe, expect, it } from 'vitest';
+import { convexPathFor, useDrift } from '@renderer/hooks/useDrift';
+import { useDocumentStore } from '@renderer/store/document';
+import { cleanup, renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-describe('emittedPathFor', () => {
-  it('derives emitted.json path from a valid IR path', () => {
-    const ir = '/proj/packages/contexture/garden.contexture.json';
-    expect(emittedPathFor(ir)).toBe('/proj/packages/contexture/.contexture/emitted.json');
-  });
-
-  it('returns null for a non-IR path', () => {
-    expect(emittedPathFor('/proj/packages/contexture/schema.ts')).toBeNull();
-  });
-
-  it('returns null for a path with no slash', () => {
-    expect(emittedPathFor('garden.contexture.json')).toBeNull();
-  });
-
-  it('handles deeply nested IR paths', () => {
-    const ir = '/a/b/c/d/garden.contexture.json';
-    expect(emittedPathFor(ir)).toBe('/a/b/c/d/.contexture/emitted.json');
-  });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  const document = useDocumentStore.getState();
+  document.setFilePath(null);
+  document.setMode('scratch');
 });
 
 describe('convexPathFor', () => {
@@ -33,5 +23,30 @@ describe('convexPathFor', () => {
 
   it('returns null for a path with no slash', () => {
     expect(convexPathFor('garden.contexture.json')).toBeNull();
+  });
+});
+
+describe('useDrift', () => {
+  it('starts the drift watcher with the open IR path, not a renderer-derived manifest path', () => {
+    const watch = vi.fn(async () => ({ ok: true }));
+    const unwatch = vi.fn(async () => ({ ok: true }));
+    (window as unknown as { contexture: unknown }).contexture = {
+      drift: {
+        watch,
+        unwatch,
+        check: vi.fn(async () => ({ ok: true })),
+        dismiss: vi.fn(async () => ({ ok: true })),
+        onDetected: vi.fn(() => () => undefined),
+        onResolved: vi.fn(() => () => undefined),
+      },
+    };
+    useDocumentStore.getState().setFilePath('/proj/packages/contexture/garden.contexture.json');
+    useDocumentStore.getState().setMode('project');
+
+    renderHook(() => useDrift());
+
+    expect(watch).toHaveBeenCalledWith({
+      irPath: '/proj/packages/contexture/garden.contexture.json',
+    });
   });
 });

@@ -16,20 +16,6 @@ import { useDriftStore } from '../store/drift';
 const IR_SUFFIX = '.contexture.json';
 
 /**
- * Derives the emitted-manifest path from the IR file path.
- *
- * IR lives at: <root>/packages/contexture/<name>.contexture.json
- * Emitted manifest: <root>/packages/contexture/.contexture/emitted.json
- */
-export function emittedPathFor(irPath: string): string | null {
-  if (!irPath.endsWith(IR_SUFFIX)) return null;
-  const slash = irPath.lastIndexOf('/');
-  if (slash === -1) return null;
-  const dir = irPath.slice(0, slash);
-  return `${dir}/.contexture/emitted.json`;
-}
-
-/**
  * Derives the Convex schema path from the IR file path.
  * Used by the reconcile hook to read the on-disk Convex source.
  */
@@ -55,13 +41,12 @@ export function useDrift(): void {
       return;
     }
 
-    const emittedJsonPath = emittedPathFor(filePath);
-    if (!emittedJsonPath) {
+    if (!filePath.endsWith(IR_SUFFIX)) {
       void driftApi.unwatch();
       return;
     }
 
-    void driftApi.watch({ emittedJsonPath });
+    void driftApi.watch({ irPath: filePath });
 
     const unDetected = driftApi.onDetected((payload) => {
       if (payload.files) useDriftStore.getState().setDetected(payload.files);

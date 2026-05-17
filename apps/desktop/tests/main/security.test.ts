@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join, parse } from 'node:path';
 import {
   assertGeneratedTargetForIr,
+  assertSafeContextureIrPath,
   assertSafeRecursiveDeleteTarget,
   isSafeExternalUrl,
 } from '@main/security';
@@ -38,6 +39,16 @@ describe('main security guards', () => {
     expect(() =>
       assertGeneratedTargetForIr(irPath, '/repo/packages/contexture/src/index.ts'),
     ).toThrow(/not a generated Contexture artifact/);
+  });
+
+  it('accepts only absolute Contexture IR paths for desktop IPC file authority', () => {
+    expect(assertSafeContextureIrPath('/repo/packages/contexture/garden.contexture.json')).toBe(
+      '/repo/packages/contexture/garden.contexture.json',
+    );
+    expect(() => assertSafeContextureIrPath('garden.contexture.json')).toThrow(/absolute/);
+    expect(() => assertSafeContextureIrPath('/repo/packages/contexture/schema.ts')).toThrow(
+      /Expected a .contexture.json/,
+    );
   });
 
   it('rejects dangerous recursive delete targets', () => {

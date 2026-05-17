@@ -9,26 +9,29 @@
  *
  * `drift:check` is a one-shot manual re-check (window focus trigger).
  */
+
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { createDriftWatcher, type DriftWatcher } from '../documents/drift-watcher';
+import { assertSafeContextureIrPath } from '../security';
 import { IpcString, parseIpcPayload } from './validation';
 
 let activeWatcher: DriftWatcher | null = null;
 
 const WatchPayloadSchema = z
   .object({
-    emittedJsonPath: IpcString,
+    irPath: IpcString,
   })
   .strict();
 
 export function registerDriftIpc(mainWindow: BrowserWindow): void {
   ipcMain.handle('drift:watch', (_evt, payload: unknown) => {
     const parsed = parseIpcPayload('drift:watch', WatchPayloadSchema, payload);
+    const irPath = assertSafeContextureIrPath(parsed.irPath);
     activeWatcher?.stop();
     activeWatcher = createDriftWatcher({
-      emittedJsonPath: parsed.emittedJsonPath,
+      irPath,
       onDrift: (paths) => mainWindow.webContents.send('drift:detected', { paths }),
       onStatus: (problems) =>
         mainWindow.webContents.send('drift:detected', {
