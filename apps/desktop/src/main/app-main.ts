@@ -13,11 +13,13 @@ import { registerClaudeIpc } from './ipc/claude';
 import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
 import { registerProjectIpc } from './ipc/project';
+import { registerReconcileIpc } from './ipc/reconcile';
 import { registerScaffoldIpc } from './ipc/scaffold';
 import { registerSchemaAgentIpc } from './ipc/schema-agent';
 import { registerShellIpc } from './ipc/shell';
 import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
+import { isSafeExternalUrl } from './security';
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -39,7 +41,9 @@ function createWindow(): BrowserWindow {
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
+    if (isSafeExternalUrl(details.url)) {
+      void shell.openExternal(details.url);
+    }
     return { action: 'deny' };
   });
 
@@ -79,6 +83,7 @@ app.whenReady().then(() => {
   registerScaffoldIpc(mainWindow);
   registerShellIpc();
   registerProjectIpc();
+  registerReconcileIpc();
   registerSchemaAgentIpc(mainWindow);
   registerClaudeIpc(mainWindow);
   registerDriftIpc(mainWindow);

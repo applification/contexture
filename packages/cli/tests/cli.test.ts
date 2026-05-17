@@ -18,6 +18,17 @@ async function fixtureProject() {
   return { dir, irPath };
 }
 
+async function fixtureScratch() {
+  const dir = await mkdtemp(join(tmpdir(), 'contexture-cli-scratch-'));
+  const irPath = join(dir, 'scratch.contexture.json');
+  const schema = {
+    version: '1',
+    types: [{ kind: 'object', name: 'Note', fields: [] }],
+  };
+  await writeFile(irPath, `${JSON.stringify(schema, null, 2)}\n`, 'utf8');
+  return { dir, irPath };
+}
+
 async function runCli(cwd: string, args: string[]) {
   return new Promise<{ stdout: string; stderr: string; exitCode: number | null }>((resolve) => {
     const proc = spawn('bun', [cliPath, ...args], { cwd });
@@ -101,6 +112,30 @@ describe('@contexture/cli', () => {
     expect(result.stdout).toContain('Post [table]');
   });
 
+  it('allows read-only inspection of scratch .contexture.json files', async () => {
+    const { dir, irPath } = await fixtureScratch();
+    const result = await runCli(dir, ['inspect', '--ir', irPath, '--json']);
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      path: irPath,
+      types: [expect.objectContaining({ name: 'Note' })],
+    });
+  });
+
+  it('rejects non-.contexture.json IR paths before reading or writing', async () => {
+    const { dir } = await fixtureProject();
+    const badPath = join(dir, 'packages/contexture/app.schema.json');
+    await writeFile(badPath, '{}\n', 'utf8');
+
+    const result = await runCli(dir, ['inspect', '--ir', badPath, '--json']);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Expected a .contexture.json path') },
+    });
+  });
+
   it('lists types as structured JSON', async () => {
     const { dir } = await fixtureProject();
     const result = await runCli(dir, ['list-types', '--json']);
@@ -181,6 +216,16 @@ describe('@contexture/cli', () => {
           status: 'clean',
         }),
       ]),
+    });
+  });
+
+  it('rejects generated-output commands for scratch IR paths', async () => {
+    const { dir, irPath } = await fixtureScratch();
+    const result = await runCli(dir, ['emit', '--ir', irPath, '--json']);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('packages/contexture/*.contexture.json') },
     });
   });
 

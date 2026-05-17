@@ -43,12 +43,14 @@ beforeEach(() => {
   useDocumentStore.setState({ filePath: IR_PATH, mode: 'project' });
   useDriftStore.getState().setResolved();
   useReconcileStore.getState().reset();
-  window.api.saveFile = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(window, 'contexture', {
     value: {
       drift: {
         check: vi.fn().mockResolvedValue({ ok: true }),
         dismiss: vi.fn().mockResolvedValue({ ok: true }),
+      },
+      reconcile: {
+        writeGeneratedTarget: vi.fn().mockResolvedValue(undefined),
       },
     },
     writable: true,
@@ -72,9 +74,13 @@ describe('ReconcileModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /regenerate from ir/i }));
 
-    await waitFor(() => expect(window.api.saveFile).toHaveBeenCalledOnce());
-    const [path, contents] = vi.mocked(window.api.saveFile).mock.calls[0] ?? [];
-    expect(path).toBe(ZOD_PATH);
+    await waitFor(() =>
+      expect(window.contexture?.reconcile.writeGeneratedTarget).toHaveBeenCalledOnce(),
+    );
+    const [payload] =
+      vi.mocked(window.contexture?.reconcile.writeGeneratedTarget).mock.calls[0] ?? [];
+    expect(payload).toMatchObject({ irPath: IR_PATH, targetPath: ZOD_PATH });
+    const contents = payload?.contents ?? '';
     expect(contents).toContain('@contexture-generated');
     expect(contents).toContain('Plot');
     expect(window.contexture?.drift.check).toHaveBeenCalledOnce();
@@ -107,7 +113,7 @@ describe('ReconcileModal', () => {
     render(<ReconcileModal />);
     fireEvent.click(screen.getByRole('button', { name: /leave dirty/i }));
 
-    expect(window.api.saveFile).not.toHaveBeenCalled();
+    expect(window.contexture?.reconcile.writeGeneratedTarget).not.toHaveBeenCalled();
     expect(useDriftStore.getState().driftedPaths).toEqual([ZOD_PATH]);
     expect(useReconcileStore.getState().isOpen).toBe(false);
   });

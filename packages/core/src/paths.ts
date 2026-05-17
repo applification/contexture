@@ -39,15 +39,33 @@ export function projectRootFor(irPath: string): string | null {
   return dir.slice(0, -suffix.length + 1);
 }
 
-export function bundlePathsFor(irPath: string): BundlePaths {
-  if (!irPath.endsWith(IR_SUFFIX)) {
-    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${irPath}`);
+export function assertContextureIrPath(path: string): string {
+  const normalized = normalizeContexturePath(path);
+  if (!normalized.endsWith(IR_SUFFIX)) {
+    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${path}`);
   }
-  const base = irPath.slice(0, -IR_SUFFIX.length);
-  const ctxDir = contextureDirFor(irPath);
+  return normalized;
+}
+
+export function assertWritableContextureProjectIrPath(path: string): string {
+  const normalized = assertContextureIrPath(path);
+  const slash = normalized.lastIndexOf('/');
+  const dir = slash === -1 ? '' : normalized.slice(0, slash);
+  if (!dir.endsWith('/packages/contexture')) {
+    throw new Error(
+      'Writable Contexture agent operations require an IR under packages/contexture/*.contexture.json.',
+    );
+  }
+  return normalized;
+}
+
+export function bundlePathsFor(irPath: string): BundlePaths {
+  const resolvedIrPath = assertContextureIrPath(irPath);
+  const base = resolvedIrPath.slice(0, -IR_SUFFIX.length);
+  const ctxDir = contextureDirFor(resolvedIrPath);
   const dir = ctxDir.slice(0, -'/.contexture'.length);
   return {
-    ir: irPath,
+    ir: resolvedIrPath,
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
     emitted: `${ctxDir}/${EMITTED_FILE}`,
@@ -57,4 +75,29 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     convex: `${dir}/convex/schema.ts`,
     aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
   };
+}
+
+function normalizeContexturePath(path: string): string {
+  const normalizedSlashes = path.replaceAll('\\', '/');
+  const drive = normalizedSlashes.match(/^([A-Za-z]:)(\/?)/);
+  const prefix = normalizedSlashes.startsWith('/')
+    ? '/'
+    : drive
+      ? `${drive[1]}${drive[2] ? '/' : ''}`
+      : '';
+  const rest = prefix ? normalizedSlashes.slice(prefix.length) : normalizedSlashes;
+  const parts: string[] = [];
+
+  for (const part of rest.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length > 0 && parts[parts.length - 1] !== '..') parts.pop();
+      else if (!prefix) parts.push(part);
+      continue;
+    }
+    parts.push(part);
+  }
+
+  if (prefix) return `${prefix}${parts.join('/')}`;
+  return parts.length > 0 ? parts.join('/') : '.';
 }

@@ -14,7 +14,11 @@ import {
 } from './ir';
 import { load } from './load';
 import type { Op } from './ops';
-import { bundlePathsFor } from './paths';
+import {
+  assertContextureIrPath,
+  assertWritableContextureProjectIrPath,
+  bundlePathsFor,
+} from './paths';
 import { runEmitPipeline } from './pipeline';
 import { checkSemantic } from './semantic-validation';
 
@@ -313,7 +317,8 @@ export function createContextureMcpServer(): McpServer {
 }
 
 async function readContextureFile(irPath: string): Promise<{ schema: Schema; warnings: string[] }> {
-  const raw = await readFile(irPath, 'utf8');
+  const path = assertContextureIrPath(irPath);
+  const raw = await readFile(path, 'utf8');
   return load(raw);
 }
 
@@ -344,22 +349,23 @@ async function applyContextureOp(
   op: Record<string, unknown>,
 ): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
   const opKind = typeof op.kind === 'string' ? op.kind : 'unknown';
+  const path = assertWritableContextureProjectIrPath(irPath);
   const parsed = OpSchema.safeParse(op);
   if (!parsed.success) {
     return {
-      path: irPath,
+      path,
       applied: false,
       opKind,
       error: `invalid op: ${formatZodIssues(parsed.error)}`,
     };
   }
 
-  const result = await createFileBackedForward(irPath)(parsed.data);
+  const result = await createFileBackedForward(path)(parsed.data);
   if ('error' in result) {
-    return { path: irPath, applied: false, opKind, error: result.error };
+    return { path, applied: false, opKind, error: result.error };
   }
   return {
-    path: irPath,
+    path,
     applied: true,
     opKind,
     typeCount: result.schema.types.length,
@@ -378,15 +384,16 @@ function formatZodIssues(error: ZodError): string {
 async function emitContextureBundle(
   irPath: string,
 ): Promise<z.infer<z.ZodObject<typeof EmitContextureOutput>>> {
-  const { schema } = await readContextureFile(irPath);
-  const { emitted, manifest } = runEmitPipeline(schema, irPath);
-  const result = await createFileBackedForward(irPath)({
+  const path = assertWritableContextureProjectIrPath(irPath);
+  const { schema } = await readContextureFile(path);
+  const { emitted, manifest } = runEmitPipeline(schema, path);
+  const result = await createFileBackedForward(path)({
     kind: 'replace_schema',
     schema,
   });
   if ('error' in result) throw new Error(result.error);
   return {
-    path: irPath,
+    path,
     emitted: emitted.map((file) => file.path),
     manifest,
   };
@@ -397,9 +404,10 @@ type GeneratedFileStatus = z.infer<typeof GeneratedFileStatusSchema>;
 async function checkContextureDrift(
   irPath: string,
 ): Promise<z.infer<z.ZodObject<typeof CheckContextureDriftOutput>>> {
-  const { schema } = await readContextureFile(irPath);
-  const { emitted, manifest } = runEmitPipeline(schema, irPath);
-  const paths = bundlePathsFor(irPath);
+  const path = assertWritableContextureProjectIrPath(irPath);
+  const { schema } = await readContextureFile(path);
+  const { emitted, manifest } = runEmitPipeline(schema, path);
+  const paths = bundlePathsFor(path);
   const expectedFiles = [
     ...emitted,
     { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
@@ -421,7 +429,7 @@ async function checkContextureDrift(
 
   const drift = files.filter((file) => file.status !== 'clean');
   return {
-    path: irPath,
+    path,
     clean: drift.length === 0,
     checked: files.length,
     files,

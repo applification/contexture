@@ -211,3 +211,42 @@ Completion evidence:
   checks, and Recordshop dogfooding.
 - Updated site metadata, brand phrase guidance, README copy, and homepage smoke
   tests to match the new positioning.
+
+## Goal 10 — Agent/Electron Trust Envelope
+
+**Status:** Done.
+
+Harden the writable trust envelope opened by the agent loop and desktop
+project flows. Contexture now exposes real mutation surfaces through MCP, CLI,
+schema chat, reconcile, and Electron IPC; those surfaces need explicit path,
+protocol, and destructive-action guards before the next architecture
+simplification pass.
+
+Completion evidence:
+
+- Reconcile generated-file reads/writes route through main-side IPC that only
+  accepts known generated targets for the open `.contexture.json` bundle.
+- Recursive project deletion rejects root, home, non-absolute, and non-directory
+  targets even if the renderer misbehaves.
+- Window-open external links are limited to expected external protocols.
+- Tests cover allowed and rejected paths/protocols.
+- MCP/CLI mutation and emit paths have explicit path-policy tests for accepted
+  `.contexture.json` inputs and rejected output locations.
+
+Progress:
+
+- Reconcile now uses main-side generated-target IPC instead of legacy preload
+  filesystem reads/writes.
+- Project recursive delete now fails closed for root, home, relative, top-level,
+  current-working-directory, and file targets.
+- External window-open handling now denies non-http/mailto protocols.
+- CLI and MCP now share core path policy: read-only operations accept resolved
+  `.contexture.json` inputs, while write-capable agent operations require
+  `packages/contexture/*.contexture.json`.
+- Tests cover non-IR path rejection, scratch-file read-only inspection, and
+  write-capable CLI/MCP rejection for scratch IR paths.
+
+Next goal candidate:
+
+- Deepen the shared generated-bundle writer so desktop, CLI, and MCP all share
+  one atomic write and drift preflight implementation.

@@ -230,6 +230,12 @@ export interface DriftDetectedPayload {
 }
 
 export interface ContextureReconcileAPI {
+  readGeneratedTarget: (payload: { irPath: string; targetPath: string }) => Promise<string | null>;
+  writeGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+    contents: string;
+  }) => Promise<void>;
   /**
    * Fire a one-shot schema-agent query that proposes IR ops to align
    * the current schema with the user's hand-edited on-disk source. The

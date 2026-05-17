@@ -4,7 +4,7 @@
  *
  * Sequence:
  *   1. Read the on-disk source for the target path via the legacy preload
- *      helper `window.api.readFileSilent` (already wired to Node fs).
+ *      helper `window.contexture.reconcile.readGeneratedTarget`.
  *   2. Snapshot the current IR from the undo store.
  *   3. Derive the target kind from the file path.
  *   4. Round-trip via the provider-neutral reconcile bridge.
@@ -61,7 +61,16 @@ export function useSchemaAgentReconcile(): void {
     }
 
     void (async () => {
-      const onDiskSource = await window.api?.readFileSilent(targetPath);
+      const irPath = docStore.filePath;
+      if (!irPath) {
+        reconcileStore.setError('No open Contexture document.');
+        return;
+      }
+
+      const onDiskSource = await window.contexture?.reconcile.readGeneratedTarget({
+        irPath,
+        targetPath,
+      });
       if (cancelledRef.current) return;
       if (onDiskSource === null || onDiskSource === undefined) {
         reconcileStore.setError(`Cannot read ${targetPath}.`);
