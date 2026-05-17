@@ -1,3 +1,4 @@
+import type { Schema } from '@contexture/core/ir';
 import type {
   GenerateTextInput,
   ProviderCapabilities,
@@ -7,7 +8,6 @@ import type {
   ProviderStatus,
 } from '@main/providers/runtime';
 import { generateReconcileProposal, type ReconcileProposalInput } from '@main/reconcile/proposals';
-import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it, vi } from 'vitest';
 
 const capabilities: ProviderCapabilities = {

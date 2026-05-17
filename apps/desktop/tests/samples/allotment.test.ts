@@ -5,7 +5,7 @@
  * meta-schema + semantic validators so the bundled sample never drifts
  * out of spec with the rest of the editor.
  */
-import { load } from '@renderer/model/load';
+import { load } from '@contexture/core/load';
 import { validate } from '@renderer/services/validation';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { describe, expect, it } from 'vitest';

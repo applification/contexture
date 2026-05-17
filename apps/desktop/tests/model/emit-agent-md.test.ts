@@ -1,4 +1,4 @@
-import { emit } from '@renderer/model/emit-agent-md';
+import { emit } from '@contexture/core/emit-agent-md';
 import { describe, expect, it } from 'vitest';
 
 describe('emit (AGENTS.md)', () => {

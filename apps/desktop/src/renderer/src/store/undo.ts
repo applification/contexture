@@ -23,10 +23,10 @@
  * every validation pass.
  */
 
+import type { Schema } from '@contexture/core/ir';
+import { load, save } from '@contexture/core/load';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { create } from 'zustand';
-import type { Schema } from '../model/ir';
-import { load, save } from '../model/load';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
 export interface UndoableState {

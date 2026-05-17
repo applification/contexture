@@ -21,8 +21,8 @@
  * rendering uses `data.imported` to pick the dashed-border style.
  */
 
+import type { FieldDef, FieldType, Schema, TypeDef } from '@contexture/core/ir';
 import type { Edge, Node } from '@xyflow/react';
-import type { FieldDef, FieldType, Schema, TypeDef } from '../../model/ir';
 
 export interface TypeNodeData extends Record<string, unknown> {
   /** Fully-qualified type name (local or `<alias>.<Name>`). */

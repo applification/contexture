@@ -1,4 +1,4 @@
-import { emit } from '@renderer/model/emit-schema-index';
+import { emit } from '@contexture/core/emit-schema-index';
 import { describe, expect, it } from 'vitest';
 
 describe('emit (schema index re-export)', () => {

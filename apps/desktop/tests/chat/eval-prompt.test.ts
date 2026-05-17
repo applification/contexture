@@ -2,7 +2,7 @@
  * Eval prompt builder — deterministic string given IR + root + mode.
  */
 
-import type { Schema } from '@renderer/model/ir';
+import type { Schema } from '@contexture/core/ir';
 import { buildEvalPrompt, evalRootCandidates } from '@shared/eval-prompt';
 import { describe, expect, it } from 'vitest';
 

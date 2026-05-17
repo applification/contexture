@@ -19,9 +19,9 @@
  * the SDK.
  */
 
+import type { Schema } from '@contexture/core/ir';
 import { buildEvalPrompt, type EvalMode } from '@shared/eval-prompt';
 import { useCallback, useState } from 'react';
-import type { Schema } from '../model/ir';
 
 export interface EvalAPI {
   generate: (args: {

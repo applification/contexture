@@ -2,8 +2,9 @@
  * FieldDetail — one test per FieldType.kind proving the right controls
  * render and the right `update_field` op flows.
  */
+
+import type { FieldDef } from '@contexture/core/ir';
 import { FieldDetail } from '@renderer/components/detail/FieldDetail';
-import type { FieldDef } from '@renderer/model/ir';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

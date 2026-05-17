@@ -19,6 +19,9 @@
  * sidebar button).
  */
 
+import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
+import { emit as emitZod } from '@contexture/core/emit-zod';
 import { evalRootCandidates } from '@shared/eval-prompt';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
@@ -57,9 +60,6 @@ import { useFileMenu } from './hooks/useFileMenu';
 import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
-import { emitConvexSchema } from './model/emit-convex';
-import { emit as emitJsonSchema } from './model/emit-json-schema';
-import { emit as emitZod } from './model/emit-zod';
 import type { Layout } from './model/layout';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { validate } from './services/validation';

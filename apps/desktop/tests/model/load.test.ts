@@ -1,5 +1,5 @@
-import { load, save } from '@renderer/model/load';
-import type { Migration } from '@renderer/model/migrations';
+import { load, save } from '@contexture/core/load';
+import type { Migration } from '@renderer/core/migrations';
 import { describe, expect, it } from 'vitest';
 
 describe('load', () => {
@@ -91,7 +91,7 @@ describe('load', () => {
   });
 
   it('round-trips a non-trivial v1 schema through save/load', () => {
-    const original: import('@renderer/model/ir').Schema = {
+    const original: import('@contexture/core/ir').Schema = {
       version: '1',
       metadata: { name: 'Blog', description: 'Demo' },
       imports: [{ kind: 'stdlib', path: '@contexture/common', alias: 'common' }],

@@ -4,8 +4,9 @@
  * optional/nullable, summary format) lives in one function so we can
  * pin its behaviour without booting React.
  */
+
+import type { Schema } from '@contexture/core/ir';
 import { buildGraph, summariseFieldType } from '@renderer/components/graph/schema-to-graph';
-import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it } from 'vitest';
 
 describe('buildGraph', () => {

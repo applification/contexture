@@ -1,5 +1,5 @@
-import { emitConvexSchema } from '@renderer/model/emit-convex';
-import type { Schema } from '@renderer/model/ir';
+import { emitConvexSchema } from '@contexture/core/emit-convex';
+import type { Schema } from '@contexture/core/ir';
 import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
