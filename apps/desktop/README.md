@@ -1,14 +1,14 @@
 # Contexture
 
-A modern desktop Zod schema editor with Claude AI integration. Chat to
-Claude about a domain, build a closed-world schema visually, and generate
+A modern desktop Zod schema editor with provider-backed AI integration. Chat
+about a domain, build a closed-world schema visually, and generate
 Zod + JSON Schema outputs that downstream LLM pipelines can import.
 
 ## Features
 
 - **Visual schema editor** — types and fields on a React Flow canvas; edges
   follow field-level refs.
-- **Claude AI assistant** — chat-driven schema authoring via a small op
+- **Schema agent** — chat-driven schema authoring via a small op
   vocabulary (add type, add field, rename, set discriminator, …) exposed as
   an in-process MCP server.
 - **IR source of truth** — `.contexture.json` is the canonical project
@@ -17,8 +17,6 @@ Zod + JSON Schema outputs that downstream LLM pipelines can import.
 - **Curated stdlib** — common types (Email, URL, UUID, Address, Money,
   PhoneE164, …) referenced by qualified name (`common.Email`) and emitted
   as `import` statements from `@contexture/runtime/<namespace>`.
-- **Eval panel** — generate sample data (realistic / minimal / edge-case /
-  adversarial) against a selected root type; Zod-validate; save fixtures.
 - **Auto layout** — ELK positions on load, sidecar-persisted overrides.
 - **Undo/redo** — per-action for direct manipulation, per-turn for chat.
 - **Cross-platform** — macOS, Windows, and Linux builds with auto-update
@@ -39,7 +37,7 @@ Zod + JSON Schema outputs that downstream LLM pipelines can import.
 | Styling | Tailwind CSS 4, shadcn/ui, Radix UI |
 | State | Zustand 5 |
 | Schema | Zod (runtime + IR meta-schema) |
-| AI | @anthropic-ai/claude-agent-sdk |
+| AI | Provider runtimes behind the Schema agent |
 | Testing | Vitest, Testing Library, Playwright |
 
 ## Prerequisites
@@ -79,13 +77,13 @@ src/
 │   ├── index.ts            # Entry point, window management
 │   ├── menu.ts             # Application menu
 │   └── ipc/                # IPC handlers (sidecar I/O, MCP, update)
-├── preload/                # window.api bridge (Phase 2 rebuild)
+├── preload/                # window.contexture bridge
 └── renderer/src/
     ├── model/              # IR types + meta-schema (Phase 2)
     ├── store/              # Zustand state management
     ├── services/           # tokens
     ├── hooks/              # layout, sidecars
-    └── components/         # graph, chat, detail, eval, ui
+    └── components/         # graph, chat, detail, schema, ui
 tests/                       # Vitest test suites
 build/                       # App icons and resources
 resources/                   # Bundled stdlib + skills (Phase 2)

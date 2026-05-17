@@ -91,4 +91,3 @@ Static analysis of the Contexture codebase revealed the following flows not cove
 - Metrics panel
 - Validation panel
 - Update banner
-- Eval panel

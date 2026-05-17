@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 
 export type Theme = 'dark' | 'light';
-export type SidebarTab = 'properties' | 'chat' | 'schema' | 'eval';
+export type SidebarTab = 'properties' | 'chat' | 'schema';
 
 interface UIChromeStoreShape {
   theme: Theme;
