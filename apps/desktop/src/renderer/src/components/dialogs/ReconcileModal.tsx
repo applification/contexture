@@ -18,12 +18,16 @@
  * Leave dirty → close the modal and leave drift state alone.
  */
 
+import { emitAiToolSchemas } from '@contexture/core/emit-ai-tool-schemas';
 import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emitFormValidators } from '@contexture/core/emit-form-validators';
 import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
+import { emitMcpDefinitions } from '@contexture/core/emit-mcp-definitions';
 import { emit as emitSchemaIndex } from '@contexture/core/emit-schema-index';
+import { emitStructuredOutputSchemas } from '@contexture/core/emit-structured-output-schemas';
 import { emit as emitZod } from '@contexture/core/emit-zod';
 import type { Schema } from '@contexture/core/ir';
-import { baseNameFor, bundlePathsFor } from '@contexture/core/paths';
+import { baseNameFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useSchemaAgentReconcile } from '@renderer/hooks/useSchemaAgentReconcile';
@@ -89,6 +93,26 @@ function safeEmitForTarget(
       case 'schema-index':
         source = emitSchemaIndex(irPath ? baseNameFor(irPath) : 'schema', irPath ?? undefined);
         break;
+      case 'ai-tool-schemas':
+        source = `${JSON.stringify(emitAiToolSchemas(schema, irPath ?? undefined), null, 2)}\n`;
+        break;
+      case 'structured-output-schemas':
+        source = `${JSON.stringify(
+          emitStructuredOutputSchemas(schema, irPath ?? undefined),
+          null,
+          2,
+        )}\n`;
+        break;
+      case 'mcp-definitions':
+        source = `${JSON.stringify(emitMcpDefinitions(schema, irPath ?? undefined), null, 2)}\n`;
+        break;
+      case 'form-validators':
+        source = emitFormValidators(
+          schema,
+          irPath ? baseNameFor(irPath) : 'schema',
+          irPath ?? undefined,
+        );
+        break;
       case 'unknown':
         return { source: '', error: `Cannot emit for unknown target kind (${targetPath}).` };
     }
@@ -137,16 +161,7 @@ function shortPath(fullPath: string): string {
 
 function generatedTargetKindFor(targetPath: string | null, irPath: string | null): TargetKind {
   if (!targetPath || !irPath) return 'unknown';
-  try {
-    const paths = bundlePathsFor(irPath);
-    if (targetPath === paths.convex) return 'convex';
-    if (targetPath === paths.schemaTs) return 'zod';
-    if (targetPath === paths.schemaJson) return 'json-schema';
-    if (targetPath === paths.schemaIndex) return 'schema-index';
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
+  return targetKindFor(targetPath, irPath);
 }
 
 export function ReconcileModal(): React.JSX.Element {

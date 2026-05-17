@@ -32,7 +32,10 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
       sandbox: false,
+      webSecurity: true,
     },
   });
 
@@ -50,7 +53,8 @@ function createWindow(): BrowserWindow {
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    const loadOptions = process.env.E2E === '1' ? { query: { e2e: '1' } } : undefined;
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'), loadOptions);
   }
 
   return mainWindow;

@@ -3,6 +3,8 @@ import {
   assertContextureIrPath,
   assertWritableContextureProjectIrPath,
   bundlePathsFor,
+  generatedTargetForPath,
+  generatedTargetsFor,
 } from '../src';
 
 describe('Contexture path policy', () => {
@@ -26,5 +28,35 @@ describe('Contexture path policy', () => {
     expect(() => assertWritableContextureProjectIrPath('/repo/app.contexture.json')).toThrow(
       /packages\/contexture/,
     );
+  });
+
+  it('derives one generated target registry for every emitted artifact path', () => {
+    const irPath = '/repo/packages/contexture/app.contexture.json';
+    expect(generatedTargetsFor(irPath)).toEqual([
+      { kind: 'zod', path: '/repo/packages/contexture/app.schema.ts' },
+      { kind: 'json-schema', path: '/repo/packages/contexture/app.schema.json' },
+      { kind: 'schema-index', path: '/repo/packages/contexture/index.ts' },
+      { kind: 'convex', path: '/repo/packages/contexture/convex/schema.ts' },
+      {
+        kind: 'ai-tool-schemas',
+        path: '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
+      },
+      {
+        kind: 'structured-output-schemas',
+        path: '/repo/packages/contexture/.contexture/structured-output-schemas.json',
+      },
+      {
+        kind: 'mcp-definitions',
+        path: '/repo/packages/contexture/.contexture/mcp-definitions.json',
+      },
+      { kind: 'form-validators', path: '/repo/packages/contexture/form-validators.ts' },
+    ]);
+    expect(
+      generatedTargetForPath(
+        irPath,
+        '/repo/packages/contexture/.contexture/../.contexture/mcp-definitions.json',
+      )?.kind,
+    ).toBe('mcp-definitions');
+    expect(generatedTargetForPath(irPath, '/repo/packages/contexture/src/index.ts')).toBeNull();
   });
 });

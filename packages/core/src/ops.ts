@@ -20,6 +20,7 @@
  *     stdlib namespace awareness when the caller has one.
  */
 
+import type { ZodError } from 'zod';
 import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from './ir';
 import { IRSchema } from './ir';
 import {
@@ -69,14 +70,46 @@ export type ApplyResult = { schema: Schema } | { error: string };
  * the gate getting in the way.
  */
 export function apply(schema: Schema, op: Op, catalog?: StdlibCatalog): ApplyResult {
-  const result = applyStructural(schema, op);
+  let result: ApplyResult;
+  try {
+    result = applyStructural(schema, op);
+  } catch (err) {
+    return { error: `${opKind(op)}: ${err instanceof Error ? err.message : String(err)}` };
+  }
   if ('error' in result) return result;
+  const structural = IRSchema.safeParse(result.schema);
+  if (!structural.success) {
+    return { error: formatStructuralErrors(op.kind, structural.error) };
+  }
   const introduced = newIssues(
     checkSemantic(schema, catalog),
-    checkSemantic(result.schema, catalog),
+    checkSemantic(structural.data, catalog),
   );
-  if (introduced.length === 0) return result;
+  if (introduced.length === 0) return { schema: structural.data };
   return { error: formatSemanticErrors(op.kind, introduced) };
+}
+
+function opKind(op: unknown): string {
+  if (op && typeof op === 'object' && 'kind' in op && typeof op.kind === 'string') {
+    return op.kind;
+  }
+  return 'unknown op';
+}
+
+function formatStructuralErrors(opKind: string, error: ZodError): string {
+  const lines = error.issues.slice(0, 5).map((issue) => {
+    const path = issue.path.join('.') || '(root)';
+    return `  - ${path}: ${issue.message}`;
+  });
+  const suffix =
+    error.issues.length > lines.length
+      ? `  - ...and ${error.issues.length - lines.length} more`
+      : null;
+  return [
+    `${opKind}: would produce an invalid Contexture IR:`,
+    ...lines,
+    ...(suffix ? [suffix] : []),
+  ].join('\n');
 }
 
 function formatSemanticErrors(opKind: string, issues: SemanticIssue[]): string {

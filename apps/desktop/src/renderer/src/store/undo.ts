@@ -149,11 +149,15 @@ export function createUndoableContextureStore(initial: Schema) {
  */
 export const useUndoStore = createUndoableContextureStore({ version: '1', types: [] });
 
-// Expose the store on `window` in test/dev so Playwright specs can dispatch
-// ops directly without relying on XYFlow pointer events (which measure the
-// canvas layout and are flaky in headless Electron). No-op in other
-// environments.
-if (typeof window !== 'undefined') {
+// Expose the store on `window` only in test/dev/e2e so Playwright specs can
+// dispatch ops directly without relying on XYFlow pointer events.
+function shouldExposeTestHooks(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') return true;
+  return new URLSearchParams(window.location.search).get('e2e') === '1';
+}
+
+if (shouldExposeTestHooks()) {
   (window as unknown as { __contextureUndoStore?: typeof useUndoStore }).__contextureUndoStore =
     useUndoStore;
   // Playwright's `page.evaluate` can't dynamic-import renderer modules in

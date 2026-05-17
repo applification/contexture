@@ -5,7 +5,7 @@ import { useClaude } from '@renderer/chat/useClaude';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const STORAGE_KEYS = ['contexture-claude-auth-mode', 'contexture-claude-api-key'];
+const STORAGE_KEYS = ['contexture-claude-auth-mode'];
 
 beforeEach(() => {
   for (const k of STORAGE_KEYS) localStorage.removeItem(k);
@@ -66,7 +66,7 @@ describe('useClaude', () => {
     expect(result.current.isReady).toBe(false);
     act(() => result.current.setApiKey('sk-ant-xyz'));
     expect(result.current.isReady).toBe(true);
-    expect(localStorage.getItem('contexture-claude-api-key')).toBe('sk-ant-xyz');
+    expect(localStorage.getItem('contexture-claude-api-key')).toBeNull();
   });
 
   it('pushes the initial auth snapshot to main on mount', async () => {

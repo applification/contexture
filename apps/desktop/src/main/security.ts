@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, parse, resolve } from 'node:path';
-import { bundlePathsFor } from '@contexture/core/paths';
+import { generatedTargetsFor } from '@contexture/core/paths';
 
 const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'mailto:']);
 
@@ -18,13 +18,8 @@ export function assertGeneratedTargetForIr(irPath: string, targetPath: string): 
     throw new Error('Contexture generated target paths must be absolute.');
   }
 
-  const paths = bundlePathsFor(resolve(irPath));
   const target = resolve(targetPath);
-  const allowed = new Set(
-    [paths.schemaTs, paths.schemaJson, paths.schemaIndex, paths.convex, paths.aiToolSchemas].map(
-      (path) => resolve(path),
-    ),
-  );
+  const allowed = new Set(generatedTargetsFor(resolve(irPath)).map((entry) => resolve(entry.path)));
 
   if (!allowed.has(target)) {
     throw new Error('Target is not a generated Contexture artifact for this IR.');

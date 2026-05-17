@@ -74,6 +74,18 @@ const TARGET_KIND_DESCRIPTIONS: Record<string, string> = {
   'schema-index':
     'a hand-edited `index.ts` schema-index file that re-exports named Zod schemas. ' +
     'Focus on the set of exported names and their re-export paths.',
+  'ai-tool-schemas':
+    'a hand-edited `.contexture/ai-tool-schemas.json` file containing provider-neutral tool definitions. ' +
+    'Focus on tool names, parameter schemas, and descriptions derived from the IR.',
+  'structured-output-schemas':
+    'a hand-edited `.contexture/structured-output-schemas.json` file containing structured-output schemas. ' +
+    'Focus on JSON Schema shape, required fields, and enum values derived from the IR.',
+  'mcp-definitions':
+    'a hand-edited `.contexture/mcp-definitions.json` file containing MCP tool metadata. ' +
+    'Focus on tool names, input schemas, and descriptions derived from the IR.',
+  'form-validators':
+    'a hand-edited `form-validators.ts` file containing generated form-validator helpers. ' +
+    'Focus on field names, constraints, optionality, and nullable behavior derived from the IR.',
 };
 
 /**

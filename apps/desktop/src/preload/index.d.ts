@@ -1,5 +1,3 @@
-import type { ElectronAPI } from '@electron-toolkit/preload';
-
 type Unsubscribe = () => void;
 
 export type UpdateState =
@@ -242,7 +240,6 @@ export interface ContextureAPI {
 
 declare global {
   interface Window {
-    electron: ElectronAPI;
     contexture: ContextureAPI;
   }
 }

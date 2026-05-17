@@ -11,7 +11,6 @@
  *
  * Renderer code should never touch `ipcRenderer` directly.
  */
-import { electronAPI } from '@electron-toolkit/preload';
 import { contextBridge, ipcRenderer } from 'electron';
 
 type Unsubscribe = () => void;
@@ -269,7 +268,6 @@ const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, r
 
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('contexture', contexture);
   } catch (err) {
     console.error(err);
