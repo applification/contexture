@@ -71,6 +71,7 @@ deb:
 appImage:
   artifactName: ${productName}-${version}.${ext}
 npmRebuild: false
+beforePack: scripts/electron-builder-before-pack.cjs
 publish:
   provider: github
   owner: applification
