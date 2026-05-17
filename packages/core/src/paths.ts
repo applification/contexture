@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 export const IR_SUFFIX = '.contexture.json';
 export const SCHEMA_TS_SUFFIX = '.schema.ts';
 export const SCHEMA_JSON_SUFFIX = '.schema.json';
@@ -42,23 +40,23 @@ export function projectRootFor(irPath: string): string | null {
 }
 
 export function assertContextureIrPath(path: string): string {
-  const resolved = resolve(path);
-  if (!resolved.endsWith(IR_SUFFIX)) {
+  const normalized = normalizeContexturePath(path);
+  if (!normalized.endsWith(IR_SUFFIX)) {
     throw new Error(`Expected a ${IR_SUFFIX} path, got: ${path}`);
   }
-  return resolved;
+  return normalized;
 }
 
 export function assertWritableContextureProjectIrPath(path: string): string {
-  const resolved = assertContextureIrPath(path);
-  const slash = resolved.lastIndexOf('/');
-  const dir = slash === -1 ? '' : resolved.slice(0, slash);
+  const normalized = assertContextureIrPath(path);
+  const slash = normalized.lastIndexOf('/');
+  const dir = slash === -1 ? '' : normalized.slice(0, slash);
   if (!dir.endsWith('/packages/contexture')) {
     throw new Error(
       'Writable Contexture agent operations require an IR under packages/contexture/*.contexture.json.',
     );
   }
-  return resolved;
+  return normalized;
 }
 
 export function bundlePathsFor(irPath: string): BundlePaths {
@@ -77,4 +75,29 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     convex: `${dir}/convex/schema.ts`,
     aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
   };
+}
+
+function normalizeContexturePath(path: string): string {
+  const normalizedSlashes = path.replaceAll('\\', '/');
+  const drive = normalizedSlashes.match(/^([A-Za-z]:)(\/?)/);
+  const prefix = normalizedSlashes.startsWith('/')
+    ? '/'
+    : drive
+      ? `${drive[1]}${drive[2] ? '/' : ''}`
+      : '';
+  const rest = prefix ? normalizedSlashes.slice(prefix.length) : normalizedSlashes;
+  const parts: string[] = [];
+
+  for (const part of rest.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length > 0 && parts[parts.length - 1] !== '..') parts.pop();
+      else if (!prefix) parts.push(part);
+      continue;
+    }
+    parts.push(part);
+  }
+
+  if (prefix) return `${prefix}${parts.join('/')}`;
+  return parts.length > 0 ? parts.join('/') : '.';
 }
