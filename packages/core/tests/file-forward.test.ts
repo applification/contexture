@@ -82,4 +82,34 @@ describe('createFileBackedForward', () => {
 
     expect(files.get(irPath)).toBe(`${JSON.stringify(initialSchema, null, 2)}\n`);
   });
+
+  it('refuses to apply ops over hand-edited generated files', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-core-'));
+    const irPath = join(dir, 'packages/contexture/app.contexture.json');
+    await mkdir(join(dir, 'packages/contexture'), { recursive: true });
+    await writeFile(irPath, `${JSON.stringify(initialSchema, null, 2)}\n`, 'utf8');
+
+    const forward = createFileBackedForward(irPath);
+    await forward({
+      kind: 'add_field',
+      typeName: 'Post',
+      field: { name: 'title', type: { kind: 'string' } },
+    });
+    await writeFile(join(dir, 'packages/contexture/app.schema.ts'), '// hand edit\n', 'utf8');
+
+    await expect(
+      forward({
+        kind: 'add_field',
+        typeName: 'Post',
+        field: { name: 'body', type: { kind: 'string' } },
+      }),
+    ).rejects.toThrow(/Generated files have drifted/);
+
+    const written = JSON.parse(await readFile(irPath, 'utf8')) as Schema;
+    const type = written.types[0];
+    expect(type?.kind).toBe('object');
+    expect(type?.kind === 'object' ? type.fields.map((field) => field.name) : []).toEqual([
+      'title',
+    ]);
+  });
 });

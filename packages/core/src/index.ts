@@ -6,6 +6,7 @@ export { emit as emitSchemaIndex } from './emit-schema-index';
 export { emitTableCrud } from './emit-table-crud';
 export { emit as emitZod } from './emit-zod';
 export * from './file-forward';
+export * from './generated-bundle-writer';
 export * from './ir';
 export * from './load';
 export * from './migrations';

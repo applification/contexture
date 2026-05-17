@@ -46,7 +46,7 @@ export interface EmitPipelineDeps {
   emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
 }
 
-function sha256(content: string): string {
+export function hashContent(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex');
 }
 
@@ -60,7 +60,7 @@ function aiOutputEnabled(schema: Schema, target: 'toolSchemas') {
 
 export function buildManifest(entries: ReadonlyArray<FileEntry>): EmittedManifest {
   const files: Record<string, string> = {};
-  for (const { path, content } of entries) files[path] = sha256(content);
+  for (const { path, content } of entries) files[path] = hashContent(content);
   return { version: '1', files };
 }
 

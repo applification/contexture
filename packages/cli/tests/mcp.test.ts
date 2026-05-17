@@ -336,6 +336,61 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('returns generated drift preflight failures as structured apply results', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'size', type: { kind: 'number', int: true } },
+          },
+        },
+      });
+
+      const schemaTsPath = irPath.replace(/\.contexture\.json$/, '.schema.ts');
+      await writeFile(schemaTsPath, '// hand edit\n', 'utf8');
+
+      const result = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'soil', type: { kind: 'string' } },
+          },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: false,
+        opKind: 'add_field',
+        error: expect.stringContaining('Generated files have drifted'),
+      });
+      expect(result.isError).not.toBe(true);
+
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ fields?: Array<{ name: string }> }>;
+      };
+      expect(updatedIr.types[0]?.fields?.map((field) => field.name)).toEqual(['name', 'size']);
+    });
+  });
+
   it('rejects write-capable tools for scratch IR paths', async () => {
     const irPath = await fixtureScratchIr({
       version: '1',
