@@ -1,9 +1,9 @@
 /**
  * Error classification + selective retry for Agent SDK `query()` calls.
  *
- * The chat and Eval drivers both iterate an SDK stream that can fail for
- * several distinct reasons. Retrying a 401 is wrong; retrying a validation
- * rejection is wrong; retrying a network blip is right. This module
+ * Provider drivers iterate SDK streams that can fail for several distinct
+ * reasons. Retrying a 401 is wrong; retrying a validation rejection is wrong;
+ * retrying a network blip is right. This module
  * separates those concerns into three pure pieces:
  *
  *   - `classifyError(err)` — string-pattern / typed-property match over
@@ -170,7 +170,7 @@ export interface RunWithRetryOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Jitter provider; tests pass a deterministic function. */
   random?: () => number;
-  /** Phase label attached to Sentry captures, e.g. 'chat' or 'eval'. */
+  /** Phase label attached to Sentry captures, e.g. 'chat'. */
   phase?: string;
   /**
    * Predicate that returns true once the body is considered "committed"

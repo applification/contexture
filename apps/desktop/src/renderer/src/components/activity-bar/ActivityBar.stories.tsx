@@ -28,7 +28,3 @@ export const Chat: Story = {
 export const Schema: Story = {
   args: { activeTab: 'schema' },
 };
-
-export const Eval: Story = {
-  args: { activeTab: 'eval' },
-};

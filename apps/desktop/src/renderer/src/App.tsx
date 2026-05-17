@@ -8,7 +8,7 @@
  *   │                                          │ SidePanel      │
  *   │             GraphCanvas                  │  (Detail /     │
  *   │                                          │   Chat /       │
- *   │                                          │   Eval)        │
+ *   │                                          │   Schema)      │
  *   │                                          │  + ActivityBar │
  *   ├──────────────────────────── StatusBar ───┴────────────────┤
  *   └───────────────────────────────────────────────────────────┘
@@ -22,12 +22,10 @@
 import { emitConvexSchema } from '@contexture/core/emit-convex';
 import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
 import { emit as emitZod } from '@contexture/core/emit-zod';
-import { evalRootCandidates } from '@shared/eval-prompt';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
-import { useClaudeEval } from './chat/useClaudeEval';
 import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
@@ -35,7 +33,6 @@ import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
-import { EvalPanel } from './components/eval/EvalPanel';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { DriftBanner } from './components/hud/DriftBanner';
@@ -61,7 +58,6 @@ import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import type { Layout } from './model/layout';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
-import { validate } from './services/validation';
 import { useDocumentStore } from './store/document';
 import { useGraphSelectionStore } from './store/selection';
 import { useUIChromeStore } from './store/ui-chrome';
@@ -245,36 +241,11 @@ export default function App(): React.JSX.Element {
     };
   }, []);
 
-  const ev = useClaudeEval({
-    api: {
-      generate: async () => ({ sample: {} }),
-      saveFixture: async () => '',
-    },
-    ir: schema,
-    getRootJsonSchema: (rootTypeName) =>
-      emitJsonSchema(schema, rootTypeName, undefined, {
-        stdlibNamespaces: STDLIB_REGISTRY.namespaces,
-      }),
-    validate: ({ rootTypeName }) => {
-      const errors = validate(schema, { stdlib: STDLIB_REGISTRY });
-      return errors.length === 0
-        ? { ok: true }
-        : {
-            ok: false,
-            errors: errors.map((e) => ({
-              path: e.path,
-              message: `${rootTypeName}: ${e.message}`,
-            })),
-          };
-    },
-  });
-
-  const rootCandidates = useMemo(() => evalRootCandidates(schema), [schema]);
   const hasSelection = selectedNodeId !== null;
 
   // Emit Zod source for the SchemaPanel. Only runs while the Schema
   // tab is active so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Eval / Properties. Wrapped in
+  // the user is looking at Chat / Properties. Wrapped in
   // try/catch so a malformed intermediate state (e.g. during a
   // multi-op chat turn) surfaces as an in-panel error rather than
   // crashing the sidebar.
@@ -283,7 +254,7 @@ export default function App(): React.JSX.Element {
 
   // Emit all three schema formats when the Schema tab is active.
   // Gated on activeTab so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Eval / Properties.
+  // the user is looking at Chat / Properties.
   const schemaEmissions = useMemo((): {
     zodSource: string;
     jsonSource: string;
@@ -422,9 +393,6 @@ export default function App(): React.JSX.Element {
                   onCopy={copyToClipboard}
                   schemaFileName={schemaFileName}
                 />
-              </div>
-              <div className={activeTab !== 'eval' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <EvalPanel eval={ev} rootCandidates={rootCandidates} onCopy={copyToClipboard} />
               </div>
             </div>
             <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
