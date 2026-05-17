@@ -16,9 +16,13 @@ import {
 import { load } from './load';
 import type { Op } from './ops';
 import { assertContextureIrPath, assertWritableContextureProjectIrPath } from './paths';
-import { checkSemantic } from './semantic-validation';
+import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
 const VERSION = '0.0.0';
+
+export interface ContextureMcpServerOptions {
+  stdlib?: StdlibCatalog;
+}
 
 const IrPathInput = {
   irPath: z.string().min(1).describe('Path to a .contexture.json file.'),
@@ -206,7 +210,7 @@ const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('replace_schema'), schema: IRSchema }),
 ]) as z.ZodType<Op>;
 
-export function createContextureMcpServer(): McpServer {
+export function createContextureMcpServer(options: ContextureMcpServerOptions = {}): McpServer {
   const server = new McpServer({ name: 'contexture-core', version: VERSION });
 
   server.registerTool(
@@ -244,7 +248,7 @@ export function createContextureMcpServer(): McpServer {
       },
     },
     async ({ irPath }) => {
-      const structuredContent = await validateContextureFile(irPath);
+      const structuredContent = await validateContextureFile(irPath, options.stdlib);
       return jsonToolResult(structuredContent);
     },
   );
@@ -264,7 +268,7 @@ export function createContextureMcpServer(): McpServer {
       },
     },
     async ({ irPath, op }) => {
-      const structuredContent = await applyContextureOp(irPath, op);
+      const structuredContent = await applyContextureOp(irPath, op, options.stdlib);
       return jsonToolResult(structuredContent);
     },
   );
@@ -320,10 +324,11 @@ async function readContextureFile(irPath: string): Promise<{ schema: Schema; war
 
 async function validateContextureFile(
   irPath: string,
+  catalog?: StdlibCatalog,
 ): Promise<z.infer<z.ZodObject<typeof ValidateOutput>>> {
   try {
     const { schema, warnings } = await readContextureFile(irPath);
-    const errors = checkSemantic(schema).map((issue) => ({
+    const errors = checkSemantic(schema, catalog).map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
@@ -343,6 +348,7 @@ async function validateContextureFile(
 async function applyContextureOp(
   irPath: string,
   op: Record<string, unknown>,
+  catalog?: StdlibCatalog,
 ): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
   const opKind = typeof op.kind === 'string' ? op.kind : 'unknown';
   const path = assertWritableContextureProjectIrPath(irPath);
@@ -358,7 +364,7 @@ async function applyContextureOp(
 
   let result: Awaited<ReturnType<ReturnType<typeof createFileBackedForward>>>;
   try {
-    result = await createFileBackedForward(path)(parsed.data);
+    result = await createFileBackedForward(path, { stdlib: catalog })(parsed.data);
   } catch (err) {
     return {
       path,

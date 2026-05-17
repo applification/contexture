@@ -27,7 +27,6 @@ import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
 import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
 import { emit as emitZod } from '@renderer/model/emit-zod';
 import type { Schema } from '@renderer/model/ir';
-import { STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';
@@ -39,6 +38,7 @@ import {
 } from '@renderer/store/reconcile';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { diffLines } from 'diff';
 import { Loader2, TriangleAlert } from 'lucide-react';
 import { useCallback, useMemo } from 'react';

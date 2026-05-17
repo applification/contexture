@@ -7,6 +7,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./emit-agent-md": "./src/emit-agent-md.ts",
     "./emit-ai-tool-schemas": "./src/emit-ai-tool-schemas.ts",
     "./emit-claude-md": "./src/emit-claude-md.ts",
     "./emit-convex": "./src/emit-convex.ts",

@@ -1,9 +1,9 @@
+import type { Schema } from '@renderer/model/ir';
 import {
   buildSystemPromptAppend,
   buildUserMessage,
   type StdlibRegistry,
-} from '@renderer/chat/system-prompt';
-import type { Schema } from '@renderer/model/ir';
+} from '@shared/system-prompt';
 import { describe, expect, it } from 'vitest';
 
 const EMPTY_STDLIB: StdlibRegistry = { entries: [] };

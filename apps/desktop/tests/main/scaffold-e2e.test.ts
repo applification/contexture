@@ -62,6 +62,7 @@ describeOrSkip('scaffold end-to-end (SCAFFOLD_E2E=1)', () => {
           existsSync(join(targetDir, 'packages/contexture', `${projectName}.contexture.json`)),
         ).toBe(true);
         expect(existsSync(join(targetDir, 'packages/contexture/convex/schema.ts'))).toBe(true);
+        expect(existsSync(join(targetDir, 'AGENTS.md'))).toBe(true);
         expect(existsSync(join(targetDir, 'CLAUDE.md'))).toBe(true);
         expect(existsSync(join(targetDir, 'biome.json'))).toBe(true);
         expect(existsSync(join(targetDir, '.git'))).toBe(true);

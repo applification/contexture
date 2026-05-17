@@ -168,6 +168,34 @@ describe('@contexture/cli', () => {
     });
   });
 
+  it('returns semantic validation issues as structured JSON', async () => {
+    const { dir, irPath } = await fixtureProject();
+    await writeFile(
+      irPath,
+      `${JSON.stringify({
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Order',
+            fields: [{ name: 'buyer', type: { kind: 'ref', typeName: 'Buyer' } }],
+          },
+          { kind: 'enum', name: 'Status', values: [] },
+        ],
+      })}\n`,
+    );
+
+    const result = await runCli(dir, ['validate', '--json']);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      errors: [
+        expect.objectContaining({ code: 'unresolved_ref', path: 'types.0.fields.0.type' }),
+        expect.objectContaining({ code: 'enum_empty', path: 'types.1.values' }),
+      ],
+    });
+  });
+
   it('adds a field and re-emits generated files', async () => {
     const { dir, irPath } = await fixtureProject();
     const result = await runCli(dir, ['add-field', 'Post', 'title', '{"kind":"string"}', '--json']);

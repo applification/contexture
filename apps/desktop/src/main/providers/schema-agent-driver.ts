@@ -1,5 +1,5 @@
-import { buildUserMessage } from '@renderer/chat/system-prompt';
-import type { Schema } from '@renderer/model/ir';
+import type { Schema } from '@contexture/core';
+import { buildUserMessage } from '@shared/system-prompt';
 import type { ChatTurnController } from '../ipc/chat-turn';
 import type {
   ModelOptions,

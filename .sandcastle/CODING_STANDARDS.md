@@ -17,8 +17,8 @@
 
 ## Architecture
 
-- `packages/stdlib` owns all implementation; `packages/runtime` is a thin re-export layer only
-- Dependencies flow one way: `apps/* → runtime → stdlib`. Never import stdlib directly from apps
+- `packages/stdlib` owns implementation; `packages/runtime` is the public runtime re-export
+- App code imports stdlib metadata only through `apps/desktop/src/shared/stdlib-registry.ts`; no other direct app imports from `@contexture/stdlib/*`
 - Prefer deep modules: small interface, rich implementation. Reduce methods and parameters; hide complexity inside
 - Accept dependencies as arguments — never construct external collaborators inside a function
 - Return values, don't produce side effects where avoidable

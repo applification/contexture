@@ -17,8 +17,7 @@
  * on top of these primitives and is intentionally kept thin.
  */
 
-import type { Schema } from '@renderer/model/ir';
-import type { ApplyResult, Op } from '@renderer/store/ops';
+import type { ApplyResult, Op, Schema } from '@contexture/core';
 
 export interface BridgeTransport {
   /** Emit an op-request to the renderer. `id` is the correlation id. */

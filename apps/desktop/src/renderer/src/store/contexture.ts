@@ -10,9 +10,10 @@
  * Undo/redo and transaction batching land in #86 — keeping this store
  * deliberately dumb lets the transactional layer wrap it cleanly.
  */
+
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { create } from 'zustand';
 import type { Schema } from '../model/ir';
-import { STDLIB_REGISTRY } from '../services/stdlib-registry';
 import { type ApplyResult, apply, type Op } from './ops';
 
 export interface ContextureState {

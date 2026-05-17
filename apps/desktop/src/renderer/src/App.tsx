@@ -19,10 +19,11 @@
  * sidebar button).
  */
 
+import { evalRootCandidates } from '@shared/eval-prompt';
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
-import { evalRootCandidates } from './chat/eval-prompt';
 import { useClaudeEval } from './chat/useClaudeEval';
 import { useClaudeSchemaChat } from './chat/useClaudeSchemaChat';
 import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
@@ -61,7 +62,6 @@ import { emit as emitJsonSchema } from './model/emit-json-schema';
 import { emit as emitZod } from './model/emit-zod';
 import type { Layout } from './model/layout';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
-import { STDLIB_REGISTRY } from './services/stdlib-registry';
 import { validate } from './services/validation';
 import { useDocumentStore } from './store/document';
 import { useGraphSelectionStore } from './store/selection';

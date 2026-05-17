@@ -24,12 +24,12 @@
  * async iterator without booting the Agent SDK or the MCP server.
  */
 
+import type { Schema } from '@contexture/core';
 import {
   buildSystemPromptAppend,
   buildUserMessage,
   type StdlibRegistry,
-} from '@renderer/chat/system-prompt';
-import type { Schema } from '@renderer/model/ir';
+} from '@shared/system-prompt';
 import type { ChatTurnController } from './chat-turn';
 import {
   ChatCancelledError,

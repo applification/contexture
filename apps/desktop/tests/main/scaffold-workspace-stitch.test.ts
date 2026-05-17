@@ -1,7 +1,7 @@
 /**
  * `scaffoldWorkspaceStitch` (stage 9) — when 'web' is in config.apps,
  * merges `@<project>/contexture: workspace:*` into `apps/web/package.json`;
- * always writes the root `CLAUDE.md`, `biome.json`, and `.gitignore`.
+ * always writes the root agent docs, `biome.json`, and `.gitignore`.
  * Pure file manipulation; git init is handled by a separate step.
  */
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
@@ -47,10 +47,13 @@ describe('scaffoldWorkspaceStitch', () => {
     expect(fs.exists(webPkgPath)).toBe(false);
   });
 
-  it('writes the root CLAUDE.md with project name substituted', async () => {
+  it('writes root agent docs with project name substituted', async () => {
     await fs.writeFile(webPkgPath, `${JSON.stringify({ name: 'web' }, null, 2)}\n`);
     await scaffoldWorkspaceStitch(webConfig, { fs });
+    const agents = await fs.readFile('/work/my-proj/AGENTS.md');
     const claude = await fs.readFile('/work/my-proj/CLAUDE.md');
+    expect(agents).toContain('my-proj');
+    expect(agents).not.toContain('{{PROJECT_NAME}}');
     expect(claude).toContain('my-proj');
     expect(claude).not.toContain('{{PROJECT_NAME}}');
   });

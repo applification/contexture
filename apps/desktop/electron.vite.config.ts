@@ -4,12 +4,12 @@ import { varlockVitePlugin } from '@varlock/vite-integration';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
-// Shared aliases — main bundles a few pure helpers out of the renderer
-// (system-prompt builder, stdlib registry) so every surface resolves
-// `@renderer/…` and `@main/…` at build time.
+// Shared aliases — main bundles a few pure helpers used by both Electron
+// processes and the renderer, so every surface resolves the same paths.
 const sharedAliases = {
   '@renderer': resolve('src/renderer/src'),
   '@main': resolve('src/main'),
+  '@shared': resolve('src/shared'),
   '@': resolve('src/renderer/src'),
 };
 

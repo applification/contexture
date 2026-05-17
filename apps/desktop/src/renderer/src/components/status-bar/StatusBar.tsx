@@ -11,12 +11,12 @@
 
 import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
 import { emit as emitZod } from '@renderer/model/emit-zod';
-import { STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { useDocumentStore } from '@renderer/store/document';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { BarChart3, Circle, CircleAlert, TriangleAlert } from 'lucide-react';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

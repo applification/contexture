@@ -1,4 +1,4 @@
-import type { Schema } from '@renderer/model/ir';
+import type { Schema } from '@contexture/core';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { createOpTools } from '../ops';

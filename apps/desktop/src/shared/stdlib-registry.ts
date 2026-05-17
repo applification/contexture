@@ -1,29 +1,22 @@
 /**
- * Stdlib registry surface consumed by the ref resolver.
+ * Desktop stdlib registry adapters.
  *
- * The canonical data lives in `@contexture/stdlib/registry` — this
- * module converts the namespace-indexed IR sidecars into a shape the
- * ref resolver can query directly:
- *
- *   `resolve('common.Email')` → `true`
- *   `resolve('common.NoSuch')` → `false`
- *   `resolve('place.CountryCode')` → `true`
- *
- * Production wires the default export into `validate()` so schemas
- * that reference qualified stdlib types without an `add_import` still
- * validate cleanly. Tests can supply a custom registry (empty, or
- * with a synthetic namespace) without touching the stdlib package.
+ * The canonical data lives in `@contexture/stdlib/registry`. This module
+ * converts those namespace-indexed IR sidecars into the small lookup surfaces
+ * used by core validation, emitters, and chat prompts.
  */
 import type { StdlibCatalog } from '@contexture/core/semantic-validation';
 import { IR_BY_NAMESPACE, NAMESPACES, type Namespace } from '@contexture/stdlib/registry';
-import type { StdlibRegistry as SystemPromptStdlibRegistry } from '../chat/system-prompt';
+import type { StdlibRegistry as SystemPromptStdlibRegistry } from './system-prompt';
 
 /**
- * Renderer-facing stdlib registry. Identical shape to the core
- * `StdlibCatalog` so that `STDLIB_REGISTRY` can be passed straight into
- * `apply(schema, op, catalog)` and `checkSemantic(schema, catalog)`.
+ * Desktop-facing stdlib registry. Identical shape to the core
+ * `StdlibCatalog` so callers can pass it straight into `apply()` and
+ * `checkSemantic()`.
  */
 export type StdlibRegistry = StdlibCatalog;
+
+export const STDLIB_NAMESPACES = NAMESPACES;
 
 export function buildStdlibRegistry(): StdlibRegistry {
   const typeNamesByNamespace: Record<string, ReadonlySet<string>> = Object.fromEntries(
@@ -40,12 +33,8 @@ export function buildStdlibRegistry(): StdlibRegistry {
 export const STDLIB_REGISTRY: StdlibRegistry = buildStdlibRegistry();
 
 /**
- * Adapter for the system-prompt builder's registry shape, which expects
- * a flat `entries` array rather than the namespace lookup surface.
- *
- * Descriptions fall back to the namespace metadata when a type lacks its
- * own — keeps the prompt informative without forcing every stdlib entry
- * to duplicate its namespace's summary.
+ * Adapter for the system-prompt builder's registry shape, which expects a flat
+ * `entries` array rather than the namespace lookup surface.
  */
 export function buildSystemPromptStdlibRegistry(): SystemPromptStdlibRegistry {
   const entries: SystemPromptStdlibRegistry['entries'] = [];

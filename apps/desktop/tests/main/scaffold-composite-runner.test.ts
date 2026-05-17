@@ -125,6 +125,7 @@ describe('createCompositeStageRunner', () => {
     for await (const _ of runner.run(STAGE.WORKSPACE_STITCH, config)) {
       // drain
     }
+    expect(fs.exists('/work/my-proj/AGENTS.md')).toBe(true);
     expect(fs.exists('/work/my-proj/CLAUDE.md')).toBe(true);
     expect(fs.exists('/work/my-proj/biome.json')).toBe(true);
     expect(fs.exists('/work/my-proj/.gitignore')).toBe(true);

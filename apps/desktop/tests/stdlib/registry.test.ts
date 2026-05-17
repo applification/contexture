@@ -7,8 +7,8 @@
  * `add_import` in the IR.
  */
 import type { Schema } from '@renderer/model/ir';
-import { buildStdlibRegistry, STDLIB_REGISTRY } from '@renderer/services/stdlib-registry';
 import { validate } from '@renderer/services/validation';
+import { buildStdlibRegistry, STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { describe, expect, it } from 'vitest';
 
 describe('stdlib registry', () => {

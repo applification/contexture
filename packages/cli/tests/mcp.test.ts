@@ -164,6 +164,7 @@ describe('Contexture MCP server', () => {
           name: 'Order',
           fields: [{ name: 'buyer', type: { kind: 'ref', typeName: 'Buyer' } }],
         },
+        { kind: 'enum', name: 'Status', values: [] },
       ],
     });
 
@@ -176,12 +177,16 @@ describe('Contexture MCP server', () => {
       expect(result.structuredContent).toMatchObject({
         path: irPath,
         valid: false,
-        errors: [
+        errors: expect.arrayContaining([
           expect.objectContaining({
             code: 'unresolved_ref',
             path: 'types.0.fields.0.type',
           }),
-        ],
+          expect.objectContaining({
+            code: 'enum_empty',
+            path: 'types.1.values',
+          }),
+        ]),
       });
     });
   });

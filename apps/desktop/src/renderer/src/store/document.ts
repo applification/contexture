@@ -22,7 +22,7 @@ import { create } from 'zustand';
  * `scratch` = bare IR on disk (no `.contexture/` sidecar). Default for
  * files not produced by the scaffolder.
  * `project` = `.contexture/` sidecar present. Triggers project-mode
- * save behaviour (emit bundle, auto-save, CLAUDE.md, …).
+ * save behaviour (emit bundle, auto-save, agent docs, …).
  */
 export type DocumentMode = 'scratch' | 'project';
 
