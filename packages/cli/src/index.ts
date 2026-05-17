@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import {
   assertContextureIrPath,
   assertWritableContextureProjectIrPath,
-  bundlePathsFor,
+  checkGeneratedBundle,
   createFileBackedForward,
   createOpTools,
   type FieldDef,
@@ -12,9 +12,10 @@ import {
   type ImportDecl,
   IRSchema,
   load,
-  runEmitPipeline,
+  nodeFileBackedFs,
   type Schema,
   type TypeDef,
+  writeGeneratedBundle,
 } from '@contexture/core';
 
 interface CliOptions {
@@ -34,13 +35,6 @@ interface ParsedArgs {
 interface JsonError {
   ok: false;
   error: { message: string; code: string };
-}
-
-type GeneratedFileStatus = 'clean' | 'drifted' | 'unreadable';
-
-interface GeneratedFileCheck {
-  path: string;
-  status: GeneratedFileStatus;
 }
 
 const HELP = `contexture <command> [args]
@@ -539,8 +533,12 @@ async function run(argv: string[]): Promise<void> {
   if (command === 'emit') {
     const writableIrPath = assertWritableContextureProjectIrPath(irPath);
     const schema = await readSchema(writableIrPath);
-    const { emitted, manifest } = runEmitPipeline(schema, writableIrPath);
-    await createFileBackedForward(writableIrPath)({ kind: 'replace_schema', schema });
+    const { emitted, manifest } = await writeGeneratedBundle({
+      irPath: writableIrPath,
+      schema,
+      fs: nodeFileBackedFs,
+      driftPreflight: false,
+    });
     writeResult({ message: `Emitted ${emitted.length} files.`, manifest }, options.json);
     return;
   }
@@ -548,24 +546,7 @@ async function run(argv: string[]): Promise<void> {
   if (command === 'check-generated') {
     const writableIrPath = assertWritableContextureProjectIrPath(irPath);
     const schema = await readSchema(writableIrPath);
-    const { emitted, manifest } = runEmitPipeline(schema, writableIrPath);
-    const paths = bundlePathsFor(writableIrPath);
-    const expectedFiles = [
-      ...emitted,
-      { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
-    ];
-    const files: GeneratedFileCheck[] = [];
-    for (const entry of expectedFiles) {
-      let onDisk: string | undefined;
-      try {
-        onDisk = await Bun.file(entry.path).text();
-      } catch {
-        onDisk = undefined;
-      }
-      if (onDisk === undefined) files.push({ path: entry.path, status: 'unreadable' });
-      else if (onDisk !== entry.content) files.push({ path: entry.path, status: 'drifted' });
-      else files.push({ path: entry.path, status: 'clean' });
-    }
+    const files = await checkGeneratedBundle(schema, writableIrPath, nodeFileBackedFs);
     const drift = files.filter((file) => file.status !== 'clean');
     if (drift.length > 0) {
       process.exitCode = 1;

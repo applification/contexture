@@ -246,7 +246,26 @@ Progress:
 - Tests cover non-IR path rejection, scratch-file read-only inspection, and
   write-capable CLI/MCP rejection for scratch IR paths.
 
-Next goal candidate:
+## Goal 11 — Shared Generated-Bundle Writer
 
-- Deepen the shared generated-bundle writer so desktop, CLI, and MCP all share
-  one atomic write and drift preflight implementation.
+**Status:** Done.
+
+Deepen the generated-bundle writer so desktop, CLI, and MCP share one core
+implementation for building generated files, writing them atomically, checking
+generated-file drift, and refusing implicit overwrites when the last emitted
+manifest shows user or agent edits.
+
+Completion evidence:
+
+- `@contexture/core` owns `generated-bundle-writer`, which builds generated
+  bundle entries, writes them with rollback, checks current generated output,
+  and runs manifest-based drift preflight before implicit writes.
+- CLI `emit` performs an explicit re-emit through the shared writer, while
+  `check-generated` reports status through the shared checker.
+- MCP `emit_contexture` and `check_contexture_drift` use the same writer/checker
+  as the CLI.
+- Desktop project-mode saves use the shared writer for generated artefacts and
+  sidecars, while scratch saves use the same atomic file writer.
+- Tests cover atomic rollback, generated drift preflight, explicit re-emit over
+  drift, shared generated checks, file-backed op rejection over drift, and
+  desktop save refusal to clobber edited generated files.

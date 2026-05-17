@@ -19,9 +19,11 @@
 import {
   bundlePathsFor,
   contextureDirFor,
+  type FileEntry,
   IR_SUFFIX,
   projectRootFor,
-  runEmitPipeline,
+  writeFilesAtomic,
+  writeGeneratedBundle,
 } from '@contexture/core';
 import { NAMESPACES as STDLIB_NAMESPACES } from '@contexture/stdlib/registry';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@renderer/model/chat-history';
@@ -226,47 +228,6 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     return { irPath, mode, schema, layout, chat, warnings };
   }
 
-  async function writeBundleAtomic(
-    files: ReadonlyArray<{ path: string; content: string }>,
-  ): Promise<void> {
-    interface Snapshot {
-      path: string;
-      existed: boolean;
-      prior?: string;
-      renamed: boolean;
-    }
-    const snapshots: Snapshot[] = [];
-    try {
-      for (const file of files) {
-        const snap: Snapshot = { path: file.path, existed: false, renamed: false };
-        try {
-          snap.prior = await fs.readFile(file.path);
-          snap.existed = true;
-        } catch (err) {
-          if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-        }
-        snapshots.push(snap);
-
-        const tmp = `${file.path}.tmp`;
-        await fs.writeFile(tmp, file.content);
-        await fs.rename(tmp, file.path);
-        snap.renamed = true;
-      }
-    } catch (err) {
-      for (const snap of snapshots.slice().reverse()) {
-        if (snap.renamed) {
-          if (snap.existed && snap.prior !== undefined) {
-            await fs.writeFile(snap.path, snap.prior).catch(() => undefined);
-          } else {
-            await fs.remove(snap.path).catch(() => undefined);
-          }
-        }
-        await fs.remove(`${snap.path}.tmp`).catch(() => undefined);
-      }
-      throw err;
-    }
-  }
-
   async function saveImpl(irPath: string, input: SaveInput): Promise<void> {
     const paths = bundlePathsFor(irPath);
     const mode: DocumentMode = (await fs.dirExists(contextureDirFor(irPath)))
@@ -278,29 +239,30 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     // artefacts graduate to project mode by running `mkdir .contexture/`
     // (or, eventually, the New Project flow).
     if (mode === 'scratch') {
-      await writeBundleAtomic([{ path: paths.ir, content: `${saveIR(input.schema)}\n` }]);
+      await writeFilesAtomic(fs, [{ path: paths.ir, content: `${saveIR(input.schema)}\n` }]);
       await bumpRecent(irPath);
       return;
     }
 
     // Project mode: full bundle. Emit first — a throwing emitter must
     // abort before any write touches disk.
-    const { emitted, manifest } = runEmitPipeline(input.schema, irPath, {
-      emitZod,
-      emitJsonSchema,
-      emitSchemaIndex,
-      emitConvex,
-    });
-
-    const files = [
-      { path: paths.ir, content: `${saveIR(input.schema)}\n` },
+    const sidecars: FileEntry[] = [
       { path: paths.layout, content: saveLayout(input.layout) },
       { path: paths.chat, content: saveChatHistory(input.chat) },
-      ...emitted,
-      { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
     ];
 
-    await writeBundleAtomic(files);
+    await writeGeneratedBundle({
+      irPath,
+      schema: input.schema,
+      fs,
+      sidecars,
+      emitDeps: {
+        emitZod,
+        emitJsonSchema,
+        emitSchemaIndex,
+        emitConvex,
+      },
+    });
     await bumpRecent(irPath);
   }
 

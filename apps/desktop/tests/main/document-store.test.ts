@@ -402,6 +402,29 @@ describe('DocumentStore', () => {
     }
   });
 
+  it('project-mode save refuses to clobber drifted generated files', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    await harness.fs.writeFile(schemaTsPath, '// hand edit\n');
+
+    await expect(
+      harness.store.save({
+        irPath,
+        schema: { version: '1', types: [{ kind: 'object', name: 'Updated', fields: [] }] },
+        layout: sampleLayout,
+        chat: sampleChat,
+      }),
+    ).rejects.toThrow(/Generated files have drifted/);
+
+    expect(await harness.fs.readFile(schemaTsPath)).toBe('// hand edit\n');
+    const reopened = await harness.store.open(irPath);
+    expect(reopened.schema).toEqual(sampleIR);
+  });
+
   it('emitted.json does not track seeded per-table CRUD files', async () => {
     // Seeded files are not @contexture-generated, so they must not appear
     // in the drift manifest. A drift check flags regen-on-mismatch;
