@@ -5,6 +5,9 @@ export const LAYOUT_FILE = 'layout.json';
 export const CHAT_FILE = 'chat.json';
 export const EMITTED_FILE = 'emitted.json';
 export const AI_TOOL_SCHEMAS_FILE = 'ai-tool-schemas.json';
+export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
+export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
+export const FORM_VALIDATORS_FILE = 'form-validators.ts';
 
 export interface BundlePaths {
   ir: string;
@@ -16,6 +19,9 @@ export interface BundlePaths {
   schemaIndex: string;
   convex: string;
   aiToolSchemas: string;
+  structuredOutputSchemas: string;
+  mcpDefinitions: string;
+  formValidators: string;
 }
 
 export function contextureDirFor(irPath: string): string {
@@ -74,6 +80,9 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     schemaIndex: `${dir}/index.ts`,
     convex: `${dir}/convex/schema.ts`,
     aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
+    structuredOutputSchemas: `${ctxDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
+    mcpDefinitions: `${ctxDir}/${MCP_DEFINITIONS_FILE}`,
+    formValidators: `${dir}/${FORM_VALIDATORS_FILE}`,
   };
 }
 
