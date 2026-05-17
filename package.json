@@ -48,12 +48,8 @@
   ],
   "overrides": {
     "@next/env": "npm:@varlock/nextjs-integration@^1.1.0",
-    "@anthropic-ai/sdk": "0.95.1",
     "mermaid": "11.15.0",
     "postcss": "^8.5.14"
-  },
-  "resolutions": {
-    "@anthropic-ai/sdk": "0.95.1"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,jsonc}": [
