@@ -9,8 +9,8 @@
  * gone.
  */
 
+import { emit as emitZod } from '@contexture/core/emit-zod';
 import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
-import { emit as emitZod } from '@renderer/model/emit-zod';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { useDocumentStore } from '@renderer/store/document';

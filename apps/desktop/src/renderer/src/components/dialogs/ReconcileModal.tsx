@@ -18,15 +18,15 @@
  * Leave dirty → close the modal and leave drift state alone.
  */
 
+import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
+import { emit as emitSchemaIndex } from '@contexture/core/emit-schema-index';
+import { emit as emitZod } from '@contexture/core/emit-zod';
+import type { Schema } from '@contexture/core/ir';
 import { baseNameFor, bundlePathsFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useSchemaAgentReconcile } from '@renderer/hooks/useSchemaAgentReconcile';
-import { emitConvexSchema } from '@renderer/model/emit-convex';
-import { emit as emitJsonSchema } from '@renderer/model/emit-json-schema';
-import { emit as emitSchemaIndex } from '@renderer/model/emit-schema-index';
-import { emit as emitZod } from '@renderer/model/emit-zod';
-import type { Schema } from '@renderer/model/ir';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';

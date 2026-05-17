@@ -13,6 +13,8 @@
  * No Electron, no SDK — the transport, query function, and turn
  * controller are all test doubles.
  */
+
+import type { Schema } from '@contexture/core/ir';
 import {
   CHAT_ASSISTANT,
   CHAT_AUTH_REQUIRED,
@@ -26,7 +28,6 @@ import {
 } from '@main/ipc/chat-driver';
 import { ChatTurnController } from '@main/ipc/chat-turn';
 import { ChatCancelledError } from '@main/ipc/claude-errors';
-import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it, vi } from 'vitest';
 
 function fakeTransport(): {

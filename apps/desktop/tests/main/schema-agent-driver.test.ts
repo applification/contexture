@@ -1,3 +1,4 @@
+import type { Schema } from '@contexture/core/ir';
 import { ChatTurnController } from '@main/ipc/chat-turn';
 import type {
   ProviderCapabilities,
@@ -15,7 +16,6 @@ import {
   SchemaAgentDriver,
   type SchemaAgentTransport,
 } from '@main/providers/schema-agent-driver';
-import type { Schema } from '@renderer/model/ir';
 import { describe, expect, it, vi } from 'vitest';
 
 const capabilities: ProviderCapabilities = {

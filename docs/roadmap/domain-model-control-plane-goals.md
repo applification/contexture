@@ -1,9 +1,15 @@
 # Domain-Model Control Plane Goals
 
 This roadmap turns [ADR 0022](../adr/0022-contexture-domain-model-control-plane.md) into
-Codex-sized goals. Each goal should be pursued as a small vertical slice:
-set one active goal, implement it end to end, verify it, then update this
-file with what changed and what the next goal should learn from it.
+reviewable checkpoints. The current branch/PR should keep these checkpoints
+layered and independently verifiable, but land the security floor,
+`@contexture/core` simplification, Phase 1 IR fixes, drift/reconcile contract,
+MCP surface, and multi-target emitters together so the generated bundle and
+agent surfaces agree end to end.
+
+Historical entries below were originally tracked as separate Codex-sized goals.
+For the current consolidation PR, treat them as evidence and acceptance
+criteria, not as instructions to split the work into separate initiatives.
 
 ## Goal 1 — Drift Status Trust Layer
 
@@ -168,6 +174,28 @@ Completion evidence:
   backed by JSON Schema parameters.
 - The new file participates in the emitted manifest and existing drift checks.
 - The target remains omitted unless explicitly enabled.
+
+## Current Consolidation PR — Complete AI-Pipeline Emitters
+
+**Status:** In progress on this branch.
+
+The first AI-pipeline emitter proved the pattern. The current single-PR
+roadmap branch extends that same manifest-backed pipeline to every
+`outputs.aiPipeline` slot so the IR no longer advertises dormant output
+targets.
+
+Completion evidence:
+
+- `outputs.aiPipeline.toolSchemas.enabled` emits
+  `.contexture/ai-tool-schemas.json`.
+- `outputs.aiPipeline.structuredOutputs.enabled` emits
+  `.contexture/structured-output-schemas.json`.
+- `outputs.aiPipeline.mcpDefinitions.enabled` emits
+  `.contexture/mcp-definitions.json`.
+- `outputs.aiPipeline.formValidators.enabled` emits `form-validators.ts`.
+- All four targets are omitted unless explicitly enabled.
+- All four targets participate in the emitted manifest and generated-file
+  drift surface.
 
 ## Goal 8 — Dogfood One Real Product
 

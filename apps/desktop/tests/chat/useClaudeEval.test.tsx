@@ -1,8 +1,9 @@
 /**
  * `useClaudeEval` — hook state machine over a fake EvalAPI.
  */
+
+import type { Schema } from '@contexture/core/ir';
 import { useClaudeEval } from '@renderer/chat/useClaudeEval';
-import type { Schema } from '@renderer/model/ir';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

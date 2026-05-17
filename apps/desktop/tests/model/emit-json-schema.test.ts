@@ -1,5 +1,5 @@
-import { emit } from '@renderer/model/emit-json-schema';
-import type { Schema } from '@renderer/model/ir';
+import { emit } from '@contexture/core/emit-json-schema';
+import type { Schema } from '@contexture/core/ir';
 import { describe, expect, it } from 'vitest';
 
 describe('emit (JSON Schema)', () => {

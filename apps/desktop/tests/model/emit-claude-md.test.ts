@@ -1,4 +1,4 @@
-import { emit } from '@renderer/model/emit-claude-md';
+import { emit } from '@contexture/core/emit-claude-md';
 import { describe, expect, it } from 'vitest';
 
 describe('emit (CLAUDE.md)', () => {

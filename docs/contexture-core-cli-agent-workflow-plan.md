@@ -77,14 +77,11 @@ Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./
 
 ## Desktop integration
 
-The desktop renderer kept its old paths (`apps/desktop/src/renderer/src/model/*.ts`) as **thin re-export shims**, e.g.:
-
-```ts
-// apps/desktop/src/renderer/src/model/ir.ts
-export * from '@contexture/core/ir';
-```
-
-This avoided rewriting every callsite. Future cleanup (low priority) can drop the shims and update imports to `@contexture/core`.
+The desktop renderer imports shared IR, load, migration, and emitter modules
+directly from `@contexture/core/*`. Earlier re-export shims under
+`apps/desktop/src/renderer/src/model/*.ts` were removed during the single-PR
+consolidation so the desktop app no longer has a mirror ownership layer for
+core product logic.
 
 ## Exit criteria — met
 
@@ -221,9 +218,6 @@ A coding agent in a downstream app can be pointed at a short doc (or skill) and 
 
 # Backlog (post-Phase 3)
 
-- Drop the desktop renderer shim files
-  (`apps/desktop/src/renderer/src/model/*.ts`) and update imports to
-  `@contexture/core/*`.
 - Optional `contexture init-agent-docs` command for downstream
   scaffolding (copies `docs/agent-contexture-workflow.md` into a
   downstream app's root agent docs).

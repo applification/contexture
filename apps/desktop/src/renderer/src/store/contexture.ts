@@ -11,9 +11,9 @@
  * deliberately dumb lets the transactional layer wrap it cleanly.
  */
 
+import type { Schema } from '@contexture/core/ir';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { create } from 'zustand';
-import type { Schema } from '../model/ir';
 import { type ApplyResult, apply, type Op } from './ops';
 
 export interface ContextureState {

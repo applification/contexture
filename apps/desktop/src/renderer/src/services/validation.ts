@@ -1,7 +1,8 @@
 /** Renderer adapter for core IR semantic validation. */
+
+import type { Schema } from '@contexture/core/ir';
 import { checkSemantic, type SemanticIssue } from '@contexture/core/semantic-validation';
 import type { StdlibRegistry } from '@shared/stdlib-registry';
-import type { Schema } from '../model/ir';
 
 export interface ValidationError {
   code: string;

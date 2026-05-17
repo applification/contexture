@@ -7,8 +7,8 @@
  * scaffold time, then never re-generated (users / coding agents are
  * expected to edit it). The banner warns re-emitters off.
  */
-import { emitTableCrud } from '@renderer/model/emit-table-crud';
-import type { Schema } from '@renderer/model/ir';
+import { emitTableCrud } from '@contexture/core/emit-table-crud';
+import type { Schema } from '@contexture/core/ir';
 import { describe, expect, it } from 'vitest';
 
 const singleTable: Schema = {

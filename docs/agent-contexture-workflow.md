@@ -102,15 +102,25 @@ schema index, and Convex schema. Existing targets can be disabled explicitly:
 }
 ```
 
-AI-pipeline targets live under `outputs.aiPipeline` and are opt-in. Enabling
-tool schemas emits `.contexture/ai-tool-schemas.json`, a provider-neutral list
-of per-type JSON Schema tool definitions:
+AI-pipeline targets live under `outputs.aiPipeline` and are opt-in:
+
+- `toolSchemas` emits `.contexture/ai-tool-schemas.json`, a provider-neutral
+  list of per-type JSON Schema tool definitions.
+- `structuredOutputs` emits `.contexture/structured-output-schemas.json`, a
+  strict structured-output schema document for SDK adapters.
+- `mcpDefinitions` emits `.contexture/mcp-definitions.json`, MCP-style tool
+  definitions for downstream servers.
+- `formValidators` emits `form-validators.ts`, dependency-free validator
+  helpers backed by the generated Zod schemas.
 
 ```json
 {
   "outputs": {
     "aiPipeline": {
-      "toolSchemas": { "enabled": true }
+      "toolSchemas": { "enabled": true },
+      "structuredOutputs": { "enabled": true },
+      "mcpDefinitions": { "enabled": true },
+      "formValidators": { "enabled": true }
     }
   }
 }

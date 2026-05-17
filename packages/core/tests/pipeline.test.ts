@@ -91,4 +91,39 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
     );
   });
+
+  it('emits opt-in structured-output schemas, MCP definitions, and form validators', () => {
+    const schema: Schema = {
+      ...baseSchema,
+      outputs: {
+        aiPipeline: {
+          structuredOutputs: { enabled: true },
+          mcpDefinitions: { enabled: true },
+          formValidators: { enabled: true },
+        },
+      },
+    };
+
+    const { emitted, manifest } = runEmitPipeline(
+      schema,
+      '/repo/packages/contexture/app.contexture.json',
+    );
+
+    expect(emitted.map((file) => file.path)).toContain(
+      '/repo/packages/contexture/.contexture/structured-output-schemas.json',
+    );
+    expect(emitted.map((file) => file.path)).toContain(
+      '/repo/packages/contexture/.contexture/mcp-definitions.json',
+    );
+    expect(emitted.map((file) => file.path)).toContain(
+      '/repo/packages/contexture/form-validators.ts',
+    );
+    expect(manifest.files).toHaveProperty(
+      '/repo/packages/contexture/.contexture/structured-output-schemas.json',
+    );
+    expect(manifest.files).toHaveProperty(
+      '/repo/packages/contexture/.contexture/mcp-definitions.json',
+    );
+    expect(manifest.files).toHaveProperty('/repo/packages/contexture/form-validators.ts');
+  });
 });

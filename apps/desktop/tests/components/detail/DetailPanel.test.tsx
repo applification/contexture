@@ -7,9 +7,10 @@
  * schema lookup path is covered; the test seeds the store via
  * `replace_schema` between renders.
  */
+
+import type { Schema } from '@contexture/core/ir';
 import { DetailPanel } from '@renderer/components/detail/DetailPanel';
 import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
-import type { Schema } from '@renderer/model/ir';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
