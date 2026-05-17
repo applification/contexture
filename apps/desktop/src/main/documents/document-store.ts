@@ -17,22 +17,17 @@
  */
 
 import {
-  buildSeededArtifacts,
   buildSidecarEntries,
   bundlePathsFor,
+  contextureDirFor,
   type DocumentMode,
-  emitAgentMd as defaultEmitAgentMd,
-  emitClaudeMd as defaultEmitClaudeMd,
   emitJsonSchema as defaultEmitJsonSchema,
   emitSchemaIndex as defaultEmitSchemaIndex,
-  emitTableCrud as defaultEmitTableCrud,
   emitZod as defaultEmitZod,
   detectDocumentMode,
   type FileEntry,
   load as loadIR,
   type Schema,
-  save as saveIR,
-  writeFilesAtomic,
   writeGeneratedBundle,
 } from '@contexture/core';
 import { type ChatHistory, loadChatHistory, saveChatHistory } from '@shared/chat-history';
@@ -95,7 +90,7 @@ export interface FsAdapter {
   rename(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
   fileExists(path: string): Promise<boolean>;
-  /** Directory-presence probe used for project-mode detection. */
+  /** Directory-presence probe used for bundle-mode detection. */
   dirExists(path: string): Promise<boolean>;
 }
 
@@ -109,14 +104,8 @@ export interface DocumentStoreDeps {
   emitJsonSchema?: (schema: Schema, sourcePath?: string) => unknown;
   /** Override for tests — defaults to the real schema-index emitter. */
   emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
-  /** Override for tests — defaults to the real AGENTS.md emitter. */
-  emitAgentMd?: (projectName: string) => string;
-  /** Override for tests — defaults to the real CLAUDE.md emitter. */
-  emitClaudeMd?: (projectName: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
-  /** Override for tests — defaults to the real per-table CRUD emitter. */
-  emitTableCrud?: (schema: Schema, tableName: string) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
   onRecentFileAdded?: (path: string) => void;
 }
@@ -132,10 +121,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
     emitJsonSchema = (s: Schema, sp?: string) =>
       defaultEmitJsonSchema(s, undefined, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
     emitSchemaIndex = defaultEmitSchemaIndex,
-    emitAgentMd = defaultEmitAgentMd,
-    emitClaudeMd = defaultEmitClaudeMd,
     emitConvex,
-    emitTableCrud = defaultEmitTableCrud,
     onRecentFileAdded,
   } = deps;
 
@@ -192,38 +178,17 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
 
-    if (mode === 'project') {
-      for (const artifact of buildSeededArtifacts(schema, irPath, {
-        emitAgentMd,
-        emitClaudeMd,
-        emitTableCrud,
-      })) {
-        if (!(await fs.fileExists(artifact.path))) {
-          await fs.writeFile(artifact.path, artifact.content);
-        }
-      }
-    }
-
     await bumpRecent(irPath);
     return { irPath, mode, schema, layout, chat, warnings };
   }
 
   async function saveImpl(irPath: string, input: SaveInput): Promise<void> {
     const paths = bundlePathsFor(irPath);
-    const mode = await detectDocumentMode(irPath, fs);
+    const hasExistingBundle = await fs.dirExists(contextureDirFor(irPath));
 
-    // Scratch mode: the IR file is the whole document. No sidecars, no
-    // mirrors — users who want persistent layout/chat or generated Convex
-    // artefacts graduate to project mode by running `mkdir .contexture/`
-    // (or, eventually, the New Project flow).
-    if (mode === 'scratch') {
-      await writeFilesAtomic(fs, [{ path: paths.ir, content: `${saveIR(input.schema)}\n` }]);
-      await bumpRecent(irPath);
-      return;
-    }
-
-    // Project mode: full bundle. Emit first — a throwing emitter must
-    // abort before any write touches disk.
+    // Save always materializes the full document bundle. Opening a bare
+    // legacy IR stays read-only until save, then initializes `.contexture/`
+    // sidecars and generated outputs next to it.
     const sidecars: FileEntry[] = buildSidecarEntries(paths, {
       layout: saveLayout(input.layout),
       chat: saveChatHistory(input.chat),
@@ -234,6 +199,8 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       schema: input.schema,
       fs,
       sidecars,
+      driftPreflight: hasExistingBundle,
+      generatedTargetPreflight: !hasExistingBundle,
       emitDeps: {
         emitZod,
         emitJsonSchema,

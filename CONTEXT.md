@@ -14,11 +14,11 @@ Contexture is the domain-model control plane for AI-native TypeScript apps. Thes
 ## Document Bundle
 
 - **Document bundle**: The files derived from one Contexture IR: the IR itself, `.contexture/` sidecars, generated artifacts, and the emitted manifest.
-- **Project mode**: A Contexture document whose `.contexture/` sidecar directory exists. Project mode writes the full document bundle and generated artifacts.
-- **Scratch mode**: A bare `.contexture.json` file without `.contexture/` sidecars. Scratch mode saves only the IR.
+- **Bundle mode**: Contexture's document mode. Saves write the `.contexture.json` IR, `.contexture/` sidecars, generated artifacts, and emitted-file manifest.
+- **Legacy bare IR**: A standalone `.contexture.json` without `.contexture/` sidecars. Desktop opens these directly as bundle documents and materializes sidecars on first save.
 - **Sidecar**: Editor-owned state stored under `.contexture/`, such as graph layout, chat history, and the emitted manifest.
 - **Generated target**: A file Contexture can regenerate from the IR, such as Zod, JSON Schema, Convex schema, schema index, AI tool schemas, MCP definitions, structured-output schemas, or form validators.
-- **Seeded artifact**: A file Contexture writes once and then treats as user-owned, such as generated agent guidance or table CRUD scaffolds.
+- **Integration guidance**: Copyable prompt, skill, or documentation that helps agents wire Contexture outputs into an existing repo without making Contexture own repo mutation.
 - **Emitted manifest**: `.contexture/emitted.json`, a SHA-256 record of generated targets used to detect drift.
 
 ## Trust And Reconcile

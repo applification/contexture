@@ -13,7 +13,7 @@ import { type BundlePaths, baseNameFor, bundlePathsFor } from './paths';
 export type { BundlePaths } from './paths';
 export {
   assertContextureIrPath,
-  assertWritableContextureProjectIrPath,
+  assertWritableContextureBundleIrPath,
   baseNameFor,
   bundlePathsFor,
   CHAT_FILE,
@@ -25,7 +25,6 @@ export {
   generatedTargetsFor,
   IR_SUFFIX,
   LAYOUT_FILE,
-  projectRootFor,
   SCHEMA_JSON_SUFFIX,
   SCHEMA_TS_SUFFIX,
 } from './paths';

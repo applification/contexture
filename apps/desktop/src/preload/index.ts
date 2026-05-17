@@ -108,28 +108,12 @@ const file = {
   /** Menu-bar -> renderer subscriptions. */
   onMenuNew: (listener: () => void) =>
     subscribe('menu:file-new', (() => listener()) as (p: unknown) => void),
-  onMenuNewProject: (listener: () => void) =>
-    subscribe('menu:file-new-project', (() => listener()) as (p: unknown) => void),
   onMenuOpen: (listener: () => void) =>
     subscribe('menu:file-open', (() => listener()) as (p: unknown) => void),
   onMenuSave: (listener: () => void) =>
     subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
   onMenuSaveAs: (listener: () => void) =>
     subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
-};
-
-const scaffold = {
-  /** Kick off the composable scaffolder; events arrive on `onEvent`. */
-  start: (config: {
-    targetDir: string;
-    projectName: string;
-    apps: string[];
-    description?: string;
-    scratchPath?: string;
-  }) => ipcRenderer.invoke('scaffold:start', config) as Promise<void>,
-  /** Subscribe to preflight + stage events streamed from main. */
-  onEvent: (listener: (event: unknown) => void) =>
-    subscribe('scaffold:event', listener as (p: unknown) => void),
 };
 
 const shell = {
@@ -139,12 +123,6 @@ const shell = {
   /** Open a folder (or file) in VS Code via the `vscode://` URL scheme. */
   openInEditor: (path: string): Promise<void> =>
     ipcRenderer.invoke('shell:open-in-editor', path) as Promise<void>,
-};
-
-const project = {
-  /** Recursively delete a directory (used by the New Project "delete and start over" flow). */
-  deleteDirectory: (path: string): Promise<void> =>
-    ipcRenderer.invoke('project:delete-directory', path) as Promise<void>,
 };
 
 const drift = {
@@ -204,7 +182,7 @@ const update = {
   },
 };
 
-const contexture = { schemaAgent, file, scaffold, shell, project, drift, reconcile, update };
+const contexture = { schemaAgent, file, shell, drift, reconcile, update };
 
 if (process.contextIsolated) {
   try {

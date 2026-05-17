@@ -31,8 +31,8 @@ describe('app menu', () => {
     expect(findItem(template, ['File', 'New Contexture File'])).toBeDefined();
   });
 
-  it('exposes a "New Project…" entry under File', () => {
-    expect(findItem(template, ['File', 'New Project…'])).toBeDefined();
+  it('does not expose a separate bundle promotion entry under File', () => {
+    expect(findItem(template, ['File', 'Promote to Contexture Bundle'])).toBeUndefined();
   });
 
   it('labels the Open item "Open Contexture File…"', () => {

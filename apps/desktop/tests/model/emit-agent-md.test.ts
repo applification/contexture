@@ -11,7 +11,7 @@ describe('emit (AGENTS.md)', () => {
   it('tells coding agents the schema source-of-truth rule', () => {
     const out = emit('my-blog');
     expect(out).toMatch(/source of truth/i);
-    expect(out).toMatch(/packages\/contexture\/my-blog\.contexture\.json/);
+    expect(out).toMatch(/my-blog\.contexture\.json/);
   });
 
   it('does not start with a @contexture-generated banner; AGENTS.md is user-owned', () => {

@@ -1,6 +1,6 @@
 /**
- * `useProjectAutoSave` — in project mode, schema edits flush to disk
- * 500ms after the last change. Scratch mode stays manual-save.
+ * `useProjectAutoSave` — schema edits flush to disk 500ms after the last
+ * change once the document has a file path.
  */
 import { useProjectAutoSave } from '@renderer/hooks/useProjectAutoSave';
 import { useDocumentStore } from '@renderer/store/document';
@@ -22,7 +22,6 @@ function mockFileBridge(): { save: ReturnType<typeof vi.fn> } {
       onMenuOpen: () => () => undefined,
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
-      onMenuNewProject: () => () => undefined,
       pickDirectory: vi.fn(async () => null),
     },
   };
@@ -34,7 +33,7 @@ beforeEach(() => {
   useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   const d = useDocumentStore.getState();
   d.setFilePath(null);
-  d.setMode('scratch');
+  d.setMode('bundle');
   d.markClean();
 });
 
@@ -45,10 +44,8 @@ afterEach(() => {
 });
 
 describe('useProjectAutoSave', () => {
-  it('does nothing in scratch mode', () => {
+  it('does nothing without a file path', () => {
     const { save } = mockFileBridge();
-    useDocumentStore.getState().setFilePath('/tmp/a.contexture.json');
-    useDocumentStore.getState().setMode('scratch');
     renderHook(() => useProjectAutoSave());
     act(() => {
       useUndoStore.getState().apply({
@@ -62,10 +59,10 @@ describe('useProjectAutoSave', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('saves 500ms after a schema change when mode=project and filePath set', async () => {
+  it('saves 500ms after a schema change when a file path is set', async () => {
     const { save } = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/a.contexture.json');
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
     renderHook(() => useProjectAutoSave());
     act(() => {
       useUndoStore.getState().apply({
@@ -86,7 +83,7 @@ describe('useProjectAutoSave', () => {
   it('debounces — multiple rapid edits coalesce into one save', async () => {
     const { save } = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/a.contexture.json');
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
     renderHook(() => useProjectAutoSave());
     for (let i = 0; i < 3; i++) {
       act(() => {
@@ -107,10 +104,10 @@ describe('useProjectAutoSave', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
-  it('does not save when filePath is null even in project mode', async () => {
+  it('does not save when filePath is null even in bundle mode', async () => {
     const { save } = mockFileBridge();
     useDocumentStore.getState().setFilePath(null);
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
     renderHook(() => useProjectAutoSave());
     act(() => {
       useUndoStore.getState().apply({
@@ -127,7 +124,7 @@ describe('useProjectAutoSave', () => {
   it('passes the current layout and chat through the getters', async () => {
     const { save } = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/a.contexture.json');
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
     const layout = { version: '1' as const, positions: { Plot: { x: 1, y: 2 } } };
     const chat = {
       version: '1' as const,

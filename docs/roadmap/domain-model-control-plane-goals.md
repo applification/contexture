@@ -270,7 +270,7 @@ Progress:
 - External window-open handling now denies non-http/mailto protocols.
 - CLI and MCP now share core path policy: read-only operations accept resolved
   `.contexture.json` inputs, while write-capable agent operations require
-  `packages/contexture/*.contexture.json`.
+  Bundle mode via a sibling `.contexture/` directory.
 - Tests cover non-IR path rejection, scratch-file read-only inspection, and
   write-capable CLI/MCP rejection for scratch IR paths.
 
@@ -292,8 +292,8 @@ Completion evidence:
   `check-generated` reports status through the shared checker.
 - MCP `emit_contexture` and `check_contexture_drift` use the same writer/checker
   as the CLI.
-- Desktop project-mode saves use the shared writer for generated artefacts and
-  sidecars, while scratch saves use the same atomic file writer.
+- Desktop saves use the shared writer for generated artefacts and sidecars,
+  including first saves of bare legacy `.contexture.json` files.
 - Tests cover atomic rollback, generated drift preflight, explicit re-emit over
   drift, shared generated checks, file-backed op rejection over drift, and
   desktop save refusal to clobber edited generated files.
@@ -312,34 +312,30 @@ the preload surface should expose one coherent Contexture interface.
 This can be implemented as one parent goal with four independent slices. If any
 slice grows, split it into its own PR while keeping this goal as the checklist.
 
-### Goal 12A — Scaffold Uses the Shared Generated-Bundle Writer
+### Goal 12A — App Scaffolder Removed
 
 **Status:** Done.
 
-Project scaffolding still writes generated artifacts and `.contexture/emitted.json`
-through scaffold-local logic. Bring scaffold generation under the same
-`@contexture/core` writer used by desktop saves, CLI, and MCP.
+The old app scaffolder has been removed. Contexture now initializes Document
+bundles through `@contexture/core` instead of creating application workspaces.
 
 Completion evidence:
 
-- `scaffoldSchemaPackage` writes the initial IR, generated artifacts, and
-  emitted manifest through the shared generated-bundle writer instead of a
-  scaffold-local `runEmitPipeline` + manual file writes.
-- `scaffoldConvexEmit` no longer narrows `.contexture/emitted.json` to only the
-  Convex schema hash, or the stage is removed/reworked so the manifest remains
-  complete after scaffolding.
-- A freshly scaffolded project has a manifest containing every generated target
-  that `contexture check-generated` expects.
-- Tests cover empty-project scaffold, scratch promotion scaffold, and manifest
+- No desktop UI promises to create a web/mobile/desktop app.
+- No desktop code shells out to framework CLIs for scaffolding.
+- Bundle initialization writes Contexture-owned files through the shared
+  generated-bundle writer.
+- Tests cover bundle initialization, legacy-file save behavior, and manifest
   completeness.
 
 Progress:
 
-- `scaffoldSchemaPackage` and `scaffoldConvexEmit` now write generated targets
-  through `@contexture/core`'s shared generated-bundle writer.
-- Scaffold manifests remain complete across empty-project scaffold and scratch
-  promotion flows instead of being reset or narrowed by later stages.
-- Targeted scaffold tests cover the complete emitted manifest surface.
+- The scaffold pipeline, IPC, preload surface, menu entry, dialog, and tests were
+  removed.
+- Bundle mode is marked by a sibling `.contexture/` directory. Bare
+  `.contexture.json` files remain legacy import inputs; desktop Save / Save As
+  initializes the bundle rather than preserving scratch semantics.
+- CLI/MCP write-capable tools accept bundles in arbitrary directories.
 
 ### Goal 12B — Dependency Security Sweep
 

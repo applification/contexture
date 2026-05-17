@@ -5,7 +5,7 @@
  * Called once at startup from `main/index.ts` alongside the other IPC
  * registrations. The watcher is started/stopped in response to
  * `drift:watch` / `drift:unwatch` IPC messages sent by the renderer
- * when a project-mode document opens or closes.
+ * when a bundle-mode document opens or closes.
  *
  * `drift:check` is a one-shot manual re-check (window focus trigger).
  */

@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { type GeneratedBundleFs, writeGeneratedBundle } from './generated-bundle-writer';
 import { load } from './load';
 import { type ApplyResult, apply, type Op } from './ops';
-import { assertWritableContextureProjectIrPath } from './paths';
+import { assertWritableContextureBundleIrPath } from './paths';
 import type { StdlibCatalog } from './semantic-validation';
 
 export interface FileBackedFs extends GeneratedBundleFs {
@@ -12,6 +12,7 @@ export interface FileBackedFs extends GeneratedBundleFs {
   rename(from: string, to: string): Promise<void>;
   remove(path: string): Promise<void>;
   mkdirp(path: string): Promise<void>;
+  dirExists(path: string): Promise<boolean>;
 }
 
 export const nodeFileBackedFs: FileBackedFs = {
@@ -27,6 +28,14 @@ export const nodeFileBackedFs: FileBackedFs = {
   },
   remove: (path) => rm(path, { force: true }),
   mkdirp: (path) => mkdir(path, { recursive: true }).then(() => undefined),
+  async dirExists(path) {
+    try {
+      const { stat } = await import('node:fs/promises');
+      return (await stat(path)).isDirectory();
+    } catch {
+      return false;
+    }
+  },
 };
 
 export interface FileBackedForwardOptions {
@@ -38,11 +47,11 @@ export function createFileBackedForward(
   irPath: string,
   optionsOrFs: FileBackedForwardOptions | FileBackedFs = nodeFileBackedFs,
 ) {
-  const resolvedIrPath = assertWritableContextureProjectIrPath(irPath);
   const options = isFileBackedFs(optionsOrFs) ? { fs: optionsOrFs } : optionsOrFs;
   const fs = options.fs ?? nodeFileBackedFs;
 
   return async function forward(op: Op): Promise<ApplyResult> {
+    const resolvedIrPath = await assertWritableContextureBundleIrPath(irPath, fs);
     const raw = await fs.readFile(resolvedIrPath);
     const { schema } = load(raw);
     const result = apply(schema, op, options.stdlib);

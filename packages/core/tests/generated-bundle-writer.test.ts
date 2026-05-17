@@ -143,6 +143,38 @@ describe('generated bundle writer', () => {
     );
   });
 
+  it('can preflight generated target collisions before initializing a bundle', async () => {
+    const fs = createFs({ '/proj/packages/contexture/app.schema.ts': '// hand edit\n' });
+
+    await expect(
+      writeGeneratedBundle({
+        irPath,
+        schema,
+        fs,
+        driftPreflight: false,
+        generatedTargetPreflight: true,
+      }),
+    ).rejects.toBeInstanceOf(GeneratedBundleDriftError);
+
+    expect(fs.files.get('/proj/packages/contexture/app.schema.ts')).toBe('// hand edit\n');
+  });
+
+  it('allows generated target preflight when existing bytes already match', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+    const schemaTs = fs.files.get('/proj/packages/contexture/app.schema.ts');
+
+    await writeGeneratedBundle({
+      irPath,
+      schema,
+      fs,
+      driftPreflight: false,
+      generatedTargetPreflight: true,
+    });
+
+    expect(fs.files.get('/proj/packages/contexture/app.schema.ts')).toBe(schemaTs);
+  });
+
   it('checks generated files through the same expected bundle shape', async () => {
     const fs = createFs();
     await writeGeneratedBundle({ irPath, schema, fs });

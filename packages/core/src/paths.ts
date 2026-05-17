@@ -24,6 +24,10 @@ export interface BundlePaths {
   formValidators: string;
 }
 
+export interface ContextureBundleProbeFs {
+  dirExists(path: string): Promise<boolean>;
+}
+
 export type GeneratedTargetKind =
   | 'zod'
   | 'json-schema'
@@ -51,15 +55,6 @@ export function baseNameFor(irPath: string): string {
   return leaf.slice(0, -IR_SUFFIX.length);
 }
 
-export function projectRootFor(irPath: string): string | null {
-  const suffix = '/packages/contexture/';
-  const slash = irPath.lastIndexOf('/');
-  if (slash === -1) return null;
-  const dir = irPath.slice(0, slash);
-  if (!dir.endsWith('/packages/contexture')) return null;
-  return dir.slice(0, -suffix.length + 1);
-}
-
 export function assertContextureIrPath(path: string): string {
   const normalized = normalizeContexturePath(path);
   if (!normalized.endsWith(IR_SUFFIX)) {
@@ -68,13 +63,14 @@ export function assertContextureIrPath(path: string): string {
   return normalized;
 }
 
-export function assertWritableContextureProjectIrPath(path: string): string {
+export async function assertWritableContextureBundleIrPath(
+  path: string,
+  fs: ContextureBundleProbeFs,
+): Promise<string> {
   const normalized = assertContextureIrPath(path);
-  const slash = normalized.lastIndexOf('/');
-  const dir = slash === -1 ? '' : normalized.slice(0, slash);
-  if (!dir.endsWith('/packages/contexture')) {
+  if (!(await fs.dirExists(contextureDirFor(normalized)))) {
     throw new Error(
-      'Writable Contexture agent operations require an IR under packages/contexture/*.contexture.json.',
+      'Writable Contexture operations require bundle mode: create a sibling .contexture/ directory by promoting or initializing the bundle first.',
     );
   }
   return normalized;

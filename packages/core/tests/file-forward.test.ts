@@ -13,7 +13,7 @@ describe('createFileBackedForward', () => {
   it('applies an op, writes the IR, and re-emits generated artefacts', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'contexture-core-'));
     const irPath = join(dir, 'packages/contexture/app.contexture.json');
-    await mkdir(join(dir, 'packages/contexture'), { recursive: true });
+    await mkdir(join(dir, 'packages/contexture/.contexture'), { recursive: true });
     await writeFile(irPath, `${JSON.stringify(initialSchema, null, 2)}\n`, 'utf8');
 
     const forward = createFileBackedForward(irPath);
@@ -69,6 +69,9 @@ describe('createFileBackedForward', () => {
       async mkdirp() {
         // no-op for the in-memory fake
       },
+      async dirExists(path) {
+        return path === '/proj/packages/contexture/.contexture';
+      },
     };
 
     const forward = createFileBackedForward(irPath, fs);
@@ -86,7 +89,7 @@ describe('createFileBackedForward', () => {
   it('refuses to apply ops over hand-edited generated files', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'contexture-core-'));
     const irPath = join(dir, 'packages/contexture/app.contexture.json');
-    await mkdir(join(dir, 'packages/contexture'), { recursive: true });
+    await mkdir(join(dir, 'packages/contexture/.contexture'), { recursive: true });
     await writeFile(irPath, `${JSON.stringify(initialSchema, null, 2)}\n`, 'utf8');
 
     const forward = createFileBackedForward(irPath);

@@ -1,3 +1,4 @@
+export * from './chat-history';
 export * from './document-bundle';
 export { emit as emitAgentMd } from './emit-agent-md';
 export { emitAiToolSchemas } from './emit-ai-tool-schemas';
@@ -13,6 +14,7 @@ export { emit as emitZod } from './emit-zod';
 export * from './file-forward';
 export * from './generated-bundle-writer';
 export * from './ir';
+export * from './layout';
 export * from './load';
 export * from './migrations';
 export * from './op-tools';

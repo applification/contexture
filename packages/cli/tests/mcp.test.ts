@@ -9,7 +9,7 @@ import { createContextureMcpServer } from '../src/mcp-server';
 async function fixtureIr(schema: unknown): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'contexture-mcp-'));
   const irPath = join(dir, 'packages/contexture/app.contexture.json');
-  await mkdir(join(dir, 'packages/contexture'), { recursive: true });
+  await mkdir(join(dir, 'packages/contexture/.contexture'), { recursive: true });
   await writeFile(irPath, `${JSON.stringify(schema, null, 2)}\n`, 'utf8');
   return irPath;
 }
@@ -365,6 +365,37 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('applies an op to an arbitrary bundle directory', async () => {
+    const irPath = await fixtureScratchIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Note', fields: [] }],
+    });
+    await mkdir(join(irPath, '..', '.contexture'), { recursive: true });
+
+    await withClient(async (client) => {
+      const applyResult = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: {
+            kind: 'add_field',
+            typeName: 'Note',
+            field: { name: 'body', type: { kind: 'string' } },
+          },
+        },
+      });
+
+      expect(applyResult.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_field',
+      });
+      await expect(
+        readFile(irPath.replace(/\.contexture\.json$/, '.schema.ts'), 'utf8'),
+      ).resolves.toContain('body');
+    });
+  });
+
   it('returns generated drift preflight failures as structured apply results', async () => {
     const irPath = await fixtureIr({
       version: '1',
@@ -435,7 +466,7 @@ describe('Contexture MCP server', () => {
         isError: true,
         content: [
           expect.objectContaining({
-            text: expect.stringContaining('packages/contexture/*.contexture.json'),
+            text: expect.stringContaining('bundle mode'),
           }),
         ],
       });
@@ -455,7 +486,7 @@ describe('Contexture MCP server', () => {
         isError: true,
         content: [
           expect.objectContaining({
-            text: expect.stringContaining('packages/contexture/*.contexture.json'),
+            text: expect.stringContaining('bundle mode'),
           }),
         ],
       });

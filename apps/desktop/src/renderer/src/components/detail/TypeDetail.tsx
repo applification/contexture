@@ -13,7 +13,6 @@
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
 import type { IndexDef, TypeDef } from '@contexture/core/ir';
-import type { DocumentMode } from '../../store/document';
 import type { Op } from '../../store/ops';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
@@ -30,11 +29,9 @@ export interface TypeDetailProps {
   type: TypeDef;
   /** Dispatch an op. In production this is `useUndoStore.getState().apply`. */
   dispatch: (op: Op) => void;
-  /** Document mode — `scratch` hides Convex-specific affordances. */
-  mode?: DocumentMode;
 }
 
-export function TypeDetail({ type, dispatch, mode = 'scratch' }: TypeDetailProps) {
+export function TypeDetail({ type, dispatch }: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
 
@@ -49,9 +46,7 @@ export function TypeDetail({ type, dispatch, mode = 'scratch' }: TypeDetailProps
       <DescriptionField type={type} dispatch={dispatch} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
-      {type.kind === 'object' && mode === 'project' && (
-        <ConvexSection type={type} dispatch={dispatch} />
-      )}
+      {type.kind === 'object' && <ConvexSection type={type} dispatch={dispatch} />}
       {type.kind === 'enum' && <EnumBody type={type} dispatch={dispatch} />}
       {type.kind === 'discriminatedUnion' && (
         <DiscriminatedUnionBody type={type} dispatch={dispatch} />
@@ -142,8 +137,7 @@ function ObjectBody({
   );
 }
 
-// ConvexSection is rendered in project mode only. TODO(#119): gate on project
-// mode via a DocumentStore-derived context — always-on for now.
+// TODO(#119): gate on output config mode once Contexture supports multiple emit targets.
 function ConvexSection({
   type,
   dispatch,

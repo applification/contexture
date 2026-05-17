@@ -31,7 +31,6 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
-import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
@@ -53,7 +52,6 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
-import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import type { Layout } from './model/layout';
@@ -149,14 +147,7 @@ export default function App(): React.JSX.Element {
   chatMessagesRef.current = chat.messages;
   const chatHydrateRef = useRef(chat.hydrate);
   chatHydrateRef.current = chat.hydrate;
-  const chatSendRef = useRef(chat.send);
-  chatSendRef.current = chat.send;
 
-  // Captures the first seeded user message from a newly scaffolded project
-  // so onOpenProject can auto-send it after the bundle loads.
-  const pendingAutoSendRef = useRef<string | null>(null);
-
-  useNewProject();
   useDrift();
 
   const fileMenu = useFileMenu({
@@ -180,17 +171,6 @@ export default function App(): React.JSX.Element {
         void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
       } else {
         void window.contexture?.schemaAgent?.threadClear();
-      }
-      // Capture a seeded first message for auto-send (set by onOpenProject).
-      const first = loadedChat.messages[0];
-      if (
-        pendingAutoSendRef.current &&
-        first?.role === 'user' &&
-        loadedChat.messages.length === 1
-      ) {
-        pendingAutoSendRef.current = first.content;
-      } else {
-        pendingAutoSendRef.current = null;
       }
     },
     onNew: () => {
@@ -250,7 +230,6 @@ export default function App(): React.JSX.Element {
   // multi-op chat turn) surfaces as an in-panel error rather than
   // crashing the sidebar.
   const filePath = useDocumentStore((s) => s.filePath);
-  const documentMode = useDocumentStore((s) => s.mode);
 
   // Emit all three schema formats when the Schema tab is active.
   // Gated on activeTab so we don't burn cycles on every IR change when
@@ -341,7 +320,7 @@ export default function App(): React.JSX.Element {
                   onLoadSample={loadSample}
                   recentFiles={recentFiles}
                   onOpenRecent={fileMenu.handleOpenPath}
-                  isNewProject={documentMode === 'project'}
+                  isBundle={filePath !== null}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
                   providerLabel={readProviderLabelProp(chat)}
                 />
@@ -403,22 +382,6 @@ export default function App(): React.JSX.Element {
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
       <ReconcileModal />
-      <NewProjectDialog
-        onOpenProject={async (irPath) => {
-          // Signal onBundleLoaded to capture a seeded first message.
-          pendingAutoSendRef.current = '__pending__';
-          await fileMenu.handleOpenPath(irPath);
-          // Switch to chat and ensure the sidebar is visible.
-          setActiveTab('chat');
-          useUIChromeStore.getState().setSidebarVisible(true);
-          // If onBundleLoaded captured a seeded first message, auto-send it.
-          const toSend = pendingAutoSendRef.current;
-          pendingAutoSendRef.current = null;
-          if (toSend && toSend !== '__pending__') {
-            await chatSendRef.current(toSend);
-          }
-        }}
-      />
     </div>
   );
 }
@@ -427,14 +390,14 @@ function EmptyState({
   onLoadSample,
   recentFiles,
   onOpenRecent,
-  isNewProject = false,
+  isBundle = false,
   projectName = null,
   providerLabel,
 }: {
   onLoadSample: () => void;
   recentFiles: string[];
   onOpenRecent: (path: string) => void;
-  isNewProject?: boolean;
+  isBundle?: boolean;
   projectName?: string | null;
   providerLabel: 'Codex' | 'Claude';
 }): React.JSX.Element {
@@ -444,14 +407,14 @@ function EmptyState({
       style={{ background: 'var(--graph-bg)' }}
     >
       <GraphBackground />
-      {isNewProject ? (
+      {isBundle ? (
         <div className="relative z-10 text-center text-muted-foreground max-w-sm space-y-3">
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-            {projectName ?? 'New project'}
+            {projectName ?? 'Contexture bundle'}
           </h1>
           <p className="text-sm">
-            Your project has been scaffolded. {providerLabel} is building your schema in the chat
-            panel — types will appear here as they're created.
+            This bundle is ready for generated outputs. Start chatting with {providerLabel} or add
+            types directly.
           </p>
           <p className="text-xs text-muted-foreground/60">
             You can iterate on the schema by continuing the conversation, or edit types directly

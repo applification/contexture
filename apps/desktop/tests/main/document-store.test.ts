@@ -21,7 +21,7 @@ import type { Layout } from '@shared/layout';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';
-// In project mode, layout and chat live inside the `.contexture/` marker
+// In bundle mode, layout and chat live inside the `.contexture/` marker
 // directory (they're implementation sidecars, not part of the document
 // package API).
 const layoutPath = '/work/.contexture/layout.json';
@@ -53,16 +53,14 @@ function setup(seed: Record<string, string> = {}): Harness {
   return { store, fs };
 }
 
-/** Seed a `.contexture/` marker dir so the store treats the workspace as project mode. */
+/** Seed an existing bundle sidecar directory. */
 const PROJECT_MARKER = { '/work/.contexture/.keep': '' } as const;
 
 describe('DocumentStore', () => {
   let harness: Harness;
 
   beforeEach(() => {
-    // Default harness is project-mode so existing save semantics (5-file
-    // bundle + emitters) continue to apply. Scratch-mode tests opt out by
-    // building their own harness with no .contexture/ marker.
+    // Default harness has an existing bundle so drift preflight is active.
     harness = setup({ ...PROJECT_MARKER });
   });
 
@@ -179,23 +177,23 @@ describe('DocumentStore', () => {
     expect(harness.fs.exists(schemaJsonPath)).toBe(false);
   });
 
-  it("open returns mode:'scratch' when no .contexture/ sibling exists", async () => {
+  it("open returns mode:'bundle' for a bare legacy IR", async () => {
     const seed = setup({ [irPath]: JSON.stringify(sampleIR) });
     const bundle = await seed.store.open(irPath);
-    expect(bundle.mode).toBe('scratch');
+    expect(bundle.mode).toBe('bundle');
   });
 
-  it("open returns mode:'project' when a .contexture/ directory sits next to the IR", async () => {
+  it("open returns mode:'bundle' when a .contexture/ directory sits next to the IR", async () => {
     const seed = setup({
       [irPath]: JSON.stringify(sampleIR),
       // The mem-fs adapter models dirs by presence of any path under them.
       '/work/.contexture/emitted.json': '{}',
     });
     const bundle = await seed.store.open(irPath);
-    expect(bundle.mode).toBe('project');
+    expect(bundle.mode).toBe('bundle');
   });
 
-  it('project-mode save writes Convex schema.ts next to the IR with the contexture-generated banner', async () => {
+  it('bundle-mode save writes Convex schema.ts next to the IR with the contexture-generated banner', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -209,7 +207,7 @@ describe('DocumentStore', () => {
     expect(convex).toMatch(/defineSchema\s*\(/);
   });
 
-  it('project-mode save writes a schema index re-export next to the IR', async () => {
+  it('bundle-mode save writes a schema index re-export next to the IR', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -223,40 +221,18 @@ describe('DocumentStore', () => {
     expect(source).toContain(`export * from './garden.schema';`);
   });
 
-  it('project-mode open writes AGENTS.md and CLAUDE.md at the project root when missing', async () => {
+  it('bundle-mode open does not write repo-level agent docs', async () => {
     const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const { store, fs } = setup({
       [monorepoIrPath]: JSON.stringify(sampleIR),
       '/proj/packages/contexture/.contexture/.keep': '',
-    });
-    const bundle = await store.open(monorepoIrPath);
-    expect(bundle.mode).toBe('project');
-    expect(fs.exists('/proj/AGENTS.md')).toBe(true);
-    expect(fs.exists('/proj/CLAUDE.md')).toBe(true);
-    const agents = await fs.readFile('/proj/AGENTS.md');
-    const claude = await fs.readFile('/proj/CLAUDE.md');
-    expect(agents).toContain('my-app');
-    expect(agents).not.toContain('{{PROJECT_NAME}}');
-    expect(claude).toContain('my-app');
-    expect(claude).not.toContain('{{PROJECT_NAME}}');
-  });
-
-  it('project-mode open never overwrites existing agent docs', async () => {
-    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
-    const { store, fs } = setup({
-      [monorepoIrPath]: JSON.stringify(sampleIR),
-      '/proj/packages/contexture/.contexture/.keep': '',
-      '/proj/AGENTS.md': '# user-owned agent notes\n',
-      '/proj/CLAUDE.md': '# user-owned notes\n',
     });
     await store.open(monorepoIrPath);
-    const agents = await fs.readFile('/proj/AGENTS.md');
-    const claude = await fs.readFile('/proj/CLAUDE.md');
-    expect(agents).toBe('# user-owned agent notes\n');
-    expect(claude).toBe('# user-owned notes\n');
+    expect(fs.exists('/proj/AGENTS.md')).toBe(false);
+    expect(fs.exists('/proj/CLAUDE.md')).toBe(false);
   });
 
-  it('project-mode open seeds apps/web/convex/<table>.ts for each table-flagged type when missing', async () => {
+  it('bundle-mode open does not seed per-table CRUD files', async () => {
     const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
     const tableSchema: Schema = {
       version: '1',
@@ -280,74 +256,11 @@ describe('DocumentStore', () => {
       '/proj/packages/contexture/.contexture/.keep': '',
     });
     await store.open(monorepoIrPath);
-    const postPath = '/proj/packages/contexture/convex/Post.ts';
-    expect(fs.exists(postPath)).toBe(true);
-    const contents = await fs.readFile(postPath);
-    expect(contents).toContain('@contexture-seeded');
-    expect(contents).toContain('ctx.db.query("Post")');
-    // Non-table types get no file.
+    expect(fs.exists('/proj/packages/contexture/convex/Post.ts')).toBe(false);
     expect(fs.exists('/proj/packages/contexture/convex/Inline.ts')).toBe(false);
   });
 
-  it('auto-save never clobbers a user-edited seeded CRUD file', async () => {
-    // Seeded CRUD files are @contexture-seeded, not @contexture-generated.
-    // Once seeded, they must survive every subsequent IR save — the user
-    // or coding agent owns them.
-    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
-    const tableSchema: Schema = {
-      version: '1',
-      types: [
-        {
-          kind: 'object',
-          name: 'Post',
-          table: true,
-          fields: [{ name: 'title', type: { kind: 'string' } }],
-        },
-      ],
-    };
-    const { store, fs } = setup({
-      [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/contexture/.contexture/.keep': '',
-    });
-    await store.open(monorepoIrPath);
-    const crudPath = '/proj/packages/contexture/convex/Post.ts';
-    // User edits the seeded file.
-    const userEdit = '// user took over\nexport const list = () => 42;\n';
-    await fs.writeFile(crudPath, userEdit);
-    // An IR save goes through.
-    await store.save({
-      irPath: monorepoIrPath,
-      schema: tableSchema,
-      layout: { version: '1', positions: {} },
-      chat: { version: '1', messages: [] },
-    });
-    expect(await fs.readFile(crudPath)).toBe(userEdit);
-  });
-
-  it('project-mode open never overwrites an existing per-table CRUD file', async () => {
-    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
-    const tableSchema: Schema = {
-      version: '1',
-      types: [
-        {
-          kind: 'object',
-          name: 'Post',
-          table: true,
-          fields: [{ name: 'title', type: { kind: 'string' } }],
-        },
-      ],
-    };
-    const userOwned = '// user-modified CRUD, do not touch\nexport const list = null;\n';
-    const { store, fs } = setup({
-      [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/contexture/.contexture/.keep': '',
-      '/proj/packages/contexture/convex/Post.ts': userOwned,
-    });
-    await store.open(monorepoIrPath);
-    expect(await fs.readFile('/proj/packages/contexture/convex/Post.ts')).toBe(userOwned);
-  });
-
-  it('scratch-mode open does not seed per-table CRUD files', async () => {
+  it('legacy bare-IR open does not write per-table CRUD files', async () => {
     const tableSchema: Schema = {
       version: '1',
       types: [
@@ -361,22 +274,18 @@ describe('DocumentStore', () => {
     };
     const { store, fs } = setup({ [irPath]: JSON.stringify(tableSchema) });
     await store.open(irPath);
-    // Scratch mode has no project root, so no convex tree can be seeded.
     expect(fs.exists('/packages/contexture/convex/Post.ts')).toBe(false);
     expect(fs.exists('/work/packages/contexture/convex/Post.ts')).toBe(false);
   });
 
-  it('scratch-mode open does not write root agent docs', async () => {
+  it('legacy bare-IR open does not write root agent docs', async () => {
     const { store, fs } = setup({ [irPath]: JSON.stringify(sampleIR) });
     await store.open(irPath);
-    // No standard project root for scratch files — the parent-parent dir
-    // would be `/`, and scratch IR by definition has no project layout
-    // so agent docs must not appear anywhere.
     expect(fs.exists('/AGENTS.md')).toBe(false);
     expect(fs.exists('/CLAUDE.md')).toBe(false);
   });
 
-  it('project-mode save writes .contexture/emitted.json with hashes of every @contexture-generated file', async () => {
+  it('bundle-mode save writes .contexture/emitted.json with hashes of every @contexture-generated file', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -405,7 +314,7 @@ describe('DocumentStore', () => {
     }
   });
 
-  it('project-mode save refuses to clobber drifted generated files', async () => {
+  it('bundle-mode save refuses to clobber drifted generated files', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -428,40 +337,7 @@ describe('DocumentStore', () => {
     expect(reopened.schema).toEqual(sampleIR);
   });
 
-  it('emitted.json does not track seeded per-table CRUD files', async () => {
-    // Seeded files are not @contexture-generated, so they must not appear
-    // in the drift manifest. A drift check flags regen-on-mismatch;
-    // listing seeded files there would cause them to be regenerated.
-    const monorepoIrPath = '/proj/packages/contexture/my-app.contexture.json';
-    const tableSchema: Schema = {
-      version: '1',
-      types: [
-        {
-          kind: 'object',
-          name: 'Post',
-          table: true,
-          fields: [{ name: 'title', type: { kind: 'string' } }],
-        },
-      ],
-    };
-    const { store, fs } = setup({
-      [monorepoIrPath]: JSON.stringify(tableSchema),
-      '/proj/packages/contexture/.contexture/.keep': '',
-    });
-    await store.open(monorepoIrPath);
-    await store.save({
-      irPath: monorepoIrPath,
-      schema: tableSchema,
-      layout: { version: '1', positions: {} },
-      chat: { version: '1', messages: [] },
-    });
-    const manifest = JSON.parse(
-      await fs.readFile('/proj/packages/contexture/.contexture/emitted.json'),
-    ) as { files: Record<string, string> };
-    expect(Object.keys(manifest.files)).not.toContain('/proj/packages/contexture/convex/Post.ts');
-  });
-
-  it('scratch-mode save does not write a schema index', async () => {
+  it('saving a bare legacy IR initializes bundle mode and writes a schema index', async () => {
     const { store, fs } = setup();
     await store.save({
       irPath,
@@ -469,10 +345,32 @@ describe('DocumentStore', () => {
       layout: sampleLayout,
       chat: sampleChat,
     });
-    expect(fs.exists('/work/index.ts')).toBe(false);
+    expect(fs.exists('/work/.contexture/layout.json')).toBe(true);
+    expect(fs.exists('/work/.contexture/chat.json')).toBe(true);
+    expect(fs.exists('/work/.contexture/emitted.json')).toBe(true);
+    expect(fs.exists('/work/index.ts')).toBe(true);
   });
 
-  it('project-mode save writes layout + chat into .contexture/', async () => {
+  it('saving a bare legacy IR refuses to overwrite existing generated targets', async () => {
+    const { store, fs } = setup({
+      [irPath]: JSON.stringify(sampleIR),
+      [schemaTsPath]: '// hand-written schema\n',
+    });
+
+    await expect(
+      store.save({
+        irPath,
+        schema: sampleIR,
+        layout: sampleLayout,
+        chat: sampleChat,
+      }),
+    ).rejects.toThrow(/Generated files have drifted/);
+
+    expect(await fs.readFile(schemaTsPath)).toBe('// hand-written schema\n');
+    expect(fs.exists('/work/.contexture/emitted.json')).toBe(false);
+  });
+
+  it('bundle-mode save writes layout + chat into .contexture/', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -483,7 +381,7 @@ describe('DocumentStore', () => {
     expect(harness.fs.exists('/work/.contexture/chat.json')).toBe(true);
   });
 
-  it('scratch-mode save writes only the IR file — no layout/chat/mirrors', async () => {
+  it('legacy-IR save writes the full bundle, including layout/chat/mirrors', async () => {
     const { store, fs } = setup();
     await store.save({
       irPath,
@@ -492,13 +390,13 @@ describe('DocumentStore', () => {
       chat: sampleChat,
     });
     expect(fs.exists(irPath)).toBe(true);
-    expect(fs.exists(layoutPath)).toBe(false);
-    expect(fs.exists(chatPath)).toBe(false);
-    expect(fs.exists(schemaTsPath)).toBe(false);
-    expect(fs.exists(schemaJsonPath)).toBe(false);
+    expect(fs.exists(layoutPath)).toBe(true);
+    expect(fs.exists(chatPath)).toBe(true);
+    expect(fs.exists(schemaTsPath)).toBe(true);
+    expect(fs.exists(schemaJsonPath)).toBe(true);
   });
 
-  it('scratch-mode round-trip: reopening returns default layout + empty chat', async () => {
+  it('legacy-IR save round-trip reopens as bundle with persisted sidecars', async () => {
     const { store } = setup();
     await store.save({
       irPath,
@@ -507,10 +405,10 @@ describe('DocumentStore', () => {
       chat: sampleChat,
     });
     const reopened = await store.open(irPath);
-    expect(reopened.mode).toBe('scratch');
+    expect(reopened.mode).toBe('bundle');
     expect(reopened.schema).toEqual(sampleIR);
-    expect(reopened.layout.positions).toEqual({});
-    expect(reopened.chat.messages).toEqual([]);
+    expect(reopened.layout).toEqual(sampleLayout);
+    expect(reopened.chat).toEqual(sampleChat);
     expect(reopened.warnings).toEqual([]);
   });
 

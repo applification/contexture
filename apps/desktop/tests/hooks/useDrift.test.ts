@@ -8,7 +8,7 @@ afterEach(() => {
   vi.clearAllMocks();
   const document = useDocumentStore.getState();
   document.setFilePath(null);
-  document.setMode('scratch');
+  document.setMode('bundle');
 });
 
 describe('convexPathFor', () => {
@@ -41,7 +41,7 @@ describe('useDrift', () => {
       },
     };
     useDocumentStore.getState().setFilePath('/proj/packages/contexture/garden.contexture.json');
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
 
     renderHook(() => useDrift());
 

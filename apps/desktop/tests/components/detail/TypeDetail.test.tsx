@@ -9,9 +9,9 @@ import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-function setup(type: TypeDef, mode: 'scratch' | 'project' = 'project') {
+function setup(type: TypeDef) {
   const dispatch = vi.fn<(op: Op) => void>();
-  render(<TypeDetail type={type} dispatch={dispatch} mode={mode} />);
+  render(<TypeDetail type={type} dispatch={dispatch} />);
   return { dispatch };
 }
 
@@ -114,11 +114,6 @@ describe('TypeDetail', () => {
         name: 'Role',
         values: [{ value: 'admin' }],
       });
-      expect(screen.queryByLabelText('Use as Convex table')).not.toBeInTheDocument();
-    });
-
-    it('hides the Convex section in scratch mode', () => {
-      setup(base, 'scratch');
       expect(screen.queryByLabelText('Use as Convex table')).not.toBeInTheDocument();
     });
 

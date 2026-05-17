@@ -1,15 +1,11 @@
 /**
- * `useProjectAutoSave` — debounced auto-save for project-mode documents.
+ * `useProjectAutoSave` — debounced auto-save for bundle-mode documents.
  *
- * In project mode the document lives in a scaffolded monorepo where
- * emitted artefacts (`schema.ts`, the Zod mirror, agent docs, …) have to
- * stay in sync with the IR. Every IR edit flushes to disk 500ms after
- * the last change so downstream tools see a recent bundle without the
- * user hitting Cmd-S.
+ * In bundle mode the document writes sidecars and generated targets. Every IR
+ * edit flushes to disk 500ms after the last change so downstream tools see a
+ * recent bundle without the user hitting Cmd-S.
  *
- * Scratch mode stays on the classic manual-save flow — editing a bare
- * `.contexture.json` anywhere on disk must not silently clobber the
- * user's file.
+ * New unsaved documents stay manual-save until the user chooses a file path.
  */
 import { useEffect, useRef } from 'react';
 import type { ChatHistory } from '../model/chat-history';
@@ -41,7 +37,7 @@ export function useProjectAutoSave(options: UseProjectAutoSaveOptions = {}): voi
     const flush = (): void => {
       timer = null;
       const doc = useDocumentStore.getState();
-      if (doc.mode !== 'project' || !doc.filePath) return;
+      if (!doc.filePath) return;
       const schema = useUndoStore.getState().schema;
       const layout = optionsRef.current.getLayout?.() ?? DEFAULT_LAYOUT;
       const chat = optionsRef.current.getChat?.() ?? DEFAULT_CHAT;
@@ -54,7 +50,7 @@ export function useProjectAutoSave(options: UseProjectAutoSaveOptions = {}): voi
       if (s.schema === lastSchema) return;
       lastSchema = s.schema;
       const doc = useDocumentStore.getState();
-      if (doc.mode !== 'project' || !doc.filePath) return;
+      if (!doc.filePath) return;
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(flush, DEBOUNCE_MS);
     });

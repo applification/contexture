@@ -39,7 +39,7 @@ export function Toolbar(): React.JSX.Element {
 
   // Project root is two dirs above the IR path (packages/contexture/<name>.contexture.json).
   const projectRoot =
-    filePath && documentMode === 'project' ? filePath.split('/').slice(0, -3).join('/') : null;
+    filePath && documentMode === 'bundle' ? filePath.split('/').slice(0, -1).join('/') : null;
 
   const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
 

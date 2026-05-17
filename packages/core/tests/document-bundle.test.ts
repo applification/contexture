@@ -1,70 +1,119 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildSeededArtifacts,
   buildSidecarEntries,
   bundlePathsFor,
   detectDocumentMode,
+  initializeDocumentBundle,
+  promoteScratchToBundle,
   type Schema,
 } from '../src';
 
 const schema: Schema = {
   version: '1',
-  types: [
-    { kind: 'object', name: 'Plot', table: true, fields: [] },
-    { kind: 'object', name: 'Inline', fields: [] },
-  ],
+  types: [{ kind: 'object', name: 'Plot', table: true, fields: [] }],
 };
 
 describe('document bundle policy', () => {
-  it('detects project mode from the .contexture sidecar directory', async () => {
+  it('detects bundle mode from the .contexture sidecar directory', async () => {
     const seen: string[] = [];
-    const mode = await detectDocumentMode('/repo/packages/contexture/app.contexture.json', {
+    const mode = await detectDocumentMode('/repo/app.contexture.json', {
       async dirExists(path) {
         seen.push(path);
-        return path === '/repo/packages/contexture/.contexture';
+        return path === '/repo/.contexture';
       },
     });
 
-    expect(mode).toBe('project');
-    expect(seen).toEqual(['/repo/packages/contexture/.contexture']);
-  });
-
-  it('derives project seeded artifacts from the IR path and table flags', () => {
-    const artifacts = buildSeededArtifacts(
-      schema,
-      '/repo/packages/contexture/app.contexture.json',
-      {
-        emitAgentMd: (projectName) => `agent:${projectName}`,
-        emitClaudeMd: (projectName) => `claude:${projectName}`,
-        emitTableCrud: (_schema, tableName) => `crud:${tableName}`,
-      },
-    );
-
-    expect(artifacts).toEqual([
-      { kind: 'agent-guidance', path: '/repo/AGENTS.md', content: 'agent:app' },
-      { kind: 'claude-guidance', path: '/repo/CLAUDE.md', content: 'claude:app' },
-      {
-        kind: 'table-crud',
-        path: '/repo/packages/contexture/convex/Plot.ts',
-        content: 'crud:Plot',
-      },
-    ]);
-  });
-
-  it('does not seed artifacts for scratch-style IR paths outside project layout', () => {
-    expect(buildSeededArtifacts(schema, '/tmp/app.contexture.json')).toEqual([]);
+    expect(mode).toBe('bundle');
+    expect(seen).toEqual(['/repo/.contexture']);
   });
 
   it('derives sidecar entries from bundle paths', () => {
-    const paths = bundlePathsFor('/repo/packages/contexture/app.contexture.json');
+    const paths = bundlePathsFor('/repo/app.contexture.json');
 
     expect(buildSidecarEntries(paths, { layout: 'layout', chat: 'chat' })).toEqual([
-      {
-        kind: 'layout',
-        path: '/repo/packages/contexture/.contexture/layout.json',
-        content: 'layout',
-      },
-      { kind: 'chat', path: '/repo/packages/contexture/.contexture/chat.json', content: 'chat' },
+      { kind: 'layout', path: '/repo/.contexture/layout.json', content: 'layout' },
+      { kind: 'chat', path: '/repo/.contexture/chat.json', content: 'chat' },
     ]);
+  });
+
+  it('initializes a bundle with IR, sidecars, generated targets, and manifest only', async () => {
+    const files = new Map<string, string>();
+    const fs = {
+      async readFile(path: string) {
+        const value = files.get(path);
+        if (value === undefined) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+        return value;
+      },
+      async writeFile(path: string, content: string) {
+        files.set(path, content);
+      },
+      async rename(from: string, to: string) {
+        const value = files.get(from);
+        if (value === undefined) throw new Error('missing tmp');
+        files.set(to, value);
+        files.delete(from);
+      },
+      async remove(path: string) {
+        files.delete(path);
+      },
+      async mkdirp(path: string) {
+        files.set(`${path}/.keep`, '');
+      },
+    };
+
+    await initializeDocumentBundle({
+      irPath: '/repo/app.contexture.json',
+      schema,
+      fs,
+      sidecars: { layout: { version: '1', positions: { Plot: { x: 1, y: 2 } } } },
+    });
+
+    expect(files.has('/repo/app.contexture.json')).toBe(true);
+    expect(files.has('/repo/.contexture/layout.json')).toBe(true);
+    expect(files.has('/repo/.contexture/chat.json')).toBe(true);
+    expect(files.has('/repo/.contexture/emitted.json')).toBe(true);
+    expect(files.has('/repo/app.schema.ts')).toBe(true);
+    expect(files.has('/repo/AGENTS.md')).toBe(false);
+    expect(files.has('/repo/CLAUDE.md')).toBe(false);
+    expect(files.has('/repo/convex/Plot.ts')).toBe(false);
+  });
+
+  it('promotes a scratch IR with default sidecars', async () => {
+    const files = new Map<string, string>([
+      ['/repo/app.contexture.json', `${JSON.stringify(schema, null, 2)}\n`],
+    ]);
+    const fs = {
+      async readFile(path: string) {
+        const value = files.get(path);
+        if (value === undefined) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+        return value;
+      },
+      async writeFile(path: string, content: string) {
+        files.set(path, content);
+      },
+      async rename(from: string, to: string) {
+        const value = files.get(from);
+        if (value === undefined) throw new Error('missing tmp');
+        files.set(to, value);
+        files.delete(from);
+      },
+      async remove(path: string) {
+        files.delete(path);
+      },
+      async mkdirp(path: string) {
+        files.set(`${path}/.keep`, '');
+      },
+    };
+
+    await promoteScratchToBundle({ scratchIrPath: '/repo/app.contexture.json', fs });
+
+    expect(files.has('/repo/.contexture/layout.json')).toBe(true);
+    expect(files.has('/repo/.contexture/chat.json')).toBe(true);
+    expect(JSON.parse(files.get('/repo/.contexture/chat.json') ?? '{}')).toEqual({
+      version: '1',
+      messages: [],
+    });
+    expect(files.has('/repo/app.schema.ts')).toBe(true);
+    expect(files.has('/repo/AGENTS.md')).toBe(false);
   });
 });
