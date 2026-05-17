@@ -9,6 +9,8 @@ import { type BundlePaths, baseNameFor, bundlePathsFor } from './paths';
 
 export type { BundlePaths } from './paths';
 export {
+  assertContextureIrPath,
+  assertWritableContextureProjectIrPath,
   baseNameFor,
   bundlePathsFor,
   CHAT_FILE,

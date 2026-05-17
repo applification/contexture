@@ -7,12 +7,23 @@
  * calling — main is deliberately dumb here. Delete is `force: true` so a
  * partial scaffold (unwritable child files, etc.) still cleans up.
  */
-import { rm } from 'node:fs/promises';
+import { lstat, rm } from 'node:fs/promises';
 import { ipcMain } from 'electron';
+import { assertSafeRecursiveDeleteTarget } from '../security';
+
+export async function deleteProjectDirectory(path: string): Promise<void> {
+  const target = assertSafeRecursiveDeleteTarget(path);
+  try {
+    const stat = await lstat(target);
+    if (!stat.isDirectory()) throw new Error('Delete target must be a directory.');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  await rm(target, { recursive: true, force: true });
+}
 
 export function registerProjectIpc(): void {
   ipcMain.handle('project:delete-directory', async (_evt, path: string) => {
-    if (typeof path !== 'string' || path === '' || path === '/') return;
-    await rm(path, { recursive: true, force: true });
+    await deleteProjectDirectory(path);
   });
 }

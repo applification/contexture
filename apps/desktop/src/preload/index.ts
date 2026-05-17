@@ -13,7 +13,6 @@
  *
  * Renderer code should never touch `ipcRenderer` directly.
  */
-import { promises as fs } from 'node:fs';
 import { electronAPI } from '@electron-toolkit/preload';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -231,6 +230,14 @@ const drift = {
 };
 
 const reconcile = {
+  readGeneratedTarget: (payload: { irPath: string; targetPath: string }): Promise<string | null> =>
+    ipcRenderer.invoke('reconcile:read-generated-target', payload) as Promise<string | null>,
+  writeGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+    contents: string;
+  }): Promise<void> =>
+    ipcRenderer.invoke('reconcile:write-generated-target', payload) as Promise<void>,
   /**
    * Fire a one-shot schema-agent query that returns reconcile ops for
    * the current IR + on-disk source of any emitted file.
@@ -250,21 +257,16 @@ const reconcile = {
 const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, reconcile };
 
 /**
- * Legacy surface. Sidecar reads/writes use the preload process's
- * Node `fs` directly — the files live next to the open document and
- * don't need a main-side dialog. Update + menu handlers route through
- * the existing `update:*` / `file:*` IPC channels.
+ * Legacy surface. Direct file access is intentionally disabled; retained
+ * methods either route through curated IPC or fail closed so old imports
+ * cannot regain preload-level filesystem access.
  */
 const legacyApi = {
-  readFileSilent: async (path: string): Promise<string | null> => {
-    try {
-      return await fs.readFile(path, 'utf-8');
-    } catch {
-      return null;
-    }
+  readFileSilent: async (_path: string): Promise<string | null> => {
+    return null;
   },
-  saveFile: async (path: string, contents: string): Promise<void> => {
-    await fs.writeFile(path, contents, 'utf-8');
+  saveFile: async (_path: string, _contents: string): Promise<void> => {
+    throw new Error('Legacy direct file writes are disabled; use window.contexture.* IPC.');
   },
   openFile: () => ipcRenderer.invoke('file:open-dialog'),
   saveFileAs: () => ipcRenderer.invoke('file:save-as-dialog'),

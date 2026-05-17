@@ -14,6 +14,13 @@ async function fixtureIr(schema: unknown): Promise<string> {
   return irPath;
 }
 
+async function fixtureScratchIr(schema: unknown): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'contexture-mcp-scratch-'));
+  const irPath = join(dir, 'scratch.contexture.json');
+  await writeFile(irPath, `${JSON.stringify(schema, null, 2)}\n`, 'utf8');
+  return irPath;
+}
+
 async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   const server = createContextureMcpServer();
   const client = new Client({ name: 'contexture-mcp-test', version: '0.0.0' });
@@ -106,6 +113,44 @@ describe('Contexture MCP server', () => {
             fields: [{ name: 'name', type: 'string' }],
           },
         ],
+      });
+    });
+  });
+
+  it('allows read-only inspection of scratch .contexture.json files', async () => {
+    const irPath = await fixtureScratchIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Note', fields: [] }],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'inspect_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        types: [expect.objectContaining({ name: 'Note' })],
+      });
+    });
+  });
+
+  it('reports non-.contexture.json validation paths as validation failures', async () => {
+    const irPath = await fixtureIr({ version: '1', types: [] });
+    const badPath = irPath.replace(/\.contexture\.json$/, '.schema.json');
+    await writeFile(badPath, '{}\n', 'utf8');
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'validate_contexture',
+        arguments: { irPath: badPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: badPath,
+        valid: false,
+        errors: [expect.objectContaining({ message: expect.stringContaining('.contexture.json') })],
       });
     });
   });
@@ -287,6 +332,48 @@ describe('Contexture MCP server', () => {
       expect(cleanAgainResult.structuredContent).toMatchObject({
         clean: true,
         drift: [],
+      });
+    });
+  });
+
+  it('rejects write-capable tools for scratch IR paths', async () => {
+    const irPath = await fixtureScratchIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Note', fields: [] }],
+    });
+
+    await withClient(async (client) => {
+      const emitResult = await client.callTool({
+        name: 'emit_contexture',
+        arguments: { irPath },
+      });
+      expect(emitResult).toMatchObject({
+        isError: true,
+        content: [
+          expect.objectContaining({
+            text: expect.stringContaining('packages/contexture/*.contexture.json'),
+          }),
+        ],
+      });
+
+      const applyResult = await client.callTool({
+        name: 'apply_contexture_op',
+        arguments: {
+          irPath,
+          op: {
+            kind: 'add_field',
+            typeName: 'Note',
+            field: { name: 'body', type: { kind: 'string' } },
+          },
+        },
+      });
+      expect(applyResult).toMatchObject({
+        isError: true,
+        content: [
+          expect.objectContaining({
+            text: expect.stringContaining('packages/contexture/*.contexture.json'),
+          }),
+        ],
       });
     });
   });

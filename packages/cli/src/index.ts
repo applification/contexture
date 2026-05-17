@@ -2,6 +2,8 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
+  assertContextureIrPath,
+  assertWritableContextureProjectIrPath,
   bundlePathsFor,
   createFileBackedForward,
   createOpTools,
@@ -483,7 +485,7 @@ async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const irPath = options.irPath ?? (await findIrPath(options.cwd));
+  const irPath = assertContextureIrPath(options.irPath ?? (await findIrPath(options.cwd)));
 
   if (command === 'inspect') {
     const schema = await readSchema(irPath);
@@ -535,17 +537,19 @@ async function run(argv: string[]): Promise<void> {
   }
 
   if (command === 'emit') {
-    const schema = await readSchema(irPath);
-    const { emitted, manifest } = runEmitPipeline(schema, irPath);
-    await createFileBackedForward(irPath)({ kind: 'replace_schema', schema });
+    const writableIrPath = assertWritableContextureProjectIrPath(irPath);
+    const schema = await readSchema(writableIrPath);
+    const { emitted, manifest } = runEmitPipeline(schema, writableIrPath);
+    await createFileBackedForward(writableIrPath)({ kind: 'replace_schema', schema });
     writeResult({ message: `Emitted ${emitted.length} files.`, manifest }, options.json);
     return;
   }
 
   if (command === 'check-generated') {
-    const schema = await readSchema(irPath);
-    const { emitted, manifest } = runEmitPipeline(schema, irPath);
-    const paths = bundlePathsFor(irPath);
+    const writableIrPath = assertWritableContextureProjectIrPath(irPath);
+    const schema = await readSchema(writableIrPath);
+    const { emitted, manifest } = runEmitPipeline(schema, writableIrPath);
+    const paths = bundlePathsFor(writableIrPath);
     const expectedFiles = [
       ...emitted,
       { path: paths.emitted, content: `${JSON.stringify(manifest, null, 2)}\n` },
@@ -589,6 +593,7 @@ async function run(argv: string[]): Promise<void> {
   }
 
   if (command === 'apply') {
+    const writableIrPath = assertWritableContextureProjectIrPath(irPath);
     let opJson = options.opJson;
     if (!opJson && options.opFile) {
       opJson = await Bun.file(options.opFile).text();
@@ -600,7 +605,7 @@ async function run(argv: string[]): Promise<void> {
     if (!op || typeof op !== 'object' || typeof op.kind !== 'string') {
       throw new Error('op must be an object with a string "kind" field');
     }
-    const forward = createFileBackedForward(irPath);
+    const forward = createFileBackedForward(writableIrPath);
     type ForwardResult = Awaited<ReturnType<typeof forward>>;
     let result: ForwardResult;
     try {
@@ -623,7 +628,8 @@ async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const forward = createFileBackedForward(irPath);
+  const writableIrPath = assertWritableContextureProjectIrPath(irPath);
+  const forward = createFileBackedForward(writableIrPath);
   const tools = new Map(createOpTools(forward).map((tool) => [tool.name, tool]));
   const { tool: toolName, input } = commandToToolInput(command, args);
   const tool = tools.get(toolName);

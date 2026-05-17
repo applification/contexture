@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 export const IR_SUFFIX = '.contexture.json';
 export const SCHEMA_TS_SUFFIX = '.schema.ts';
 export const SCHEMA_JSON_SUFFIX = '.schema.json';
@@ -39,15 +41,33 @@ export function projectRootFor(irPath: string): string | null {
   return dir.slice(0, -suffix.length + 1);
 }
 
-export function bundlePathsFor(irPath: string): BundlePaths {
-  if (!irPath.endsWith(IR_SUFFIX)) {
-    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${irPath}`);
+export function assertContextureIrPath(path: string): string {
+  const resolved = resolve(path);
+  if (!resolved.endsWith(IR_SUFFIX)) {
+    throw new Error(`Expected a ${IR_SUFFIX} path, got: ${path}`);
   }
-  const base = irPath.slice(0, -IR_SUFFIX.length);
-  const ctxDir = contextureDirFor(irPath);
+  return resolved;
+}
+
+export function assertWritableContextureProjectIrPath(path: string): string {
+  const resolved = assertContextureIrPath(path);
+  const slash = resolved.lastIndexOf('/');
+  const dir = slash === -1 ? '' : resolved.slice(0, slash);
+  if (!dir.endsWith('/packages/contexture')) {
+    throw new Error(
+      'Writable Contexture agent operations require an IR under packages/contexture/*.contexture.json.',
+    );
+  }
+  return resolved;
+}
+
+export function bundlePathsFor(irPath: string): BundlePaths {
+  const resolvedIrPath = assertContextureIrPath(irPath);
+  const base = resolvedIrPath.slice(0, -IR_SUFFIX.length);
+  const ctxDir = contextureDirFor(resolvedIrPath);
   const dir = ctxDir.slice(0, -'/.contexture'.length);
   return {
-    ir: irPath,
+    ir: resolvedIrPath,
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
     emitted: `${ctxDir}/${EMITTED_FILE}`,

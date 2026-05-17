@@ -1,7 +1,8 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { load, save } from './load';
 import { type ApplyResult, apply, type Op } from './ops';
+import { assertWritableContextureProjectIrPath } from './paths';
 import { bundlePathsFor, type FileEntry, runEmitPipeline } from './pipeline';
 
 export interface FileBackedFs {
@@ -68,7 +69,7 @@ async function writeBundleAtomic(fs: FileBackedFs, files: ReadonlyArray<FileEntr
 }
 
 export function createFileBackedForward(irPath: string, fs: FileBackedFs = nodeFileBackedFs) {
-  const resolvedIrPath = resolve(irPath);
+  const resolvedIrPath = assertWritableContextureProjectIrPath(irPath);
 
   return async function forward(op: Op): Promise<ApplyResult> {
     // TODO(#160): run drift pre-flight before writing generated artefacts.
