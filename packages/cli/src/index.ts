@@ -14,6 +14,7 @@ import {
   IRSchema,
   load,
   nodeFileBackedFs,
+  OpSchema,
   type Schema,
   type TypeDef,
   writeGeneratedBundle,
@@ -605,11 +606,22 @@ async function run(argv: string[]): Promise<void> {
     if (!op || typeof op !== 'object' || typeof op.kind !== 'string') {
       throw new Error('op must be an object with a string "kind" field');
     }
+    const parsedOp = OpSchema.safeParse(op);
+    if (!parsedOp.success) {
+      process.exitCode = 1;
+      const error: JsonError = {
+        ok: false,
+        error: { message: `invalid op: ${formatZodIssues(parsedOp.error)}`, code: 'INVALID_OP' },
+      };
+      if (options.json) writeJson(error);
+      else process.stderr.write(`${error.error.message}\n`);
+      return;
+    }
     const forward = createFileBackedForward(writableIrPath);
     type ForwardResult = Awaited<ReturnType<typeof forward>>;
     let result: ForwardResult;
     try {
-      result = await forward(op as Parameters<typeof forward>[0]);
+      result = await forward(parsedOp.data);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`apply failed: ${message}`);
@@ -643,6 +655,15 @@ async function run(argv: string[]): Promise<void> {
     return;
   }
   writeResult({ message: `${command} applied.`, schema: result.schema }, options.json);
+}
+
+function formatZodIssues(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.join('.') || '(root)';
+      return `${path}: ${issue.message}`;
+    })
+    .join('; ');
 }
 
 run(process.argv.slice(2)).catch((err) => {

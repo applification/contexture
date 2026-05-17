@@ -3,6 +3,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { varlockVitePlugin } from '@varlock/vite-integration';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import type { ConfigEnv, PluginOption } from 'vite';
+import { rendererContentSecurityPolicy } from './src/shared/renderer-csp';
 
 // Shared aliases — main bundles a few pure helpers used by both Electron
 // processes and the renderer, so every surface resolves the same paths.
@@ -13,7 +15,25 @@ const sharedAliases = {
   '@': resolve('src/renderer/src'),
 };
 
-export default defineConfig({
+function rendererCspPlugin(command: ConfigEnv['command']): PluginOption {
+  return {
+    name: 'contexture-renderer-csp',
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'meta',
+          attrs: {
+            'http-equiv': 'Content-Security-Policy',
+            content: rendererContentSecurityPolicy(command),
+          },
+          injectTo: 'head-prepend',
+        },
+      ];
+    },
+  };
+}
+
+export default defineConfig(({ command }) => ({
   main: {
     // Keep `@contexture/*` workspace packages inlined into the main/preload
     // bundle. They ship as `.ts` sources with ESM exports, and externalizing
@@ -42,6 +62,11 @@ export default defineConfig({
   },
   renderer: {
     resolve: { alias: sharedAliases },
-    plugins: [varlockVitePlugin({ ssrInjectMode: 'resolved-env' }), tailwindcss(), react()],
+    plugins: [
+      rendererCspPlugin(command),
+      varlockVitePlugin({ ssrInjectMode: 'resolved-env' }),
+      tailwindcss(),
+      react(),
+    ],
   },
-});
+}));

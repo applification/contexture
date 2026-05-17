@@ -20,9 +20,9 @@
  *     stdlib namespace awareness when the caller has one.
  */
 
-import type { ZodError } from 'zod';
+import { type ZodError, z } from 'zod';
 import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from './ir';
-import { IRSchema } from './ir';
+import { FieldDefSchema, IndexDefSchema, IRSchema, IRSchemaObject, TypeDefSchema } from './ir';
 import {
   checkSemantic,
   newIssues,
@@ -59,6 +59,111 @@ export type Op =
 
 export type ApplyResult = { schema: Schema } | { error: string };
 
+const ImportDeclItemSchema = (
+  IRSchemaObject.shape.imports as z.ZodOptional<z.ZodArray<z.ZodType>>
+).unwrap().element;
+
+const TypeUpdatePatchSchema = z.record(z.string(), z.unknown()).superRefine((patch, ctx) => {
+  for (const forbidden of ['kind', 'name']) {
+    if (Object.hasOwn(patch, forbidden)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [forbidden],
+        message: `update_type.patch must not include "${forbidden}"; use ${
+          forbidden === 'name' ? 'rename_type' : 'replace_schema'
+        } instead.`,
+      });
+    }
+  }
+});
+
+export const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('add_type'), type: TypeDefSchema }),
+  z.object({
+    kind: z.literal('update_type'),
+    name: z.string().min(1),
+    patch: TypeUpdatePatchSchema,
+  }),
+  z.object({ kind: z.literal('rename_type'), from: z.string().min(1), to: z.string().min(1) }),
+  z.object({ kind: z.literal('delete_type'), name: z.string().min(1) }),
+  z.object({
+    kind: z.literal('add_field'),
+    typeName: z.string().min(1),
+    field: FieldDefSchema,
+    index: z.number().int().optional(),
+  }),
+  z.object({
+    kind: z.literal('update_field'),
+    typeName: z.string().min(1),
+    fieldName: z.string().min(1),
+    patch: FieldDefSchema.partial(),
+  }),
+  z.object({
+    kind: z.literal('remove_field'),
+    typeName: z.string().min(1),
+    fieldName: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('add_value'),
+    typeName: z.string().min(1),
+    value: z.string().min(1),
+    description: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('update_value'),
+    typeName: z.string().min(1),
+    value: z.string().min(1),
+    patch: z.object({
+      value: z.string().min(1).optional(),
+      description: z.string().optional(),
+    }),
+  }),
+  z.object({
+    kind: z.literal('remove_value'),
+    typeName: z.string().min(1),
+    value: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('reorder_fields'),
+    typeName: z.string().min(1),
+    order: z.array(z.string().min(1)),
+  }),
+  z.object({
+    kind: z.literal('add_variant'),
+    typeName: z.string().min(1),
+    variant: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('set_discriminator'),
+    typeName: z.string().min(1),
+    discriminator: z.string().min(1),
+  }),
+  z.object({ kind: z.literal('add_import'), import: ImportDeclItemSchema }),
+  z.object({ kind: z.literal('remove_import'), alias: z.string().min(1) }),
+  z.object({
+    kind: z.literal('set_table_flag'),
+    typeName: z.string().min(1),
+    table: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal('add_index'),
+    typeName: z.string().min(1),
+    index: IndexDefSchema,
+  }),
+  z.object({
+    kind: z.literal('remove_index'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('update_index'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
+    patch: IndexDefSchema.partial(),
+  }),
+  z.object({ kind: z.literal('replace_schema'), schema: IRSchema }),
+]) as z.ZodType<Op>;
+
 /**
  * Apply an `Op` to `schema` and return the next schema or a structured
  * error.
@@ -70,9 +175,14 @@ export type ApplyResult = { schema: Schema } | { error: string };
  * the gate getting in the way.
  */
 export function apply(schema: Schema, op: Op, catalog?: StdlibCatalog): ApplyResult {
+  const parsedOp = OpSchema.safeParse(op);
+  if (!parsedOp.success) {
+    return { error: formatStructuralErrors(opKind(op), parsedOp.error) };
+  }
+
   let result: ApplyResult;
   try {
-    result = applyStructural(schema, op);
+    result = applyStructural(schema, parsedOp.data);
   } catch (err) {
     return { error: `${opKind(op)}: ${err instanceof Error ? err.message : String(err)}` };
   }

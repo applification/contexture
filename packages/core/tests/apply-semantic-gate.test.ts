@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Schema } from '../src/ir';
-import { apply, type Op } from '../src/ops';
+import { apply, type Op, OpSchema } from '../src/ops';
 import type { StdlibCatalog } from '../src/semantic-validation';
 
 const STDLIB: StdlibCatalog = {
@@ -21,6 +21,27 @@ const baseSchema: Schema = {
 };
 
 describe('apply() — delta semantic gate', () => {
+  it('rejects update_type patches that try to change identity through the wrong op', () => {
+    const parsed = OpSchema.safeParse({
+      kind: 'update_type',
+      name: 'Order',
+      patch: { name: 'Invoice' },
+    });
+    expect(parsed.success).toBe(false);
+
+    const result = apply(baseSchema, {
+      kind: 'update_type',
+      name: 'Order',
+      patch: { kind: 'raw' },
+    } as unknown as Op);
+
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('update_type');
+      expect(result.error).toContain('replace_schema');
+    }
+  });
+
   it('returns an error instead of throwing when an update_type patch breaks IR structure', () => {
     const result = apply(baseSchema, {
       kind: 'update_type',

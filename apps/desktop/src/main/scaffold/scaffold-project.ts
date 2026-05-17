@@ -12,7 +12,9 @@
  * against the same directory.
  */
 
-export type AppKind = 'web' | 'mobile' | 'desktop';
+import { type AppKind, deriveStages, STAGE, type StageNumber } from '@shared/scaffold-stages';
+
+export { type AppKind, deriveStages, STAGE, type StageNumber } from '@shared/scaffold-stages';
 
 export interface ScaffoldConfig {
   targetDir: string;
@@ -24,51 +26,8 @@ export interface ScaffoldConfig {
   scratchPath?: string;
 }
 
-/**
- * Fixed stage numbers. Optional app stages (WEB_*, MOBILE, DESKTOP)
- * are included only when the corresponding app kind is selected.
- */
-export const STAGE = {
-  TURBO_SKELETON: 1,
-  WEB_NEXT: 2,
-  WEB_SHADCN: 3,
-  MOBILE_EXPO: 4,
-  DESKTOP_ELECTRON: 5,
-  CONVEX_INIT: 6,
-  SCHEMA_PACKAGE: 7,
-  CONVEX_EMIT: 8,
-  WORKSPACE_STITCH: 9,
-  BUN_INSTALL: 10,
-  LLM_SEED: 11,
-} as const;
-
-export type StageNumber = (typeof STAGE)[keyof typeof STAGE];
-
 /** First stage that is safe to retry against the same target dir. */
 const FIRST_RETRY_SAFE_STAGE: StageNumber = STAGE.WEB_NEXT;
-
-/** Derive the ordered stage list for a given app selection. */
-export function deriveStages(apps: AppKind[]): StageNumber[] {
-  const stages: StageNumber[] = [STAGE.TURBO_SKELETON];
-  if (apps.includes('web')) {
-    stages.push(STAGE.WEB_NEXT, STAGE.WEB_SHADCN);
-  }
-  if (apps.includes('mobile')) {
-    stages.push(STAGE.MOBILE_EXPO);
-  }
-  if (apps.includes('desktop')) {
-    stages.push(STAGE.DESKTOP_ELECTRON);
-  }
-  stages.push(
-    STAGE.CONVEX_INIT,
-    STAGE.SCHEMA_PACKAGE,
-    STAGE.CONVEX_EMIT,
-    STAGE.WORKSPACE_STITCH,
-    STAGE.BUN_INSTALL,
-    STAGE.LLM_SEED,
-  );
-  return stages;
-}
 
 export type StageEvent =
   | { kind: 'stage-start'; stage: StageNumber }

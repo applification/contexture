@@ -1,9 +1,9 @@
 /**
  * Short, user-facing labels for scaffolder stages. Kept in the
- * renderer because only the UI needs them; main-side code works with
- * stage numbers directly.
+ * renderer because only the UI needs them; stage numbers live in shared
+ * code so renderer does not import main-process modules.
  */
-import { STAGE } from '@main/scaffold/scaffold-project';
+import { STAGE } from '@shared/scaffold-stages';
 
 export const SCAFFOLD_STAGE_LABELS: Readonly<Record<number, string>> = {
   [STAGE.TURBO_SKELETON]: 'Scaffolding monorepo',

@@ -185,6 +185,20 @@ describe('createOpTools', () => {
     expect(forwardSpy).not.toHaveBeenCalled();
   });
 
+  it('update_type rejects patches that try to change identity', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const updateType = toolNamed(tools, 'update_type');
+
+    await expect(
+      updateType.handler({ payload: { name: 'Post', patch: { name: 'Article' } } }),
+    ).rejects.toThrow(/rename_type/);
+    await expect(
+      updateType.handler({ payload: { name: 'Post', patch: { kind: 'raw' } } }),
+    ).rejects.toThrow(/replace_schema/);
+    expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
   it('replace_schema accepts a valid IR and forwards the whole Schema', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);

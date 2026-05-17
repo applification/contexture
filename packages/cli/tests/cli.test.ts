@@ -363,6 +363,25 @@ describe('@contexture/cli', () => {
     });
   });
 
+  it('apply rejects malformed ops before they reach the file-backed forwarder', async () => {
+    const { dir, irPath } = await fixtureProject();
+    const op = JSON.stringify({
+      kind: 'update_type',
+      name: 'Post',
+      patch: { name: 'Article' },
+    });
+
+    const result = await runCli(dir, ['apply', '--op-json', op, '--json']);
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_OP', message: expect.stringContaining('rename_type') },
+    });
+    const ir = JSON.parse(await readFile(irPath, 'utf8'));
+    expect(ir.types[0].name).toBe('Post');
+  });
+
   it('exits non-zero with JSON when an op fails', async () => {
     const { dir } = await fixtureProject();
     const result = await runCli(dir, ['delete-field', 'Post', 'missing', '--json']);
