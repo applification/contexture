@@ -2,13 +2,6 @@ import type { ElectronAPI } from '@electron-toolkit/preload';
 
 type Unsubscribe = () => void;
 
-/**
- * Legacy `window.api` surface — carried over from the pre-pivot app so
- * hooks like `useLayoutSidecar`, `useChatSidecar`, and `UpdateBanner`
- * typecheck. The methods are wired to real IPC where implemented and
- * stubbed out in the test setup file (`tests/setup.ts`). New renderer
- * code should reach for `window.contexture.*` instead.
- */
 export type UpdateState =
   | { status: 'idle' }
   | { status: 'checking' }
@@ -16,29 +9,6 @@ export type UpdateState =
   | { status: 'downloading'; version?: string; progress?: number }
   | { status: 'ready'; version?: string }
   | { status: 'error'; message?: string };
-
-export interface LegacyAPI {
-  readFileSilent: (path: string) => Promise<string | null>;
-  saveFile: (path: string, contents: string) => Promise<unknown>;
-  openFile?: () => Promise<unknown>;
-  saveFileAs?: () => Promise<unknown>;
-  onMenuFileOpen?: (listener: (path: string) => void) => Unsubscribe;
-  onMenuFileSave?: (listener: () => void) => Unsubscribe;
-  onMenuFileSaveAs?: (listener: () => void) => Unsubscribe;
-
-  // Auto-update
-  getUpdateState: () => Promise<UpdateState>;
-  onUpdateState: (listener: (state: UpdateState) => void) => Unsubscribe;
-  checkForUpdate: () => Promise<unknown>;
-  downloadUpdate: () => Promise<unknown>;
-  installUpdate: () => void;
-  openReleasesPage: () => void;
-
-  // Legacy Claude assistant subscription (ImprovementHUD)
-  onClaudeAssistantText: (listener: (text: string) => void) => Unsubscribe;
-  onClaudeResult: (listener: (result?: unknown) => void) => Unsubscribe;
-  onClaudeError: (listener: (err?: unknown) => void) => Unsubscribe;
-}
 
 export interface ContextureChatAPI {
   send: (message: string) => Promise<{ ok: boolean; error?: string }>;
@@ -249,6 +219,15 @@ export interface ContextureReconcileAPI {
   }) => Promise<{ ok: boolean; ops?: unknown[]; error?: string }>;
 }
 
+export interface ContextureUpdateAPI {
+  getState: () => Promise<UpdateState>;
+  onState: (listener: (state: UpdateState) => void) => Unsubscribe;
+  check: () => Promise<unknown>;
+  download: () => Promise<unknown>;
+  install: () => void;
+  openReleasesPage: () => void;
+}
+
 export interface ContextureAPI {
   chat: ContextureChatAPI;
   schemaAgent: ContextureSchemaAgentAPI;
@@ -258,12 +237,12 @@ export interface ContextureAPI {
   project: ContextureProjectAPI;
   drift: ContextureDriftAPI;
   reconcile: ContextureReconcileAPI;
+  update: ContextureUpdateAPI;
 }
 
 declare global {
   interface Window {
     electron: ElectronAPI;
     contexture: ContextureAPI;
-    api: LegacyAPI;
   }
 }

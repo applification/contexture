@@ -6,8 +6,8 @@ describe('UpdateBanner', () => {
   afterEach(cleanup);
 
   beforeEach(() => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({ status: 'idle' });
-    vi.mocked(window.api.onUpdateState).mockReturnValue(() => {});
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({ status: 'idle' });
+    vi.mocked(window.contexture.update.onState).mockReturnValue(() => {});
   });
 
   it('returns null for idle status', async () => {
@@ -17,14 +17,14 @@ describe('UpdateBanner', () => {
   });
 
   it('returns null for checking status', async () => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({ status: 'checking' });
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({ status: 'checking' });
     const { container } = render(<UpdateBanner />);
     await act(async () => {});
     expect(container.innerHTML).toBe('');
   });
 
   it('shows available update with download button', async () => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({
       status: 'available',
       version: '1.2.3',
     });
@@ -35,7 +35,10 @@ describe('UpdateBanner', () => {
   });
 
   it('shows downloading state with progress', async () => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({ status: 'downloading', progress: 45 });
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({
+      status: 'downloading',
+      progress: 45,
+    });
     render(<UpdateBanner />);
     await act(async () => {});
     expect(screen.getByText('Downloading update…')).toBeInTheDocument();
@@ -43,7 +46,10 @@ describe('UpdateBanner', () => {
   });
 
   it('shows ready state with install button', async () => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({ status: 'ready', version: '1.2.3' });
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({
+      status: 'ready',
+      version: '1.2.3',
+    });
     render(<UpdateBanner />);
     await act(async () => {});
     expect(screen.getByText(/v1.2.3 ready to install/)).toBeInTheDocument();
@@ -51,9 +57,9 @@ describe('UpdateBanner', () => {
   });
 
   it('shows error state with retry button', async () => {
-    vi.mocked(window.api.getUpdateState).mockResolvedValue({
+    vi.mocked(window.contexture.update.getState).mockResolvedValue({
       status: 'error',
-      error: 'Network error',
+      message: 'Network error',
     });
     render(<UpdateBanner />);
     await act(async () => {});

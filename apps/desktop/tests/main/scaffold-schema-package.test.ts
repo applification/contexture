@@ -1,8 +1,8 @@
 /**
  * `scaffoldSchemaPackage` (stage 6) — lays down `packages/contexture/`
- * with the initial IR, empty sidecars, a workspace package.json, a
- * `.gitignore`, and the `.contexture/` marker dir with empty
- * layout/chat/emitted stubs. Drives through MemFsAdapter so the
+ * with the initial IR, generated bundle, a workspace package.json, a
+ * `.gitignore`, and the `.contexture/` marker dir with
+ * layout/chat/emitted sidecars. Drives through MemFsAdapter so the
  * expected tree is easy to assert.
  */
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
@@ -58,10 +58,24 @@ describe('scaffoldSchemaPackage', () => {
       version: '1',
       messages: [],
     });
-    expect(JSON.parse(await fs.readFile(`${schemaDir}/.contexture/emitted.json`))).toEqual({
-      version: '1',
-      files: {},
-    });
+  });
+
+  it('writes emitted.json with every generated target from the shared bundle writer', async () => {
+    await scaffoldSchemaPackage(config, { fs });
+    const manifest = JSON.parse(await fs.readFile(`${schemaDir}/.contexture/emitted.json`)) as {
+      version: string;
+      files: Record<string, string>;
+    };
+
+    expect(manifest.version).toBe('1');
+    expect(Object.keys(manifest.files).sort()).toEqual(
+      [
+        `${schemaDir}/my-proj.schema.ts`,
+        `${schemaDir}/my-proj.schema.json`,
+        `${schemaDir}/index.ts`,
+        `${schemaDir}/convex/schema.ts`,
+      ].sort(),
+    );
   });
 
   it('seeds chat.json with the description as the first user message when provided', async () => {
@@ -123,5 +137,17 @@ describe('scaffoldSchemaPackage', () => {
     const schemaTsPath = `${schemaDir}/my-proj.schema.ts`;
     const schemaTs = await seededFs.readFile(schemaTsPath);
     expect(schemaTs).toContain('User');
+
+    const manifest = JSON.parse(
+      await seededFs.readFile(`${schemaDir}/.contexture/emitted.json`),
+    ) as { files: Record<string, string> };
+    expect(Object.keys(manifest.files)).toEqual(
+      expect.arrayContaining([
+        `${schemaDir}/my-proj.schema.ts`,
+        `${schemaDir}/my-proj.schema.json`,
+        `${schemaDir}/index.ts`,
+        `${schemaDir}/convex/schema.ts`,
+      ]),
+    );
   });
 });

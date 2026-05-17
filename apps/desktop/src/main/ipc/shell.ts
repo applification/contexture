@@ -1,14 +1,28 @@
 import { spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ipcMain, shell } from 'electron';
 
 export type CliRunner = (args: readonly string[]) => Promise<void>;
 
 export async function openInEditor(path: string, runCli: CliRunner): Promise<void> {
+  const safePath = assertSafeShellPath(path);
   try {
-    await runCli(['--new-window', path]);
+    await runCli(['--new-window', safePath]);
   } catch {
-    await shell.openExternal(`vscode://file${path}`);
+    await shell.openExternal(toVscodeFileUrl(safePath));
   }
+}
+
+export function assertSafeShellPath(path: unknown): string {
+  if (typeof path !== 'string' || path.length === 0 || path.includes('\0') || !isAbsolute(path)) {
+    throw new Error('Shell paths must be non-empty absolute paths.');
+  }
+  return path;
+}
+
+function toVscodeFileUrl(path: string): string {
+  return `vscode://file${pathToFileURL(path).pathname}`;
 }
 
 function spawnCode(args: readonly string[]): Promise<void> {
@@ -28,7 +42,7 @@ function spawnCode(args: readonly string[]): Promise<void> {
 
 export function registerShellIpc(): void {
   ipcMain.handle('shell:reveal', (_evt, path: string) => {
-    shell.showItemInFolder(path);
+    shell.showItemInFolder(assertSafeShellPath(path));
   });
   ipcMain.handle('shell:open-in-editor', async (_evt, path: string) => {
     await openInEditor(path, spawnCode);

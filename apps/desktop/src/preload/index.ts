@@ -1,9 +1,7 @@
 /**
- * Preload bridge — `window.contexture` is the new curated surface, and
- * `window.api` carries legacy methods the pre-pivot renderer still uses
- * (UpdateBanner, useLayoutSidecar, useChatSidecar). Everything goes
- * through one allowlist of IPC channels so there's a single place to
- * audit main-side handlers.
+ * Preload bridge — `window.contexture` is the curated renderer surface.
+ * Everything goes through one allowlist of IPC channels so there's a
+ * single place to audit main-side handlers.
  *
  * Each method either:
  *   - invokes a main-side handler (`ipcRenderer.invoke`) and returns a
@@ -254,62 +252,25 @@ const reconcile = {
     }>,
 };
 
-const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, reconcile };
-
-/**
- * Legacy surface. Direct file access is intentionally disabled; retained
- * methods either route through curated IPC or fail closed so old imports
- * cannot regain preload-level filesystem access.
- */
-const legacyApi = {
-  readFileSilent: async (_path: string): Promise<string | null> => {
-    return null;
-  },
-  saveFile: async (_path: string, _contents: string): Promise<void> => {
-    throw new Error('Legacy direct file writes are disabled; use window.contexture.* IPC.');
-  },
-  openFile: () => ipcRenderer.invoke('file:open-dialog'),
-  saveFileAs: () => ipcRenderer.invoke('file:save-as-dialog'),
-  onMenuFileOpen: (listener: (path: string) => void) =>
-    subscribe('menu:file-open', listener as (p: unknown) => void),
-  onMenuFileSave: (listener: () => void) =>
-    subscribe('menu:file-save', (() => listener()) as (p: unknown) => void),
-  onMenuFileSaveAs: (listener: () => void) =>
-    subscribe('menu:file-save-as', (() => listener()) as (p: unknown) => void),
-
-  getUpdateState: () => ipcRenderer.invoke('update:get-state'),
-  onUpdateState: (listener: (state: unknown) => void) => subscribe('update:state', listener),
-  checkForUpdate: () => ipcRenderer.invoke('update:check'),
-  downloadUpdate: () => ipcRenderer.invoke('update:download'),
-  installUpdate: () => {
+const update = {
+  getState: () => ipcRenderer.invoke('update:get-state'),
+  onState: (listener: (state: unknown) => void) => subscribe('update:state', listener),
+  check: () => ipcRenderer.invoke('update:check'),
+  download: () => ipcRenderer.invoke('update:download'),
+  install: () => {
     void ipcRenderer.invoke('update:install');
   },
   openReleasesPage: () => {
     void ipcRenderer.invoke('update:open-releases');
   },
-
-  // Legacy assistant channels kept as no-ops so `ImprovementHUD` won't
-  // crash on import — the pre-pivot UI lands in the bin when the new
-  // App shell fully replaces it.
-  onClaudeAssistantText:
-    (_listener: (text: string) => void): Unsubscribe =>
-    () =>
-      undefined,
-  onClaudeResult:
-    (_listener: (r?: unknown) => void): Unsubscribe =>
-    () =>
-      undefined,
-  onClaudeError:
-    (_listener: (e?: unknown) => void): Unsubscribe =>
-    () =>
-      undefined,
 };
+
+const contexture = { chat, schemaAgent, file, scaffold, shell, project, drift, reconcile, update };
 
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('contexture', contexture);
-    contextBridge.exposeInMainWorld('api', legacyApi);
   } catch (err) {
     console.error(err);
   }

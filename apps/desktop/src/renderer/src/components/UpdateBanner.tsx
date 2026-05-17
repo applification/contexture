@@ -7,9 +7,10 @@ export function UpdateBanner(): React.JSX.Element | null {
   useEffect(() => {
     // Tolerate environments without the preload bridge (Storybook,
     // vitest-in-jsdom, early dev before contextBridge exposure).
-    if (!window.api?.getUpdateState) return;
-    window.api.getUpdateState().then(setUpdate);
-    return window.api.onUpdateState(setUpdate);
+    const updateApi = window.contexture?.update;
+    if (!updateApi?.getState) return;
+    updateApi.getState().then(setUpdate);
+    return updateApi.onState(setUpdate);
   }, []);
 
   if (update.status === 'idle' || update.status === 'checking') return null;
@@ -20,7 +21,7 @@ export function UpdateBanner(): React.JSX.Element | null {
         <span>Update available: v{update.version}</span>
         <button
           type="button"
-          onClick={() => window.api.downloadUpdate()}
+          onClick={() => window.contexture.update.download()}
           className="ml-4 underline hover:no-underline"
         >
           Download
@@ -50,7 +51,7 @@ export function UpdateBanner(): React.JSX.Element | null {
         <span>v{update.version} ready to install</span>
         <button
           type="button"
-          onClick={() => window.api.installUpdate()}
+          onClick={() => window.contexture.update.install()}
           className="ml-4 underline hover:no-underline"
         >
           Restart & update
@@ -66,7 +67,7 @@ export function UpdateBanner(): React.JSX.Element | null {
           Update check failed —{' '}
           <button
             type="button"
-            onClick={() => window.api.openReleasesPage()}
+            onClick={() => window.contexture.update.openReleasesPage()}
             className="underline cursor-pointer hover:no-underline"
           >
             view releases
@@ -74,7 +75,7 @@ export function UpdateBanner(): React.JSX.Element | null {
         </span>
         <button
           type="button"
-          onClick={() => window.api.checkForUpdate()}
+          onClick={() => window.contexture.update.check()}
           className="ml-4 underline hover:no-underline"
         >
           Retry
