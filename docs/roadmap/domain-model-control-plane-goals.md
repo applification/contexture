@@ -341,12 +341,10 @@ Progress:
 - Claude SDK transitive usage is forced to patched 0.95.1 through root
   overrides/resolutions while keeping the Claude Agent SDK on the newest
   installable release allowed by the repo's package age policy.
-- `bun audit` is reduced to the Mermaid 11.14.0 findings pulled in by
-  Streamdown. Mermaid 11.15.0 fixes the findings, but it was published on
-  2026-05-11 at 11:15 UTC and is still blocked by the repository's
-  seven-day `minimum-release-age` policy during this implementation window.
-  Accept temporarily and upgrade the override to Mermaid 11.15.0 once the
-  package age guard allows it.
+- Streamdown remains in place, with Mermaid pinned through the root override to
+  patched 11.15.0. This was installed as an explicit security exception to the
+  package age guard.
+- `bun audit` reports no vulnerabilities.
 
 ### Goal 12C — Harden Shell and External IPC Inputs
 
@@ -407,9 +405,8 @@ Completion evidence:
 - Scaffold, desktop save, CLI, and MCP generated-output paths now share the core
   generated-bundle writer for generated artifacts and emitted manifests.
 - Dependency advisories with available installable fixes were upgraded or
-  pinned; the only remaining `bun audit` finding is the documented Mermaid
-  11.14.0 transitive advisory blocked temporarily by the seven-day package age
-  guard.
+  pinned, including the Streamdown Mermaid transitive dependency; `bun audit`
+  now reports no vulnerabilities.
 - Shell IPC rejects unsafe path input before shell/editor calls and encodes the
   VS Code fallback URI.
 - The renderer no longer uses or receives `window.api`; privileged renderer
