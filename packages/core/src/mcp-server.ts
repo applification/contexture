@@ -356,7 +356,17 @@ async function applyContextureOp(
     };
   }
 
-  const result = await createFileBackedForward(path)(parsed.data);
+  let result: Awaited<ReturnType<ReturnType<typeof createFileBackedForward>>>;
+  try {
+    result = await createFileBackedForward(path)(parsed.data);
+  } catch (err) {
+    return {
+      path,
+      applied: false,
+      opKind,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
   if ('error' in result) {
     return { path, applied: false, opKind, error: result.error };
   }
