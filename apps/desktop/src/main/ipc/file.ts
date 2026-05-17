@@ -25,6 +25,7 @@ import {
   type DocumentStore,
 } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
+import { assertSafeContextureIrPath } from '../security';
 import { IpcString, parseIpcPayload } from './validation';
 
 // Electron's FileFilter.extensions is a list of bare extensions (no dot,
@@ -102,16 +103,17 @@ export async function handleSave(input: HandleSaveInput): Promise<void> {
  * recent-files path to silently prune stale entries).
  */
 export async function handleOpen(irPath: string): Promise<OpenResult | null> {
+  const safeIrPath = assertSafeContextureIrPath(irPath);
   const s = getStore();
-  if (!(await s.fileExists(irPath))) return null;
-  const content = await s.readFile(irPath);
-  const bundle = await s.open(irPath);
+  if (!(await s.fileExists(safeIrPath))) return null;
+  const content = await s.readFile(safeIrPath);
+  const bundle = await s.open(safeIrPath);
   const warnings: OpenWarning[] = bundle.warnings.map((w) => ({
     message: w.message,
     severity: w.severity,
   }));
   return {
-    irPath,
+    irPath: safeIrPath,
     mode: bundle.mode,
     content,
     layout: bundle.layout,

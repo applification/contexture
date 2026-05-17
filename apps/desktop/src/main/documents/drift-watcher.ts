@@ -2,13 +2,14 @@
  * Drift detection for `@contexture-generated` files.
  *
  * `detectDrift` is a pure function that reads `.contexture/emitted.json`,
- * hashes every file listed in the manifest, and returns a per-file
- * status (`match | drifted | unreadable`). It has no side effects and
- * can be reused by the CLI's file-backed forward (#207).
+ * hashes manifest entries that are inside the caller's allowed target set,
+ * and returns a per-file status (`match | drifted | unreadable`). It has no
+ * side effects and can be reused by the CLI's file-backed forward (#207).
  *
- * `createDriftWatcher` wraps `detectDrift` with `fs.watch` subscriptions
- * so the Electron main process gets live callbacks when any manifest
- * file is hand-edited (or returns to its expected hash).
+ * `createDriftWatcher` derives the manifest path and generated target set
+ * from the open IR, then wraps `detectDrift` with `fs.watch` subscriptions
+ * so the Electron main process gets live callbacks when a generated file is
+ * hand-edited (or returns to its expected hash).
  *
  * Self-write suppression: the DocumentStore writes `emitted.json`
  * before it writes the watched files in the atomic bundle; by the time
@@ -17,6 +18,7 @@
  */
 import { createHash } from 'node:crypto';
 import { type FSWatcher, promises as fsPromises, watch } from 'node:fs';
+import { bundlePathsFor, generatedTargetsFor } from '@contexture/core';
 
 // ─── Pure detector ───────────────────────────────────────────────────
 
@@ -33,6 +35,7 @@ export interface DriftProblem {
 export async function detectDrift(
   emittedJsonPath: string,
   readFile: (path: string) => Promise<string> = (p) => fsPromises.readFile(p, 'utf-8'),
+  options: { allowedPaths?: readonly string[] } = {},
 ): Promise<DriftResult[]> {
   let manifest: { files?: Record<string, string> };
   try {
@@ -44,9 +47,11 @@ export async function detectDrift(
 
   const files = manifest.files;
   if (!files || Object.keys(files).length === 0) return [];
+  const allowed = options.allowedPaths ? new Set(options.allowedPaths) : null;
 
   const results: DriftResult[] = [];
   for (const [filePath, expectedHash] of Object.entries(files)) {
+    if (allowed && !allowed.has(filePath)) continue;
     let actual: string | null;
     try {
       const content = await readFile(filePath);
@@ -75,7 +80,7 @@ export interface DriftWatcher {
 }
 
 export interface DriftWatcherOptions {
-  emittedJsonPath: string;
+  irPath: string;
   onDrift: (paths: string[]) => void;
   onStatus?: (problems: DriftProblem[]) => void;
   onResolved: () => void;
@@ -85,13 +90,15 @@ export interface DriftWatcherOptions {
 
 export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   const {
-    emittedJsonPath,
+    irPath,
     onDrift,
     onStatus,
     onResolved,
     debounceMs = 300,
     readFile = (p) => fsPromises.readFile(p, 'utf-8'),
   } = opts;
+  const emittedJsonPath = bundlePathsFor(irPath).emitted;
+  const allowedPaths = generatedTargetsFor(irPath).map((entry) => entry.path);
 
   let watchers: FSWatcher[] = [];
   let watchedPaths: string[] = [];
@@ -100,7 +107,7 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   let stopped = false;
 
   async function doCheck(): Promise<void> {
-    const results = await detectDrift(emittedJsonPath, readFile);
+    const results = await detectDrift(emittedJsonPath, readFile, { allowedPaths });
     if (stopped || results.length === 0) return;
 
     const problems = results.filter((r): r is DriftProblem => r.status !== 'match');

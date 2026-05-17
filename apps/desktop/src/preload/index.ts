@@ -149,7 +149,7 @@ const project = {
 
 const drift = {
   /** Start watching all manifest files for drift; stops any previous watcher. */
-  watch: (payload: { emittedJsonPath: string }): Promise<{ ok: boolean }> =>
+  watch: (payload: { irPath: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('drift:watch', payload) as Promise<{ ok: boolean }>,
   /** Stop the active watcher. */
   unwatch: (): Promise<{ ok: boolean }> =>

@@ -44,6 +44,15 @@ describe('handleOpen (routes through DocumentStore)', () => {
     );
     expect(await handleOpen('/missing.contexture.json')).toBeNull();
   });
+
+  it('rejects non-Contexture paths before reading file contents', async () => {
+    const fs = createMemFsAdapter({ '/work/secret.txt': 'do not read' });
+    setDocumentStoreForTesting(
+      createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' }),
+    );
+
+    await expect(handleOpen('/work/secret.txt')).rejects.toThrow(/Expected a .contexture.json/);
+  });
 });
 
 describe('file IPC open/save filters', () => {
