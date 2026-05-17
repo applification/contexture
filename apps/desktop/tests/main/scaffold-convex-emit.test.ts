@@ -1,9 +1,8 @@
 /**
  * `scaffoldConvexEmit` (stage 7) — emits the Convex schema (and
  * per-table CRUD seeds, if the initial IR had any tables) at
- * `packages/contexture/convex/`. At scaffold time the IR is empty, so
- * the convex schema is the degenerate `defineSchema({})`. The stage
- * still needs to run so `bun run dev` finds a valid schema file.
+ * `packages/contexture/convex/`. The stage uses the shared generated
+ * bundle writer so the emitted manifest remains complete.
  */
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import { scaffoldConvexEmit } from '@main/scaffold/convex-emit';
@@ -43,5 +42,24 @@ describe('scaffoldConvexEmit', () => {
     // (The scaffolder only ever runs against an empty IR in v1 — stage 10
     // seeds tables afterwards, and a subsequent save writes the CRUD.)
     expect(fs.exists(`${schemaDir}/convex/Post.ts`)).toBe(false);
+  });
+
+  it('keeps emitted.json complete instead of narrowing it to the Convex schema', async () => {
+    const irPath = `${schemaDir}/my-proj.contexture.json`;
+    await fs.writeFile(irPath, JSON.stringify({ version: '1', types: [] }));
+
+    await scaffoldConvexEmit(config, { fs });
+
+    const manifest = JSON.parse(await fs.readFile(`${schemaDir}/.contexture/emitted.json`)) as {
+      files: Record<string, string>;
+    };
+    expect(Object.keys(manifest.files).sort()).toEqual(
+      [
+        `${schemaDir}/my-proj.schema.ts`,
+        `${schemaDir}/my-proj.schema.json`,
+        `${schemaDir}/index.ts`,
+        `${schemaDir}/convex/schema.ts`,
+      ].sort(),
+    );
   });
 });

@@ -269,3 +269,151 @@ Completion evidence:
 - Tests cover atomic rollback, generated drift preflight, explicit re-emit over
   drift, shared generated checks, file-backed op rejection over drift, and
   desktop save refusal to clobber edited generated files.
+
+## Goal 12 — Pre-Feature Hardening Sweep
+
+**Status:** Done.
+
+Before adding the drift-preflight UX and reconcile apply loop, close the
+remaining simplification and security gaps exposed by Goals 10 and 11. The aim
+is to make the current trust envelope boring: generated bundle writes should go
+through one core path, privileged Electron IPC should have narrow inputs, the
+dependency audit should not have obvious high-severity desktop findings, and
+the preload surface should expose one coherent Contexture interface.
+
+This can be implemented as one parent goal with four independent slices. If any
+slice grows, split it into its own PR while keeping this goal as the checklist.
+
+### Goal 12A — Scaffold Uses the Shared Generated-Bundle Writer
+
+**Status:** Done.
+
+Project scaffolding still writes generated artifacts and `.contexture/emitted.json`
+through scaffold-local logic. Bring scaffold generation under the same
+`@contexture/core` writer used by desktop saves, CLI, and MCP.
+
+Completion evidence:
+
+- `scaffoldSchemaPackage` writes the initial IR, generated artifacts, and
+  emitted manifest through the shared generated-bundle writer instead of a
+  scaffold-local `runEmitPipeline` + manual file writes.
+- `scaffoldConvexEmit` no longer narrows `.contexture/emitted.json` to only the
+  Convex schema hash, or the stage is removed/reworked so the manifest remains
+  complete after scaffolding.
+- A freshly scaffolded project has a manifest containing every generated target
+  that `contexture check-generated` expects.
+- Tests cover empty-project scaffold, scratch promotion scaffold, and manifest
+  completeness.
+
+Progress:
+
+- `scaffoldSchemaPackage` and `scaffoldConvexEmit` now write generated targets
+  through `@contexture/core`'s shared generated-bundle writer.
+- Scaffold manifests remain complete across empty-project scaffold and scratch
+  promotion flows instead of being reset or narrowed by later stages.
+- Targeted scaffold tests cover the complete emitted manifest surface.
+
+### Goal 12B — Dependency Security Sweep
+
+**Status:** Done.
+
+Run and address the package audit before more feature work. The current audit
+flags high-severity Electron advisories and moderate advisories in packages
+used by renderer/markdown/provider surfaces.
+
+Completion evidence:
+
+- Electron is upgraded to a patched version supported by the current
+  electron-builder/electron-vite toolchain, or any remaining Electron advisory
+  is documented with a concrete non-applicability reason.
+- Mermaid/Streamdown, PostCSS/Next/Vite, and Claude SDK transitive advisories
+  are updated or documented with risk notes.
+- `bun audit` output is clean, or all remaining findings are listed in an ADR
+  or roadmap note with severity, affected surface, and why they are accepted.
+- Desktop build, packaged MCP smoke, web build, and full local CI pass after
+  dependency changes.
+
+Progress:
+
+- Electron was upgraded to the patched 39.8.x line and electron-builder to
+  26.8.x.
+- PostCSS is pinned through the root override to a patched 8.5.x release.
+- Claude SDK transitive usage is forced to patched 0.95.1 through root
+  overrides/resolutions while keeping the Claude Agent SDK on the newest
+  installable release allowed by the repo's package age policy.
+- `bun audit` is reduced to the Mermaid 11.14.0 findings pulled in by
+  Streamdown. Mermaid 11.15.0 fixes the findings, but it was published on
+  2026-05-11 at 11:15 UTC and is still blocked by the repository's
+  seven-day `minimum-release-age` policy during this implementation window.
+  Accept temporarily and upgrade the override to Mermaid 11.15.0 once the
+  package age guard allows it.
+
+### Goal 12C — Harden Shell and External IPC Inputs
+
+**Status:** Done.
+
+The renderer can still ask main to reveal/open arbitrary paths in the OS shell
+or editor. Narrow this IPC so it remains useful for project files while being
+less attractive if renderer content ever becomes compromised.
+
+Completion evidence:
+
+- `shell:reveal` and `shell:open-in-editor` validate that input is a non-empty
+  absolute path and reject unsafe values before calling Electron shell APIs or
+  spawning `code`.
+- VS Code URI fallback encodes paths safely instead of string-concatenating
+  raw renderer input into `vscode://file...`.
+- Shell IPC tests cover accepted absolute paths, relative/empty rejection, and
+  URI encoding.
+- Existing project/open/reveal workflows still work from the renderer.
+
+Progress:
+
+- Shell IPC now rejects non-string, empty, relative, and null-byte paths before
+  calling `shell.showItemInFolder`, spawning `code`, or opening the VS Code URL
+  fallback.
+- The VS Code fallback URL is built through `pathToFileURL` path encoding.
+- Main-process shell IPC tests cover accepted paths, rejected paths, and
+  encoded fallback URLs.
+
+### Goal 12D — Narrow or Remove the Legacy Preload API
+
+**Status:** Done.
+
+`window.contexture` is now the preferred privileged interface, but `window.api`
+still exposes legacy methods beside it. Reduce the renderer attack surface and
+maintenance burden by deleting unused legacy methods or making the legacy API a
+thin compatibility alias over the same typed `contexture` surface.
+
+Completion evidence:
+
+- Renderer references to `window.api` are removed where equivalent
+  `window.contexture` methods exist.
+- Legacy direct file helpers remain disabled or are deleted entirely.
+- Preload tests/types demonstrate one canonical privileged Contexture surface,
+  with any retained legacy aliases documented as temporary compatibility.
+- No desktop tests rely on legacy-only preload methods.
+
+Progress:
+
+- Update controls moved from `window.api` to `window.contexture.update`.
+- The unused legacy `ImprovementHUD` and its no-op preload channels were
+  removed.
+- `window.api` is no longer exposed from preload, and the preload type surface
+  declares only `window.contexture`.
+
+Completion evidence:
+
+- Scaffold, desktop save, CLI, and MCP generated-output paths now share the core
+  generated-bundle writer for generated artifacts and emitted manifests.
+- Dependency advisories with available installable fixes were upgraded or
+  pinned; the only remaining `bun audit` finding is the documented Mermaid
+  11.14.0 transitive advisory blocked temporarily by the seven-day package age
+  guard.
+- Shell IPC rejects unsafe path input before shell/editor calls and encodes the
+  VS Code fallback URI.
+- The renderer no longer uses or receives `window.api`; privileged renderer
+  access is through `window.contexture`.
+- Verified with targeted scaffold/shell/update tests, desktop typecheck,
+  desktop build, packaged MCP stdio smoke, web production build, and full local
+  `bun run ci`.
