@@ -25,7 +25,7 @@ bun run lint        # biome lint
 bun run format      # biome format --write
 ```
 
-Run a single test file: `cd packages/<pkg> && bun test path/to/file.test.ts`.
+Run a single test file: `cd packages/<pkg> && bun run test -- path/to/file.test.ts`.
 
 ## CI
 

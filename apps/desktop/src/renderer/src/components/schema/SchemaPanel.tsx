@@ -377,20 +377,6 @@ export function SchemaPanel({
             <span className="truncate font-mono">{selectedOutput.fileName}</span>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
-            {selectedOutputPath && onOpenGeneratedFile ? (
-              <Button
-                size="icon"
-                type="button"
-                variant="ghost"
-                className="size-7"
-                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
-                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
-                title={`Open ${selectedOutput.fileName} in VS Code`}
-                data-testid="schema-open-generated"
-              >
-                <ExternalLink className="size-3.5" />
-              </Button>
-            ) : null}
             <Button
               size="icon"
               type="button"
@@ -429,6 +415,20 @@ export function SchemaPanel({
             >
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </Button>
+            {selectedOutputPath && onOpenGeneratedFile ? (
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
+                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
+                title={`Open ${selectedOutput.fileName} in VS Code`}
+                data-testid="schema-open-generated"
+              >
+                <ExternalLink className="size-3.5" />
+              </Button>
+            ) : null}
           </div>
         </div>
         <div
