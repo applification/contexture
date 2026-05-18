@@ -277,46 +277,33 @@ export default function App(): React.JSX.Element {
       // Non-fatal: Convex tab will render empty
     }
 
-    if (schema.outputs?.aiPipeline?.toolSchemas?.enabled === true) {
-      try {
-        additionalSources.push({
-          type: 'ai-tool-schemas',
-          source: `${JSON.stringify(emitAiToolSchemas(schema, irPath), null, 2)}\n`,
-        });
-      } catch {
-        // Non-fatal: failed optional output stays hidden
-      }
-    }
-
-    if (schema.outputs?.aiPipeline?.structuredOutputs?.enabled === true) {
-      try {
-        additionalSources.push({
-          type: 'structured-outputs',
-          source: `${JSON.stringify(emitStructuredOutputSchemas(schema, irPath), null, 2)}\n`,
-        });
-      } catch {
-        // Non-fatal: failed optional output stays hidden
-      }
-    }
-
-    if (schema.outputs?.aiPipeline?.mcpDefinitions?.enabled === true) {
-      try {
-        additionalSources.push({
-          type: 'mcp-definitions',
-          source: `${JSON.stringify(emitMcpDefinitions(schema, irPath), null, 2)}\n`,
-        });
-      } catch {
-        // Non-fatal: failed optional output stays hidden
-      }
-    }
-
-    if (schema.outputs?.aiPipeline?.formValidators?.enabled === true) {
-      try {
+    const optionalOutputSources = {
+      'ai-tool-schemas': () => `${JSON.stringify(emitAiToolSchemas(schema, irPath), null, 2)}\n`,
+      'structured-outputs': () =>
+        `${JSON.stringify(emitStructuredOutputSchemas(schema, irPath), null, 2)}\n`,
+      'mcp-definitions': () => `${JSON.stringify(emitMcpDefinitions(schema, irPath), null, 2)}\n`,
+      'form-validators': () => {
         const formValidatorBaseName = filePath ? baseNameFor(filePath) : 'schema';
-        additionalSources.push({
-          type: 'form-validators',
-          source: emitFormValidators(schema, formValidatorBaseName, irPath),
-        });
+        return emitFormValidators(schema, formValidatorBaseName, irPath);
+      },
+    } satisfies Record<SchemaPanelAdditionalSource['type'], () => string>;
+
+    const optionalOutputEnabled = {
+      'ai-tool-schemas': schema.outputs?.aiPipeline?.toolSchemas?.enabled === true,
+      'structured-outputs': schema.outputs?.aiPipeline?.structuredOutputs?.enabled === true,
+      'mcp-definitions': schema.outputs?.aiPipeline?.mcpDefinitions?.enabled === true,
+      'form-validators': schema.outputs?.aiPipeline?.formValidators?.enabled === true,
+    } satisfies Record<SchemaPanelAdditionalSource['type'], boolean>;
+
+    for (const type of Object.keys(
+      optionalOutputSources,
+    ) as SchemaPanelAdditionalSource['type'][]) {
+      if (!optionalOutputEnabled[type]) {
+        additionalSources.push({ type, enabled: false, source: '' });
+        continue;
+      }
+      try {
+        additionalSources.push({ type, enabled: true, source: optionalOutputSources[type]() });
       } catch {
         // Non-fatal: failed optional output stays hidden
       }
@@ -324,6 +311,32 @@ export default function App(): React.JSX.Element {
 
     return { zodSource, jsonSource, convexSource, additionalSources, error };
   }, [activeTab, schema, filePath]);
+
+  const enableSchemaOutput = useCallback(
+    (type: SchemaPanelAdditionalSource['type']): void => {
+      const targetByOutput = {
+        'ai-tool-schemas': 'toolSchemas',
+        'structured-outputs': 'structuredOutputs',
+        'mcp-definitions': 'mcpDefinitions',
+        'form-validators': 'formValidators',
+      } as const satisfies Record<SchemaPanelAdditionalSource['type'], string>;
+      const target = targetByOutput[type];
+      useUndoStore.getState().apply({
+        kind: 'replace_schema',
+        schema: {
+          ...schema,
+          outputs: {
+            ...(schema.outputs ?? {}),
+            aiPipeline: {
+              ...(schema.outputs?.aiPipeline ?? {}),
+              [target]: { enabled: true },
+            },
+          },
+        },
+      });
+    },
+    [schema],
+  );
 
   // Filename shown in the SchemaPanel header: the document's basename
   // with the IR suffix swapped for `.schema.ts`. Falls back to a
@@ -425,6 +438,7 @@ export default function App(): React.JSX.Element {
                   isEmpty={!hasSchema}
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}
+                  onEnableOutput={enableSchemaOutput}
                   schemaFileName={schemaFileName}
                 />
               </div>

@@ -45,6 +45,7 @@ type SchemaOutputLanguage = 'typescript' | 'json';
 export interface SchemaPanelAdditionalSource {
   type: Exclude<SchemaOutputType, 'zod' | 'json' | 'convex'>;
   source: string;
+  enabled?: boolean;
 }
 
 export interface SchemaPanelProps {
@@ -68,10 +69,12 @@ export interface SchemaPanelProps {
    */
   schemaFileName?: string;
   /**
-   * Optional non-core generated outputs. Empty sources are hidden so
-   * disabled/failed opt-in outputs do not clutter the selector.
+   * Optional non-core generated outputs. Disabled outputs are shown as
+   * available choices; enabled outputs with empty sources stay hidden.
    */
   additionalSources?: SchemaPanelAdditionalSource[];
+  /** Enable an optional output target from the grouped selector. */
+  onEnableOutput?: (type: SchemaPanelAdditionalSource['type']) => void;
 }
 
 /**
@@ -153,10 +156,7 @@ interface OutputOption {
   label: string;
   language: SchemaOutputLanguage;
   fileName: string;
-}
-
-function isVisibleOptionalSource(source: SchemaPanelAdditionalSource): boolean {
-  return source.source.trim().length > 0;
+  enabled: boolean;
 }
 
 export function SchemaPanel({
@@ -168,6 +168,7 @@ export function SchemaPanel({
   onCopy,
   schemaFileName = 'schema.ts',
   additionalSources = [],
+  onEnableOutput,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -188,34 +189,37 @@ export function SchemaPanel({
   }, []);
 
   const outputOptions = useMemo<OutputOption[]>(() => {
-    const coreSources: { type: SchemaOutputType; source: string }[] = [
+    const coreSources: Array<{ type: SchemaOutputType; source: string; enabled?: boolean }> = [
       { type: 'zod', source: zodSource },
       { type: 'json', source: jsonSource },
       { type: 'convex', source: convexSource },
     ];
-    return [...coreSources, ...additionalSources.filter(isVisibleOptionalSource)].map(
-      ({ type, source }) => {
-        const metadata = OUTPUT_METADATA[type];
-        return {
-          type,
-          source,
-          group: metadata.group,
-          label: metadata.label,
-          language: metadata.language,
-          fileName: metadata.fileName(schemaFileName),
-        };
-      },
+    const optionalSources = additionalSources.filter(
+      (source) => source.enabled === false || source.source.trim().length > 0,
     );
+    return [...coreSources, ...optionalSources].map(({ type, source, enabled = true }) => {
+      const metadata = OUTPUT_METADATA[type];
+      return {
+        type,
+        source,
+        group: metadata.group,
+        label: metadata.label,
+        language: metadata.language,
+        fileName: metadata.fileName(schemaFileName),
+        enabled,
+      };
+    });
   }, [additionalSources, convexSource, jsonSource, schemaFileName, zodSource]);
 
   useEffect(() => {
-    if (!outputOptions.some((output) => output.type === activeOutput)) {
+    if (!outputOptions.some((output) => output.type === activeOutput && output.enabled)) {
       setActiveOutput('zod');
     }
   }, [activeOutput, outputOptions]);
 
   const selectedOutput =
-    outputOptions.find((output) => output.type === activeOutput) ?? outputOptions[0];
+    outputOptions.find((output) => output.type === activeOutput && output.enabled) ??
+    outputOptions[0];
   const activeSource = selectedOutput.source;
 
   // Re-highlight whenever the active source or output type changes.
@@ -329,17 +333,26 @@ export function SchemaPanel({
                     key={output.type}
                     type="button"
                     role="option"
-                    aria-selected={activeOutput === output.type}
+                    aria-selected={output.enabled && activeOutput === output.type}
                     data-testid={`schema-output-${output.type}`}
                     onClick={() => {
+                      if (!output.enabled) {
+                        setActiveOutput(output.type);
+                        setHighlightedHtml(null);
+                        onEnableOutput?.(output.type as SchemaPanelAdditionalSource['type']);
+                        return;
+                      }
                       setActiveOutput(output.type);
                       setHighlightedHtml(null);
                     }}
+                    title={output.enabled ? output.label : `Enable ${output.label}`}
                     className={[
                       'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
-                      activeOutput === output.type
+                      output.enabled && activeOutput === output.type
                         ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        : !output.enabled
+                          ? 'border border-dashed border-border/80 text-muted-foreground/60 hover:border-border hover:bg-muted hover:text-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     ].join(' ')}
                   >
                     <span className="truncate">{output.label}</span>

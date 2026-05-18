@@ -159,6 +159,30 @@ describe('SchemaPanel', () => {
       expect(screen.queryByTestId('schema-output-structured-outputs')).not.toBeInTheDocument();
     });
 
+    it('shows disabled optional outputs as enableable choices', () => {
+      const onEnableOutput = vi.fn();
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          additionalSources={[
+            { type: 'ai-tool-schemas', enabled: false, source: '' },
+            { type: 'form-validators', enabled: false, source: '' },
+          ]}
+          onEnableOutput={onEnableOutput}
+        />,
+      );
+
+      expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
+      expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
+      fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
+      expect(onEnableOutput).toHaveBeenCalledWith('ai-tool-schemas');
+      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toHaveAttribute(
+        'aria-selected',
+        'false',
+      );
+    });
+
     it('switches to an enabled AI source and shows its friendly filename', () => {
       render(
         <SchemaPanel

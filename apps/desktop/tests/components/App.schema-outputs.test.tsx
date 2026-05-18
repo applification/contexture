@@ -54,6 +54,28 @@ afterEach(() => {
 });
 
 describe('App schema outputs', () => {
+  it('lets users enable optional outputs from the Schema panel', async () => {
+    useUndoStore.getState().apply({
+      kind: 'replace_schema',
+      schema: {
+        version: '1',
+        types: [{ kind: 'object', name: 'Lead', fields: [] }],
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
+
+    await waitFor(() => {
+      expect(useUndoStore.getState().schema.outputs?.aiPipeline?.toolSchemas?.enabled).toBe(true);
+    });
+    expect(screen.getByTestId('schema-code').textContent).toContain('submit_lead');
+  });
+
   it('uses a valid fallback import in unsaved form-validator previews', async () => {
     useUndoStore.getState().apply({
       kind: 'replace_schema',
