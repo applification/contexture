@@ -1,7 +1,7 @@
 name = "qa"
 description = "Contexture QA agent for regression risk, acceptance gaps, and behaviour-focused verification."
-model = "gpt-5.4"
-model_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["Dan"]
 developer_instructions = """
