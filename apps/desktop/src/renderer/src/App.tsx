@@ -338,6 +338,10 @@ export default function App(): React.JSX.Element {
     [schema],
   );
 
+  const openGeneratedFile = useCallback((path: string): void => {
+    void window.contexture?.shell.openInEditor(path);
+  }, []);
+
   // Filename shown in the SchemaPanel header: the document's basename
   // with the IR suffix swapped for `.schema.ts`. Falls back to a
   // generic label before the document is saved.
@@ -439,6 +443,8 @@ export default function App(): React.JSX.Element {
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}
                   onEnableOutput={enableSchemaOutput}
+                  documentFilePath={filePath}
+                  onOpenGeneratedFile={openGeneratedFile}
                   schemaFileName={schemaFileName}
                 />
               </div>

@@ -240,6 +240,46 @@ describe('SchemaPanel', () => {
       expect(onCopy).toHaveBeenCalledWith(jsonSrc);
     });
 
+    it('opens the active generated file in the external editor', () => {
+      const onOpenGeneratedFile = vi.fn();
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          jsonSource="json"
+          additionalSources={[{ type: 'mcp-definitions', source: '{\n  "servers": []\n}\n' }]}
+          documentFilePath="/repo/garden.contexture.json"
+          onOpenGeneratedFile={onOpenGeneratedFile}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('schema-open-generated'));
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.ts');
+
+      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-open-generated'));
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.json');
+
+      fireEvent.click(screen.getByTestId('schema-output-mcp-definitions'));
+      fireEvent.click(screen.getByTestId('schema-open-generated'));
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith(
+        '/repo/.contexture/mcp-definitions.json',
+      );
+    });
+
+    it('hides the external editor action before the document has a file path', () => {
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          onOpenGeneratedFile={vi.fn()}
+          documentFilePath={null}
+        />,
+      );
+
+      expect(screen.queryByTestId('schema-open-generated')).not.toBeInTheDocument();
+    });
+
     it('shows the JSON Schema filename when on the JSON output', () => {
       render(
         <SchemaPanel

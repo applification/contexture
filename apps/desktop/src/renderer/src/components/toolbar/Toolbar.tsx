@@ -9,9 +9,8 @@ import {
   SCHEMA_AGENT_PROVIDER_CHANGED,
   type SchemaAgentProvider,
 } from '@renderer/chat/useSchemaAgentChat';
-import { useDocumentStore } from '@renderer/store/document';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
-import { Bot, ChevronDown, Code, Moon, PanelRight, Sun } from 'lucide-react';
+import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,12 +33,6 @@ export function Toolbar(): React.JSX.Element {
   const [providerStatus, setProviderStatus] = useState('Provider status unknown.');
   const [providerApiKey, setProviderApiKey] = useState('');
   const [providerPopoverOpen, setProviderPopoverOpen] = useState(false);
-  const filePath = useDocumentStore((s) => s.filePath);
-  const documentMode = useDocumentStore((s) => s.mode);
-
-  // Bundle root is the directory containing the active .contexture.json document.
-  const bundleRoot =
-    filePath && documentMode === 'bundle' ? filePath.split('/').slice(0, -1).join('/') : null;
 
   const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
 
@@ -139,19 +132,6 @@ export function Toolbar(): React.JSX.Element {
       <div className="flex-1 flex justify-center">
         <GraphSearchBar />
       </div>
-
-      {bundleRoot && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          title="Open bundle folder in VS Code"
-          onClick={() => void window.contexture?.shell.openInEditor(bundleRoot)}
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <Code className="size-4" />
-        </Button>
-      )}
 
       <Button
         variant="ghost"

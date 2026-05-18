@@ -24,7 +24,16 @@
  * HTML with all user text escaped in `<span>` text nodes — there is no
  * path for user-authored source to introduce raw tags.
  */
-import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
+import { bundlePathsFor } from '@contexture/core/paths';
+import {
+  AArrowDown,
+  AArrowUp,
+  Check,
+  Copy,
+  ExternalLink,
+  FileBracesCorner,
+  FileCode,
+} from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
@@ -76,6 +85,10 @@ export interface SchemaPanelProps {
   additionalSources?: SchemaPanelAdditionalSource[];
   /** Enable an optional output target from the grouped selector. */
   onEnableOutput?: (type: SchemaPanelAdditionalSource['type']) => void;
+  /** Absolute path of the active `.contexture.json`; absent for unsaved documents. */
+  documentFilePath?: string | null;
+  /** Open the selected generated file in an external editor. */
+  onOpenGeneratedFile?: (path: string) => void;
 }
 
 /**
@@ -169,6 +182,26 @@ interface OutputOption {
   enabled: boolean;
 }
 
+function generatedPathForOutput(type: SchemaOutputType, documentFilePath: string): string {
+  const paths = bundlePathsFor(documentFilePath);
+  switch (type) {
+    case 'zod':
+      return paths.schemaTs;
+    case 'json':
+      return paths.schemaJson;
+    case 'convex':
+      return paths.convex;
+    case 'ai-tool-schemas':
+      return paths.aiToolSchemas;
+    case 'structured-outputs':
+      return paths.structuredOutputSchemas;
+    case 'mcp-definitions':
+      return paths.mcpDefinitions;
+    case 'form-validators':
+      return paths.formValidators;
+  }
+}
+
 export function SchemaPanel({
   zodSource,
   jsonSource,
@@ -179,6 +212,8 @@ export function SchemaPanel({
   schemaFileName = 'schema.ts',
   additionalSources = [],
   onEnableOutput,
+  documentFilePath = null,
+  onOpenGeneratedFile,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -232,6 +267,9 @@ export function SchemaPanel({
     outputOptions.find((output) => output.type === activeOutput && output.enabled) ??
     outputOptions[0];
   const activeSource = selectedOutput.source;
+  const selectedOutputPath = documentFilePath
+    ? generatedPathForOutput(selectedOutput.type, documentFilePath)
+    : null;
 
   // Re-highlight whenever the active source or output type changes.
   useEffect(() => {
@@ -396,6 +434,20 @@ export function SchemaPanel({
             <span className="truncate font-mono">{selectedOutput.fileName}</span>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
+            {selectedOutputPath && onOpenGeneratedFile ? (
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
+                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
+                title={`Open ${selectedOutput.fileName} in VS Code`}
+                data-testid="schema-open-generated"
+              >
+                <ExternalLink className="size-3.5" />
+              </Button>
+            ) : null}
             <Button
               size="icon"
               type="button"
