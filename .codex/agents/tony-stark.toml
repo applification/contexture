@@ -1,6 +1,6 @@
-name = "tony_stark"
+name = "cto"
 description = "Contexture Software Architect/CTO agent for architectural agility, KISS, module depth, and long-term codebase shape."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Tony Stark"]

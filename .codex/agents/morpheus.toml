@@ -1,6 +1,6 @@
 name = "cso"
 description = "Contexture CSO agent for application security, trust envelopes, DevOps, release, supply-chain, and provider/runtime risk."
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Morpheus"]
