@@ -10,6 +10,7 @@
 
 import { SchemaPanel } from '@renderer/components/schema/SchemaPanel';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Keep shiki init pending forever so the panel renders the plain
@@ -242,7 +243,8 @@ describe('SchemaPanel', () => {
       expect(onCopy).toHaveBeenCalledWith(jsonSrc);
     });
 
-    it('opens the active generated file in the external editor', () => {
+    it('opens the active generated file in the external editor', async () => {
+      const user = userEvent.setup();
       const onOpenGeneratedFile = vi.fn();
       render(
         <SchemaPanel
@@ -257,6 +259,9 @@ describe('SchemaPanel', () => {
 
       fireEvent.click(screen.getByTestId('schema-open-generated'));
       expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.ts');
+      screen.getByTestId('schema-copy').focus();
+      await user.tab();
+      expect(screen.getByTestId('schema-open-generated')).toHaveFocus();
 
       fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       fireEvent.click(screen.getByTestId('schema-open-generated'));
