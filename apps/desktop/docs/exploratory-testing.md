@@ -5,7 +5,6 @@ The QA agent uses `agent-browser` and Playwright to explore the running Electron
 ## Prerequisites
 
 - Built desktop app: `cd apps/desktop && bun run build`
-- `agent-browser` installed globally: `npm i -g agent-browser`
 - Playwright installed: `cd apps/desktop && bun install`
 
 ## On-demand run
@@ -13,14 +12,14 @@ The QA agent uses `agent-browser` and Playwright to explore the running Electron
 ```bash
 # From repo root
 cd apps/desktop
-E2E=1 bun run test:e2e
+bun run test:e2e
 ```
 
 This runs all suites under `e2e/`. To run a single spec:
 
 ```bash
 cd apps/desktop
-E2E=1 npx playwright test e2e/theme-sidebar.spec.ts
+bun run test:e2e -- e2e/theme-sidebar.spec.ts
 ```
 
 ## Triggering an exploratory heartbeat
@@ -31,7 +30,7 @@ The QA agent (Columbo / CQO) accepts a Paperclip task with the title:
 
 The agent will:
 1. Check out the task and create a branch `paperclip/ONT-NNN-exploratory-<date>`
-2. Launch Electron via `E2E=1 bun run test:e2e` and run existing suites to confirm baseline
+2. Launch Electron via `bun run test:e2e` and run existing suites to confirm baseline
 3. Inspect source code (components, IPC handlers, menu items) for flows not covered by existing specs
 4. Write new `e2e/*.spec.ts` files for each discovered flow
 5. Open a PR with the new specs and a findings comment
