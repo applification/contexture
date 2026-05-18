@@ -31,7 +31,9 @@ playwright-report/
 .paperclip/
 
 # Codex Desktop local state
-.codex/
+.codex/*
+!.codex/agents/
+!.codex/agents/*.toml
 
 # Claude Code scheduled-task runtime artefacts
 .claude/scheduled_tasks.lock
