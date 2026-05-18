@@ -98,6 +98,7 @@ const OUTPUT_METADATA: Record<
   {
     group: SchemaOutputGroup;
     label: string;
+    help: string;
     language: SchemaOutputLanguage;
     fileName: (schemaFileName: string) => string;
   }
@@ -105,12 +106,14 @@ const OUTPUT_METADATA: Record<
   zod: {
     group: 'core',
     label: 'Zod schema',
+    help: 'TypeScript Zod schemas for app/runtime validation.',
     language: 'typescript',
     fileName: (schemaFileName) => schemaFileName,
   },
   json: {
     group: 'core',
     label: 'JSON Schema',
+    help: 'Draft 2020-12 JSON Schema for interoperable validation and tooling.',
     language: 'json',
     fileName: (schemaFileName) => {
       const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
@@ -120,30 +123,35 @@ const OUTPUT_METADATA: Record<
   convex: {
     group: 'core',
     label: 'Convex schema',
+    help: 'Convex database schema generated from Contexture table types.',
     language: 'typescript',
     fileName: () => 'convex/schema.ts',
   },
   'ai-tool-schemas': {
     group: 'ai',
     label: 'Tool schemas',
+    help: 'JSON Schema tool definitions for AI function/tool calling.',
     language: 'json',
     fileName: () => '.contexture/ai-tool-schemas.json',
   },
   'structured-outputs': {
     group: 'ai',
     label: 'Structured outputs',
+    help: 'Provider-neutral response schemas for model outputs.',
     language: 'json',
     fileName: () => '.contexture/structured-output-schemas.json',
   },
   'mcp-definitions': {
     group: 'ai',
     label: 'MCP definitions',
+    help: 'Machine-readable tool/server definitions for MCP integrations.',
     language: 'json',
     fileName: () => '.contexture/mcp-definitions.json',
   },
   'form-validators': {
     group: 'forms',
     label: 'Form validators',
+    help: 'Type-safe validation helpers backed by generated Zod schemas.',
     language: 'typescript',
     fileName: () => 'form-validators.ts',
   },
@@ -154,6 +162,7 @@ interface OutputOption {
   source: string;
   group: SchemaOutputGroup;
   label: string;
+  help: string;
   language: SchemaOutputLanguage;
   fileName: string;
   enabled: boolean;
@@ -204,6 +213,7 @@ export function SchemaPanel({
         source,
         group: metadata.group,
         label: metadata.label,
+        help: metadata.help,
         language: metadata.language,
         fileName: metadata.fileName(schemaFileName),
         enabled,
@@ -345,7 +355,7 @@ export function SchemaPanel({
                       setActiveOutput(output.type);
                       setHighlightedHtml(null);
                     }}
-                    title={output.enabled ? output.label : `Enable ${output.label}`}
+                    title={output.enabled ? output.help : `Enable ${output.label}: ${output.help}`}
                     className={[
                       'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
                       output.enabled && activeOutput === output.type

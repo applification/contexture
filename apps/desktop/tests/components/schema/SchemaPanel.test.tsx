@@ -183,6 +183,32 @@ describe('SchemaPanel', () => {
       );
     });
 
+    it('provides lightweight help text on output choices', () => {
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          additionalSources={[
+            { type: 'ai-tool-schemas', enabled: false, source: '' },
+            { type: 'form-validators', source: 'export function validate() {}\n' },
+          ]}
+        />,
+      );
+
+      expect(screen.getByTestId('schema-output-zod')).toHaveAttribute(
+        'title',
+        'TypeScript Zod schemas for app/runtime validation.',
+      );
+      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toHaveAttribute(
+        'title',
+        'Enable Tool schemas: JSON Schema tool definitions for AI function/tool calling.',
+      );
+      expect(screen.getByTestId('schema-output-form-validators')).toHaveAttribute(
+        'title',
+        'Type-safe validation helpers backed by generated Zod schemas.',
+      );
+    });
+
     it('switches to an enabled AI source and shows its friendly filename', () => {
       render(
         <SchemaPanel
