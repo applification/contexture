@@ -9,7 +9,7 @@
  */
 
 import { SchemaPanel } from '@renderer/components/schema/SchemaPanel';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Keep shiki init pending forever so the panel renders the plain
@@ -183,7 +183,7 @@ describe('SchemaPanel', () => {
       );
     });
 
-    it('provides lightweight help text on output choices', () => {
+    it('provides lightweight tooltip help on output choices', async () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -195,18 +195,21 @@ describe('SchemaPanel', () => {
         />,
       );
 
-      expect(screen.getByTestId('schema-output-zod')).toHaveAttribute(
-        'title',
-        'TypeScript Zod schemas for app/runtime validation.',
-      );
-      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toHaveAttribute(
-        'title',
-        'Enable Tool schemas: JSON Schema tool definitions for AI function/tool calling.',
-      );
-      expect(screen.getByTestId('schema-output-form-validators')).toHaveAttribute(
-        'title',
-        'Type-safe validation helpers backed by generated Zod schemas.',
-      );
+      fireEvent.focus(screen.getByTestId('schema-output-ai-tool-schemas'));
+      await waitFor(() => {
+        expect(
+          screen.getAllByText(/Enable Tool schemas: JSON Schema tool definitions/i).length,
+        ).toBeGreaterThan(0);
+      });
+
+      fireEvent.blur(screen.getByTestId('schema-output-ai-tool-schemas'));
+      fireEvent.focus(screen.getByTestId('schema-output-form-validators'));
+      await waitFor(() => {
+        expect(
+          screen.getAllByText(/Type-safe validation helpers backed by generated Zod schemas/i)
+            .length,
+        ).toBeGreaterThan(0);
+      });
     });
 
     it('switches to an enabled AI source and shows its friendly filename', () => {

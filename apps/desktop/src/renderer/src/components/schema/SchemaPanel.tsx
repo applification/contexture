@@ -28,6 +28,7 @@ import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'l
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
 export type SchemaOutputType =
@@ -337,38 +338,52 @@ export function SchemaPanel({
               <div className="w-11 shrink-0 px-0.5 py-1.5 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/50">
                 {label}
               </div>
-              <div className="flex min-w-0 flex-1 flex-wrap gap-1">
-                {groupOutputs.map((output) => (
-                  <button
-                    key={output.type}
-                    type="button"
-                    role="option"
-                    aria-selected={output.enabled && activeOutput === output.type}
-                    data-testid={`schema-output-${output.type}`}
-                    onClick={() => {
-                      if (!output.enabled) {
-                        setActiveOutput(output.type);
-                        setHighlightedHtml(null);
-                        onEnableOutput?.(output.type as SchemaPanelAdditionalSource['type']);
-                        return;
-                      }
-                      setActiveOutput(output.type);
-                      setHighlightedHtml(null);
-                    }}
-                    title={output.enabled ? output.help : `Enable ${output.label}: ${output.help}`}
-                    className={[
-                      'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
-                      output.enabled && activeOutput === output.type
-                        ? 'bg-primary text-primary-foreground'
-                        : !output.enabled
-                          ? 'border border-dashed border-border/80 text-muted-foreground/60 hover:border-border hover:bg-muted hover:text-foreground'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    ].join(' ')}
-                  >
-                    <span className="truncate">{output.label}</span>
-                  </button>
-                ))}
-              </div>
+              <TooltipProvider delayDuration={250}>
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+                  {groupOutputs.map((output) => {
+                    const tooltip = output.enabled
+                      ? output.help
+                      : `Enable ${output.label}: ${output.help}`;
+                    return (
+                      <Tooltip key={output.type}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={output.enabled && activeOutput === output.type}
+                            data-testid={`schema-output-${output.type}`}
+                            onClick={() => {
+                              if (!output.enabled) {
+                                setActiveOutput(output.type);
+                                setHighlightedHtml(null);
+                                onEnableOutput?.(
+                                  output.type as SchemaPanelAdditionalSource['type'],
+                                );
+                                return;
+                              }
+                              setActiveOutput(output.type);
+                              setHighlightedHtml(null);
+                            }}
+                            className={[
+                              'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
+                              output.enabled && activeOutput === output.type
+                                ? 'bg-primary text-primary-foreground'
+                                : !output.enabled
+                                  ? 'border border-dashed border-border/80 text-muted-foreground/60 hover:border-border hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                            ].join(' ')}
+                          >
+                            <span className="truncate">{output.label}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-64 text-xs leading-snug">
+                          {tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
             </div>
           );
         })}
