@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { type GeneratedBundleFs, writeGeneratedBundle } from './generated-bundle-writer';
 import { load } from './load';
 import { type ApplyResult, apply, type Op } from './ops';
-import { assertWritableContextureBundleIrPath } from './paths';
+import { assertContextureIrPath } from './paths';
 import type { StdlibCatalog } from './semantic-validation';
 
 export interface FileBackedFs extends GeneratedBundleFs {
@@ -51,7 +51,7 @@ export function createFileBackedForward(
   const fs = options.fs ?? nodeFileBackedFs;
 
   return async function forward(op: Op): Promise<ApplyResult> {
-    const resolvedIrPath = await assertWritableContextureBundleIrPath(irPath, fs);
+    const resolvedIrPath = assertContextureIrPath(irPath);
     const raw = await fs.readFile(resolvedIrPath);
     const { schema } = load(raw);
     const result = apply(schema, op, options.stdlib);

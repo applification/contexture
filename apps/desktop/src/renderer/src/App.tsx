@@ -19,14 +19,13 @@
  * sidebar button).
  */
 
-import { emitAiToolSchemas } from '@contexture/core/emit-ai-tool-schemas';
-import { emitConvexSchema } from '@contexture/core/emit-convex';
-import { emitFormValidators } from '@contexture/core/emit-form-validators';
-import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
-import { emitMcpDefinitions } from '@contexture/core/emit-mcp-definitions';
-import { emitStructuredOutputSchemas } from '@contexture/core/emit-structured-output-schemas';
-import { emit as emitZod } from '@contexture/core/emit-zod';
-import { baseNameFor } from '@contexture/core/paths';
+import type { Layout } from '@contexture/core';
+import {
+  emitGeneratedTarget,
+  enableGeneratedTarget,
+  isGeneratedTargetEnabled,
+  previewableGeneratedTargets,
+} from '@contexture/core/generated-targets';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -40,7 +39,7 @@ import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { DriftBanner } from './components/hud/DriftBanner';
-import { SchemaPanel, type SchemaPanelAdditionalSource } from './components/schema/SchemaPanel';
+import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -59,7 +58,6 @@ import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
-import type { Layout } from './model/layout';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { useDocumentStore } from './store/document';
 import { useGraphSelectionStore } from './store/selection';
@@ -236,103 +234,56 @@ export default function App(): React.JSX.Element {
   const filePath = useDocumentStore((s) => s.filePath);
 
   const schemaEmissions = useMemo((): {
-    zodSource: string;
-    jsonSource: string;
-    convexSource: string;
-    additionalSources: SchemaPanelAdditionalSource[];
+    sources: SchemaPanelSource[];
     error: string | null;
   } => {
     if (activeTab !== 'schema') {
       return {
-        zodSource: '',
-        jsonSource: '',
-        convexSource: '',
-        additionalSources: [],
+        sources: [],
         error: null,
       };
     }
     const irPath = filePath ?? 'schema.contexture.json';
-    let zodSource = '';
-    let jsonSource = '';
-    let convexSource = '';
-    const additionalSources: SchemaPanelAdditionalSource[] = [];
+    const sources: SchemaPanelSource[] = [];
     let error: string | null = null;
 
-    try {
-      zodSource = emitZod(schema, irPath, { stdlibNamespaces: STDLIB_REGISTRY.namespaces });
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      return { zodSource, jsonSource, convexSource, additionalSources, error };
-    }
-
-    try {
-      jsonSource = JSON.stringify(emitJsonSchema(schema, undefined, irPath), null, 2);
-    } catch {
-      // Non-fatal: JSON Schema tab will render empty
-    }
-
-    try {
-      convexSource = emitConvexSchema(schema, irPath);
-    } catch {
-      // Non-fatal: Convex tab will render empty
-    }
-
-    const optionalOutputSources = {
-      'ai-tool-schemas': () => `${JSON.stringify(emitAiToolSchemas(schema, irPath), null, 2)}\n`,
-      'structured-outputs': () =>
-        `${JSON.stringify(emitStructuredOutputSchemas(schema, irPath), null, 2)}\n`,
-      'mcp-definitions': () => `${JSON.stringify(emitMcpDefinitions(schema, irPath), null, 2)}\n`,
-      'form-validators': () => {
-        const formValidatorBaseName = filePath ? baseNameFor(filePath) : 'schema';
-        return emitFormValidators(schema, formValidatorBaseName, irPath);
-      },
-    } satisfies Record<SchemaPanelAdditionalSource['type'], () => string>;
-
-    const optionalOutputEnabled = {
-      'ai-tool-schemas': schema.outputs?.aiPipeline?.toolSchemas?.enabled === true,
-      'structured-outputs': schema.outputs?.aiPipeline?.structuredOutputs?.enabled === true,
-      'mcp-definitions': schema.outputs?.aiPipeline?.mcpDefinitions?.enabled === true,
-      'form-validators': schema.outputs?.aiPipeline?.formValidators?.enabled === true,
-    } satisfies Record<SchemaPanelAdditionalSource['type'], boolean>;
-
-    for (const type of Object.keys(
-      optionalOutputSources,
-    ) as SchemaPanelAdditionalSource['type'][]) {
-      if (!optionalOutputEnabled[type]) {
-        additionalSources.push({ type, enabled: false, source: '' });
+    for (const target of previewableGeneratedTargets()) {
+      const enabled = isGeneratedTargetEnabled(schema, target.kind);
+      if (!enabled) {
+        sources.push({ type: target.kind, enabled: false, source: '' });
         continue;
       }
       try {
-        additionalSources.push({ type, enabled: true, source: optionalOutputSources[type]() });
-      } catch {
-        // Non-fatal: failed optional output stays hidden
+        sources.push({
+          type: target.kind,
+          enabled: true,
+          source: emitGeneratedTarget(
+            schema,
+            target.kind,
+            irPath,
+            {},
+            {
+              stdlibNamespaces: STDLIB_REGISTRY.namespaces,
+            },
+          ),
+        });
+      } catch (e) {
+        if (target.kind === 'zod') {
+          error = e instanceof Error ? e.message : String(e);
+          return { sources, error };
+        }
+        // Non-fatal: failed secondary output stays hidden.
       }
     }
 
-    return { zodSource, jsonSource, convexSource, additionalSources, error };
+    return { sources, error };
   }, [activeTab, schema, filePath]);
 
   const enableSchemaOutput = useCallback(
-    (type: SchemaPanelAdditionalSource['type']): void => {
-      const targetByOutput = {
-        'ai-tool-schemas': 'toolSchemas',
-        'structured-outputs': 'structuredOutputs',
-        'mcp-definitions': 'mcpDefinitions',
-        'form-validators': 'formValidators',
-      } as const satisfies Record<SchemaPanelAdditionalSource['type'], string>;
-      const target = targetByOutput[type];
+    (type: SchemaPanelSource['type']): void => {
       useUndoStore.getState().apply({
         kind: 'replace_schema',
-        schema: {
-          ...schema,
-          outputs: {
-            ...(schema.outputs ?? {}),
-            aiPipeline: {
-              ...(schema.outputs?.aiPipeline ?? {}),
-              [target]: { enabled: true },
-            },
-          },
-        },
+        schema: enableGeneratedTarget(schema, type),
       });
     },
     [schema],
@@ -435,10 +386,7 @@ export default function App(): React.JSX.Element {
               </div>
               <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <SchemaPanel
-                  zodSource={schemaEmissions.zodSource}
-                  jsonSource={schemaEmissions.jsonSource}
-                  convexSource={schemaEmissions.convexSource}
-                  additionalSources={schemaEmissions.additionalSources}
+                  sources={schemaEmissions.sources}
                   isEmpty={!hasSchema}
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}

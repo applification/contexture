@@ -13,11 +13,10 @@
  *   6. `recentFiles()` tracks open + save, most-recent first, deduped.
  */
 
+import type { ChatHistory, Layout } from '@contexture/core';
 import type { Schema } from '@contexture/core/ir';
 import { createDocumentStore, type DocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
-import type { ChatHistory } from '@shared/chat-history';
-import type { Layout } from '@shared/layout';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const irPath = '/work/garden.contexture.json';

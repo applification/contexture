@@ -3,10 +3,8 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   assertContextureIrPath,
-  assertWritableContextureBundleIrPath,
   checkGeneratedBundle,
   checkSemantic,
-  contextureDirFor,
   createFileBackedForward,
   createOpTools,
   type FieldDef,
@@ -16,7 +14,6 @@ import {
   load,
   nodeFileBackedFs,
   OpSchema,
-  promoteScratchToBundle,
   type Schema,
   type TypeDef,
   writeGeneratedBundle,
@@ -50,7 +47,6 @@ Read helpers:
   validate [--json]
   emit [--json]
   check-generated [--json]
-  promote [--json]
 
 Schema mutations:
   apply (--op-json <json> | --op-file <path>)
@@ -554,7 +550,7 @@ async function run(argv: string[]): Promise<void> {
   }
 
   if (command === 'emit') {
-    const writableIrPath = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+    const writableIrPath = assertContextureIrPath(irPath);
     const schema = await readSchema(writableIrPath);
     const { emitted, manifest } = await writeGeneratedBundle({
       irPath: writableIrPath,
@@ -567,7 +563,7 @@ async function run(argv: string[]): Promise<void> {
   }
 
   if (command === 'check-generated') {
-    const writableIrPath = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+    const writableIrPath = assertContextureIrPath(irPath);
     const schema = await readSchema(writableIrPath);
     const files = await checkGeneratedBundle(schema, writableIrPath, nodeFileBackedFs);
     const drift = files.filter((file) => file.status !== 'clean');
@@ -596,23 +592,8 @@ async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  if (command === 'promote') {
-    if (await nodeFileBackedFs.dirExists(contextureDirFor(irPath))) {
-      throw new Error(`${irPath} is already a Contexture bundle.`);
-    }
-    const { emitted, manifest } = await promoteScratchToBundle({
-      scratchIrPath: irPath,
-      fs: nodeFileBackedFs,
-    });
-    writeResult(
-      { message: `Promoted ${irPath} to a Contexture bundle.`, emitted, manifest },
-      options.json,
-    );
-    return;
-  }
-
   if (command === 'apply') {
-    const writableIrPath = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+    const writableIrPath = assertContextureIrPath(irPath);
     let opJson = options.opJson;
     if (!opJson && options.opFile) {
       opJson = await Bun.file(options.opFile).text();
@@ -658,7 +639,7 @@ async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const writableIrPath = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+  const writableIrPath = assertContextureIrPath(irPath);
   const forward = createFileBackedForward(writableIrPath);
   const tools = new Map(createOpTools(forward).map((tool) => [tool.name, tool]));
   const { tool: toolName, input } = commandToToolInput(command, args);

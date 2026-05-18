@@ -20,12 +20,12 @@
  * main so follow-up turns resume that thread's prior context.
  */
 
+import type { ChatMessage } from '@contexture/core';
 import { type ChatThread, useChatThreads } from '@renderer/chat/useChatThreads';
 import type {
   SchemaAgentChatState,
   SchemaAgentModelOptionDescriptor,
 } from '@renderer/chat/useSchemaAgentChat';
-import type { ChatMessage } from '@renderer/model/chat-history';
 import { useDocumentStore } from '@renderer/store/document';
 import { code } from '@streamdown/code';
 import { ArrowUp, BotMessageSquare, List, Square, SquarePen } from 'lucide-react';

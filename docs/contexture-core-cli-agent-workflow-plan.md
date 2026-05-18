@@ -37,9 +37,7 @@ packages/core/
     emit-json-schema.ts
     emit-convex.ts
     emit-schema-index.ts
-    emit-table-crud.ts
-    emit-agent-md.ts
-    emit-claude-md.ts
+    generated-targets.ts
   tests/
     apply-semantic-gate.test.ts
     emit-stdlib-imports.test.ts
@@ -50,7 +48,7 @@ packages/core/
 ### Divergences from the original draft (kept on purpose)
 
 - `validation.ts` was renamed to `semantic-validation.ts` to make the layer obvious.
-- The original draft listed only Zod / JSON Schema / Convex emitters. Reality ships more: `emit-schema-index`, `emit-table-crud`, `emit-agent-md`, `emit-claude-md`.
+- The original draft listed only Zod / JSON Schema / Convex emitters. Reality now ships more generated targets through `generated-targets.ts` and the emit pipeline.
 - Two additional modules exist beyond the draft:
   - `pipeline.ts` — `runEmitPipeline(schema, irPath)` runs all emitters and returns a hashed `EmittedManifest` for drift detection.
   - `paths.ts` — single source of truth for bundle paths (`*.schema.ts`, `*.schema.json`, `convex/schema.ts`, `.contexture/{layout,chat,emitted}.json`).
@@ -73,7 +71,7 @@ import {
 } from '@contexture/core';
 ```
 
-Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./semantic-validation`, `./pipeline`, `./paths`, `./file-forward`, `./emit-zod`, `./emit-json-schema`, `./emit-convex`, `./emit-schema-index`, `./emit-table-crud`, `./emit-agent-md`, `./emit-claude-md`.
+Subpaths available: `./ir`, `./load`, `./ops`, `./op-tools`, `./migrations`, `./semantic-validation`, `./pipeline`, `./paths`, `./file-forward`, `./generated-targets`, `./emit-zod`, `./emit-json-schema`, `./emit-convex`, `./emit-schema-index`.
 
 ## Desktop integration
 

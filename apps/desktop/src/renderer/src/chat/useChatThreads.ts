@@ -15,8 +15,9 @@
  * Silent failure is acceptable — losing transcripts never blocks
  * schema authoring.
  */
+
+import type { ChatMessage } from '@contexture/core';
 import { useCallback, useEffect, useState } from 'react';
-import type { ChatMessage } from '../model/chat-history';
 
 export type ProviderKind = 'codex' | 'claude';
 

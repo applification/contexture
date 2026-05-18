@@ -4,7 +4,6 @@ import {
   bundlePathsFor,
   detectDocumentMode,
   initializeDocumentBundle,
-  promoteScratchToBundle,
   type Schema,
 } from '../src';
 
@@ -76,44 +75,5 @@ describe('document bundle policy', () => {
     expect(files.has('/repo/AGENTS.md')).toBe(false);
     expect(files.has('/repo/CLAUDE.md')).toBe(false);
     expect(files.has('/repo/convex/Plot.ts')).toBe(false);
-  });
-
-  it('promotes a scratch IR with default sidecars', async () => {
-    const files = new Map<string, string>([
-      ['/repo/app.contexture.json', `${JSON.stringify(schema, null, 2)}\n`],
-    ]);
-    const fs = {
-      async readFile(path: string) {
-        const value = files.get(path);
-        if (value === undefined) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
-        return value;
-      },
-      async writeFile(path: string, content: string) {
-        files.set(path, content);
-      },
-      async rename(from: string, to: string) {
-        const value = files.get(from);
-        if (value === undefined) throw new Error('missing tmp');
-        files.set(to, value);
-        files.delete(from);
-      },
-      async remove(path: string) {
-        files.delete(path);
-      },
-      async mkdirp(path: string) {
-        files.set(`${path}/.keep`, '');
-      },
-    };
-
-    await promoteScratchToBundle({ scratchIrPath: '/repo/app.contexture.json', fs });
-
-    expect(files.has('/repo/.contexture/layout.json')).toBe(true);
-    expect(files.has('/repo/.contexture/chat.json')).toBe(true);
-    expect(JSON.parse(files.get('/repo/.contexture/chat.json') ?? '{}')).toEqual({
-      version: '1',
-      messages: [],
-    });
-    expect(files.has('/repo/app.schema.ts')).toBe(true);
-    expect(files.has('/repo/AGENTS.md')).toBe(false);
   });
 });

@@ -128,7 +128,7 @@ describe('SchemaPanel', () => {
       const jsonSrc = '{\n  "$schema": "https://json-schema.org/draft/2020-12/schema"\n}';
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} jsonSource={jsonSrc} />);
 
-      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       expect(screen.getByTestId('schema-code').textContent).toContain('$schema');
     });
 
@@ -147,7 +147,7 @@ describe('SchemaPanel', () => {
           zodSource="zod"
           additionalSources={[
             { type: 'ai-tool-schemas', source: '{\n  "tools": []\n}\n' },
-            { type: 'structured-outputs', source: '' },
+            { type: 'structured-output-schemas', source: '' },
             { type: 'form-validators', source: 'export function validate() {}\n' },
           ]}
         />,
@@ -156,7 +156,9 @@ describe('SchemaPanel', () => {
       expect(screen.getByTestId('schema-group-core')).toHaveTextContent('Zod schema');
       expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
       expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
-      expect(screen.queryByTestId('schema-output-structured-outputs')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('schema-output-structured-output-schemas'),
+      ).not.toBeInTheDocument();
     });
 
     it('shows disabled optional outputs as enableable choices', () => {
@@ -235,7 +237,7 @@ describe('SchemaPanel', () => {
         <SchemaPanel {...DEFAULT_PROPS} zodSource="zod" jsonSource={jsonSrc} onCopy={onCopy} />,
       );
 
-      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       fireEvent.click(screen.getByTestId('schema-copy'));
       expect(onCopy).toHaveBeenCalledWith(jsonSrc);
     });
@@ -256,7 +258,7 @@ describe('SchemaPanel', () => {
       fireEvent.click(screen.getByTestId('schema-open-generated'));
       expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.ts');
 
-      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       fireEvent.click(screen.getByTestId('schema-open-generated'));
       expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.json');
 
@@ -289,7 +291,7 @@ describe('SchemaPanel', () => {
           schemaFileName="allotment.schema.ts"
         />,
       );
-      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('allotment.schema.json');
     });
 
@@ -310,7 +312,7 @@ describe('SchemaPanel', () => {
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource="a" jsonSource="b" />);
       // Default schemaFileName is 'schema.ts' — no '.schema.ts' segment, so the
       // fallback .ts → .json replacement must fire.
-      fireEvent.click(screen.getByTestId('schema-output-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('schema.json');
     });
   });

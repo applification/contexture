@@ -14,9 +14,8 @@
  */
 
 import { join } from 'node:path';
+import type { ChatHistory, Layout } from '@contexture/core';
 import { IRSchema, type Schema } from '@contexture/core';
-import type { ChatHistory } from '@shared/chat-history';
-import type { Layout } from '@shared/layout';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import { z } from 'zod';
 import {

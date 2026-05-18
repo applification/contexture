@@ -18,9 +18,9 @@ async function fixtureProject() {
   return { dir, irPath };
 }
 
-async function fixtureScratch() {
-  const dir = await mkdtemp(join(tmpdir(), 'contexture-cli-scratch-'));
-  const irPath = join(dir, 'scratch.contexture.json');
+async function fixtureBareIr() {
+  const dir = await mkdtemp(join(tmpdir(), 'contexture-cli-bare-'));
+  const irPath = join(dir, 'bare.contexture.json');
   const schema = {
     version: '1',
     types: [{ kind: 'object', name: 'Note', fields: [] }],
@@ -112,8 +112,8 @@ describe('@contexture/cli', () => {
     expect(result.stdout).toContain('Post [table]');
   });
 
-  it('allows read-only inspection of scratch .contexture.json files', async () => {
-    const { dir, irPath } = await fixtureScratch();
+  it('allows read-only inspection of legacy bare .contexture.json files', async () => {
+    const { dir, irPath } = await fixtureBareIr();
     const result = await runCli(dir, ['inspect', '--ir', irPath, '--json']);
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({
@@ -247,46 +247,24 @@ describe('@contexture/cli', () => {
     });
   });
 
-  it('rejects generated-output commands for scratch IR paths', async () => {
-    const { dir, irPath } = await fixtureScratch();
+  it('emits generated files and materializes sidecars for legacy bare IR paths', async () => {
+    const { dir, irPath } = await fixtureBareIr();
     const result = await runCli(dir, ['emit', '--ir', irPath, '--json']);
-    expect(result.exitCode).toBe(1);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      ok: false,
-      error: { message: expect.stringContaining('bundle mode') },
-    });
-  });
-
-  it('promotes a scratch IR into a Contexture bundle', async () => {
-    const { dir, irPath } = await fixtureScratch();
-    const result = await runCli(dir, ['promote', '--ir', irPath, '--json']);
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({
       ok: true,
-      message: expect.stringContaining('Promoted'),
+      message: expect.stringContaining('Emitted'),
     });
     await expect(readFile(join(dir, '.contexture/layout.json'), 'utf8')).resolves.toContain(
       '"positions"',
     );
     await expect(readFile(join(dir, '.contexture/emitted.json'), 'utf8')).resolves.toContain(
-      'scratch.schema.ts',
+      'bare.schema.ts',
     );
-
-    const applyResult = await runCli(dir, [
-      'add-field',
-      'Note',
-      'body',
-      '{"kind":"string"}',
-      '--ir',
-      irPath,
-      '--json',
-    ]);
-    expect(applyResult.exitCode).toBe(0);
   });
 
-  it('applies write commands to arbitrary bundle directories', async () => {
-    const { dir, irPath } = await fixtureScratch();
-    await mkdir(join(dir, '.contexture'), { recursive: true });
+  it('applies write commands to legacy bare IR paths', async () => {
+    const { dir, irPath } = await fixtureBareIr();
     const result = await runCli(dir, [
       'add-field',
       'Note',
@@ -297,7 +275,10 @@ describe('@contexture/cli', () => {
       '--json',
     ]);
     expect(result.exitCode).toBe(0);
-    await expect(readFile(join(dir, 'scratch.schema.ts'), 'utf8')).resolves.toContain('body');
+    await expect(readFile(join(dir, 'bare.schema.ts'), 'utf8')).resolves.toContain('body');
+    await expect(readFile(join(dir, '.contexture/emitted.json'), 'utf8')).resolves.toContain(
+      'bare.schema.ts',
+    );
   });
 
   it('check-generated detects drift after manual edits', async () => {

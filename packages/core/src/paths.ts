@@ -24,10 +24,6 @@ export interface BundlePaths {
   formValidators: string;
 }
 
-export interface ContextureBundleProbeFs {
-  dirExists(path: string): Promise<boolean>;
-}
-
 export type GeneratedTargetKind =
   | 'zod'
   | 'json-schema'
@@ -59,19 +55,6 @@ export function assertContextureIrPath(path: string): string {
   const normalized = normalizeContexturePath(path);
   if (!normalized.endsWith(IR_SUFFIX)) {
     throw new Error(`Expected a ${IR_SUFFIX} path, got: ${path}`);
-  }
-  return normalized;
-}
-
-export async function assertWritableContextureBundleIrPath(
-  path: string,
-  fs: ContextureBundleProbeFs,
-): Promise<string> {
-  const normalized = assertContextureIrPath(path);
-  if (!(await fs.dirExists(contextureDirFor(normalized)))) {
-    throw new Error(
-      'Writable Contexture operations require bundle mode: create a sibling .contexture/ directory by promoting or initializing the bundle first.',
-    );
   }
   return normalized;
 }

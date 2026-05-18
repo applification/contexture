@@ -14,9 +14,9 @@ async function fixtureIr(schema: unknown): Promise<string> {
   return irPath;
 }
 
-async function fixtureScratchIr(schema: unknown): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'contexture-mcp-scratch-'));
-  const irPath = join(dir, 'scratch.contexture.json');
+async function fixtureBareIr(schema: unknown): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'contexture-mcp-bare-'));
+  const irPath = join(dir, 'bare.contexture.json');
   await writeFile(irPath, `${JSON.stringify(schema, null, 2)}\n`, 'utf8');
   return irPath;
 }
@@ -117,8 +117,8 @@ describe('Contexture MCP server', () => {
     });
   });
 
-  it('allows read-only inspection of scratch .contexture.json files', async () => {
-    const irPath = await fixtureScratchIr({
+  it('allows read-only inspection of legacy bare .contexture.json files', async () => {
+    const irPath = await fixtureBareIr({
       version: '1',
       types: [{ kind: 'object', name: 'Note', fields: [] }],
     });
@@ -366,7 +366,7 @@ describe('Contexture MCP server', () => {
   });
 
   it('applies an op to an arbitrary bundle directory', async () => {
-    const irPath = await fixtureScratchIr({
+    const irPath = await fixtureBareIr({
       version: '1',
       types: [{ kind: 'object', name: 'Note', fields: [] }],
     });
@@ -451,8 +451,8 @@ describe('Contexture MCP server', () => {
     });
   });
 
-  it('rejects write-capable tools for scratch IR paths', async () => {
-    const irPath = await fixtureScratchIr({
+  it('materializes bundle sidecars for write-capable tools against legacy bare IR paths', async () => {
+    const irPath = await fixtureBareIr({
       version: '1',
       types: [{ kind: 'object', name: 'Note', fields: [] }],
     });
@@ -462,14 +462,13 @@ describe('Contexture MCP server', () => {
         name: 'emit_contexture',
         arguments: { irPath },
       });
-      expect(emitResult).toMatchObject({
-        isError: true,
-        content: [
-          expect.objectContaining({
-            text: expect.stringContaining('bundle mode'),
-          }),
-        ],
+      expect(emitResult.structuredContent).toMatchObject({
+        path: irPath,
+        emitted: expect.arrayContaining([irPath.replace(/\.contexture\.json$/, '.schema.ts')]),
       });
+      await expect(
+        readFile(join(irPath, '..', '.contexture/emitted.json'), 'utf8'),
+      ).resolves.toContain('bare.schema.ts');
 
       const applyResult = await client.callTool({
         name: 'apply_contexture_op',
@@ -482,14 +481,14 @@ describe('Contexture MCP server', () => {
           },
         },
       });
-      expect(applyResult).toMatchObject({
-        isError: true,
-        content: [
-          expect.objectContaining({
-            text: expect.stringContaining('bundle mode'),
-          }),
-        ],
+      expect(applyResult.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_field',
       });
+      await expect(
+        readFile(irPath.replace(/\.contexture\.json$/, '.schema.ts'), 'utf8'),
+      ).resolves.toContain('body');
     });
   });
 });

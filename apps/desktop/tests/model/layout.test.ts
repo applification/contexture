@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT, loadLayout, renameLayoutKey, saveLayout } from '@renderer/model/layout';
+import { DEFAULT_LAYOUT, loadLayout, renameLayoutKey, saveLayout } from '@contexture/core';
 import { describe, expect, it } from 'vitest';
 
 describe('layout sidecar', () => {

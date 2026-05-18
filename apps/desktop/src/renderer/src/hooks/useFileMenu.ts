@@ -26,11 +26,10 @@
  * subscriptions in a single `useEffect`.
  */
 
+import type { ChatHistory, Layout } from '@contexture/core';
 import { load } from '@contexture/core/load';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useCallback, useEffect, useRef } from 'react';
-import type { ChatHistory } from '../model/chat-history';
-import type { Layout } from '../model/layout';
 import { validate } from '../services/validation';
 import { useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';
