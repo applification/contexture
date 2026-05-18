@@ -16,16 +16,16 @@ describe('handleOpen (routes through DocumentStore)', () => {
     setDocumentStoreForTesting(null);
   });
 
-  it('returns mode: scratch when no .contexture/ sibling exists', async () => {
+  it('returns mode: bundle when no .contexture/ sibling exists', async () => {
     const fs = createMemFsAdapter({ [irPath]: JSON.stringify(schema) });
     setDocumentStoreForTesting(
       createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' }),
     );
     const result = await handleOpen(irPath);
-    expect(result?.mode).toBe('scratch');
+    expect(result?.mode).toBe('bundle');
   });
 
-  it('returns mode: project when .contexture/ marker directory sits next to the IR', async () => {
+  it('returns mode: bundle when .contexture/ marker directory sits next to the IR', async () => {
     const fs = createMemFsAdapter({
       [irPath]: JSON.stringify(schema),
       '/work/.contexture/.keep': '',
@@ -34,7 +34,7 @@ describe('handleOpen (routes through DocumentStore)', () => {
       createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' }),
     );
     const result = await handleOpen(irPath);
-    expect(result?.mode).toBe('project');
+    expect(result?.mode).toBe('bundle');
   });
 
   it('returns null when the IR file does not exist', async () => {

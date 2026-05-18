@@ -8,9 +8,8 @@ schema, JSON Schema, the schema-index barrel) is regenerated from it.
 
 - **Do not edit generated schema files.** They carry a
   `@contexture-generated` header and will be overwritten on the next
-  regenerate. Files marked `@contexture-seeded` (e.g. table CRUD
-  scaffolds, root `AGENTS.md` / `CLAUDE.md`) are seeded once and owned by
-  you after that.
+  regenerate. Contexture no longer seeds repo-owned files automatically;
+  use prompts, MCP setup, or the Contexture integration skill for repo wiring.
 - **Treat `*.contexture.json` as the primary domain model.** Add or change
   entities, fields, refs, enums, indexes, and table flags there first.
 - **Regenerate after every model change.** Run `contexture emit`.
@@ -20,10 +19,15 @@ schema, JSON Schema, the schema-index barrel) is regenerated from it.
 ## CLI quick reference
 
 The CLI auto-discovers a single `*.contexture.json` in
-`./packages/contexture/` or the current directory. Pass `--ir <path>`
-if you need to target a specific file. Add `--json` to any command to
+`./packages/contexture/` or the current directory. Write-capable commands require
+Bundle mode: a sibling `.contexture/` directory next to the IR. Pass
+`--ir <path>` if you need to target a specific file. Add `--json` to any command to
 get a machine-readable envelope (`{ ok: true, ... }` or
 `{ ok: false, error: { message, code } }`).
+
+The desktop app creates that bundle automatically on Save / Save As. Bare
+legacy `.contexture.json` files can still be opened for import, and saving them
+materializes `.contexture/` sidecars plus generated outputs next to the IR.
 
 ### Inspect
 

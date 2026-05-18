@@ -25,7 +25,7 @@ Default entry seams:
 
 - Schema mutation features enter through the Op vocabulary, Op applier, and semantic gate.
 - Generated target features enter through `@contexture/core` emitters, output config, `GeneratedTargetKind`, the generated target registry, and the emit pipeline.
-- Document lifecycle features enter through the Document bundle Module: Contexture IR, Sidecar files, Generated targets, Seeded artifacts, and Emitted manifest handling.
+- Document lifecycle features enter through the Document bundle Module: Contexture IR, sidecar files, generated targets, output configuration, and emitted manifest handling.
 - Agent/provider features enter through the Provider runtime Interface and Schema agent driver, preserving Schema-only mode.
 - Drift and Reconcile features enter through generated bundle checks, the emitted manifest, Reconcile proposal generation, and generated target metadata.
 - CLI and MCP features enter through `@contexture/core` or file-backed core helpers, then expose that capability through the CLI/MCP Adapter.

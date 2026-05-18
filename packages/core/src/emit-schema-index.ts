@@ -1,7 +1,7 @@
 /**
- * Pure emitter for `packages/contexture/index.ts` — the workspace re-export that
- * lets `apps/*` import schemas as `import { Post } from '@<project>/contexture'`
- * without caring which sibling `.schema.ts` module a name lives in.
+ * Pure emitter for the generated schema barrel inside a Contexture bundle. It
+ * lets app code import schemas from one stable module without caring which
+ * sibling `.schema.ts` module a name lives in.
  *
  * With a single IR per project the output is trivial: one re-export from
  * the sibling `<base>.schema` module. When Contexture grows multi-IR

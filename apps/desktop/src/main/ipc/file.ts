@@ -62,7 +62,7 @@ export interface OpenWarning {
 
 export interface OpenResult {
   irPath: string;
-  /** `scratch` = bare IR on disk; `project` = `.contexture/` marker present. */
+  /** Desktop opens legacy bare IRs directly into bundle mode. */
   mode: DocumentMode;
   /** Raw IR text — the renderer calls `load()` to parse + surface errors. */
   content: string;
@@ -148,7 +148,7 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
 
   ipcMain.handle('file:pick-contexture-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choose Scratch IR File',
+      title: 'Choose Contexture File',
       filters: [CONTEXTURE_OPEN_FILTER],
       properties: ['openFile'],
     });

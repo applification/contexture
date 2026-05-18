@@ -1,11 +1,9 @@
 /**
- * Regression coverage for scratch-mode fixtures.
+ * Regression coverage for the bundled allotment fixture.
  *
- * `samples/allotment.contexture.json` is the canonical bare-IR bundle
- * shipped inside the app — no `.contexture/` sidecar, no emitted
- * artefacts. Opening + saving it through `DocumentStore` must remain
- * byte-clean for scratch users, regardless of what changes in project
- * mode.
+ * `samples/allotment.contexture.json` is the canonical bare IR shipped
+ * inside the app. Opening it should be read-only; saving it should
+ * initialize the full document bundle.
  */
 import { bundlePathsFor, createDocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
@@ -16,17 +14,17 @@ import allotment from '../../src/renderer/src/samples/allotment.contexture.json'
 
 const IR_PATH = '/work/allotment.contexture.json';
 
-describe('scratch-mode fixture', () => {
-  it('opens the allotment sample as scratch', async () => {
+describe('allotment fixture', () => {
+  it('opens the allotment sample in bundle mode', async () => {
     const fs = createMemFsAdapter({ [IR_PATH]: JSON.stringify(allotment) });
     const store = createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' });
     const bundle = await store.open(IR_PATH);
-    expect(bundle.mode).toBe('scratch');
+    expect(bundle.mode).toBe('bundle');
     expect(bundle.schema.types.length).toBe(allotment.types.length);
     expect(bundle.warnings).toEqual([]);
   });
 
-  it('save in scratch mode writes only the IR — no emit/manifest sidecars', async () => {
+  it('save initializes bundle sidecars and generated files', async () => {
     const fs = createMemFsAdapter({ [IR_PATH]: JSON.stringify(allotment) });
     const store = createDocumentStore({ fs, recentFilesPath: '/userData/recent-files.json' });
     const bundle = await store.open(IR_PATH);
@@ -38,12 +36,12 @@ describe('scratch-mode fixture', () => {
     });
     const paths = bundlePathsFor(IR_PATH);
     expect(await fs.fileExists(paths.ir)).toBe(true);
-    expect(await fs.fileExists(paths.layout)).toBe(false);
-    expect(await fs.fileExists(paths.chat)).toBe(false);
-    expect(await fs.fileExists(paths.emitted)).toBe(false);
-    expect(await fs.fileExists(paths.schemaTs)).toBe(false);
-    expect(await fs.fileExists(paths.schemaJson)).toBe(false);
-    expect(await fs.fileExists(paths.convex)).toBe(false);
+    expect(await fs.fileExists(paths.layout)).toBe(true);
+    expect(await fs.fileExists(paths.chat)).toBe(true);
+    expect(await fs.fileExists(paths.emitted)).toBe(true);
+    expect(await fs.fileExists(paths.schemaTs)).toBe(true);
+    expect(await fs.fileExists(paths.schemaJson)).toBe(true);
+    expect(await fs.fileExists(paths.convex)).toBe(true);
   });
 
   it('open → save → reopen preserves all types', async () => {
@@ -57,6 +55,7 @@ describe('scratch-mode fixture', () => {
       chat: first.chat,
     });
     const second = await store.open(IR_PATH);
+    expect(second.mode).toBe('bundle');
     expect(second.schema.types.map((t) => t.name)).toEqual(first.schema.types.map((t) => t.name));
   });
 });

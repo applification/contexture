@@ -11,23 +11,24 @@ describe('emit (CLAUDE.md)', () => {
   it('tells coding agents the schema source-of-truth rule', () => {
     const out = emit('my-blog');
     expect(out).toMatch(/source of truth/i);
-    expect(out).toMatch(/packages\/contexture\/my-blog\.contexture\.json/);
+    expect(out).toMatch(/my-blog\.contexture\.json/);
   });
 
-  it('warns against editing the generated Convex schema directly', () => {
+  it('warns against editing generated files directly', () => {
     const out = emit('my-blog');
-    expect(out).toMatch(/packages\/contexture\/convex\/schema\.ts/);
-    expect(out).toMatch(/do not edit|regenerat/i);
+    expect(out).toMatch(/Do not edit generated files directly/i);
+    expect(out).toMatch(/drift\/reconcile/i);
   });
 
-  it('names the workspace package as @{{PROJECT_NAME}}/contexture', () => {
+  it('tells agents to inspect the existing repo instead of assuming a framework', () => {
     const out = emit('my-blog');
-    expect(out).toContain('@my-blog/contexture');
+    expect(out).toMatch(/Inspect the existing repo/i);
+    expect(out).toMatch(/actual framework/i);
   });
 
-  it('mentions the .contexture/ internal directory as off-limits', () => {
+  it('mentions MCP as the safe agent integration surface', () => {
     const out = emit('my-blog');
-    expect(out).toContain('.contexture/');
+    expect(out).toMatch(/MCP server/i);
   });
 
   it('does not start with a @contexture-generated banner — CLAUDE.md is user-owned', () => {

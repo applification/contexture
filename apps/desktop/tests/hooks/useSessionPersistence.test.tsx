@@ -28,7 +28,7 @@ beforeEach(() => {
   useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   const d = useDocumentStore.getState();
   d.setFilePath(null);
-  d.setMode('scratch');
+  d.setMode('bundle');
   d.markClean();
 });
 

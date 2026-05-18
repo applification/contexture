@@ -1,17 +1,13 @@
 /**
- * Pure emitter for `apps/web/convex/<table>.ts` — the starter CRUD file
- * scaffolded for each table-flagged object. Unlike the other emitters
- * in this folder, the output is `@contexture-seeded`: written once on
- * first project-mode open and then left alone. Users and coding agents
- * own this file from that point on, so the header specifically calls
- * out that the file is editable and will not be regenerated.
+ * Pure emitter for optional starter Convex CRUD functions. Contexture does not
+ * write this automatically during Document bundle open/initialize; callers may
+ * expose it as copyable integration guidance.
  *
  * Pure function: same IR in, same string out, no I/O.
  */
 import type { Schema, TypeDef } from './ir';
 
-const BANNER =
-  '// @contexture-seeded — Contexture created this on scaffold. Edit freely; not regenerated.';
+const BANNER = '// Contexture integration guidance — edit freely; not regenerated.';
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 

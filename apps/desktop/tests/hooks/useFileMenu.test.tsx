@@ -32,7 +32,6 @@ function mockFileBridge(): {
       onMenuOpen: () => () => undefined,
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
-      onMenuNewProject: () => () => undefined,
       pickDirectory: vi.fn(async () => null),
     },
   };
@@ -223,40 +222,57 @@ describe('useFileMenu', () => {
     );
   });
 
-  it('handleOpen hydrates mode on the document store (scratch)', async () => {
+  it('handleOpen defaults legacy inputs to bundle mode in the renderer', async () => {
     const bridge = mockFileBridge();
     bridge.openDialog.mockResolvedValueOnce({
       irPath: '/tmp/x.contexture.json',
-      mode: 'scratch',
       content: JSON.stringify({ version: '1', types: [] }),
     });
     const { result } = renderHook(() => useFileMenu());
     await act(async () => {
       await result.current.handleOpen();
     });
-    expect(useDocumentStore.getState().mode).toBe('scratch');
+    expect(useDocumentStore.getState().mode).toBe('bundle');
   });
 
-  it('handleOpen hydrates mode on the document store (project)', async () => {
+  it('handleOpen hydrates mode on the document store (bundle)', async () => {
     const bridge = mockFileBridge();
     bridge.openDialog.mockResolvedValueOnce({
       irPath: '/tmp/x.contexture.json',
-      mode: 'project',
+      mode: 'bundle',
       content: JSON.stringify({ version: '1', types: [] }),
     });
     const { result } = renderHook(() => useFileMenu());
     await act(async () => {
       await result.current.handleOpen();
     });
-    expect(useDocumentStore.getState().mode).toBe('project');
+    expect(useDocumentStore.getState().mode).toBe('bundle');
   });
 
-  it('handleNew resets mode to scratch', () => {
+  it('handleNew resets mode to bundle', () => {
     mockFileBridge();
-    useDocumentStore.getState().setMode('project');
+    useDocumentStore.getState().setMode('bundle');
     const { result } = renderHook(() => useFileMenu());
     act(() => result.current.handleNew());
-    expect(useDocumentStore.getState().mode).toBe('scratch');
+    expect(useDocumentStore.getState().mode).toBe('bundle');
+  });
+
+  it('handleSave against an opened legacy file keeps bundle mode', async () => {
+    const bridge = mockFileBridge();
+    useDocumentStore.getState().setFilePath('/tmp/x.contexture.json');
+    useDocumentStore.getState().setMode('bundle');
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    const { result } = renderHook(() => useFileMenu());
+    await act(async () => {
+      await result.current.handleSave();
+    });
+    expect(bridge.save).toHaveBeenCalledWith(
+      expect.objectContaining({ irPath: '/tmp/x.contexture.json' }),
+    );
+    expect(useDocumentStore.getState().mode).toBe('bundle');
   });
 
   it('handleOpenPath opens via the recent-files channel', async () => {

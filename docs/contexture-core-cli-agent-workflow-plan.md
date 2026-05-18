@@ -198,32 +198,24 @@ A coding agent in a downstream app can be pointed at a short doc (or skill) and 
 - ✅ `docs/agent-contexture-workflow.md` — the canonical workflow doc.
   Covers the rules, CLI surface, recommended loop, and the
   `check-generated` CI wiring pattern for downstream apps.
-- ✅ Emitter header audit. Every emitter in `packages/core/src/emit-*.ts`
-  carries the right marker:
-  - `@contexture-generated` (regenerated every save): `emit-zod`,
-    `emit-json-schema`, `emit-schema-index`, `emit-convex`.
-  - `@contexture-seeded` (written once, owned by user thereafter):
-    `emit-table-crud`, `emit-agent-md`, `emit-claude-md`.
-- Optional skill (`.claude/skills/contexture-domain-model/SKILL.md`) and
-  downstream-scaffold command (`contexture init-agent-docs`) are still
-  open. Both are tracked in the backlog below.
+- ✅ Emitter header audit. Generated emitters carry `@contexture-generated`;
+  optional guidance emitters are not written automatically by the Document
+  bundle lifecycle.
+- Optional skill (`skills.sh` `contexture-integration`) is still open and is the
+  preferred home for repo mutation guidance.
 
 ## Exit criteria — met
 
 - `docs/agent-contexture-workflow.md` exists and matches the actual CLI surface.
-- Every emitter includes the right marker.
+- Generated emitters include the right marker.
 - The recommended loop is documented.
 
 ---
 
 # Backlog (post-Phase 3)
 
-- Optional `contexture init-agent-docs` command for downstream
-  scaffolding (copies `docs/agent-contexture-workflow.md` into a
-  downstream app's root agent docs).
-- Optional Claude Code skill at
-  `.claude/skills/contexture-domain-model/SKILL.md` that triggers on
-  domain / Convex / Zod edits and points to the workflow doc.
+- Optional `skills.sh` `contexture-integration` skill that triggers on domain,
+  Convex, Zod, JSON Schema, or MCP setup work and points to the workflow doc.
 
 ---
 

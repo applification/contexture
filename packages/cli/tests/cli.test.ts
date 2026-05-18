@@ -13,7 +13,7 @@ async function fixtureProject() {
     version: '1',
     types: [{ kind: 'object', name: 'Post', table: true, fields: [] }],
   };
-  await mkdir(join(dir, 'packages/contexture'), { recursive: true });
+  await mkdir(join(dir, 'packages/contexture/.contexture'), { recursive: true });
   await writeFile(irPath, `${JSON.stringify(schema, null, 2)}\n`, 'utf8');
   return { dir, irPath };
 }
@@ -253,8 +253,51 @@ describe('@contexture/cli', () => {
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(result.stdout)).toMatchObject({
       ok: false,
-      error: { message: expect.stringContaining('packages/contexture/*.contexture.json') },
+      error: { message: expect.stringContaining('bundle mode') },
     });
+  });
+
+  it('promotes a scratch IR into a Contexture bundle', async () => {
+    const { dir, irPath } = await fixtureScratch();
+    const result = await runCli(dir, ['promote', '--ir', irPath, '--json']);
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      message: expect.stringContaining('Promoted'),
+    });
+    await expect(readFile(join(dir, '.contexture/layout.json'), 'utf8')).resolves.toContain(
+      '"positions"',
+    );
+    await expect(readFile(join(dir, '.contexture/emitted.json'), 'utf8')).resolves.toContain(
+      'scratch.schema.ts',
+    );
+
+    const applyResult = await runCli(dir, [
+      'add-field',
+      'Note',
+      'body',
+      '{"kind":"string"}',
+      '--ir',
+      irPath,
+      '--json',
+    ]);
+    expect(applyResult.exitCode).toBe(0);
+  });
+
+  it('applies write commands to arbitrary bundle directories', async () => {
+    const { dir, irPath } = await fixtureScratch();
+    await mkdir(join(dir, '.contexture'), { recursive: true });
+    const result = await runCli(dir, [
+      'add-field',
+      'Note',
+      'body',
+      '{"kind":"string"}',
+      '--ir',
+      irPath,
+      '--json',
+    ]);
+    expect(result.exitCode).toBe(0);
+    await expect(readFile(join(dir, 'scratch.schema.ts'), 'utf8')).resolves.toContain('body');
   });
 
   it('check-generated detects drift after manual edits', async () => {

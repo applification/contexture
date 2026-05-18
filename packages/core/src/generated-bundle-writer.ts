@@ -39,6 +39,7 @@ export interface GeneratedBundleWriteInput {
   sidecars?: ReadonlyArray<FileEntry>;
   includeIr?: boolean;
   driftPreflight?: boolean;
+  generatedTargetPreflight?: boolean;
 }
 
 export interface GeneratedBundleWriteResult extends GeneratedBundleBuild {
@@ -137,6 +138,7 @@ export async function writeGeneratedBundle(
     sidecars = [],
     includeIr = true,
     driftPreflight = true,
+    generatedTargetPreflight = false,
   } = input;
 
   if (driftPreflight) {
@@ -147,6 +149,10 @@ export async function writeGeneratedBundle(
   }
 
   const bundle = buildGeneratedBundle(schema, irPath, emitDeps);
+  if (generatedTargetPreflight) {
+    const collisions = await checkGeneratedTargetCollisions(bundle.emitted, fs);
+    if (collisions.length > 0) throw new GeneratedBundleDriftError(collisions);
+  }
   await fs.mkdirp?.(contextureDirFor(irPath));
   await fs.mkdirp?.(dirname(bundle.paths.convex));
 
@@ -202,6 +208,24 @@ export async function writeFilesAtomic(
     }
     throw err;
   }
+}
+
+async function checkGeneratedTargetCollisions(
+  emitted: ReadonlyArray<FileEntry>,
+  fs: Pick<GeneratedBundleFs, 'readFile'>,
+): Promise<GeneratedFileCheck[]> {
+  const collisions: GeneratedFileCheck[] = [];
+  for (const entry of emitted) {
+    try {
+      const onDisk = await fs.readFile(entry.path);
+      if (onDisk !== entry.content) collisions.push({ path: entry.path, status: 'drifted' });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        collisions.push({ path: entry.path, status: 'unreadable' });
+      }
+    }
+  }
+  return collisions;
 }
 
 function dirname(path: string): string {

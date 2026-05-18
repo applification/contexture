@@ -1,8 +1,8 @@
 /**
  * `useDrift` — mounts and tears down the drift watcher for the current
- * project-mode document.
+ * bundle-mode document.
  *
- * When a project-mode document is open, starts watching all
+ * When a bundle-mode document is open, starts watching all
  * `@contexture-generated` files listed in `.contexture/emitted.json`.
  * Also triggers a manual re-check on window focus so edits made while
  * Contexture was in the background are caught immediately on return.
@@ -35,7 +35,7 @@ export function useDrift(): void {
     const driftApi = window.contexture?.drift;
     if (!driftApi) return;
 
-    if (mode !== 'project' || !filePath) {
+    if (mode !== 'bundle' || !filePath) {
       void driftApi.unwatch();
       useDriftStore.getState().setResolved();
       return;

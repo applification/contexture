@@ -1,12 +1,17 @@
-import { emit as emitAgentMd } from './emit-agent-md';
-import { emit as emitClaudeMd } from './emit-claude-md';
-import { emitTableCrud } from './emit-table-crud';
+import { type ChatHistory, DEFAULT_CHAT_HISTORY, saveChatHistory } from './chat-history';
+import {
+  type GeneratedBundleFs,
+  type GeneratedBundleWriteResult,
+  writeGeneratedBundle,
+} from './generated-bundle-writer';
 import type { Schema } from './ir';
+import { DEFAULT_LAYOUT, type Layout, saveLayout } from './layout';
+import { load } from './load';
 import type { BundlePaths } from './paths';
-import { baseNameFor, bundlePathsFor, contextureDirFor, projectRootFor } from './paths';
-import type { FileEntry } from './pipeline';
+import { bundlePathsFor, contextureDirFor } from './paths';
+import type { EmitPipelineDeps, FileEntry } from './pipeline';
 
-export type DocumentMode = 'scratch' | 'project';
+export type DocumentMode = 'bundle';
 
 export interface DocumentBundleProbeFs {
   dirExists(path: string): Promise<boolean>;
@@ -16,7 +21,8 @@ export async function detectDocumentMode(
   irPath: string,
   fs: DocumentBundleProbeFs,
 ): Promise<DocumentMode> {
-  return (await fs.dirExists(contextureDirFor(irPath))) ? 'project' : 'scratch';
+  await fs.dirExists(contextureDirFor(irPath));
+  return 'bundle';
 }
 
 export type SidecarKind = 'layout' | 'chat';
@@ -35,54 +41,77 @@ export function buildSidecarEntries(
   ];
 }
 
-export type SeededArtifactKind = 'agent-guidance' | 'claude-guidance' | 'table-crud';
-
-export interface SeededArtifact extends FileEntry {
-  kind: SeededArtifactKind;
+export interface InitialDocumentSidecars {
+  layout?: Layout;
+  chat?: ChatHistory;
 }
 
-export interface SeededArtifactDeps {
-  emitAgentMd?: (projectName: string) => string;
-  emitClaudeMd?: (projectName: string) => string;
-  emitTableCrud?: (schema: Schema, tableName: string) => string;
+export interface InitializeDocumentBundleInput {
+  irPath: string;
+  schema: Schema;
+  sidecars?: InitialDocumentSidecars;
+  fs: GeneratedBundleFs;
+  emitDeps?: EmitPipelineDeps;
+  driftPreflight?: boolean;
+  generatedTargetPreflight?: boolean;
 }
 
-export function buildSeededArtifacts(
-  schema: Schema,
-  irPath: string,
-  deps: SeededArtifactDeps = {},
-): SeededArtifact[] {
-  const paths = bundlePathsFor(irPath);
-  const root = projectRootFor(paths.ir);
-  if (!root) return [];
+export async function initializeDocumentBundle(
+  input: InitializeDocumentBundleInput,
+): Promise<GeneratedBundleWriteResult> {
+  const paths = bundlePathsFor(input.irPath);
+  const sidecars = buildSidecarEntries(paths, {
+    layout: saveLayout(input.sidecars?.layout ?? DEFAULT_LAYOUT),
+    chat: saveChatHistory(input.sidecars?.chat ?? DEFAULT_CHAT_HISTORY),
+  });
 
-  const projectName = baseNameFor(paths.ir);
-  const schemaDir = contextureDirFor(paths.ir).slice(0, -'/.contexture'.length);
-  const renderAgentMd = deps.emitAgentMd ?? emitAgentMd;
-  const renderClaudeMd = deps.emitClaudeMd ?? emitClaudeMd;
-  const renderTableCrud = deps.emitTableCrud ?? emitTableCrud;
+  return writeGeneratedBundle({
+    irPath: paths.ir,
+    schema: input.schema,
+    fs: input.fs,
+    emitDeps: input.emitDeps,
+    sidecars,
+    driftPreflight: input.driftPreflight,
+    generatedTargetPreflight: input.generatedTargetPreflight,
+  });
+}
 
-  const artifacts: SeededArtifact[] = [
-    {
-      kind: 'agent-guidance',
-      path: `${root}/AGENTS.md`,
-      content: renderAgentMd(projectName),
-    },
-    {
-      kind: 'claude-guidance',
-      path: `${root}/CLAUDE.md`,
-      content: renderClaudeMd(projectName),
-    },
-  ];
+export interface PromoteScratchToBundleInput {
+  scratchIrPath: string;
+  bundleIrPath?: string;
+  initialChatMessage?: string;
+  fs: GeneratedBundleFs;
+  emitDeps?: EmitPipelineDeps;
+}
 
-  for (const type of schema.types) {
-    if (type.kind !== 'object' || type.table !== true) continue;
-    artifacts.push({
-      kind: 'table-crud',
-      path: `${schemaDir}/convex/${type.name}.ts`,
-      content: renderTableCrud(schema, type.name),
-    });
-  }
+export async function promoteScratchToBundle(
+  input: PromoteScratchToBundleInput,
+): Promise<GeneratedBundleWriteResult> {
+  const source = bundlePathsFor(input.scratchIrPath).ir;
+  const target = bundlePathsFor(input.bundleIrPath ?? input.scratchIrPath).ir;
+  const { schema } = load(await input.fs.readFile(source));
+  const chat: ChatHistory =
+    input.initialChatMessage && input.initialChatMessage.length > 0
+      ? {
+          version: '1',
+          messages: [
+            {
+              id: 'initial-user-message',
+              role: 'user',
+              content: input.initialChatMessage,
+              createdAt: Date.now(),
+            },
+          ],
+        }
+      : DEFAULT_CHAT_HISTORY;
 
-  return artifacts;
+  return initializeDocumentBundle({
+    irPath: target,
+    schema,
+    fs: input.fs,
+    emitDeps: input.emitDeps,
+    sidecars: { chat },
+    driftPreflight: false,
+    generatedTargetPreflight: true,
+  });
 }

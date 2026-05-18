@@ -1,18 +1,18 @@
 /**
  * SchemaPanel — read-only preview of the emitted schema source.
  *
- * Supports three schema formats via an in-panel tab strip:
- *   - Zod (TypeScript)  → <name>.schema.ts
- *   - JSON Schema        → <name>.schema.json
- *   - Convex             → convex/schema.ts
+ * Supports grouped output previews:
+ *   - Core: Zod, JSON Schema, Convex
+ *   - AI: tool schemas, structured outputs, MCP definitions when enabled
+ *   - Forms: form validators when enabled
  *
  * Three visual states:
  *   - Empty (schema has no types): an `Empty` nudge telling the
  *     user to add a type on the canvas.
  *   - Error (emit threw): a muted error line. Transient — the
  *     next valid IR clears it on re-render.
- *   - OK: a tab strip, header with filename + font-size and copy
- *     controls, above a shiki-highlighted code block.
+ *   - OK: a compact grouped selector, header with filename + font-size
+ *     and copy controls, above a shiki-highlighted code block.
  *
  * Shiki init is lazy (first mount) via `getHighlighter`. We pre-warm
  * the highlighter on mount so it loads in the background — by the time
@@ -24,13 +24,39 @@
  * HTML with all user text escaped in `<span>` text nodes — there is no
  * path for user-authored source to introduce raw tags.
  */
-import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { bundlePathsFor } from '@contexture/core/paths';
+import {
+  AArrowDown,
+  AArrowUp,
+  Check,
+  Copy,
+  ExternalLink,
+  FileBracesCorner,
+  FileCode,
+} from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
-export type SchemaType = 'zod' | 'json' | 'convex';
+export type SchemaOutputType =
+  | 'zod'
+  | 'json'
+  | 'convex'
+  | 'ai-tool-schemas'
+  | 'structured-outputs'
+  | 'mcp-definitions'
+  | 'form-validators';
+
+type SchemaOutputGroup = 'core' | 'ai' | 'forms';
+type SchemaOutputLanguage = 'typescript' | 'json';
+
+export interface SchemaPanelAdditionalSource {
+  type: Exclude<SchemaOutputType, 'zod' | 'json' | 'convex'>;
+  source: string;
+  enabled?: boolean;
+}
 
 export interface SchemaPanelProps {
   /** Emitted Zod TypeScript source. */
@@ -52,6 +78,17 @@ export interface SchemaPanelProps {
    * document has been saved.
    */
   schemaFileName?: string;
+  /**
+   * Optional non-core generated outputs. Disabled outputs are shown as
+   * available choices; enabled outputs with empty sources stay hidden.
+   */
+  additionalSources?: SchemaPanelAdditionalSource[];
+  /** Enable an optional output target from the grouped selector. */
+  onEnableOutput?: (type: SchemaPanelAdditionalSource['type']) => void;
+  /** Absolute path of the active `.contexture.json`; absent for unsaved documents. */
+  documentFilePath?: string | null;
+  /** Open the selected generated file in an external editor. */
+  onOpenGeneratedFile?: (path: string) => void;
 }
 
 /**
@@ -64,22 +101,105 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 13px
 /** How long the Copy icon flips to a check after a successful copy. */
 const COPY_FEEDBACK_MS = 2000;
 
-const SCHEMA_TABS: { type: SchemaType; label: string }[] = [
-  { type: 'zod', label: 'Zod' },
-  { type: 'json', label: 'JSON Schema' },
-  { type: 'convex', label: 'Convex' },
+const OUTPUT_GROUPS: { group: SchemaOutputGroup; label: string }[] = [
+  { group: 'core', label: 'Core' },
+  { group: 'ai', label: 'AI' },
+  { group: 'forms', label: 'Forms' },
 ];
 
-function deriveFileName(schemaFileName: string, type: SchemaType): string {
-  if (type === 'zod') return schemaFileName;
-  if (type === 'convex') return 'convex/schema.ts';
-  // json: replace .schema.ts → .schema.json, or .ts → .json as fallback
-  const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
-  return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
+const OUTPUT_METADATA: Record<
+  SchemaOutputType,
+  {
+    group: SchemaOutputGroup;
+    label: string;
+    help: string;
+    language: SchemaOutputLanguage;
+    fileName: (schemaFileName: string) => string;
+  }
+> = {
+  zod: {
+    group: 'core',
+    label: 'Zod schema',
+    help: 'TypeScript Zod schemas for app/runtime validation.',
+    language: 'typescript',
+    fileName: (schemaFileName) => schemaFileName,
+  },
+  json: {
+    group: 'core',
+    label: 'JSON Schema',
+    help: 'Draft 2020-12 JSON Schema for interoperable validation and tooling.',
+    language: 'json',
+    fileName: (schemaFileName) => {
+      const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
+      return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
+    },
+  },
+  convex: {
+    group: 'core',
+    label: 'Convex schema',
+    help: 'Convex database schema generated from Contexture table types.',
+    language: 'typescript',
+    fileName: () => 'convex/schema.ts',
+  },
+  'ai-tool-schemas': {
+    group: 'ai',
+    label: 'Tool schemas',
+    help: 'JSON Schema tool definitions for AI function/tool calling.',
+    language: 'json',
+    fileName: () => '.contexture/ai-tool-schemas.json',
+  },
+  'structured-outputs': {
+    group: 'ai',
+    label: 'Structured outputs',
+    help: 'Provider-neutral response schemas for model outputs.',
+    language: 'json',
+    fileName: () => '.contexture/structured-output-schemas.json',
+  },
+  'mcp-definitions': {
+    group: 'ai',
+    label: 'MCP definitions',
+    help: 'Machine-readable tool/server definitions for MCP integrations.',
+    language: 'json',
+    fileName: () => '.contexture/mcp-definitions.json',
+  },
+  'form-validators': {
+    group: 'forms',
+    label: 'Form validators',
+    help: 'Type-safe validation helpers backed by generated Zod schemas.',
+    language: 'typescript',
+    fileName: () => 'form-validators.ts',
+  },
+};
+
+interface OutputOption {
+  type: SchemaOutputType;
+  source: string;
+  group: SchemaOutputGroup;
+  label: string;
+  help: string;
+  language: SchemaOutputLanguage;
+  fileName: string;
+  enabled: boolean;
 }
 
-function langForType(type: SchemaType): string {
-  return type === 'json' ? 'json' : 'typescript';
+function generatedPathForOutput(type: SchemaOutputType, documentFilePath: string): string {
+  const paths = bundlePathsFor(documentFilePath);
+  switch (type) {
+    case 'zod':
+      return paths.schemaTs;
+    case 'json':
+      return paths.schemaJson;
+    case 'convex':
+      return paths.convex;
+    case 'ai-tool-schemas':
+      return paths.aiToolSchemas;
+    case 'structured-outputs':
+      return paths.structuredOutputSchemas;
+    case 'mcp-definitions':
+      return paths.mcpDefinitions;
+    case 'form-validators':
+      return paths.formValidators;
+  }
 }
 
 export function SchemaPanel({
@@ -90,8 +210,12 @@ export function SchemaPanel({
   error,
   onCopy,
   schemaFileName = 'schema.ts',
+  additionalSources = [],
+  onEnableOutput,
+  documentFilePath = null,
+  onOpenGeneratedFile,
 }: SchemaPanelProps): React.JSX.Element {
-  const [activeSchema, setActiveSchema] = useState<SchemaType>('zod');
+  const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
@@ -109,14 +233,45 @@ export function SchemaPanel({
     getHighlighter().catch(() => undefined);
   }, []);
 
-  const sourceByType: Record<SchemaType, string> = {
-    zod: zodSource,
-    json: jsonSource,
-    convex: convexSource,
-  };
-  const activeSource = sourceByType[activeSchema];
+  const outputOptions = useMemo<OutputOption[]>(() => {
+    const coreSources: Array<{ type: SchemaOutputType; source: string; enabled?: boolean }> = [
+      { type: 'zod', source: zodSource },
+      { type: 'json', source: jsonSource },
+      { type: 'convex', source: convexSource },
+    ];
+    const optionalSources = additionalSources.filter(
+      (source) => source.enabled === false || source.source.trim().length > 0,
+    );
+    return [...coreSources, ...optionalSources].map(({ type, source, enabled = true }) => {
+      const metadata = OUTPUT_METADATA[type];
+      return {
+        type,
+        source,
+        group: metadata.group,
+        label: metadata.label,
+        help: metadata.help,
+        language: metadata.language,
+        fileName: metadata.fileName(schemaFileName),
+        enabled,
+      };
+    });
+  }, [additionalSources, convexSource, jsonSource, schemaFileName, zodSource]);
 
-  // Re-highlight whenever the active source or schema type changes.
+  useEffect(() => {
+    if (!outputOptions.some((output) => output.type === activeOutput && output.enabled)) {
+      setActiveOutput('zod');
+    }
+  }, [activeOutput, outputOptions]);
+
+  const selectedOutput =
+    outputOptions.find((output) => output.type === activeOutput && output.enabled) ??
+    outputOptions[0];
+  const activeSource = selectedOutput.source;
+  const selectedOutputPath = documentFilePath
+    ? generatedPathForOutput(selectedOutput.type, documentFilePath)
+    : null;
+
+  // Re-highlight whenever the active source or output type changes.
   useEffect(() => {
     if (isEmpty || error !== null || activeSource === '') {
       setHighlightedHtml(null);
@@ -128,7 +283,7 @@ export function SchemaPanel({
         const hl = await getHighlighter();
         if (cancelled) return;
         const html = hl.codeToHtml(activeSource, {
-          lang: langForType(activeSchema),
+          lang: selectedOutput.language,
           themes: SHIKI_THEMES,
           defaultColor: false,
         });
@@ -140,7 +295,7 @@ export function SchemaPanel({
     return () => {
       cancelled = true;
     };
-  }, [activeSource, activeSchema, isEmpty, error]);
+  }, [activeSource, selectedOutput.language, isEmpty, error]);
 
   // Clear the "copied" feedback timer on unmount.
   useEffect(
@@ -201,42 +356,98 @@ export function SchemaPanel({
     );
   }
 
-  const displayFileName = deriveFileName(schemaFileName, activeSchema);
-
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
-      {/* Schema type tab strip */}
-      <div className="flex items-center gap-1 mb-2" role="tablist" aria-label="Schema format">
-        {SCHEMA_TABS.map(({ type, label }) => (
-          <button
-            key={type}
-            type="button"
-            role="tab"
-            aria-selected={activeSchema === type}
-            data-testid={`schema-tab-${type}`}
-            onClick={() => {
-              setActiveSchema(type);
-              setHighlightedHtml(null);
-            }}
-            className={[
-              'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-              activeSchema === type
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            ].join(' ')}
-          >
-            {label}
-          </button>
-        ))}
+      <div
+        className="mb-2 space-y-1 rounded-md border border-border bg-muted/35 p-1.5"
+        role="listbox"
+        aria-label="Generated outputs"
+        data-testid="schema-output-selector"
+      >
+        {OUTPUT_GROUPS.map(({ group, label }) => {
+          const groupOutputs = outputOptions.filter((output) => output.group === group);
+          if (groupOutputs.length === 0) return null;
+          return (
+            <div
+              key={group}
+              className="flex items-start gap-2"
+              data-testid={`schema-group-${group}`}
+            >
+              <div className="w-11 shrink-0 px-0.5 py-1.5 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/50">
+                {label}
+              </div>
+              <TooltipProvider delayDuration={250}>
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+                  {groupOutputs.map((output) => {
+                    const tooltip = output.enabled
+                      ? output.help
+                      : `Enable ${output.label}: ${output.help}`;
+                    return (
+                      <Tooltip key={output.type}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={output.enabled && activeOutput === output.type}
+                            data-testid={`schema-output-${output.type}`}
+                            onClick={() => {
+                              if (!output.enabled) {
+                                setActiveOutput(output.type);
+                                setHighlightedHtml(null);
+                                onEnableOutput?.(
+                                  output.type as SchemaPanelAdditionalSource['type'],
+                                );
+                                return;
+                              }
+                              setActiveOutput(output.type);
+                              setHighlightedHtml(null);
+                            }}
+                            className={[
+                              'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
+                              output.enabled && activeOutput === output.type
+                                ? 'bg-primary text-primary-foreground'
+                                : !output.enabled
+                                  ? 'border border-dashed border-border/80 text-muted-foreground/60 hover:border-border hover:bg-muted hover:text-foreground'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                            ].join(' ')}
+                          >
+                            <span className="truncate">{output.label}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-64 text-xs leading-snug">
+                          {tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
+            </div>
+          );
+        })}
       </div>
 
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2" data-testid="schema-filename">
             <FileCode className="size-3.5 shrink-0" />
-            <span className="truncate font-mono">{displayFileName}</span>
+            <span className="truncate font-mono">{selectedOutput.fileName}</span>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
+            {selectedOutputPath && onOpenGeneratedFile ? (
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
+                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
+                title={`Open ${selectedOutput.fileName} in VS Code`}
+                data-testid="schema-open-generated"
+              >
+                <ExternalLink className="size-3.5" />
+              </Button>
+            ) : null}
             <Button
               size="icon"
               type="button"

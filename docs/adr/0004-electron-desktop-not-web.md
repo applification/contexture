@@ -7,8 +7,8 @@
 
 The editor needs:
 
-- Direct filesystem access (read/write a `.contexture.json` bundle, watch sidecars for drift, scaffold a project directory with git init and turbo skeleton).
-- Long-lived process spawning (Claude Agent SDK CLI, Convex emit, scaffold runners).
+- Direct filesystem access (read/write a `.contexture.json` bundle, watch sidecars for drift, and open the bundle folder in an editor).
+- Long-lived process spawning (Codex and Claude CLI sessions, generated-target emits, and validation/check workflows).
 - Native menus, window chrome, auto-update, and OS-keychain-style integration for credentials.
 - A graph canvas with React Flow and ELK that benefits from a real Node runtime for layout work.
 
@@ -27,6 +27,6 @@ Ship the editor as Electron, with React 19 + Vite (`electron-vite`) in the rende
 
 ## Alternatives considered
 
-- **Tauri:** smaller binary, Rust backend. Rejected because the team's primary language is TypeScript; rewriting the scaffold pipeline, Claude integration, and document store in Rust would dwarf the binary-size win.
+- **Tauri:** smaller binary, Rust backend. Rejected because the team's primary language is TypeScript; rewriting the agent integrations and document-store workflow in Rust would dwarf the binary-size win.
 - **Browser app + local backend daemon:** two binaries, two update paths, harder onboarding.
 - **VS Code extension:** ties us to one host editor and limits the canvas UX.

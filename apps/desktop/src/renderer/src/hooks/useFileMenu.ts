@@ -14,7 +14,7 @@
  *     stash the path, and hand layout + chat to `onBundleLoaded` so
  *     App can rehydrate canvas positions + chat transcript.
  *   - **Save**: serialise the IR + sidecars (pulled from the injected
- *     `getLayout` / `getChat` getters) into the five-file bundle via
+ *     `getLayout` / `getChat` getters) into the document bundle via
  *     `file:save`. If validation has errors, prompt first
  *     (`saveWithErrorsPrompt`) and only save when the user confirms
  *     via the dialog's `Save anyway` path (`forceSave`).
@@ -77,7 +77,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
     const doc = useDocumentStore.getState();
     doc.setFilePath(null);
-    doc.setMode('scratch');
+    doc.setMode('bundle');
     doc.markClean();
   }, []);
 
@@ -85,7 +85,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     (opened: {
       content: string;
       irPath: string;
-      mode?: 'scratch' | 'project';
+      mode?: 'bundle';
       layout?: Layout;
       chat?: ChatHistory;
       warnings?: Array<{ message: string; severity: 'warning' | 'error' }>;
@@ -95,7 +95,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
         const { schema, warnings: irWarnings } = load(opened.content);
         useUndoStore.getState().apply({ kind: 'replace_schema', schema });
         doc.setFilePath(opened.irPath);
-        doc.setMode(opened.mode ?? 'scratch');
+        doc.setMode('bundle');
         doc.markClean();
 
         optionsRef.current.onBundleLoaded?.({
@@ -137,7 +137,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
   // Maps a prompt id (from `showSaveWithErrors`) to the target path
   // the user wanted to save to, so `handleForceSave` can complete the
   // save once they click "Save anyway".
-  const pendingForceSaveRef = useRef<Map<string, string>>(new Map());
+  const pendingForceSaveRef = useRef<Map<string, { irPath: string }>>(new Map());
 
   // The save path validates first. If there are errors we stash the
   // target path under a fresh prompt id and ask the user; `Save
@@ -149,7 +149,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
       const errors = validate(schema, { stdlib: STDLIB_REGISTRY });
       if (errors.length > 0) {
         const id = genId();
-        pendingForceSaveRef.current.set(id, irPath);
+        pendingForceSaveRef.current.set(id, { irPath });
         useDocumentStore.getState().showSaveWithErrors({
           id,
           messages: errors.map((e) => e.message),
@@ -183,10 +183,10 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
   const handleForceSave = useCallback(
     async (promptId: string): Promise<void> => {
       if (!fileApi) return;
-      const irPath = pendingForceSaveRef.current.get(promptId);
-      if (!irPath) return;
+      const pending = pendingForceSaveRef.current.get(promptId);
+      if (!pending) return;
       pendingForceSaveRef.current.delete(promptId);
-      await writeBundle(fileApi, irPath, optionsRef.current);
+      await writeBundle(fileApi, pending.irPath, optionsRef.current);
     },
     [fileApi],
   );
@@ -219,7 +219,14 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     });
   }, []);
 
-  return { handleNew, handleOpen, handleOpenPath, handleSave, handleSaveAs, handleForceSave };
+  return {
+    handleNew,
+    handleOpen,
+    handleOpenPath,
+    handleSave,
+    handleSaveAs,
+    handleForceSave,
+  };
 }
 
 async function writeBundle(
@@ -233,5 +240,6 @@ async function writeBundle(
   await fileApi.save({ irPath, schema, layout, chat });
   const doc = useDocumentStore.getState();
   doc.setFilePath(irPath);
+  doc.setMode('bundle');
   doc.markClean();
 }

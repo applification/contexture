@@ -12,9 +12,6 @@ export const nodeFsAdapter: FsAdapter = {
     return fs.readFile(path, 'utf-8');
   },
   async writeFile(path, content) {
-    // Project-mode seeding may target paths like
-    // `apps/web/convex/<table>.ts` whose parent directories don't exist
-    // yet on first open. Mirror MemFsAdapter's implicit-parent semantics.
     await fs.mkdir(dirname(path), { recursive: true });
     await fs.writeFile(path, content, 'utf-8');
   },

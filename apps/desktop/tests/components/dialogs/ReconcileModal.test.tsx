@@ -40,7 +40,7 @@ beforeEach(() => {
     canUndo: false,
     canRedo: false,
   });
-  useDocumentStore.setState({ filePath: IR_PATH, mode: 'project' });
+  useDocumentStore.setState({ filePath: IR_PATH, mode: 'bundle' });
   useDriftStore.getState().setResolved();
   useReconcileStore.getState().reset();
   Object.defineProperty(window, 'contexture', {

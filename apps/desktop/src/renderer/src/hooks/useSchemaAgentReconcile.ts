@@ -50,8 +50,8 @@ export function useSchemaAgentReconcile(): void {
     const docStore = useDocumentStore.getState();
     const mode = docStore.mode;
 
-    if (mode !== 'project') {
-      reconcileStore.setError('Reconcile is only available for project-mode documents.');
+    if (mode !== 'bundle') {
+      reconcileStore.setError('Reconcile is only available for bundle-mode documents.');
       return;
     }
 

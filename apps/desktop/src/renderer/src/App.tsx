@@ -19,9 +19,14 @@
  * sidebar button).
  */
 
+import { emitAiToolSchemas } from '@contexture/core/emit-ai-tool-schemas';
 import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emitFormValidators } from '@contexture/core/emit-form-validators';
 import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
+import { emitMcpDefinitions } from '@contexture/core/emit-mcp-definitions';
+import { emitStructuredOutputSchemas } from '@contexture/core/emit-structured-output-schemas';
 import { emit as emitZod } from '@contexture/core/emit-zod';
+import { baseNameFor } from '@contexture/core/paths';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -31,12 +36,11 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
-import { NewProjectDialog } from './components/dialogs/NewProjectDialog';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { DriftBanner } from './components/hud/DriftBanner';
-import { SchemaPanel } from './components/schema/SchemaPanel';
+import { SchemaPanel, type SchemaPanelAdditionalSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -53,7 +57,6 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
-import { useNewProject } from './hooks/useNewProject';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import type { Layout } from './model/layout';
@@ -149,14 +152,7 @@ export default function App(): React.JSX.Element {
   chatMessagesRef.current = chat.messages;
   const chatHydrateRef = useRef(chat.hydrate);
   chatHydrateRef.current = chat.hydrate;
-  const chatSendRef = useRef(chat.send);
-  chatSendRef.current = chat.send;
 
-  // Captures the first seeded user message from a newly scaffolded project
-  // so onOpenProject can auto-send it after the bundle loads.
-  const pendingAutoSendRef = useRef<string | null>(null);
-
-  useNewProject();
   useDrift();
 
   const fileMenu = useFileMenu({
@@ -180,17 +176,6 @@ export default function App(): React.JSX.Element {
         void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
       } else {
         void window.contexture?.schemaAgent?.threadClear();
-      }
-      // Capture a seeded first message for auto-send (set by onOpenProject).
-      const first = loadedChat.messages[0];
-      if (
-        pendingAutoSendRef.current &&
-        first?.role === 'user' &&
-        loadedChat.messages.length === 1
-      ) {
-        pendingAutoSendRef.current = first.content;
-      } else {
-        pendingAutoSendRef.current = null;
       }
     },
     onNew: () => {
@@ -243,38 +228,41 @@ export default function App(): React.JSX.Element {
 
   const hasSelection = selectedNodeId !== null;
 
-  // Emit Zod source for the SchemaPanel. Only runs while the Schema
-  // tab is active so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Properties. Wrapped in
-  // try/catch so a malformed intermediate state (e.g. during a
-  // multi-op chat turn) surfaces as an in-panel error rather than
-  // crashing the sidebar.
+  // Emit generated sources for the SchemaPanel. Only runs while the
+  // Schema tab is active so we don't burn cycles on every IR change
+  // when the user is looking at Chat / Properties. Wrapped in try/catch
+  // so a malformed intermediate state (e.g. during a multi-op chat
+  // turn) surfaces as an in-panel error rather than crashing the sidebar.
   const filePath = useDocumentStore((s) => s.filePath);
-  const documentMode = useDocumentStore((s) => s.mode);
 
-  // Emit all three schema formats when the Schema tab is active.
-  // Gated on activeTab so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Properties.
   const schemaEmissions = useMemo((): {
     zodSource: string;
     jsonSource: string;
     convexSource: string;
+    additionalSources: SchemaPanelAdditionalSource[];
     error: string | null;
   } => {
     if (activeTab !== 'schema') {
-      return { zodSource: '', jsonSource: '', convexSource: '', error: null };
+      return {
+        zodSource: '',
+        jsonSource: '',
+        convexSource: '',
+        additionalSources: [],
+        error: null,
+      };
     }
-    const irPath = filePath ?? '<unsaved>.contexture.json';
+    const irPath = filePath ?? 'schema.contexture.json';
     let zodSource = '';
     let jsonSource = '';
     let convexSource = '';
+    const additionalSources: SchemaPanelAdditionalSource[] = [];
     let error: string | null = null;
 
     try {
       zodSource = emitZod(schema, irPath, { stdlibNamespaces: STDLIB_REGISTRY.namespaces });
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      return { zodSource, jsonSource, convexSource, error };
+      return { zodSource, jsonSource, convexSource, additionalSources, error };
     }
 
     try {
@@ -289,14 +277,76 @@ export default function App(): React.JSX.Element {
       // Non-fatal: Convex tab will render empty
     }
 
-    return { zodSource, jsonSource, convexSource, error };
+    const optionalOutputSources = {
+      'ai-tool-schemas': () => `${JSON.stringify(emitAiToolSchemas(schema, irPath), null, 2)}\n`,
+      'structured-outputs': () =>
+        `${JSON.stringify(emitStructuredOutputSchemas(schema, irPath), null, 2)}\n`,
+      'mcp-definitions': () => `${JSON.stringify(emitMcpDefinitions(schema, irPath), null, 2)}\n`,
+      'form-validators': () => {
+        const formValidatorBaseName = filePath ? baseNameFor(filePath) : 'schema';
+        return emitFormValidators(schema, formValidatorBaseName, irPath);
+      },
+    } satisfies Record<SchemaPanelAdditionalSource['type'], () => string>;
+
+    const optionalOutputEnabled = {
+      'ai-tool-schemas': schema.outputs?.aiPipeline?.toolSchemas?.enabled === true,
+      'structured-outputs': schema.outputs?.aiPipeline?.structuredOutputs?.enabled === true,
+      'mcp-definitions': schema.outputs?.aiPipeline?.mcpDefinitions?.enabled === true,
+      'form-validators': schema.outputs?.aiPipeline?.formValidators?.enabled === true,
+    } satisfies Record<SchemaPanelAdditionalSource['type'], boolean>;
+
+    for (const type of Object.keys(
+      optionalOutputSources,
+    ) as SchemaPanelAdditionalSource['type'][]) {
+      if (!optionalOutputEnabled[type]) {
+        additionalSources.push({ type, enabled: false, source: '' });
+        continue;
+      }
+      try {
+        additionalSources.push({ type, enabled: true, source: optionalOutputSources[type]() });
+      } catch {
+        // Non-fatal: failed optional output stays hidden
+      }
+    }
+
+    return { zodSource, jsonSource, convexSource, additionalSources, error };
   }, [activeTab, schema, filePath]);
+
+  const enableSchemaOutput = useCallback(
+    (type: SchemaPanelAdditionalSource['type']): void => {
+      const targetByOutput = {
+        'ai-tool-schemas': 'toolSchemas',
+        'structured-outputs': 'structuredOutputs',
+        'mcp-definitions': 'mcpDefinitions',
+        'form-validators': 'formValidators',
+      } as const satisfies Record<SchemaPanelAdditionalSource['type'], string>;
+      const target = targetByOutput[type];
+      useUndoStore.getState().apply({
+        kind: 'replace_schema',
+        schema: {
+          ...schema,
+          outputs: {
+            ...(schema.outputs ?? {}),
+            aiPipeline: {
+              ...(schema.outputs?.aiPipeline ?? {}),
+              [target]: { enabled: true },
+            },
+          },
+        },
+      });
+    },
+    [schema],
+  );
+
+  const openGeneratedFile = useCallback((path: string): void => {
+    void window.contexture?.shell.openInEditor(path);
+  }, []);
 
   // Filename shown in the SchemaPanel header: the document's basename
   // with the IR suffix swapped for `.schema.ts`. Falls back to a
   // generic label before the document is saved.
   const schemaFileName = useMemo(() => {
-    if (filePath === null) return 'schema.ts';
+    if (filePath === null) return 'schema.schema.ts';
     const base = filePath.split(/[\\/]/).pop() ?? filePath;
     return base.replace(/\.contexture\.json$/i, '.schema.ts');
   }, [filePath]);
@@ -341,7 +391,7 @@ export default function App(): React.JSX.Element {
                   onLoadSample={loadSample}
                   recentFiles={recentFiles}
                   onOpenRecent={fileMenu.handleOpenPath}
-                  isNewProject={documentMode === 'project'}
+                  isBundle={filePath !== null}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
                   providerLabel={readProviderLabelProp(chat)}
                 />
@@ -388,9 +438,13 @@ export default function App(): React.JSX.Element {
                   zodSource={schemaEmissions.zodSource}
                   jsonSource={schemaEmissions.jsonSource}
                   convexSource={schemaEmissions.convexSource}
+                  additionalSources={schemaEmissions.additionalSources}
                   isEmpty={!hasSchema}
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}
+                  onEnableOutput={enableSchemaOutput}
+                  documentFilePath={filePath}
+                  onOpenGeneratedFile={openGeneratedFile}
                   schemaFileName={schemaFileName}
                 />
               </div>
@@ -403,22 +457,6 @@ export default function App(): React.JSX.Element {
       <StatusBar />
       <DocumentDialogs onForceSave={fileMenu.handleForceSave} />
       <ReconcileModal />
-      <NewProjectDialog
-        onOpenProject={async (irPath) => {
-          // Signal onBundleLoaded to capture a seeded first message.
-          pendingAutoSendRef.current = '__pending__';
-          await fileMenu.handleOpenPath(irPath);
-          // Switch to chat and ensure the sidebar is visible.
-          setActiveTab('chat');
-          useUIChromeStore.getState().setSidebarVisible(true);
-          // If onBundleLoaded captured a seeded first message, auto-send it.
-          const toSend = pendingAutoSendRef.current;
-          pendingAutoSendRef.current = null;
-          if (toSend && toSend !== '__pending__') {
-            await chatSendRef.current(toSend);
-          }
-        }}
-      />
     </div>
   );
 }
@@ -427,14 +465,14 @@ function EmptyState({
   onLoadSample,
   recentFiles,
   onOpenRecent,
-  isNewProject = false,
+  isBundle = false,
   projectName = null,
   providerLabel,
 }: {
   onLoadSample: () => void;
   recentFiles: string[];
   onOpenRecent: (path: string) => void;
-  isNewProject?: boolean;
+  isBundle?: boolean;
   projectName?: string | null;
   providerLabel: 'Codex' | 'Claude';
 }): React.JSX.Element {
@@ -444,14 +482,14 @@ function EmptyState({
       style={{ background: 'var(--graph-bg)' }}
     >
       <GraphBackground />
-      {isNewProject ? (
+      {isBundle ? (
         <div className="relative z-10 text-center text-muted-foreground max-w-sm space-y-3">
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-            {projectName ?? 'New project'}
+            {projectName ?? 'Contexture bundle'}
           </h1>
           <p className="text-sm">
-            Your project has been scaffolded. {providerLabel} is building your schema in the chat
-            panel — types will appear here as they're created.
+            This bundle is ready for generated outputs. Start chatting with {providerLabel} or add
+            types directly.
           </p>
           <p className="text-xs text-muted-foreground/60">
             You can iterate on the schema by continuing the conversation, or edit types directly

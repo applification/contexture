@@ -1,11 +1,8 @@
 /**
- * `emitTableCrud` — per-table CRUD seed emitter.
+ * `emitTableCrud` — optional per-table CRUD guidance emitter.
  *
- * Produces the contents of `apps/web/convex/<table>.ts`: a starter set
- * of queries + mutations for a single table. Unlike the other emitters
- * in this folder, this file is `@contexture-seeded` — written once at
- * scaffold time, then never re-generated (users / coding agents are
- * expected to edit it). The banner warns re-emitters off.
+ * Produces starter queries + mutations for a single table. Contexture no longer
+ * writes this automatically during Document bundle open/initialize.
  */
 import { emitTableCrud } from '@contexture/core/emit-table-crud';
 import type { Schema } from '@contexture/core/ir';
@@ -27,10 +24,10 @@ const singleTable: Schema = {
 };
 
 describe('emitTableCrud', () => {
-  it('starts with the @contexture-seeded banner', () => {
+  it('starts with integration guidance copy', () => {
     const out = emitTableCrud(singleTable, 'Post');
     const firstLine = out.split('\n', 1)[0];
-    expect(firstLine).toMatch(/@contexture-seeded/);
+    expect(firstLine).toMatch(/Contexture integration guidance/);
     expect(firstLine).toMatch(/edit freely/i);
     expect(firstLine).toMatch(/not regenerated/i);
   });
