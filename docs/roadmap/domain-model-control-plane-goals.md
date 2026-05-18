@@ -426,7 +426,7 @@ Progress:
 
 Completion evidence:
 
-- Scaffold, desktop save, CLI, and MCP generated-output paths now share the core
+- Bundle initialization, desktop save, CLI, and MCP generated-output paths now share the core
   generated-bundle writer for generated artifacts and emitted manifests.
 - Dependency advisories with available installable fixes were upgraded or
   pinned, including the Streamdown Mermaid transitive dependency; `bun audit`
@@ -435,6 +435,6 @@ Completion evidence:
   VS Code fallback URI.
 - The renderer no longer uses or receives `window.api`; privileged renderer
   access is through `window.contexture`.
-- Verified with targeted scaffold/shell/update tests, desktop typecheck,
+- Verified with targeted bundle/shell/update tests, desktop typecheck,
   desktop build, packaged MCP stdio smoke, web production build, and full local
   `bun run ci`.

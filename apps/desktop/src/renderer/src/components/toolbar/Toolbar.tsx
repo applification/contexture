@@ -37,8 +37,8 @@ export function Toolbar(): React.JSX.Element {
   const filePath = useDocumentStore((s) => s.filePath);
   const documentMode = useDocumentStore((s) => s.mode);
 
-  // Project root is two dirs above the IR path (packages/contexture/<name>.contexture.json).
-  const projectRoot =
+  // Bundle root is the directory containing the active .contexture.json document.
+  const bundleRoot =
     filePath && documentMode === 'bundle' ? filePath.split('/').slice(0, -1).join('/') : null;
 
   const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
@@ -140,13 +140,13 @@ export function Toolbar(): React.JSX.Element {
         <GraphSearchBar />
       </div>
 
-      {projectRoot && (
+      {bundleRoot && (
         <Button
           variant="ghost"
           size="icon"
           className="size-8"
-          title="Open project in VS Code"
-          onClick={() => void window.contexture?.shell.openInEditor(projectRoot)}
+          title="Open bundle folder in VS Code"
+          onClick={() => void window.contexture?.shell.openInEditor(bundleRoot)}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <Code className="size-4" />

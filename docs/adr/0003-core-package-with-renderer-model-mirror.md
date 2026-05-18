@@ -8,8 +8,8 @@
 The renderer mirror described here was removed during the single-PR roadmap
 consolidation. Renderer code now imports IR, load, migrations, and emitters
 directly from `@contexture/core/*`. Renderer-local model helpers that do not
-belong in core, such as layout, chat history, scaffold labels, project-name
-validation, and preflight copy, remain under `apps/desktop/src/renderer/src/model/`.
+belong in core, such as layout, chat history, project-name validation, and
+preflight copy, remain under `apps/desktop/src/renderer/src/model/`.
 
 The still-active part of this ADR is that `packages/core` is the canonical home
 for shared IR, ops, validation, emitters, bundle paths, drift metadata, and MCP
@@ -19,7 +19,8 @@ operations. The mirror itself is historical.
 
 The IR meta-schema, op vocabulary, ops reducer, loader, migrations, paths, and emitters are needed by:
 
-- The Electron main process (IPC layer, MCP op tools, document store, scaffold pipeline).
+- The Electron main process (IPC layer, MCP op tools, document store, and the
+  historical scaffold pipeline).
 - The renderer (Zustand store, validation, on-screen graph rendering, undo).
 - The CLI.
 - Tests.

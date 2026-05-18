@@ -1,6 +1,6 @@
 # Remove App Scaffolder Plan
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Date:** 2026-05-17
 - **Related ADRs:** [0022](adr/0022-contexture-domain-model-control-plane.md), [0023](adr/0023-features-enter-through-core-domain-modules.md)
 
