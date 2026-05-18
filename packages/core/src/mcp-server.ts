@@ -6,7 +6,7 @@ import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-w
 import type { FieldType, Schema, TypeDef } from './ir';
 import { load } from './load';
 import { OpSchema } from './ops';
-import { assertContextureIrPath, assertWritableContextureBundleIrPath } from './paths';
+import { assertContextureIrPath } from './paths';
 import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
 const VERSION = '0.0.0';
@@ -251,7 +251,7 @@ async function applyContextureOp(
   catalog?: StdlibCatalog,
 ): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
   const opKind = typeof op.kind === 'string' ? op.kind : 'unknown';
-  const path = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+  const path = assertContextureIrPath(irPath);
   const parsed = OpSchema.safeParse(op);
   if (!parsed.success) {
     return {
@@ -296,7 +296,7 @@ function formatZodIssues(error: ZodError): string {
 async function emitContextureBundle(
   irPath: string,
 ): Promise<z.infer<z.ZodObject<typeof EmitContextureOutput>>> {
-  const path = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+  const path = assertContextureIrPath(irPath);
   const { schema } = await readContextureFile(path);
   const { emitted, manifest } = await writeGeneratedBundle({
     irPath: path,
@@ -314,7 +314,7 @@ async function emitContextureBundle(
 async function checkContextureDrift(
   irPath: string,
 ): Promise<z.infer<z.ZodObject<typeof CheckContextureDriftOutput>>> {
-  const path = await assertWritableContextureBundleIrPath(irPath, nodeFileBackedFs);
+  const path = assertContextureIrPath(irPath);
   const { schema } = await readContextureFile(path);
   const files = await checkGeneratedBundle(schema, path, nodeFileBackedFs);
 

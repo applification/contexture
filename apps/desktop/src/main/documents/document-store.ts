@@ -19,6 +19,7 @@
 import {
   buildSidecarEntries,
   bundlePathsFor,
+  type ChatHistory,
   contextureDirFor,
   type DocumentMode,
   emitJsonSchema as defaultEmitJsonSchema,
@@ -26,12 +27,15 @@ import {
   emitZod as defaultEmitZod,
   detectDocumentMode,
   type FileEntry,
+  type Layout,
+  loadChatHistory,
   load as loadIR,
+  loadLayout,
   type Schema,
+  saveChatHistory,
+  saveLayout,
   writeGeneratedBundle,
 } from '@contexture/core';
-import { type ChatHistory, loadChatHistory, saveChatHistory } from '@shared/chat-history';
-import { type Layout, loadLayout, saveLayout } from '@shared/layout';
 import { STDLIB_NAMESPACES } from '@shared/stdlib-registry';
 
 /** Layout + chat now live inside `.contexture/` as implementation sidecars. */

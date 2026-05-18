@@ -73,9 +73,9 @@ Keep only the Contexture document-bundle capabilities, and move any missing
 behavior to `@contexture/core`.
 
 The durable domain module should initialize a Contexture bundle from parsed
-domain values, not import files or create an application repo. Adapters may
-offer "new empty bundle" or "promote scratch file" flows, but they should read
-and parse scratch files before crossing the core seam.
+domain values, not import files or create an application repo. Legacy bare IRs
+are readable inputs; adapters materialize bundle sidecars on first write through
+the core bundle writer.
 
 Layout and chat history are Document bundle Sidecars, not desktop-only state.
 As part of this work, move their versioned types, defaults, load functions, and
@@ -104,24 +104,6 @@ async function initializeDocumentBundle(
   input: InitializeDocumentBundleInput,
 ): Promise<GeneratedBundleWriteResult>;
 ```
-
-Suggested file-backed adapter helper:
-
-```ts
-interface PromoteScratchToBundleInput {
-  scratchIrPath: string;
-  bundleIrPath: string;
-  initialChatMessage?: string;
-  fs: GeneratedBundleFs;
-}
-
-async function promoteScratchToBundle(
-  input: PromoteScratchToBundleInput,
-): Promise<GeneratedBundleWriteResult>;
-```
-
-The adapter helper may live in core if CLI/MCP need it, but the deeper
-initializer should stay path-shape-agnostic and schema-first.
 
 The operation should write only Contexture-owned files:
 
@@ -169,50 +151,31 @@ Bundle mode should replace the current "Project mode" language and mean:
 ```
 
 where the sibling `.contexture/` directory marks the IR as a Contexture bundle.
-Scratch mode remains a bare `.contexture.json` with no sibling `.contexture/`.
-Because there is no backward-compatibility requirement, rename the
+Legacy bare IRs remain openable `.contexture.json` inputs, but writable
+operations materialize the sibling `.contexture/` directory directly instead of
+preserving a separate bare-file lifecycle. Because there is no backward-compatibility requirement, rename the
 `DocumentMode` variant from `project` to `bundle` instead of carrying the old app
 builder wording forward.
 
 Implementation implication:
 
-- Keep pure path normalization in `assertContextureIrPath`, but replace
-  `assertWritableContextureProjectIrPath` with an async/file-backed writable
-  bundle guard. Bundle mode is filesystem state: the sibling `.contexture/`
-  directory exists.
-- File-backed CLI/MCP `apply_contexture_op` should still refuse to mutate
-  scratch files unless the caller first initializes/promotes the bundle.
-- The explicit initialize/promote operation is the sanctioned way to create the
-  sibling `.contexture/` directory and generated manifest.
+- Keep pure path normalization in `assertContextureIrPath`. Writable operations
+  should accept any valid `.contexture.json` path and create missing bundle
+  sidecars/generated manifests through the shared bundle writer.
 - Path helpers such as `bundlePathsFor` can continue deriving generated targets
   relative to the IR path; they should not assume the app's root directory.
 - Delete or isolate `projectRootFor` and `buildSeededArtifacts` behavior that
   infers a repo root from `packages/contexture`; it belongs to integration
   guidance, not Document bundle initialization.
 
-Desktop, CLI, and MCP should be adapters over this core operation:
-
-- Desktop: create a new `.contexture.json` or promote a scratch file to a
-  bundle.
-- CLI: expose equivalent commands once the core seam exists.
-- MCP: let an agent initialize or promote a bundle through the same file-backed
-  semantics, if that tool is needed.
+Desktop, CLI, and MCP should be adapters over this core operation: on first
+write, a legacy bare IR becomes a full Document bundle.
 
 ## Replacement Product Flows
 
-### New Contexture File
+### Legacy Bare IR
 
-Create a bare scratch-mode `.contexture.json`.
-
-This remains the smallest possible artifact and should keep working for users
-who only want the IR.
-
-### Promote To Contexture Bundle
-
-Take an existing scratch `.contexture.json` and add sidecars, generated outputs,
-and an emitted manifest around it.
-
-Scratch mode:
+A standalone `.contexture.json` remains a readable input:
 
 ```txt
 app.contexture.json
@@ -233,9 +196,8 @@ index.ts
 
 This is the replacement for the useful part of the old scaffolder.
 
-The promotion flow should be explicit. Opening a scratch file should not
-silently create sidecars or generated targets; the user or agent chooses to
-promote it.
+Opening a legacy bare IR remains read-only until the first explicit save, emit,
+or mutation command, which creates sidecars and generated targets.
 
 ### Generate Integration Prompt
 
@@ -328,10 +290,6 @@ scaffolded Convex + Next.js app.
 
 Known stale language:
 
-- `packages/core/src/emit-claude-md.ts` currently says "A Convex + Next.js
-  monorepo scaffolded by Contexture."
-- emitted agent guidance assumes `apps/web` and `packages/contexture`
-  integration.
 - `CONTEXT.md`, code comments, and tests should rename durable "Project mode"
   wording to "Bundle mode" if this plan makes that terminology change.
 - README and marketing language should describe Contexture as reusable across
@@ -354,7 +312,6 @@ Known stale language:
 - Move Document bundle sidecar IO for layout and chat history into
   `@contexture/core`, or keep the initializer sidecar-serialized if that split is
   intentionally deferred.
-- Add a thin promote helper only if CLI/MCP need file-backed scratch promotion.
 - Reuse `writeGeneratedBundle`, `buildSidecarEntries`, and existing path
   helpers.
 - Add tests in `packages/core/tests`.
@@ -365,9 +322,7 @@ Known stale language:
 - Rename durable "Project mode" terminology to "Bundle mode".
 - Replace `packages/contexture` as the writable-agent path rule with an
   async/file-backed bundle-mode guard.
-- Keep scratch files read-only for file-backed agent mutation until explicitly
-  promoted.
-- Update path/security tests so the rule is "sibling `.contexture/` exists",
+- Update path/security tests so the rule is "valid `.contexture.json` target",
   not "directory name is `packages/contexture`".
 - Remove automatic seeded artifact writes from Document open/initialize paths;
   route repo guidance through MCP setup, prompt generation, and the `skills.sh`
@@ -375,8 +330,7 @@ Known stale language:
 
 ### Slice 4: Desktop Bundle Flow
 
-- Add a small desktop adapter for creating/promoting a Contexture bundle.
-- Use the core initializer.
+- Use the core bundle writer/initializer for first-save bundle materialization.
 - Keep UI copy explicit: this creates Contexture files, not an application.
 - Do not add stage logs, shell output, retry semantics, or package-manager
   checks.

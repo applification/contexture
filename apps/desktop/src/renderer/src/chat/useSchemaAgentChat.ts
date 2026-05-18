@@ -1,14 +1,23 @@
+import type { ChatMessage, ChatRole } from '@contexture/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ContextureSchemaAgentAPI } from '../../../preload/index.d';
-import type { ChatMessage, ChatRole } from '../model/chat-history';
 import { useChatComposerStore } from '../store/chat-composer';
 import type { ApplyResult, Op } from '../store/ops';
+import {
+  effortStorageKey,
+  modelStorageKey,
+  normalizeEffort,
+  providerLabel,
+  readStoredModelOptions,
+  type SchemaAgentModelOptions,
+  type SchemaAgentModelSettings,
+  type SchemaAgentProvider,
+  useSchemaAgentSettingsStore,
+} from '../store/schema-agent-settings';
 import { useUndoStore } from '../store/undo';
 import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 
-export type SchemaAgentProvider = 'codex' | 'claude';
-export const SCHEMA_AGENT_PROVIDER_CHANGED = 'contexture-schema-agent-provider-changed';
-export type SchemaAgentModelOptions = Record<string, string | boolean>;
+export type { SchemaAgentModelOptions, SchemaAgentModelSettings, SchemaAgentProvider };
 
 export type SchemaAgentModelOptionDescriptor =
   | {
@@ -62,13 +71,6 @@ export interface SchemaAgentChatState {
   clear: () => void;
 }
 
-export interface SchemaAgentModelSettings {
-  provider?: SchemaAgentProvider;
-  model?: string;
-  effort?: string;
-  modelOptions?: SchemaAgentModelOptions;
-}
-
 export interface UseSchemaAgentChatOptions {
   api: ContextureSchemaAgentAPI;
   onMessagePersisted?: (message: ChatMessage) => void;
@@ -87,6 +89,10 @@ export function useSchemaAgentChat({
   api,
   onMessagePersisted,
 }: UseSchemaAgentChatOptions): SchemaAgentChatState {
+  useState(() => {
+    useSchemaAgentSettingsStore.getState().reloadFromStorage();
+    return null;
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setStreaming] = useState(false);
   const [liveAssistant, setLiveAssistant] = useState('');
@@ -95,23 +101,20 @@ export function useSchemaAgentChat({
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [providerThreadRef, setProviderThreadRef] = useState<unknown>(undefined);
   const [desynced, setDesynced] = useState(false);
-  const [provider, setProviderState] = useState<SchemaAgentProvider>(
-    () =>
-      (localStorage.getItem('contexture-schema-agent-provider') as SchemaAgentProvider | null) ??
-      'codex',
-  );
+  const provider = useSchemaAgentSettingsStore((s) => s.provider);
+  const model = useSchemaAgentSettingsStore((s) => s.model);
+  const effort = useSchemaAgentSettingsStore((s) => s.effort);
+  const modelOptions = useSchemaAgentSettingsStore((s) => s.modelOptions);
+  const setProviderSetting = useSchemaAgentSettingsStore((s) => s.setProvider);
+  const restoreModelSettings = useSchemaAgentSettingsStore((s) => s.restoreSettings);
+  const setModelSetting = useSchemaAgentSettingsStore((s) => s.setModel);
+  const setEffortSetting = useSchemaAgentSettingsStore((s) => s.setEffort);
+  const setModelOptionsSetting = useSchemaAgentSettingsStore((s) => s.setModelOptions);
   const [models, setModels] = useState<SchemaAgentModelInfo[]>([]);
   const [modelsProvider, setModelsProvider] = useState<SchemaAgentProvider | null>(null);
   const [modelListState, setModelListState] = useState<'idle' | 'loading' | 'loaded' | 'error'>(
     'idle',
   );
-  const [model, setModelState] = useState(
-    () => localStorage.getItem(modelStorageKey(provider)) ?? '',
-  );
-  const [modelOptions, setModelOptionsState] = useState<SchemaAgentModelOptions>(() =>
-    readStoredModelOptions(provider),
-  );
-  const [effort, setEffortState] = useState(() => readStoredEffort(provider));
   const providerRef = useRef(provider);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const persistenceEnabled = useChatComposerStore((s) => s.chatHistoryPersistence);
@@ -184,29 +187,6 @@ export function useSchemaAgentChat({
   }, [provider]);
 
   useEffect(() => {
-    const listener = (event: Event) => {
-      const detail = (event as CustomEvent<{ provider?: unknown }>).detail;
-      const next = detail?.provider;
-      if (next !== 'codex' && next !== 'claude') return;
-      if (next === providerRef.current) return;
-      setProviderState(next);
-      const nextModel = localStorage.getItem(modelStorageKey(next)) ?? '';
-      const nextEffort = readStoredEffort(next);
-      const nextOptions = readStoredModelOptions(next);
-      setModels([]);
-      setModelsProvider(null);
-      setModelListState('idle');
-      setModelState(nextModel);
-      setEffortState(nextEffort);
-      setModelOptionsState(nextOptions);
-      setProviderThreadRef(undefined);
-      setDesynced(false);
-    };
-    window.addEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
-    return () => window.removeEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     api
       .setProvider(provider)
@@ -260,7 +240,7 @@ export function useSchemaAgentChat({
         setModelsProvider(provider);
         setModelListState('loaded');
         if (parsed.length === 0) {
-          setModelState('');
+          setModelSetting('');
           return;
         }
         const storedModel = localStorage.getItem(modelStorageKey(provider)) ?? '';
@@ -280,12 +260,9 @@ export function useSchemaAgentChat({
         );
         const nextEffort = readEffortFromOptions(provider, nextOptions, modelInfo);
         if (nextModel) {
-          setModelState(nextModel);
-          localStorage.setItem(modelStorageKey(provider), nextModel);
-          setModelOptionsState(nextOptions);
-          localStorage.setItem(modelOptionsStorageKey(provider), JSON.stringify(nextOptions));
-          if (nextEffort && nextEffort !== storedEffort) setEffortState(nextEffort);
-          if (nextEffort) localStorage.setItem(effortStorageKey(provider), nextEffort);
+          setModelSetting(nextModel);
+          setModelOptionsSetting(nextOptions);
+          if (nextEffort && nextEffort !== storedEffort) setEffortSetting(nextEffort);
           api
             .setModelOptions({ model: nextModel, effort: nextEffort, options: nextOptions })
             .catch(() => undefined);
@@ -297,7 +274,7 @@ export function useSchemaAgentChat({
     return () => {
       cancelled = true;
     };
-  }, [api, provider]);
+  }, [api, provider, setEffortSetting, setModelOptionsSetting, setModelSetting]);
 
   useEffect(() => {
     if (!selectedModel) return;
@@ -442,83 +419,57 @@ export function useSchemaAgentChat({
     (settings: SchemaAgentModelSettings) => {
       const nextProvider = settings.provider ?? provider;
       providerRef.current = nextProvider;
-      setProviderState(nextProvider);
-      localStorage.setItem('contexture-schema-agent-provider', nextProvider);
-
-      const nextModel =
-        settings.model !== undefined
-          ? settings.model
-          : (localStorage.getItem(modelStorageKey(nextProvider)) ?? '');
-      const nextEffort = normalizeEffort(
-        nextProvider,
-        settings.effort ?? localStorage.getItem(effortStorageKey(nextProvider)),
-      );
-      const nextOptions = settings.modelOptions ?? readStoredModelOptions(nextProvider);
-
+      restoreModelSettings(settings);
       setModels([]);
       setModelsProvider(null);
       setModelListState('idle');
-      setModelState(nextModel);
-      setEffortState(nextEffort);
-      setModelOptionsState(nextOptions);
       setProviderThreadRef(undefined);
       setDesynced(false);
 
-      localStorage.setItem(modelStorageKey(nextProvider), nextModel);
-      localStorage.setItem(effortStorageKey(nextProvider), nextEffort);
-      localStorage.setItem(modelOptionsStorageKey(nextProvider), JSON.stringify(nextOptions));
       api.setProvider(nextProvider).catch(() => undefined);
-      window.dispatchEvent(
-        new CustomEvent(SCHEMA_AGENT_PROVIDER_CHANGED, { detail: { provider: nextProvider } }),
-      );
     },
-    [api, provider],
+    [api, provider, restoreModelSettings],
   );
 
   const setProvider = useCallback(
     (next: SchemaAgentProvider) => {
       if (next === provider) {
-        localStorage.setItem('contexture-schema-agent-provider', next);
+        setProviderSetting(next);
         api.setProvider(next).catch(() => undefined);
         return;
       }
       providerRef.current = next;
-      setProviderState(next);
-      localStorage.setItem('contexture-schema-agent-provider', next);
-      const nextModel = localStorage.getItem(modelStorageKey(next)) ?? '';
-      const nextEffort = readStoredEffort(next);
-      const nextOptions = readStoredModelOptions(next);
+      setProviderSetting(next);
       setModels([]);
       setModelsProvider(null);
       setModelListState('idle');
-      setModelState(nextModel);
-      setEffortState(nextEffort);
-      setModelOptionsState(nextOptions);
       setProviderThreadRef(undefined);
       setDesynced(false);
       api.setProvider(next).catch(() => undefined);
-      window.dispatchEvent(
-        new CustomEvent(SCHEMA_AGENT_PROVIDER_CHANGED, { detail: { provider: next } }),
-      );
     },
-    [api, provider],
+    [api, provider, setProviderSetting],
   );
 
   const setModel = useCallback(
     (next: string) => {
-      setModelState(next);
-      localStorage.setItem(modelStorageKey(provider), next);
+      setModelSetting(next);
       const modelInfo = models.find((option) => option.id === next);
       const nextOptions = normalizeModelOptions(provider, modelOptions, modelInfo);
       const nextEffort = readEffortFromOptions(provider, nextOptions, modelInfo);
-      setModelOptionsState(nextOptions);
-      localStorage.setItem(modelOptionsStorageKey(provider), JSON.stringify(nextOptions));
+      setModelOptionsSetting(nextOptions);
       if (nextEffort && nextEffort !== effort) {
-        setEffortState(nextEffort);
-        localStorage.setItem(effortStorageKey(provider), nextEffort);
+        setEffortSetting(nextEffort);
       }
     },
-    [effort, modelOptions, models, provider],
+    [
+      effort,
+      modelOptions,
+      models,
+      provider,
+      setEffortSetting,
+      setModelOptionsSetting,
+      setModelSetting,
+    ],
   );
 
   const setEffort = useCallback(
@@ -534,12 +485,10 @@ export function useSchemaAgentChat({
       const nextOptions = descriptor
         ? { ...modelOptions, [descriptor.id]: normalized }
         : modelOptions;
-      setModelOptionsState(nextOptions);
-      setEffortState(normalized);
-      localStorage.setItem(modelOptionsStorageKey(provider), JSON.stringify(nextOptions));
-      localStorage.setItem(effortStorageKey(provider), normalized);
+      setModelOptionsSetting(nextOptions);
+      setEffortSetting(normalized);
     },
-    [model, modelOptions, models, provider],
+    [model, modelOptions, models, provider, setEffortSetting, setModelOptionsSetting],
   );
 
   const setModelOption = useCallback(
@@ -547,14 +496,12 @@ export function useSchemaAgentChat({
       const nextOptions = { ...modelOptions, [id]: value };
       const activeModel = models.find((option) => option.id === model);
       const nextEffort = readEffortFromOptions(provider, nextOptions, activeModel);
-      setModelOptionsState(nextOptions);
-      localStorage.setItem(modelOptionsStorageKey(provider), JSON.stringify(nextOptions));
+      setModelOptionsSetting(nextOptions);
       if (nextEffort) {
-        setEffortState(nextEffort);
-        localStorage.setItem(effortStorageKey(provider), nextEffort);
+        setEffortSetting(nextEffort);
       }
     },
-    [model, modelOptions, models, provider],
+    [model, modelOptions, models, provider, setEffortSetting, setModelOptionsSetting],
   );
 
   const hydrate = useCallback((next: ChatMessage[]) => setMessages(next), []);
@@ -568,7 +515,7 @@ export function useSchemaAgentChat({
 
   return {
     provider,
-    providerLabel: provider === 'codex' ? 'Codex' : 'Claude',
+    providerLabel: providerLabel(provider),
     setProvider,
     restoreSettings,
     models: visibleModels,
@@ -634,62 +581,8 @@ function isAuthMessage(message: string): boolean {
   return /auth|sign.?in|unauthori[sz]ed|api key/i.test(message);
 }
 
-function modelStorageKey(provider: SchemaAgentProvider): string {
-  return `contexture-schema-agent-${provider}-model`;
-}
-
-function effortStorageKey(provider: SchemaAgentProvider): string {
-  return `contexture-schema-agent-${provider}-effort`;
-}
-
-function modelOptionsStorageKey(provider: SchemaAgentProvider): string {
-  return `contexture-schema-agent-${provider}-model-options`;
-}
-
-function readStoredModelOptions(provider: SchemaAgentProvider): SchemaAgentModelOptions {
-  try {
-    const raw = localStorage.getItem(modelOptionsStorageKey(provider));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(
-        (entry): entry is [string, string | boolean] =>
-          typeof entry[1] === 'string' || typeof entry[1] === 'boolean',
-      ),
-    );
-  } catch {
-    return {};
-  }
-}
-
-function readStoredEffort(provider: SchemaAgentProvider): string {
-  return normalizeEffort(provider, localStorage.getItem(effortStorageKey(provider)));
-}
-
 function defaultEffort(provider: SchemaAgentProvider): string {
   return provider === 'codex' ? 'high' : 'auto';
-}
-
-function normalizeEffort(provider: SchemaAgentProvider, effort: unknown): string {
-  if (provider === 'codex') {
-    if (effort === 'med') return 'medium';
-    if (effort === 'low' || effort === 'medium' || effort === 'high' || effort === 'xhigh') {
-      return effort;
-    }
-    return 'high';
-  }
-  if (effort === 'medium') return 'med';
-  if (
-    effort === 'auto' ||
-    effort === 'low' ||
-    effort === 'med' ||
-    effort === 'high' ||
-    effort === 'xhigh'
-  ) {
-    return effort;
-  }
-  return 'auto';
 }
 
 function normalizeEffortForModel(

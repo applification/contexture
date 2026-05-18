@@ -6,7 +6,6 @@ import {
 } from './generated-bundle-writer';
 import type { Schema } from './ir';
 import { DEFAULT_LAYOUT, type Layout, saveLayout } from './layout';
-import { load } from './load';
 import type { BundlePaths } from './paths';
 import { bundlePathsFor, contextureDirFor } from './paths';
 import type { EmitPipelineDeps, FileEntry } from './pipeline';
@@ -73,45 +72,5 @@ export async function initializeDocumentBundle(
     sidecars,
     driftPreflight: input.driftPreflight,
     generatedTargetPreflight: input.generatedTargetPreflight,
-  });
-}
-
-export interface PromoteScratchToBundleInput {
-  scratchIrPath: string;
-  bundleIrPath?: string;
-  initialChatMessage?: string;
-  fs: GeneratedBundleFs;
-  emitDeps?: EmitPipelineDeps;
-}
-
-export async function promoteScratchToBundle(
-  input: PromoteScratchToBundleInput,
-): Promise<GeneratedBundleWriteResult> {
-  const source = bundlePathsFor(input.scratchIrPath).ir;
-  const target = bundlePathsFor(input.bundleIrPath ?? input.scratchIrPath).ir;
-  const { schema } = load(await input.fs.readFile(source));
-  const chat: ChatHistory =
-    input.initialChatMessage && input.initialChatMessage.length > 0
-      ? {
-          version: '1',
-          messages: [
-            {
-              id: 'initial-user-message',
-              role: 'user',
-              content: input.initialChatMessage,
-              createdAt: Date.now(),
-            },
-          ],
-        }
-      : DEFAULT_CHAT_HISTORY;
-
-  return initializeDocumentBundle({
-    irPath: target,
-    schema,
-    fs: input.fs,
-    emitDeps: input.emitDeps,
-    sidecars: { chat },
-    driftPreflight: false,
-    generatedTargetPreflight: true,
   });
 }

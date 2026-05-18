@@ -28,26 +28,8 @@ export type ReconcileStatus = 'idle' | 'loading' | 'ready' | 'error' | 'applying
 /** Which emitted-file kind the modal is reconciling against. */
 export type TargetKind = GeneratedTargetKind | 'unknown';
 
-/**
- * Detect the target kind from an absolute emitted-file path.
- * Patterns mirror `bundlePathsFor` in `@contexture/core/pipeline`:
- *   convex   → .../convex/schema.ts
- *   zod      → .../<name>.schema.ts
- *   json-schema → .../<name>.schema.json
- *   schema-index → .../index.ts
- */
 export function targetKindFor(path: string, irPath?: string | null): TargetKind {
   if (irPath) return generatedTargetForPath(irPath, path)?.kind ?? 'unknown';
-  if (path.endsWith('/convex/schema.ts')) return 'convex';
-  if (path.endsWith('.schema.ts')) return 'zod';
-  if (path.endsWith('.schema.json')) return 'json-schema';
-  if (path.endsWith('/index.ts')) return 'schema-index';
-  if (path.endsWith('/.contexture/ai-tool-schemas.json')) return 'ai-tool-schemas';
-  if (path.endsWith('/.contexture/structured-output-schemas.json')) {
-    return 'structured-output-schemas';
-  }
-  if (path.endsWith('/.contexture/mcp-definitions.json')) return 'mcp-definitions';
-  if (path.endsWith('/form-validators.ts')) return 'form-validators';
   return 'unknown';
 }
 

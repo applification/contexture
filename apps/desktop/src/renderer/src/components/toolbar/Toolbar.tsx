@@ -6,9 +6,10 @@
  */
 
 import {
-  SCHEMA_AGENT_PROVIDER_CHANGED,
+  providerLabel as labelForProvider,
   type SchemaAgentProvider,
-} from '@renderer/chat/useSchemaAgentChat';
+  useSchemaAgentSettingsStore,
+} from '@renderer/store/schema-agent-settings';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -20,32 +21,22 @@ import { cn } from '@/lib/utils';
 import { GraphSearchBar } from './GraphSearchBar';
 
 export function Toolbar(): React.JSX.Element {
+  useState(() => {
+    useSchemaAgentSettingsStore.getState().reloadFromStorage();
+    return null;
+  });
   const theme = useUIChromeStore((s) => s.theme);
   const toggleTheme = useUIChromeStore((s) => s.toggleTheme);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const toggleSidebar = useUIChromeStore((s) => s.toggleSidebar);
-  const [provider, setProviderState] = useState<SchemaAgentProvider>(
-    () =>
-      (localStorage.getItem('contexture-schema-agent-provider') as SchemaAgentProvider | null) ??
-      'codex',
-  );
+  const provider = useSchemaAgentSettingsStore((s) => s.provider);
+  const setProviderSetting = useSchemaAgentSettingsStore((s) => s.setProvider);
   const [providerReady, setProviderReady] = useState(false);
   const [providerStatus, setProviderStatus] = useState('Provider status unknown.');
   const [providerApiKey, setProviderApiKey] = useState('');
   const [providerPopoverOpen, setProviderPopoverOpen] = useState(false);
 
-  const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
-
-  useEffect(() => {
-    const listener = (event: Event) => {
-      const next = (event as CustomEvent<{ provider?: unknown }>).detail?.provider;
-      if (next !== 'codex' && next !== 'claude') return;
-      setProviderState(next);
-      localStorage.setItem('contexture-schema-agent-provider', next);
-    };
-    window.addEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
-    return () => window.removeEventListener(SCHEMA_AGENT_PROVIDER_CHANGED, listener);
-  }, []);
+  const providerLabel = labelForProvider(provider);
 
   const applyProviderStatus = useCallback(
     (status: unknown): void => {
@@ -86,11 +77,7 @@ export function Toolbar(): React.JSX.Element {
   }, [provider, applyProviderStatus]);
 
   const handleProviderChange = async (next: SchemaAgentProvider): Promise<void> => {
-    setProviderState(next);
-    localStorage.setItem('contexture-schema-agent-provider', next);
-    window.dispatchEvent(
-      new CustomEvent(SCHEMA_AGENT_PROVIDER_CHANGED, { detail: { provider: next } }),
-    );
+    setProviderSetting(next);
     await window.contexture.schemaAgent.setProvider(next);
     const status = await window.contexture.schemaAgent.getStatus();
     const readiness =

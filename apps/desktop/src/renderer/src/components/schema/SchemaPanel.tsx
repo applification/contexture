@@ -24,7 +24,15 @@
  * HTML with all user text escaped in `<span>` text nodes — there is no
  * path for user-authored source to introduce raw tags.
  */
-import { bundlePathsFor } from '@contexture/core/paths';
+import {
+  type GeneratedTargetGroup,
+  type GeneratedTargetLanguage,
+  generatedTargetDisplayPath,
+  generatedTargetMetadata,
+  generatedTargetPath,
+  previewableGeneratedTargets,
+} from '@contexture/core/generated-targets';
+import type { GeneratedTargetKind } from '@contexture/core/paths';
 import {
   AArrowDown,
   AArrowUp,
@@ -40,31 +48,29 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '..
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
-export type SchemaOutputType =
-  | 'zod'
-  | 'json'
-  | 'convex'
-  | 'ai-tool-schemas'
-  | 'structured-outputs'
-  | 'mcp-definitions'
-  | 'form-validators';
-
-type SchemaOutputGroup = 'core' | 'ai' | 'forms';
-type SchemaOutputLanguage = 'typescript' | 'json';
+export type SchemaOutputType = GeneratedTargetKind;
 
 export interface SchemaPanelAdditionalSource {
-  type: Exclude<SchemaOutputType, 'zod' | 'json' | 'convex'>;
+  type: Exclude<SchemaOutputType, 'zod' | 'json-schema' | 'schema-index' | 'convex'>;
+  source: string;
+  enabled?: boolean;
+}
+
+export interface SchemaPanelSource {
+  type: SchemaOutputType;
   source: string;
   enabled?: boolean;
 }
 
 export interface SchemaPanelProps {
-  /** Emitted Zod TypeScript source. */
-  zodSource: string;
+  /** Generated output previews. Disabled entries appear as opt-in choices. */
+  sources?: SchemaPanelSource[];
+  /** Emitted Zod TypeScript source. Kept for focused tests/stories that do not build sources. */
+  zodSource?: string;
   /** Emitted JSON Schema (pre-stringified JSON). */
-  jsonSource: string;
+  jsonSource?: string;
   /** Emitted Convex schema TypeScript source. */
-  convexSource: string;
+  convexSource?: string;
   /** True when the IR has zero types; drives the empty state. */
   isEmpty: boolean;
   /** Non-null when the primary (Zod) emit threw. Rendered as-is. */
@@ -84,7 +90,7 @@ export interface SchemaPanelProps {
    */
   additionalSources?: SchemaPanelAdditionalSource[];
   /** Enable an optional output target from the grouped selector. */
-  onEnableOutput?: (type: SchemaPanelAdditionalSource['type']) => void;
+  onEnableOutput?: (type: SchemaOutputType) => void;
   /** Absolute path of the active `.contexture.json`; absent for unsaved documents. */
   documentFilePath?: string | null;
   /** Open the selected generated file in an external editor. */
@@ -101,108 +107,31 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 13px
 /** How long the Copy icon flips to a check after a successful copy. */
 const COPY_FEEDBACK_MS = 2000;
 
-const OUTPUT_GROUPS: { group: SchemaOutputGroup; label: string }[] = [
+const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
   { group: 'core', label: 'Core' },
   { group: 'ai', label: 'AI' },
   { group: 'forms', label: 'Forms' },
 ];
 
-const OUTPUT_METADATA: Record<
-  SchemaOutputType,
-  {
-    group: SchemaOutputGroup;
-    label: string;
-    help: string;
-    language: SchemaOutputLanguage;
-    fileName: (schemaFileName: string) => string;
-  }
-> = {
-  zod: {
-    group: 'core',
-    label: 'Zod schema',
-    help: 'TypeScript Zod schemas for app/runtime validation.',
-    language: 'typescript',
-    fileName: (schemaFileName) => schemaFileName,
-  },
-  json: {
-    group: 'core',
-    label: 'JSON Schema',
-    help: 'Draft 2020-12 JSON Schema for interoperable validation and tooling.',
-    language: 'json',
-    fileName: (schemaFileName) => {
-      const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
-      return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
-    },
-  },
-  convex: {
-    group: 'core',
-    label: 'Convex schema',
-    help: 'Convex database schema generated from Contexture table types.',
-    language: 'typescript',
-    fileName: () => 'convex/schema.ts',
-  },
-  'ai-tool-schemas': {
-    group: 'ai',
-    label: 'Tool schemas',
-    help: 'JSON Schema tool definitions for AI function/tool calling.',
-    language: 'json',
-    fileName: () => '.contexture/ai-tool-schemas.json',
-  },
-  'structured-outputs': {
-    group: 'ai',
-    label: 'Structured outputs',
-    help: 'Provider-neutral response schemas for model outputs.',
-    language: 'json',
-    fileName: () => '.contexture/structured-output-schemas.json',
-  },
-  'mcp-definitions': {
-    group: 'ai',
-    label: 'MCP definitions',
-    help: 'Machine-readable tool/server definitions for MCP integrations.',
-    language: 'json',
-    fileName: () => '.contexture/mcp-definitions.json',
-  },
-  'form-validators': {
-    group: 'forms',
-    label: 'Form validators',
-    help: 'Type-safe validation helpers backed by generated Zod schemas.',
-    language: 'typescript',
-    fileName: () => 'form-validators.ts',
-  },
-};
-
 interface OutputOption {
   type: SchemaOutputType;
   source: string;
-  group: SchemaOutputGroup;
+  group: GeneratedTargetGroup;
   label: string;
   help: string;
-  language: SchemaOutputLanguage;
+  language: GeneratedTargetLanguage;
   fileName: string;
   enabled: boolean;
 }
 
-function generatedPathForOutput(type: SchemaOutputType, documentFilePath: string): string {
-  const paths = bundlePathsFor(documentFilePath);
-  switch (type) {
-    case 'zod':
-      return paths.schemaTs;
-    case 'json':
-      return paths.schemaJson;
-    case 'convex':
-      return paths.convex;
-    case 'ai-tool-schemas':
-      return paths.aiToolSchemas;
-    case 'structured-outputs':
-      return paths.structuredOutputSchemas;
-    case 'mcp-definitions':
-      return paths.mcpDefinitions;
-    case 'form-validators':
-      return paths.formValidators;
-  }
+function fallbackBaseName(schemaFileName: string): string {
+  const schemaTs = schemaFileName.replace(/\.schema\.ts$/i, '');
+  if (schemaTs !== schemaFileName) return schemaTs;
+  return schemaFileName.replace(/\.[^.]+$/i, '') || 'schema';
 }
 
 export function SchemaPanel({
+  sources,
   zodSource,
   jsonSource,
   convexSource,
@@ -234,28 +163,43 @@ export function SchemaPanel({
   }, []);
 
   const outputOptions = useMemo<OutputOption[]>(() => {
-    const coreSources: Array<{ type: SchemaOutputType; source: string; enabled?: boolean }> = [
-      { type: 'zod', source: zodSource },
-      { type: 'json', source: jsonSource },
-      { type: 'convex', source: convexSource },
-    ];
-    const optionalSources = additionalSources.filter(
-      (source) => source.enabled === false || source.source.trim().length > 0,
+    const sourceEntries =
+      sources && sources.length > 0
+        ? sources
+        : ([
+            { type: 'zod', source: zodSource ?? '' },
+            { type: 'json-schema', source: jsonSource ?? '' },
+            { type: 'convex', source: convexSource ?? '' },
+            ...additionalSources,
+          ] satisfies SchemaPanelSource[]);
+    const visibleSourceEntries = sourceEntries.filter(
+      (source) =>
+        source.type === 'zod' ||
+        source.type === 'json-schema' ||
+        source.type === 'convex' ||
+        source.enabled === false ||
+        source.source.trim().length > 0,
     );
-    return [...coreSources, ...optionalSources].map(({ type, source, enabled = true }) => {
-      const metadata = OUTPUT_METADATA[type];
-      return {
-        type,
-        source,
-        group: metadata.group,
-        label: metadata.label,
-        help: metadata.help,
-        language: metadata.language,
-        fileName: metadata.fileName(schemaFileName),
-        enabled,
-      };
-    });
-  }, [additionalSources, convexSource, jsonSource, schemaFileName, zodSource]);
+    const baseName = fallbackBaseName(schemaFileName);
+    const sortOrder = new Map(
+      previewableGeneratedTargets().map((target, index) => [target.kind, index] as const),
+    );
+    return [...visibleSourceEntries]
+      .sort((a, b) => (sortOrder.get(a.type) ?? 999) - (sortOrder.get(b.type) ?? 999))
+      .map(({ type, source, enabled = true }) => {
+        const metadata = generatedTargetMetadata(type);
+        return {
+          type,
+          source,
+          group: metadata.group,
+          label: metadata.label,
+          help: metadata.help,
+          language: metadata.language,
+          fileName: generatedTargetDisplayPath(type, baseName),
+          enabled,
+        };
+      });
+  }, [additionalSources, convexSource, jsonSource, schemaFileName, sources, zodSource]);
 
   useEffect(() => {
     if (!outputOptions.some((output) => output.type === activeOutput && output.enabled)) {
@@ -266,10 +210,11 @@ export function SchemaPanel({
   const selectedOutput =
     outputOptions.find((output) => output.type === activeOutput && output.enabled) ??
     outputOptions[0];
-  const activeSource = selectedOutput.source;
-  const selectedOutputPath = documentFilePath
-    ? generatedPathForOutput(selectedOutput.type, documentFilePath)
-    : null;
+  const activeSource = selectedOutput?.source ?? '';
+  const selectedOutputPath =
+    selectedOutput && documentFilePath
+      ? generatedTargetPath(selectedOutput.type, documentFilePath)
+      : null;
 
   // Re-highlight whenever the active source or output type changes.
   useEffect(() => {
@@ -283,7 +228,7 @@ export function SchemaPanel({
         const hl = await getHighlighter();
         if (cancelled) return;
         const html = hl.codeToHtml(activeSource, {
-          lang: selectedOutput.language,
+          lang: selectedOutput?.language ?? 'typescript',
           themes: SHIKI_THEMES,
           defaultColor: false,
         });
@@ -295,7 +240,7 @@ export function SchemaPanel({
     return () => {
       cancelled = true;
     };
-  }, [activeSource, selectedOutput.language, isEmpty, error]);
+  }, [activeSource, selectedOutput?.language, isEmpty, error]);
 
   // Clear the "copied" feedback timer on unmount.
   useEffect(
@@ -394,9 +339,7 @@ export function SchemaPanel({
                               if (!output.enabled) {
                                 setActiveOutput(output.type);
                                 setHighlightedHtml(null);
-                                onEnableOutput?.(
-                                  output.type as SchemaPanelAdditionalSource['type'],
-                                );
+                                onEnableOutput?.(output.type);
                                 return;
                               }
                               setActiveOutput(output.type);

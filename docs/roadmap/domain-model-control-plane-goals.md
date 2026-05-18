@@ -268,11 +268,11 @@ Progress:
 - Project recursive delete now fails closed for root, home, relative, top-level,
   current-working-directory, and file targets.
 - External window-open handling now denies non-http/mailto protocols.
-- CLI and MCP now share core path policy: read-only operations accept resolved
-  `.contexture.json` inputs, while write-capable agent operations require
-  Bundle mode via a sibling `.contexture/` directory.
-- Tests cover non-IR path rejection, scratch-file read-only inspection, and
-  write-capable CLI/MCP rejection for scratch IR paths.
+- CLI and MCP now share core path policy: read-only and write-capable
+  operations accept resolved `.contexture.json` inputs, and writes materialize
+  missing bundle sidecars through the shared bundle writer.
+- Tests cover non-IR path rejection, legacy bare-IR inspection, and CLI/MCP
+  first-write bundle materialization.
 
 ## Goal 11 — Shared Generated-Bundle Writer
 

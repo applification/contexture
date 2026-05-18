@@ -7,9 +7,9 @@
  *
  * New unsaved documents stay manual-save until the user chooses a file path.
  */
+
+import type { ChatHistory, Layout } from '@contexture/core';
 import { useEffect, useRef } from 'react';
-import type { ChatHistory } from '../model/chat-history';
-import type { Layout } from '../model/layout';
 import { useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';
 

@@ -1,6 +1,6 @@
+import type { Layout } from '@contexture/core';
 import type { Schema } from '@contexture/core/ir';
 import { useEffect, useRef } from 'react';
-import type { Layout } from '../model/layout';
 import { useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';
 

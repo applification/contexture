@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertContextureIrPath,
-  assertWritableContextureBundleIrPath,
   bundlePathsFor,
   generatedTargetForPath,
   generatedTargetsFor,
@@ -19,19 +18,6 @@ describe('Contexture path policy', () => {
     expect(() => assertContextureIrPath('/repo/packages/contexture/app.schema.json')).toThrow(
       /Expected a \.contexture\.json path/,
     );
-  });
-
-  it('allows write-capable operations only when the sibling .contexture directory exists', async () => {
-    await expect(
-      assertWritableContextureBundleIrPath('/repo/app.contexture.json', {
-        dirExists: async (path) => path === '/repo/.contexture',
-      }),
-    ).resolves.toBe('/repo/app.contexture.json');
-    await expect(
-      assertWritableContextureBundleIrPath('/repo/app.contexture.json', {
-        dirExists: async () => false,
-      }),
-    ).rejects.toThrow(/bundle mode/);
   });
 
   it('derives one generated target registry for every emitted artifact path', () => {

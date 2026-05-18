@@ -1,4 +1,6 @@
+import { DEFAULT_CHAT_HISTORY, saveChatHistory } from './chat-history';
 import type { Schema } from './ir';
+import { DEFAULT_LAYOUT, saveLayout } from './layout';
 import { save } from './load';
 import { type BundlePaths, bundlePathsFor, contextureDirFor } from './paths';
 import {
@@ -156,8 +158,10 @@ export async function writeGeneratedBundle(
   await fs.mkdirp?.(contextureDirFor(irPath));
   await fs.mkdirp?.(dirname(bundle.paths.convex));
 
+  const defaultSidecars = await missingDefaultSidecars(bundle.paths, fs, sidecars);
   const files = [
     ...(includeIr ? [{ path: bundle.paths.ir, content: `${save(schema)}\n` }] : []),
+    ...defaultSidecars,
     ...sidecars,
     ...bundle.emitted,
     bundle.manifestFile,
@@ -165,6 +169,34 @@ export async function writeGeneratedBundle(
 
   await writeFilesAtomic(fs, files);
   return { ...bundle, files };
+}
+
+async function missingDefaultSidecars(
+  paths: BundlePaths,
+  fs: GeneratedBundleFs,
+  sidecars: ReadonlyArray<FileEntry>,
+): Promise<FileEntry[]> {
+  const explicitSidecars = new Set(sidecars.map((entry) => entry.path));
+  const defaults: FileEntry[] = [
+    { path: paths.layout, content: saveLayout(DEFAULT_LAYOUT) },
+    { path: paths.chat, content: saveChatHistory(DEFAULT_CHAT_HISTORY) },
+  ];
+  const missing: FileEntry[] = [];
+
+  for (const entry of defaults) {
+    if (explicitSidecars.has(entry.path)) continue;
+    try {
+      await fs.readFile(entry.path);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        missing.push(entry);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  return missing;
 }
 
 export async function writeFilesAtomic(

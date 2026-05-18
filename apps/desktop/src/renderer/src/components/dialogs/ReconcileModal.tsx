@@ -18,16 +18,8 @@
  * Leave dirty → close the modal and leave drift state alone.
  */
 
-import { emitAiToolSchemas } from '@contexture/core/emit-ai-tool-schemas';
-import { emitConvexSchema } from '@contexture/core/emit-convex';
-import { emitFormValidators } from '@contexture/core/emit-form-validators';
-import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
-import { emitMcpDefinitions } from '@contexture/core/emit-mcp-definitions';
-import { emit as emitSchemaIndex } from '@contexture/core/emit-schema-index';
-import { emitStructuredOutputSchemas } from '@contexture/core/emit-structured-output-schemas';
-import { emit as emitZod } from '@contexture/core/emit-zod';
+import { emitGeneratedTarget } from '@contexture/core/generated-targets';
 import type { Schema } from '@contexture/core/ir';
-import { baseNameFor } from '@contexture/core/paths';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useSchemaAgentReconcile } from '@renderer/hooks/useSchemaAgentReconcile';
@@ -40,6 +32,7 @@ import {
   targetKindFor,
   useReconcileStore,
 } from '@renderer/store/reconcile';
+import { useSchemaAgentSettingsStore } from '@renderer/store/schema-agent-settings';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
@@ -68,55 +61,24 @@ function safeEmitForTarget(
   schema: Schema,
   targetPath: string,
   irPath: string | null,
-  kind: TargetKind = targetKindFor(targetPath),
+  kind: TargetKind,
 ): EmitResult {
+  if (kind === 'unknown' || !irPath) {
+    return { source: '', error: `Cannot emit for unknown target kind (${targetPath}).` };
+  }
   try {
-    let source: string;
-    switch (kind) {
-      case 'convex':
-        source = emitConvexSchema(schema, irPath ?? undefined);
-        break;
-      case 'zod':
-        source = emitZod(schema, irPath ?? '<unknown>', {
+    return {
+      source: emitGeneratedTarget(
+        schema,
+        kind,
+        irPath,
+        {},
+        {
           stdlibNamespaces: STDLIB_REGISTRY.namespaces,
-        });
-        break;
-      case 'json-schema':
-        source = `${JSON.stringify(
-          emitJsonSchema(schema, undefined, irPath ?? undefined, {
-            stdlibNamespaces: STDLIB_REGISTRY.namespaces,
-          }),
-          null,
-          2,
-        )}\n`;
-        break;
-      case 'schema-index':
-        source = emitSchemaIndex(irPath ? baseNameFor(irPath) : 'schema', irPath ?? undefined);
-        break;
-      case 'ai-tool-schemas':
-        source = `${JSON.stringify(emitAiToolSchemas(schema, irPath ?? undefined), null, 2)}\n`;
-        break;
-      case 'structured-output-schemas':
-        source = `${JSON.stringify(
-          emitStructuredOutputSchemas(schema, irPath ?? undefined),
-          null,
-          2,
-        )}\n`;
-        break;
-      case 'mcp-definitions':
-        source = `${JSON.stringify(emitMcpDefinitions(schema, irPath ?? undefined), null, 2)}\n`;
-        break;
-      case 'form-validators':
-        source = emitFormValidators(
-          schema,
-          irPath ? baseNameFor(irPath) : 'schema',
-          irPath ?? undefined,
-        );
-        break;
-      case 'unknown':
-        return { source: '', error: `Cannot emit for unknown target kind (${targetPath}).` };
-    }
-    return { source, error: null };
+        },
+      ),
+      error: null,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { source: '', error: message };
@@ -275,13 +237,9 @@ export function ReconcileModal(): React.JSX.Element {
       '```',
     ].join('\n');
 
-    const storedProvider = localStorage.getItem('contexture-schema-agent-provider');
-    const provider =
-      window.contexture?.schemaAgent && (storedProvider === 'codex' || storedProvider === 'claude')
-        ? storedProvider
-        : window.contexture?.schemaAgent
-          ? 'codex'
-          : 'claude';
+    const provider = window.contexture?.schemaAgent
+      ? useSchemaAgentSettingsStore.getState().provider
+      : 'claude';
     const threadId = history.createThread({
       provider,
       ...(provider === 'claude' ? { model: 'claude-sonnet-4-6' } : {}),

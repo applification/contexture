@@ -1,8 +1,4 @@
-import {
-  DEFAULT_CHAT_HISTORY,
-  loadChatHistory,
-  saveChatHistory,
-} from '@renderer/model/chat-history';
+import { DEFAULT_CHAT_HISTORY, loadChatHistory, saveChatHistory } from '@contexture/core';
 import { describe, expect, it } from 'vitest';
 
 describe('chat history sidecar', () => {
