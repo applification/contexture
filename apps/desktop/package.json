@@ -1,6 +1,6 @@
 {
   "name": "@contexture/desktop",
-  "version": "0.15.4",
+  "version": "0.15.5",
   "description": "Visual Zod schema editor with LLM support",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/applification/contexture",
@@ -17,8 +17,7 @@
     "typecheck": "bun run typegen && bun run typecheck:node && bun run typecheck:web",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "bash e2e/runner.sh",
-    "test:e2e:playwright": "playwright test",
+    "test:e2e": "playwright test",
     "build:win": "bun run build && electron-builder --win --config",
     "build:mac": "bun run build && electron-builder --mac --config",
     "build:linux": "bun run build && electron-builder --linux --config",

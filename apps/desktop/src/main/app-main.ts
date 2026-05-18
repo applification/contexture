@@ -18,6 +18,8 @@ import { registerUpdateIpc } from './ipc/update';
 import { createMenu } from './menu';
 import { isSafeExternalUrl } from './security';
 
+const isE2E = process.env.E2E === '1';
+
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -50,7 +52,7 @@ function createWindow(): BrowserWindow {
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    const loadOptions = process.env.E2E === '1' ? { query: { e2e: '1' } } : undefined;
+    const loadOptions = isE2E ? { query: { e2e: '1' } } : undefined;
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'), loadOptions);
   }
 
@@ -60,7 +62,7 @@ function createWindow(): BrowserWindow {
 app.setName('Contexture');
 
 // Enable CDP for e2e testing when E2E=1
-if (process.env.E2E === '1') {
+if (isE2E) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.E2E_CDP_PORT ?? '9222');
   app.commandLine.appendSwitch('remote-allow-origins', '*');
 }
@@ -95,7 +97,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' || isE2E) {
     app.quit();
   }
 });
