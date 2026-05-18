@@ -1,18 +1,18 @@
 /**
  * SchemaPanel — read-only preview of the emitted schema source.
  *
- * Supports three schema formats via an in-panel tab strip:
- *   - Zod (TypeScript)  → <name>.schema.ts
- *   - JSON Schema        → <name>.schema.json
- *   - Convex             → convex/schema.ts
+ * Supports grouped output previews:
+ *   - Core: Zod, JSON Schema, Convex
+ *   - AI: tool schemas, structured outputs, MCP definitions when enabled
+ *   - Forms: form validators when enabled
  *
  * Three visual states:
  *   - Empty (schema has no types): an `Empty` nudge telling the
  *     user to add a type on the canvas.
  *   - Error (emit threw): a muted error line. Transient — the
  *     next valid IR clears it on re-render.
- *   - OK: a tab strip, header with filename + font-size and copy
- *     controls, above a shiki-highlighted code block.
+ *   - OK: a compact grouped selector, header with filename + font-size
+ *     and copy controls, above a shiki-highlighted code block.
  *
  * Shiki init is lazy (first mount) via `getHighlighter`. We pre-warm
  * the highlighter on mount so it loads in the background — by the time
@@ -25,12 +25,27 @@
  * path for user-authored source to introduce raw tags.
  */
 import { AArrowDown, AArrowUp, Check, Copy, FileBracesCorner, FileCode } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
-export type SchemaType = 'zod' | 'json' | 'convex';
+export type SchemaOutputType =
+  | 'zod'
+  | 'json'
+  | 'convex'
+  | 'ai-tool-schemas'
+  | 'structured-outputs'
+  | 'mcp-definitions'
+  | 'form-validators';
+
+type SchemaOutputGroup = 'core' | 'ai' | 'forms';
+type SchemaOutputLanguage = 'typescript' | 'json';
+
+export interface SchemaPanelAdditionalSource {
+  type: Exclude<SchemaOutputType, 'zod' | 'json' | 'convex'>;
+  source: string;
+}
 
 export interface SchemaPanelProps {
   /** Emitted Zod TypeScript source. */
@@ -52,6 +67,11 @@ export interface SchemaPanelProps {
    * document has been saved.
    */
   schemaFileName?: string;
+  /**
+   * Optional non-core generated outputs. Empty sources are hidden so
+   * disabled/failed opt-in outputs do not clutter the selector.
+   */
+  additionalSources?: SchemaPanelAdditionalSource[];
 }
 
 /**
@@ -64,22 +84,79 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 13px
 /** How long the Copy icon flips to a check after a successful copy. */
 const COPY_FEEDBACK_MS = 2000;
 
-const SCHEMA_TABS: { type: SchemaType; label: string }[] = [
-  { type: 'zod', label: 'Zod' },
-  { type: 'json', label: 'JSON Schema' },
-  { type: 'convex', label: 'Convex' },
+const OUTPUT_GROUPS: { group: SchemaOutputGroup; label: string }[] = [
+  { group: 'core', label: 'Core' },
+  { group: 'ai', label: 'AI' },
+  { group: 'forms', label: 'Forms' },
 ];
 
-function deriveFileName(schemaFileName: string, type: SchemaType): string {
-  if (type === 'zod') return schemaFileName;
-  if (type === 'convex') return 'convex/schema.ts';
-  // json: replace .schema.ts → .schema.json, or .ts → .json as fallback
-  const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
-  return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
+const OUTPUT_METADATA: Record<
+  SchemaOutputType,
+  {
+    group: SchemaOutputGroup;
+    label: string;
+    language: SchemaOutputLanguage;
+    fileName: (schemaFileName: string) => string;
+  }
+> = {
+  zod: {
+    group: 'core',
+    label: 'Zod schema',
+    language: 'typescript',
+    fileName: (schemaFileName) => schemaFileName,
+  },
+  json: {
+    group: 'core',
+    label: 'JSON Schema',
+    language: 'json',
+    fileName: (schemaFileName) => {
+      const replaced = schemaFileName.replace(/\.schema\.ts$/i, '.schema.json');
+      return replaced !== schemaFileName ? replaced : schemaFileName.replace(/\.ts$/i, '.json');
+    },
+  },
+  convex: {
+    group: 'core',
+    label: 'Convex schema',
+    language: 'typescript',
+    fileName: () => 'convex/schema.ts',
+  },
+  'ai-tool-schemas': {
+    group: 'ai',
+    label: 'Tool schemas',
+    language: 'json',
+    fileName: () => '.contexture/ai-tool-schemas.json',
+  },
+  'structured-outputs': {
+    group: 'ai',
+    label: 'Structured outputs',
+    language: 'json',
+    fileName: () => '.contexture/structured-output-schemas.json',
+  },
+  'mcp-definitions': {
+    group: 'ai',
+    label: 'MCP definitions',
+    language: 'json',
+    fileName: () => '.contexture/mcp-definitions.json',
+  },
+  'form-validators': {
+    group: 'forms',
+    label: 'Form validators',
+    language: 'typescript',
+    fileName: () => 'form-validators.ts',
+  },
+};
+
+interface OutputOption {
+  type: SchemaOutputType;
+  source: string;
+  group: SchemaOutputGroup;
+  label: string;
+  language: SchemaOutputLanguage;
+  fileName: string;
 }
 
-function langForType(type: SchemaType): string {
-  return type === 'json' ? 'json' : 'typescript';
+function isVisibleOptionalSource(source: SchemaPanelAdditionalSource): boolean {
+  return source.source.trim().length > 0;
 }
 
 export function SchemaPanel({
@@ -90,8 +167,9 @@ export function SchemaPanel({
   error,
   onCopy,
   schemaFileName = 'schema.ts',
+  additionalSources = [],
 }: SchemaPanelProps): React.JSX.Element {
-  const [activeSchema, setActiveSchema] = useState<SchemaType>('zod');
+  const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
@@ -109,14 +187,38 @@ export function SchemaPanel({
     getHighlighter().catch(() => undefined);
   }, []);
 
-  const sourceByType: Record<SchemaType, string> = {
-    zod: zodSource,
-    json: jsonSource,
-    convex: convexSource,
-  };
-  const activeSource = sourceByType[activeSchema];
+  const outputOptions = useMemo<OutputOption[]>(() => {
+    const coreSources: { type: SchemaOutputType; source: string }[] = [
+      { type: 'zod', source: zodSource },
+      { type: 'json', source: jsonSource },
+      { type: 'convex', source: convexSource },
+    ];
+    return [...coreSources, ...additionalSources.filter(isVisibleOptionalSource)].map(
+      ({ type, source }) => {
+        const metadata = OUTPUT_METADATA[type];
+        return {
+          type,
+          source,
+          group: metadata.group,
+          label: metadata.label,
+          language: metadata.language,
+          fileName: metadata.fileName(schemaFileName),
+        };
+      },
+    );
+  }, [additionalSources, convexSource, jsonSource, schemaFileName, zodSource]);
 
-  // Re-highlight whenever the active source or schema type changes.
+  useEffect(() => {
+    if (!outputOptions.some((output) => output.type === activeOutput)) {
+      setActiveOutput('zod');
+    }
+  }, [activeOutput, outputOptions]);
+
+  const selectedOutput =
+    outputOptions.find((output) => output.type === activeOutput) ?? outputOptions[0];
+  const activeSource = selectedOutput.source;
+
+  // Re-highlight whenever the active source or output type changes.
   useEffect(() => {
     if (isEmpty || error !== null || activeSource === '') {
       setHighlightedHtml(null);
@@ -128,7 +230,7 @@ export function SchemaPanel({
         const hl = await getHighlighter();
         if (cancelled) return;
         const html = hl.codeToHtml(activeSource, {
-          lang: langForType(activeSchema),
+          lang: selectedOutput.language,
           themes: SHIKI_THEMES,
           defaultColor: false,
         });
@@ -140,7 +242,7 @@ export function SchemaPanel({
     return () => {
       cancelled = true;
     };
-  }, [activeSource, activeSchema, isEmpty, error]);
+  }, [activeSource, selectedOutput.language, isEmpty, error]);
 
   // Clear the "copied" feedback timer on unmount.
   useEffect(
@@ -201,40 +303,59 @@ export function SchemaPanel({
     );
   }
 
-  const displayFileName = deriveFileName(schemaFileName, activeSchema);
-
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
-      {/* Schema type tab strip */}
-      <div className="flex items-center gap-1 mb-2" role="tablist" aria-label="Schema format">
-        {SCHEMA_TABS.map(({ type, label }) => (
-          <button
-            key={type}
-            type="button"
-            role="tab"
-            aria-selected={activeSchema === type}
-            data-testid={`schema-tab-${type}`}
-            onClick={() => {
-              setActiveSchema(type);
-              setHighlightedHtml(null);
-            }}
-            className={[
-              'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-              activeSchema === type
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            ].join(' ')}
-          >
-            {label}
-          </button>
-        ))}
+      <div
+        className="mb-2 space-y-1 rounded-md border border-border bg-muted/35 p-1.5"
+        role="listbox"
+        aria-label="Generated outputs"
+        data-testid="schema-output-selector"
+      >
+        {OUTPUT_GROUPS.map(({ group, label }) => {
+          const groupOutputs = outputOptions.filter((output) => output.group === group);
+          if (groupOutputs.length === 0) return null;
+          return (
+            <div
+              key={group}
+              className="flex items-start gap-1.5"
+              data-testid={`schema-group-${group}`}
+            >
+              <div className="w-10 shrink-0 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/75">
+                {label}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+                {groupOutputs.map((output) => (
+                  <button
+                    key={output.type}
+                    type="button"
+                    role="option"
+                    aria-selected={activeOutput === output.type}
+                    data-testid={`schema-output-${output.type}`}
+                    onClick={() => {
+                      setActiveOutput(output.type);
+                      setHighlightedHtml(null);
+                    }}
+                    className={[
+                      'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
+                      activeOutput === output.type
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    <span className="truncate">{output.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2" data-testid="schema-filename">
             <FileCode className="size-3.5 shrink-0" />
-            <span className="truncate font-mono">{displayFileName}</span>
+            <span className="truncate font-mono">{selectedOutput.fileName}</span>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
             <Button

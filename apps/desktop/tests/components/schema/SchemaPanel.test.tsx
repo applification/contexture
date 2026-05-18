@@ -111,44 +111,83 @@ describe('SchemaPanel', () => {
     expect(increase).toBeDisabled();
   });
 
-  describe('multi-schema tabs', () => {
-    it('shows Zod tab active by default', () => {
+  describe('grouped output selector', () => {
+    it('shows Zod active by default without rendering a tab strip', () => {
       const zodSrc = "import { z } from 'zod';\n";
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} />);
-      const zodTab = screen.getByTestId('schema-tab-zod');
-      expect(zodTab).toHaveAttribute('aria-selected', 'true');
+      const zodOutput = screen.getByTestId('schema-output-zod');
+      expect(screen.getByTestId('schema-output-selector')).toBeInTheDocument();
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      expect(zodOutput).toHaveAttribute('aria-selected', 'true');
+      expect(screen.queryByTestId('schema-group-ai')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('schema-group-forms')).not.toBeInTheDocument();
     });
 
-    it('switches to JSON Schema source when the JSON tab is clicked', () => {
+    it('switches to JSON Schema source when the JSON output is clicked', () => {
       const zodSrc = "import { z } from 'zod';\n";
       const jsonSrc = '{\n  "$schema": "https://json-schema.org/draft/2020-12/schema"\n}';
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} jsonSource={jsonSrc} />);
 
-      fireEvent.click(screen.getByTestId('schema-tab-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json'));
       expect(screen.getByTestId('schema-code').textContent).toContain('$schema');
     });
 
-    it('switches to Convex source when the Convex tab is clicked', () => {
+    it('switches to Convex source when the Convex output is clicked', () => {
       const convexSrc = 'import { defineSchema } from "convex/server";\n';
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" convexSource={convexSrc} />);
 
-      fireEvent.click(screen.getByTestId('schema-tab-convex'));
+      fireEvent.click(screen.getByTestId('schema-output-convex'));
       expect(screen.getByTestId('schema-code').textContent).toContain('defineSchema');
     });
 
-    it('copies the active tab source when Copy is clicked', () => {
+    it('shows non-empty AI and Forms outputs grouped away from Core', () => {
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          additionalSources={[
+            { type: 'ai-tool-schemas', source: '{\n  "tools": []\n}\n' },
+            { type: 'structured-outputs', source: '' },
+            { type: 'form-validators', source: 'export function validate() {}\n' },
+          ]}
+        />,
+      );
+
+      expect(screen.getByTestId('schema-group-core')).toHaveTextContent('Zod schema');
+      expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
+      expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
+      expect(screen.queryByTestId('schema-output-structured-outputs')).not.toBeInTheDocument();
+    });
+
+    it('switches to an enabled AI source and shows its friendly filename', () => {
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          additionalSources={[{ type: 'mcp-definitions', source: '{\n  "servers": []\n}\n' }]}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('schema-output-mcp-definitions'));
+      expect(screen.getByTestId('schema-code').textContent).toContain('"servers"');
+      expect(screen.getByTestId('schema-filename').textContent).toContain(
+        '.contexture/mcp-definitions.json',
+      );
+    });
+
+    it('copies the active output source when Copy is clicked', () => {
       const jsonSrc = '{ "$schema": "..." }';
       const onCopy = vi.fn();
       render(
         <SchemaPanel {...DEFAULT_PROPS} zodSource="zod" jsonSource={jsonSrc} onCopy={onCopy} />,
       );
 
-      fireEvent.click(screen.getByTestId('schema-tab-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json'));
       fireEvent.click(screen.getByTestId('schema-copy'));
       expect(onCopy).toHaveBeenCalledWith(jsonSrc);
     });
 
-    it('shows the JSON Schema filename when on the JSON tab', () => {
+    it('shows the JSON Schema filename when on the JSON output', () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -157,11 +196,11 @@ describe('SchemaPanel', () => {
           schemaFileName="allotment.schema.ts"
         />,
       );
-      fireEvent.click(screen.getByTestId('schema-tab-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('allotment.schema.json');
     });
 
-    it('shows the Convex filename when on the Convex tab', () => {
+    it('shows the Convex filename when on the Convex output', () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -170,7 +209,7 @@ describe('SchemaPanel', () => {
           schemaFileName="allotment.schema.ts"
         />,
       );
-      fireEvent.click(screen.getByTestId('schema-tab-convex'));
+      fireEvent.click(screen.getByTestId('schema-output-convex'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('convex/schema.ts');
     });
 
@@ -178,7 +217,7 @@ describe('SchemaPanel', () => {
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource="a" jsonSource="b" />);
       // Default schemaFileName is 'schema.ts' — no '.schema.ts' segment, so the
       // fallback .ts → .json replacement must fire.
-      fireEvent.click(screen.getByTestId('schema-tab-json'));
+      fireEvent.click(screen.getByTestId('schema-output-json'));
       expect(screen.getByTestId('schema-filename').textContent).toContain('schema.json');
     });
   });

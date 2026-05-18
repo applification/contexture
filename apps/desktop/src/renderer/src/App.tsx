@@ -19,9 +19,14 @@
  * sidebar button).
  */
 
+import { emitAiToolSchemas } from '@contexture/core/emit-ai-tool-schemas';
 import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emitFormValidators } from '@contexture/core/emit-form-validators';
 import { emit as emitJsonSchema } from '@contexture/core/emit-json-schema';
+import { emitMcpDefinitions } from '@contexture/core/emit-mcp-definitions';
+import { emitStructuredOutputSchemas } from '@contexture/core/emit-structured-output-schemas';
 import { emit as emitZod } from '@contexture/core/emit-zod';
+import { baseNameFor } from '@contexture/core/paths';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -35,7 +40,7 @@ import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { DriftBanner } from './components/hud/DriftBanner';
-import { SchemaPanel } from './components/schema/SchemaPanel';
+import { SchemaPanel, type SchemaPanelAdditionalSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -223,37 +228,41 @@ export default function App(): React.JSX.Element {
 
   const hasSelection = selectedNodeId !== null;
 
-  // Emit Zod source for the SchemaPanel. Only runs while the Schema
-  // tab is active so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Properties. Wrapped in
-  // try/catch so a malformed intermediate state (e.g. during a
-  // multi-op chat turn) surfaces as an in-panel error rather than
-  // crashing the sidebar.
+  // Emit generated sources for the SchemaPanel. Only runs while the
+  // Schema tab is active so we don't burn cycles on every IR change
+  // when the user is looking at Chat / Properties. Wrapped in try/catch
+  // so a malformed intermediate state (e.g. during a multi-op chat
+  // turn) surfaces as an in-panel error rather than crashing the sidebar.
   const filePath = useDocumentStore((s) => s.filePath);
 
-  // Emit all three schema formats when the Schema tab is active.
-  // Gated on activeTab so we don't burn cycles on every IR change when
-  // the user is looking at Chat / Properties.
   const schemaEmissions = useMemo((): {
     zodSource: string;
     jsonSource: string;
     convexSource: string;
+    additionalSources: SchemaPanelAdditionalSource[];
     error: string | null;
   } => {
     if (activeTab !== 'schema') {
-      return { zodSource: '', jsonSource: '', convexSource: '', error: null };
+      return {
+        zodSource: '',
+        jsonSource: '',
+        convexSource: '',
+        additionalSources: [],
+        error: null,
+      };
     }
-    const irPath = filePath ?? '<unsaved>.contexture.json';
+    const irPath = filePath ?? 'schema.contexture.json';
     let zodSource = '';
     let jsonSource = '';
     let convexSource = '';
+    const additionalSources: SchemaPanelAdditionalSource[] = [];
     let error: string | null = null;
 
     try {
       zodSource = emitZod(schema, irPath, { stdlibNamespaces: STDLIB_REGISTRY.namespaces });
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
-      return { zodSource, jsonSource, convexSource, error };
+      return { zodSource, jsonSource, convexSource, additionalSources, error };
     }
 
     try {
@@ -268,14 +277,59 @@ export default function App(): React.JSX.Element {
       // Non-fatal: Convex tab will render empty
     }
 
-    return { zodSource, jsonSource, convexSource, error };
+    if (schema.outputs?.aiPipeline?.toolSchemas?.enabled === true) {
+      try {
+        additionalSources.push({
+          type: 'ai-tool-schemas',
+          source: `${JSON.stringify(emitAiToolSchemas(schema, irPath), null, 2)}\n`,
+        });
+      } catch {
+        // Non-fatal: failed optional output stays hidden
+      }
+    }
+
+    if (schema.outputs?.aiPipeline?.structuredOutputs?.enabled === true) {
+      try {
+        additionalSources.push({
+          type: 'structured-outputs',
+          source: `${JSON.stringify(emitStructuredOutputSchemas(schema, irPath), null, 2)}\n`,
+        });
+      } catch {
+        // Non-fatal: failed optional output stays hidden
+      }
+    }
+
+    if (schema.outputs?.aiPipeline?.mcpDefinitions?.enabled === true) {
+      try {
+        additionalSources.push({
+          type: 'mcp-definitions',
+          source: `${JSON.stringify(emitMcpDefinitions(schema, irPath), null, 2)}\n`,
+        });
+      } catch {
+        // Non-fatal: failed optional output stays hidden
+      }
+    }
+
+    if (schema.outputs?.aiPipeline?.formValidators?.enabled === true) {
+      try {
+        const formValidatorBaseName = filePath ? baseNameFor(filePath) : 'schema';
+        additionalSources.push({
+          type: 'form-validators',
+          source: emitFormValidators(schema, formValidatorBaseName, irPath),
+        });
+      } catch {
+        // Non-fatal: failed optional output stays hidden
+      }
+    }
+
+    return { zodSource, jsonSource, convexSource, additionalSources, error };
   }, [activeTab, schema, filePath]);
 
   // Filename shown in the SchemaPanel header: the document's basename
   // with the IR suffix swapped for `.schema.ts`. Falls back to a
   // generic label before the document is saved.
   const schemaFileName = useMemo(() => {
-    if (filePath === null) return 'schema.ts';
+    if (filePath === null) return 'schema.schema.ts';
     const base = filePath.split(/[\\/]/).pop() ?? filePath;
     return base.replace(/\.contexture\.json$/i, '.schema.ts');
   }, [filePath]);
@@ -367,6 +421,7 @@ export default function App(): React.JSX.Element {
                   zodSource={schemaEmissions.zodSource}
                   jsonSource={schemaEmissions.jsonSource}
                   convexSource={schemaEmissions.convexSource}
+                  additionalSources={schemaEmissions.additionalSources}
                   isEmpty={!hasSchema}
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}
