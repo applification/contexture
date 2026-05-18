@@ -321,10 +321,10 @@ export function SchemaPanel({
           return (
             <div
               key={group}
-              className="flex items-start gap-1.5"
+              className="flex items-start gap-2"
               data-testid={`schema-group-${group}`}
             >
-              <div className="w-10 shrink-0 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/75">
+              <div className="w-11 shrink-0 px-0.5 py-1.5 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/50">
                 {label}
               </div>
               <div className="flex min-w-0 flex-1 flex-wrap gap-1">
