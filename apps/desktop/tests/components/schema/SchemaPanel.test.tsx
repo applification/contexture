@@ -58,6 +58,78 @@ describe('SchemaPanel', () => {
     expect(onCopy).toHaveBeenCalledWith(source);
   });
 
+  it('shows Agent setup with the packaged Codex MCP install command', () => {
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" />);
+
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
+    expect(screen.getByLabelText('Codex install command')).toHaveValue(
+      'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
+    );
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('inspect_contexture');
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('validate_contexture');
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('apply_contexture_op');
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('emit_contexture');
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('check_contexture_drift');
+  });
+
+  it('copies the Agent setup install command with announced feedback', () => {
+    const onCopy = vi.fn();
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" onCopy={onCopy} />);
+
+    fireEvent.click(screen.getByTestId('agent-setup-install-copy'));
+    expect(onCopy).toHaveBeenCalledWith(
+      'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
+    );
+    expect(screen.getByText('Copied install command')).toBeInTheDocument();
+  });
+
+  it('uses the saved document path in the Agent setup prompt and smoke test', () => {
+    const onCopy = vi.fn();
+    render(
+      <SchemaPanel
+        {...DEFAULT_PROPS}
+        zodSource="zod"
+        documentFilePath="/repo/garden.contexture.json"
+        onCopy={onCopy}
+      />,
+    );
+
+    expect(screen.getByLabelText('Saved-document prompt')).toHaveValue(
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+    );
+    expect(screen.getByLabelText('Smoke test')).toHaveValue(
+      'Ask Codex: "List the contexture MCP tools, then inspect /repo/garden.contexture.json."',
+    );
+
+    fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
+    expect(onCopy).toHaveBeenCalledWith(
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+    );
+  });
+
+  it('shows a save-first Agent setup state before the document has a path', () => {
+    const onRequestSave = vi.fn();
+    render(
+      <SchemaPanel
+        {...DEFAULT_PROPS}
+        zodSource="zod"
+        documentFilePath={null}
+        onRequestSave={onRequestSave}
+      />,
+    );
+
+    expect(screen.getByTestId('agent-setup-unsaved')).toHaveTextContent(
+      'Save this document to create a stable .contexture.json path before handing it to an agent.',
+    );
+    expect(screen.queryByLabelText('Saved-document prompt')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Smoke test')).toHaveValue(
+      'Ask Codex: "List the contexture MCP tools."',
+    );
+
+    fireEvent.click(screen.getByText('Save first'));
+    expect(onRequestSave).toHaveBeenCalledTimes(1);
+  });
+
   it('renders an error message when `error` is non-null and hides the code/copy controls', () => {
     render(
       <SchemaPanel {...DEFAULT_PROPS} error="Unknown field kind: 'frobnicate'" onCopy={vi.fn()} />,

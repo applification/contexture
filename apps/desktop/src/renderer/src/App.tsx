@@ -393,6 +393,7 @@ export default function App(): React.JSX.Element {
                   onEnableOutput={enableSchemaOutput}
                   documentFilePath={filePath}
                   onOpenGeneratedFile={openGeneratedFile}
+                  onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                 />
               </div>

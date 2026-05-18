@@ -41,6 +41,7 @@ import {
   ExternalLink,
   FileBracesCorner,
   FileCode,
+  PlugZap,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
@@ -95,6 +96,8 @@ export interface SchemaPanelProps {
   documentFilePath?: string | null;
   /** Open the selected generated file in an external editor. */
   onOpenGeneratedFile?: (path: string) => void;
+  /** Prompt the app save flow when agent setup needs a stable IR path. */
+  onRequestSave?: () => void;
 }
 
 /**
@@ -112,6 +115,19 @@ const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
   { group: 'ai', label: 'AI' },
   { group: 'forms', label: 'Forms' },
 ];
+
+const CODEX_MCP_INSTALL_COMMAND =
+  'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp';
+
+const CONTEXTURE_MCP_TOOLS = [
+  'inspect_contexture',
+  'validate_contexture',
+  'apply_contexture_op',
+  'emit_contexture',
+  'check_contexture_drift',
+] as const;
+
+type AgentSetupCopyKey = 'install' | 'prompt' | 'smoke';
 
 interface OutputOption {
   type: SchemaOutputType;
@@ -143,12 +159,15 @@ export function SchemaPanel({
   onEnableOutput,
   documentFilePath = null,
   onOpenGeneratedFile,
+  onRequestSave,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
+  const [agentCopied, setAgentCopied] = useState<AgentSetupCopyKey | null>(null);
   const copyTimeoutRef = useRef<number | null>(null);
+  const agentCopyTimeoutRef = useRef<number | null>(null);
   const codeRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -248,6 +267,9 @@ export function SchemaPanel({
       if (copyTimeoutRef.current !== null) {
         window.clearTimeout(copyTimeoutRef.current);
       }
+      if (agentCopyTimeoutRef.current !== null) {
+        window.clearTimeout(agentCopyTimeoutRef.current);
+      }
     },
     [],
   );
@@ -261,6 +283,18 @@ export function SchemaPanel({
     copyTimeoutRef.current = window.setTimeout(() => {
       setCopied(false);
       copyTimeoutRef.current = null;
+    }, COPY_FEEDBACK_MS);
+  };
+
+  const handleAgentCopy = (key: AgentSetupCopyKey, text: string): void => {
+    onCopy?.(text);
+    setAgentCopied(key);
+    if (agentCopyTimeoutRef.current !== null) {
+      window.clearTimeout(agentCopyTimeoutRef.current);
+    }
+    agentCopyTimeoutRef.current = window.setTimeout(() => {
+      setAgentCopied(null);
+      agentCopyTimeoutRef.current = null;
     }, COPY_FEEDBACK_MS);
   };
 
@@ -282,6 +316,14 @@ export function SchemaPanel({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
+        <div className="px-3 pb-3">
+          <AgentSetupSection
+            documentFilePath={documentFilePath}
+            copied={agentCopied}
+            onCopy={handleAgentCopy}
+            onRequestSave={onRequestSave}
+          />
+        </div>
       </div>
     );
   }
@@ -370,6 +412,13 @@ export function SchemaPanel({
         })}
       </div>
 
+      <AgentSetupSection
+        documentFilePath={documentFilePath}
+        copied={agentCopied}
+        onCopy={handleAgentCopy}
+        onRequestSave={onRequestSave}
+      />
+
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2" data-testid="schema-filename">
@@ -443,6 +492,164 @@ export function SchemaPanel({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AgentSetupSection({
+  documentFilePath,
+  copied,
+  onCopy,
+  onRequestSave,
+}: {
+  documentFilePath: string | null;
+  copied: AgentSetupCopyKey | null;
+  onCopy: (key: AgentSetupCopyKey, text: string) => void;
+  onRequestSave?: () => void;
+}): React.JSX.Element {
+  const savedPrompt =
+    documentFilePath === null
+      ? null
+      : `Use the Contexture MCP server to inspect ${documentFilePath}, then validate, emit, and check drift before finishing.`;
+  const smokeTest =
+    documentFilePath === null
+      ? 'Ask Codex: "List the contexture MCP tools."'
+      : `Ask Codex: "List the contexture MCP tools, then inspect ${documentFilePath}."`;
+  const copiedLabel =
+    copied === 'install'
+      ? 'Copied install command'
+      : copied === 'prompt'
+        ? 'Copied saved-document prompt'
+        : copied === 'smoke'
+          ? 'Copied smoke test'
+          : '';
+
+  return (
+    <section
+      className="mb-2 shrink-0 rounded-md border border-border bg-muted/20 p-2"
+      aria-labelledby="agent-setup-title"
+      data-testid="agent-setup"
+    >
+      <div className="mb-2 flex items-start gap-2">
+        <PlugZap className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="min-w-0">
+          <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
+            Agent setup
+          </h3>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Use this Contexture document from Codex or another MCP-capable agent.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <AgentCopyRow
+          label="Codex install command"
+          value={CODEX_MCP_INSTALL_COMMAND}
+          copied={copied === 'install'}
+          onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
+          copyLabel="Copy Codex MCP install command"
+          testId="agent-setup-install"
+        />
+
+        {savedPrompt === null ? (
+          <div
+            className="rounded border border-dashed border-border/80 bg-background/60 p-2 text-[11px] leading-snug text-muted-foreground"
+            data-testid="agent-setup-unsaved"
+          >
+            <p>
+              Save this document to create a stable .contexture.json path before handing it to an
+              agent.
+            </p>
+            {onRequestSave ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="mt-2 h-7 text-xs"
+                onClick={onRequestSave}
+              >
+                Save first
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <AgentCopyRow
+            label="Saved-document prompt"
+            value={savedPrompt}
+            copied={copied === 'prompt'}
+            onCopy={() => onCopy('prompt', savedPrompt)}
+            copyLabel="Copy saved-document prompt"
+            testId="agent-setup-prompt"
+          />
+        )}
+
+        <AgentCopyRow
+          label="Smoke test"
+          value={smokeTest}
+          copied={copied === 'smoke'}
+          onCopy={() => onCopy('smoke', smokeTest)}
+          copyLabel="Copy MCP smoke test"
+          testId="agent-setup-smoke"
+        />
+      </div>
+
+      <ul className="mt-2 flex flex-wrap gap-1 text-[10px]" aria-label="Contexture MCP tools">
+        {CONTEXTURE_MCP_TOOLS.map((tool) => (
+          <li key={tool}>
+            <code className="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-mono text-muted-foreground">
+              {tool}
+            </code>
+          </li>
+        ))}
+      </ul>
+      <p className="sr-only" aria-live="polite">
+        {copiedLabel}
+      </p>
+    </section>
+  );
+}
+
+function AgentCopyRow({
+  label,
+  value,
+  copied,
+  onCopy,
+  copyLabel,
+  testId,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+  copyLabel: string;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <div className="rounded border border-border/70 bg-background/70 p-1.5" data-testid={testId}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/70">
+          {label}
+        </span>
+        <Button
+          size="icon"
+          type="button"
+          variant="ghost"
+          className="size-6"
+          onClick={onCopy}
+          aria-label={copyLabel}
+          title={copied ? 'Copied' : copyLabel}
+          data-testid={`${testId}-copy`}
+        >
+          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        </Button>
+      </div>
+      <textarea
+        readOnly
+        value={value}
+        aria-label={label}
+        className="min-h-10 w-full resize-none rounded border border-border/50 bg-muted/20 p-1.5 font-mono text-[11px] leading-snug text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
     </div>
   );
 }
