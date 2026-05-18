@@ -1,25 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-function parseVersion(version) {
-  return version.split('.').map((part) => Number.parseInt(part, 10));
-}
-
-function satisfiesCaretZero(version, range) {
-  if (!range.startsWith('^0.')) {
-    return version === range || range === '*' || range === version;
-  }
-
-  const [major, minor, patch] = parseVersion(range.slice(1));
-  const [candidateMajor, candidateMinor, candidatePatch] = parseVersion(version);
-
-  if (candidateMajor !== major || candidateMinor !== minor) {
-    return false;
-  }
-
-  return candidatePatch >= patch;
-}
-
 function findWorkspaceRoot(startDir) {
   let current = startDir;
 
@@ -44,6 +25,38 @@ function findWorkspaceRoot(startDir) {
   }
 }
 
+function findResolvedPackage(startDir, packageName) {
+  let packageEntry;
+
+  try {
+    packageEntry = require.resolve(packageName, { paths: [startDir] });
+  } catch {
+    return undefined;
+  }
+
+  let current = path.dirname(packageEntry);
+
+  while (true) {
+    const packageJsonPath = path.join(current, 'package.json');
+
+    if (fs.existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+      if (packageJson.name === packageName) {
+        return current;
+      }
+    }
+
+    const parent = path.dirname(current);
+
+    if (parent === current) {
+      throw new Error(`Could not find package root for ${packageName} from ${packageEntry}`);
+    }
+
+    current = parent;
+  }
+}
+
 function findInstalledPackage(workspaceRoot, packageName, range) {
   const bunStoreDir = path.join(workspaceRoot, 'node_modules', '.bun');
   const packageDirName = packageName.replace('/', '+');
@@ -62,12 +75,16 @@ function findInstalledPackage(workspaceRoot, packageName, range) {
 
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-    if (satisfiesCaretZero(packageJson.version, range)) {
+    if (packageJson.version === range || range === '*' || range === packageJson.version) {
       return packageDir;
     }
   }
 
   throw new Error(`Could not find ${packageName}@${range} in ${bunStoreDir}`);
+}
+
+function readPackageJson(packageDir) {
+  return JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
 }
 
 exports.default = async function beforePack(context) {
@@ -76,18 +93,23 @@ exports.default = async function beforePack(context) {
   const claudeAgentSdkDir = fs.realpathSync(
     path.join(appDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk'),
   );
-  const claudeAgentSdkPackageJson = JSON.parse(
-    fs.readFileSync(path.join(claudeAgentSdkDir, 'package.json'), 'utf8'),
-  );
+  const claudeAgentSdkPackageJsonPath = path.join(claudeAgentSdkDir, 'package.json');
+  const claudeAgentSdkPackageJson = JSON.parse(fs.readFileSync(claudeAgentSdkPackageJsonPath, 'utf8'));
   const sdkRange = claudeAgentSdkPackageJson.dependencies?.['@anthropic-ai/sdk'];
 
   if (!sdkRange) {
     return;
   }
 
-  const sdkDir = findInstalledPackage(workspaceRoot, '@anthropic-ai/sdk', sdkRange);
+  const sdkDir = fs.realpathSync(
+    findResolvedPackage(appDir, '@anthropic-ai/sdk') ?? findInstalledPackage(workspaceRoot, '@anthropic-ai/sdk', sdkRange),
+  );
+  const sdkPackageJson = readPackageJson(sdkDir);
   const linkDir = path.join(claudeAgentSdkDir, 'node_modules', '@anthropic-ai');
   const linkPath = path.join(linkDir, 'sdk');
+
+  claudeAgentSdkPackageJson.dependencies['@anthropic-ai/sdk'] = sdkPackageJson.version;
+  fs.writeFileSync(claudeAgentSdkPackageJsonPath, `${JSON.stringify(claudeAgentSdkPackageJson, null, 2)}\n`);
 
   fs.mkdirSync(linkDir, { recursive: true });
 
