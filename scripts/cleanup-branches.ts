@@ -276,8 +276,6 @@ async function main() {
   let aborted = false;
 
   for (const c of candidates) {
-    if (aborted) break;
-
     const catColor =
       c.category === 'merged' ? GREEN : c.category === 'merged-via-squash' ? CYAN : YELLOW;
     console.log(`${BOLD}${c.branch}${RESET}`);
@@ -359,7 +357,6 @@ async function main() {
       }
       const ans = await prompt(`  Remove worktree? [y/N/q] `);
       if (ans === 'q') {
-        aborted = true;
         break;
       }
       if (ans !== 'y') {
