@@ -4,6 +4,7 @@ import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const unsub = () => undefined;
@@ -66,8 +67,9 @@ describe('App schema outputs', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toBeInTheDocument();
+      expect(screen.getByTestId('schema-output-config')).toBeInTheDocument();
     });
+    fireEvent.click(screen.getByTestId('schema-output-config'));
     fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
 
     await waitFor(() => {
@@ -88,13 +90,15 @@ describe('App schema outputs', () => {
 
     render(<App />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('schema-output-form-validators')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('schema-output-form-validators'));
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('schema-output-selector'));
+    fireEvent.click(await screen.findByTestId('schema-output-form-validators'));
 
-    const code = screen.getByTestId('schema-code').textContent ?? '';
-    expect(code).toContain("import { Lead } from './schema.schema';");
-    expect(code).not.toContain('<unsaved>');
+    await waitFor(() => {
+      expect(screen.getByTestId('schema-code').textContent ?? '').toContain(
+        "import { Lead } from './schema.schema';",
+      );
+    });
+    expect(screen.getByTestId('schema-code').textContent ?? '').not.toContain('<unsaved>');
   });
 });

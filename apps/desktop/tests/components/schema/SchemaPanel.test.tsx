@@ -9,7 +9,7 @@
  */
 
 import { SchemaPanel } from '@renderer/components/schema/SchemaPanel';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,20 +62,22 @@ describe('SchemaPanel', () => {
     render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" />);
 
     expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
-    expect(screen.getByLabelText('Codex install command')).toHaveValue(
+    fireEvent.click(screen.getByTestId('agent-setup'));
+    expect(screen.getByTestId('agent-setup-install-value')).toHaveTextContent(
       'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
     );
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('inspect_contexture');
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('validate_contexture');
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('apply_contexture_op');
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('emit_contexture');
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('check_contexture_drift');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_contexture');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('validate_contexture');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('apply_contexture_op');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('emit_contexture');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('check_contexture_drift');
   });
 
   it('copies the Agent setup install command with announced feedback', () => {
     const onCopy = vi.fn();
     render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" onCopy={onCopy} />);
 
+    fireEvent.click(screen.getByTestId('agent-setup'));
     fireEvent.click(screen.getByTestId('agent-setup-install-copy'));
     expect(onCopy).toHaveBeenCalledWith(
       'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
@@ -94,10 +96,11 @@ describe('SchemaPanel', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Saved-document prompt')).toHaveValue(
+    fireEvent.click(screen.getByTestId('agent-setup'));
+    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
       'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
     );
-    expect(screen.getByLabelText('Smoke test')).toHaveValue(
+    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
       'Ask Codex: "List the contexture MCP tools, then inspect /repo/garden.contexture.json."',
     );
 
@@ -118,11 +121,12 @@ describe('SchemaPanel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-unsaved')).toHaveTextContent(
       'Save this document to create a stable .contexture.json path before handing it to an agent.',
     );
     expect(screen.queryByLabelText('Saved-document prompt')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Smoke test')).toHaveValue(
+    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
       'Ask Codex: "List the contexture MCP tools."',
     );
 
@@ -139,6 +143,24 @@ describe('SchemaPanel', () => {
     expect(err.textContent).toContain("Unknown field kind: 'frobnicate'");
     expect(screen.queryByTestId('schema-copy')).not.toBeInTheDocument();
     expect(screen.queryByTestId('schema-code')).not.toBeInTheDocument();
+  });
+
+  it('keeps Agent setup visible when generated preview emission fails', () => {
+    render(
+      <SchemaPanel
+        {...DEFAULT_PROPS}
+        error="Unknown field kind: 'frobnicate'"
+        documentFilePath="/repo/garden.contexture.json"
+        onCopy={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('schema-error')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-setup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('agent-setup'));
+    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+    );
   });
 
   it('prefers the empty state over the error state when the schema is empty', () => {
@@ -184,36 +206,42 @@ describe('SchemaPanel', () => {
     expect(increase).toBeDisabled();
   });
 
-  describe('grouped output selector', () => {
+  describe('output selector', () => {
+    async function chooseOutput(testId: string): Promise<void> {
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId('schema-output-selector'));
+      await user.click(await screen.findByTestId(testId));
+    }
+
     it('shows Zod active by default without rendering a tab strip', () => {
       const zodSrc = "import { z } from 'zod';\n";
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} />);
-      const zodOutput = screen.getByTestId('schema-output-zod');
       expect(screen.getByTestId('schema-output-selector')).toBeInTheDocument();
       expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-      expect(zodOutput).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByTestId('schema-output-selector')).toHaveTextContent('Zod schema');
       expect(screen.queryByTestId('schema-group-ai')).not.toBeInTheDocument();
       expect(screen.queryByTestId('schema-group-forms')).not.toBeInTheDocument();
     });
 
-    it('switches to JSON Schema source when the JSON output is clicked', () => {
+    it('switches to JSON Schema source when the JSON output is selected', async () => {
       const zodSrc = "import { z } from 'zod';\n";
       const jsonSrc = '{\n  "$schema": "https://json-schema.org/draft/2020-12/schema"\n}';
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} jsonSource={jsonSrc} />);
 
-      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
+      await chooseOutput('schema-output-json-schema');
       expect(screen.getByTestId('schema-code').textContent).toContain('$schema');
     });
 
-    it('switches to Convex source when the Convex output is clicked', () => {
+    it('switches to Convex source when the Convex output is selected', async () => {
       const convexSrc = 'import { defineSchema } from "convex/server";\n';
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" convexSource={convexSrc} />);
 
-      fireEvent.click(screen.getByTestId('schema-output-convex'));
+      await chooseOutput('schema-output-convex');
       expect(screen.getByTestId('schema-code').textContent).toContain('defineSchema');
     });
 
-    it('shows non-empty AI and Forms outputs grouped away from Core', () => {
+    it('shows non-empty AI and Forms outputs grouped away from Core in the selector', async () => {
+      const user = userEvent.setup();
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -226,6 +254,7 @@ describe('SchemaPanel', () => {
         />,
       );
 
+      await user.click(screen.getByTestId('schema-output-selector'));
       expect(screen.getByTestId('schema-group-core')).toHaveTextContent('Zod schema');
       expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
       expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
@@ -234,7 +263,7 @@ describe('SchemaPanel', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('shows disabled optional outputs as enableable choices', () => {
+    it('shows disabled optional outputs as explicit configuration actions', () => {
       const onEnableOutput = vi.fn();
       render(
         <SchemaPanel
@@ -248,46 +277,35 @@ describe('SchemaPanel', () => {
         />,
       );
 
+      fireEvent.click(screen.getByTestId('schema-output-config'));
       expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
       expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
       fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
       expect(onEnableOutput).toHaveBeenCalledWith('ai-tool-schemas');
-      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toHaveAttribute(
-        'aria-selected',
-        'false',
-      );
     });
 
-    it('provides lightweight tooltip help on output choices', async () => {
+    it('describes disabled optional outputs in the configuration popover', () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
           zodSource="zod"
           additionalSources={[
             { type: 'ai-tool-schemas', enabled: false, source: '' },
-            { type: 'form-validators', source: 'export function validate() {}\n' },
+            { type: 'form-validators', enabled: false, source: '' },
           ]}
         />,
       );
 
-      fireEvent.focus(screen.getByTestId('schema-output-ai-tool-schemas'));
-      await waitFor(() => {
-        expect(
-          screen.getAllByText(/Enable Tool schemas: JSON Schema tool definitions/i).length,
-        ).toBeGreaterThan(0);
-      });
-
-      fireEvent.blur(screen.getByTestId('schema-output-ai-tool-schemas'));
-      fireEvent.focus(screen.getByTestId('schema-output-form-validators'));
-      await waitFor(() => {
-        expect(
-          screen.getAllByText(/Type-safe validation helpers backed by generated Zod schemas/i)
-            .length,
-        ).toBeGreaterThan(0);
-      });
+      fireEvent.click(screen.getByTestId('schema-output-config'));
+      expect(screen.getByTestId('schema-output-ai-tool-schemas')).toHaveTextContent(
+        /JSON Schema tool definitions/i,
+      );
+      expect(screen.getByTestId('schema-output-form-validators')).toHaveTextContent(
+        /Type-safe validation helpers backed by generated Zod schemas/i,
+      );
     });
 
-    it('switches to an enabled AI source and shows its friendly filename', () => {
+    it('switches to an enabled AI source and shows its friendly filename', async () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -296,21 +314,21 @@ describe('SchemaPanel', () => {
         />,
       );
 
-      fireEvent.click(screen.getByTestId('schema-output-mcp-definitions'));
+      await chooseOutput('schema-output-mcp-definitions');
       expect(screen.getByTestId('schema-code').textContent).toContain('"servers"');
       expect(screen.getByTestId('schema-filename').textContent).toContain(
         '.contexture/mcp-definitions.json',
       );
     });
 
-    it('copies the active output source when Copy is clicked', () => {
+    it('copies the active output source when Copy is clicked', async () => {
       const jsonSrc = '{ "$schema": "..." }';
       const onCopy = vi.fn();
       render(
         <SchemaPanel {...DEFAULT_PROPS} zodSource="zod" jsonSource={jsonSrc} onCopy={onCopy} />,
       );
 
-      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
+      await chooseOutput('schema-output-json-schema');
       fireEvent.click(screen.getByTestId('schema-copy'));
       expect(onCopy).toHaveBeenCalledWith(jsonSrc);
     });
@@ -335,11 +353,11 @@ describe('SchemaPanel', () => {
       await user.tab();
       expect(screen.getByTestId('schema-open-generated')).toHaveFocus();
 
-      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
+      await chooseOutput('schema-output-json-schema');
       fireEvent.click(screen.getByTestId('schema-open-generated'));
       expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.json');
 
-      fireEvent.click(screen.getByTestId('schema-output-mcp-definitions'));
+      await chooseOutput('schema-output-mcp-definitions');
       fireEvent.click(screen.getByTestId('schema-open-generated'));
       expect(onOpenGeneratedFile).toHaveBeenLastCalledWith(
         '/repo/.contexture/mcp-definitions.json',
@@ -359,7 +377,7 @@ describe('SchemaPanel', () => {
       expect(screen.queryByTestId('schema-open-generated')).not.toBeInTheDocument();
     });
 
-    it('shows the JSON Schema filename when on the JSON output', () => {
+    it('shows the JSON Schema filename when on the JSON output', async () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -368,11 +386,11 @@ describe('SchemaPanel', () => {
           schemaFileName="allotment.schema.ts"
         />,
       );
-      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
+      await chooseOutput('schema-output-json-schema');
       expect(screen.getByTestId('schema-filename').textContent).toContain('allotment.schema.json');
     });
 
-    it('shows the Convex filename when on the Convex output', () => {
+    it('shows the Convex filename when on the Convex output', async () => {
       render(
         <SchemaPanel
           {...DEFAULT_PROPS}
@@ -381,15 +399,15 @@ describe('SchemaPanel', () => {
           schemaFileName="allotment.schema.ts"
         />,
       );
-      fireEvent.click(screen.getByTestId('schema-output-convex'));
+      await chooseOutput('schema-output-convex');
       expect(screen.getByTestId('schema-filename').textContent).toContain('convex/schema.ts');
     });
 
-    it('derives JSON filename via .ts → .json fallback when name has no .schema.ts suffix', () => {
+    it('derives JSON filename via .ts → .json fallback when name has no .schema.ts suffix', async () => {
       render(<SchemaPanel {...DEFAULT_PROPS} zodSource="a" jsonSource="b" />);
       // Default schemaFileName is 'schema.ts' — no '.schema.ts' segment, so the
       // fallback .ts → .json replacement must fire.
-      fireEvent.click(screen.getByTestId('schema-output-json-schema'));
+      await chooseOutput('schema-output-json-schema');
       expect(screen.getByTestId('schema-filename').textContent).toContain('schema.json');
     });
   });
