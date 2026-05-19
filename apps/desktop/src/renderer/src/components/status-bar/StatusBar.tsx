@@ -14,7 +14,7 @@ import { useDocumentStore } from '@renderer/store/document';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
-import { BarChart3, Circle, CircleAlert, TriangleAlert } from 'lucide-react';
+import { BarChart3, Circle, CircleAlert } from 'lucide-react';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -51,10 +51,7 @@ export function StatusBar(): React.JSX.Element {
   }, [schema, filePath, typeCount]);
 
   const errors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
-  // Validation surfaces a single severity today ("error"), but the bar
-  // keeps a warning slot so future warning-level rules drop in cleanly.
   const errorCount = errors.length;
-  const warnCount = 0;
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [analyticsOff, setAnalyticsOff] = useState(() => getAnalyticsOptOut());
@@ -78,7 +75,7 @@ export function StatusBar(): React.JSX.Element {
   }
 
   const tokenDisplay = tokenCount > 0 ? `~${tokenCount.toLocaleString()} tokens` : '0 tokens';
-  const hasIssues = errorCount + warnCount > 0;
+  const hasIssues = errorCount > 0;
 
   return (
     <div
@@ -135,14 +132,10 @@ export function StatusBar(): React.JSX.Element {
                 type="button"
                 className={cn(
                   'flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted transition-colors',
-                  errorCount > 0 ? 'text-destructive' : 'text-warning',
+                  'text-destructive',
                 )}
               >
-                {errorCount > 0 ? (
-                  <CircleAlert className="size-3" />
-                ) : (
-                  <TriangleAlert className="size-3" />
-                )}
+                <CircleAlert className="size-3" />
                 <span>
                   {errorCount} {errorCount === 1 ? 'error' : 'errors'}
                 </span>
