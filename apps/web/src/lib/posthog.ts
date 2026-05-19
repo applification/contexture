@@ -1,5 +1,9 @@
 import posthog from 'posthog-js';
 
+function isLocalHostname(hostname: string) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
+}
+
 export function initPostHog() {
   if (typeof window === 'undefined') return;
   if (posthog.__loaded) return;
@@ -8,7 +12,7 @@ export function initPostHog() {
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
 
   if (!key) return;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
+  if (isLocalHostname(window.location.hostname)) return;
 
   posthog.init(key, {
     api_host: host,
