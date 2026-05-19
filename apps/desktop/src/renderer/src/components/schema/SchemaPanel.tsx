@@ -41,10 +41,23 @@ import {
   ExternalLink,
   FileBracesCorner,
   FileCode,
+  PlugZap,
+  Settings2,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
@@ -89,12 +102,14 @@ export interface SchemaPanelProps {
    * available choices; enabled outputs with empty sources stay hidden.
    */
   additionalSources?: SchemaPanelAdditionalSource[];
-  /** Enable an optional output target from the grouped selector. */
+  /** Enable an optional output target from the output configuration popover. */
   onEnableOutput?: (type: SchemaOutputType) => void;
   /** Absolute path of the active `.contexture.json`; absent for unsaved documents. */
   documentFilePath?: string | null;
   /** Open the selected generated file in an external editor. */
   onOpenGeneratedFile?: (path: string) => void;
+  /** Prompt the app save flow when agent setup needs a stable IR path. */
+  onRequestSave?: () => void;
 }
 
 /**
@@ -112,6 +127,19 @@ const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
   { group: 'ai', label: 'AI' },
   { group: 'forms', label: 'Forms' },
 ];
+
+const CODEX_MCP_INSTALL_COMMAND =
+  'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp';
+
+const CONTEXTURE_MCP_TOOLS = [
+  'inspect_contexture',
+  'validate_contexture',
+  'apply_contexture_op',
+  'emit_contexture',
+  'check_contexture_drift',
+] as const;
+
+type AgentSetupCopyKey = 'install' | 'prompt' | 'smoke';
 
 interface OutputOption {
   type: SchemaOutputType;
@@ -143,12 +171,15 @@ export function SchemaPanel({
   onEnableOutput,
   documentFilePath = null,
   onOpenGeneratedFile,
+  onRequestSave,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
+  const [agentCopied, setAgentCopied] = useState<AgentSetupCopyKey | null>(null);
   const copyTimeoutRef = useRef<number | null>(null);
+  const agentCopyTimeoutRef = useRef<number | null>(null);
   const codeRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -201,15 +232,23 @@ export function SchemaPanel({
       });
   }, [additionalSources, convexSource, jsonSource, schemaFileName, sources, zodSource]);
 
+  const enabledOutputOptions = useMemo(
+    () => outputOptions.filter((output) => output.enabled),
+    [outputOptions],
+  );
+  const disabledOutputOptions = useMemo(
+    () => outputOptions.filter((output) => !output.enabled),
+    [outputOptions],
+  );
+
   useEffect(() => {
-    if (!outputOptions.some((output) => output.type === activeOutput && output.enabled)) {
-      setActiveOutput('zod');
+    if (!enabledOutputOptions.some((output) => output.type === activeOutput)) {
+      setActiveOutput(enabledOutputOptions[0]?.type ?? 'zod');
     }
-  }, [activeOutput, outputOptions]);
+  }, [activeOutput, enabledOutputOptions]);
 
   const selectedOutput =
-    outputOptions.find((output) => output.type === activeOutput && output.enabled) ??
-    outputOptions[0];
+    enabledOutputOptions.find((output) => output.type === activeOutput) ?? enabledOutputOptions[0];
   const activeSource = selectedOutput?.source ?? '';
   const selectedOutputPath =
     selectedOutput && documentFilePath
@@ -248,6 +287,9 @@ export function SchemaPanel({
       if (copyTimeoutRef.current !== null) {
         window.clearTimeout(copyTimeoutRef.current);
       }
+      if (agentCopyTimeoutRef.current !== null) {
+        window.clearTimeout(agentCopyTimeoutRef.current);
+      }
     },
     [],
   );
@@ -261,6 +303,18 @@ export function SchemaPanel({
     copyTimeoutRef.current = window.setTimeout(() => {
       setCopied(false);
       copyTimeoutRef.current = null;
+    }, COPY_FEEDBACK_MS);
+  };
+
+  const handleAgentCopy = (key: AgentSetupCopyKey, text: string): void => {
+    onCopy?.(text);
+    setAgentCopied(key);
+    if (agentCopyTimeoutRef.current !== null) {
+      window.clearTimeout(agentCopyTimeoutRef.current);
+    }
+    agentCopyTimeoutRef.current = window.setTimeout(() => {
+      setAgentCopied(null);
+      agentCopyTimeoutRef.current = null;
     }, COPY_FEEDBACK_MS);
   };
 
@@ -282,6 +336,14 @@ export function SchemaPanel({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
+        <div className="px-3 pb-3">
+          <AgentSetupPopover
+            documentFilePath={documentFilePath}
+            copied={agentCopied}
+            onCopy={handleAgentCopy}
+            onRequestSave={onRequestSave}
+          />
+        </div>
       </div>
     );
   }
@@ -297,84 +359,56 @@ export function SchemaPanel({
             Couldn't emit schema: {error}
           </p>
         </div>
+        <div className="pt-2">
+          <AgentSetupPopover
+            documentFilePath={documentFilePath}
+            copied={agentCopied}
+            onCopy={handleAgentCopy}
+            onRequestSave={onRequestSave}
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
-      <div
-        className="mb-2 space-y-1 rounded-md border border-border bg-muted/35 p-1.5"
-        role="listbox"
-        aria-label="Generated outputs"
-        data-testid="schema-output-selector"
-      >
-        {OUTPUT_GROUPS.map(({ group, label }) => {
-          const groupOutputs = outputOptions.filter((output) => output.group === group);
-          if (groupOutputs.length === 0) return null;
-          return (
-            <div
-              key={group}
-              className="flex items-start gap-2"
-              data-testid={`schema-group-${group}`}
-            >
-              <div className="w-11 shrink-0 px-0.5 py-1.5 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/50">
-                {label}
-              </div>
-              <TooltipProvider delayDuration={250}>
-                <div className="flex min-w-0 flex-1 flex-wrap gap-1">
-                  {groupOutputs.map((output) => {
-                    const tooltip = output.enabled
-                      ? output.help
-                      : `Enable ${output.label}: ${output.help}`;
-                    return (
-                      <Tooltip key={output.type}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={output.enabled && activeOutput === output.type}
-                            data-testid={`schema-output-${output.type}`}
-                            onClick={() => {
-                              if (!output.enabled) {
-                                setActiveOutput(output.type);
-                                setHighlightedHtml(null);
-                                onEnableOutput?.(output.type);
-                                return;
-                              }
-                              setActiveOutput(output.type);
-                              setHighlightedHtml(null);
-                            }}
-                            className={[
-                              'min-w-0 rounded px-2 py-1 text-left text-xs font-medium leading-none transition-colors',
-                              output.enabled && activeOutput === output.type
-                                ? 'bg-primary text-primary-foreground'
-                                : !output.enabled
-                                  ? 'border border-dashed border-border/80 text-muted-foreground/60 hover:border-border hover:bg-muted hover:text-foreground'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                            ].join(' ')}
-                          >
-                            <span className="truncate">{output.label}</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-64 text-xs leading-snug">
-                          {tooltip}
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              </TooltipProvider>
-            </div>
-          );
-        })}
-      </div>
-
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-3 py-2 text-xs text-muted-foreground">
-          <div className="flex min-w-0 items-center gap-2" data-testid="schema-filename">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <FileCode className="size-3.5 shrink-0" />
-            <span className="truncate font-mono">{selectedOutput.fileName}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <OutputSelect
+                  activeOutput={activeOutput}
+                  enabledOptions={enabledOutputOptions}
+                  onValueChange={(type) => {
+                    setActiveOutput(type);
+                    setHighlightedHtml(null);
+                  }}
+                />
+                {disabledOutputOptions.length > 0 ? (
+                  <OutputConfigPopover
+                    disabledOptions={disabledOutputOptions}
+                    onEnableOutput={(type) => {
+                      setActiveOutput(type);
+                      setHighlightedHtml(null);
+                      onEnableOutput?.(type);
+                    }}
+                  />
+                ) : null}
+                <AgentSetupPopover
+                  documentFilePath={documentFilePath}
+                  copied={agentCopied}
+                  onCopy={handleAgentCopy}
+                  onRequestSave={onRequestSave}
+                  compact
+                />
+              </div>
+              <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
+                {selectedOutput?.fileName ?? 'schema.ts'}
+              </div>
+            </div>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
             <Button
@@ -443,6 +477,307 @@ export function SchemaPanel({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function OutputSelect({
+  activeOutput,
+  enabledOptions,
+  onValueChange,
+}: {
+  activeOutput: SchemaOutputType;
+  enabledOptions: OutputOption[];
+  onValueChange: (type: SchemaOutputType) => void;
+}): React.JSX.Element {
+  return (
+    <Select
+      value={activeOutput}
+      onValueChange={(value) => onValueChange(value as SchemaOutputType)}
+    >
+      <SelectTrigger
+        className="h-7 min-w-0 flex-1 border-border/70 bg-background/80 px-2 py-1 text-xs"
+        aria-label="Generated output"
+        data-testid="schema-output-selector"
+      >
+        <SelectValue placeholder="Select output" />
+      </SelectTrigger>
+      <SelectContent align="start" className="max-h-80">
+        {OUTPUT_GROUPS.map(({ group, label }) => {
+          const groupOutputs = enabledOptions.filter((output) => output.group === group);
+          if (groupOutputs.length === 0) return null;
+          return (
+            <SelectGroup key={group} data-testid={`schema-group-${group}`}>
+              <SelectLabel className="py-1 pl-2 pr-2 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                {label}
+              </SelectLabel>
+              {groupOutputs.map((output) => (
+                <SelectItem
+                  key={output.type}
+                  value={output.type}
+                  className="text-xs"
+                  data-testid={`schema-output-${output.type}`}
+                >
+                  {output.label}
+                </SelectItem>
+              ))}
+              <SelectSeparator />
+            </SelectGroup>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function OutputConfigPopover({
+  disabledOptions,
+  onEnableOutput,
+}: {
+  disabledOptions: OutputOption[];
+  onEnableOutput?: (type: SchemaOutputType) => void;
+}): React.JSX.Element {
+  return (
+    <Popover>
+      <TooltipProvider delayDuration={250}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0"
+                aria-label="Configure generated outputs"
+                title="Configure generated outputs"
+                data-testid="schema-output-config"
+              >
+                <Settings2 className="size-3.5" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            Configure generated outputs
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent className="w-72 p-2" align="end">
+        <div className="mb-2 px-1">
+          <div className="text-xs font-semibold text-foreground">Generated outputs</div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Enable optional targets for this Contexture bundle.
+          </p>
+        </div>
+        <div className="space-y-1">
+          {OUTPUT_GROUPS.map(({ group, label }) => {
+            const groupOutputs = disabledOptions.filter((output) => output.group === group);
+            if (groupOutputs.length === 0) return null;
+            return (
+              <div key={group} data-testid={`schema-group-${group}`}>
+                <div className="px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                  {label}
+                </div>
+                {groupOutputs.map((output) => (
+                  <button
+                    key={output.type}
+                    type="button"
+                    className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => onEnableOutput?.(output.type)}
+                    data-testid={`schema-output-${output.type}`}
+                  >
+                    <span className="mt-0.5 text-muted-foreground">+</span>
+                    <span className="min-w-0">
+                      <span className="block font-medium text-foreground">
+                        Enable {output.label}
+                      </span>
+                      <span className="block text-[11px] leading-snug text-muted-foreground">
+                        {output.help}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function AgentSetupPopover({
+  documentFilePath,
+  copied,
+  onCopy,
+  onRequestSave,
+  compact = false,
+}: {
+  documentFilePath: string | null;
+  copied: AgentSetupCopyKey | null;
+  onCopy: (key: AgentSetupCopyKey, text: string) => void;
+  onRequestSave?: () => void;
+  compact?: boolean;
+}): React.JSX.Element {
+  const savedPrompt =
+    documentFilePath === null
+      ? null
+      : `Use the Contexture MCP server to inspect ${documentFilePath}, then validate, emit, and check drift before finishing.`;
+  const smokeTest =
+    documentFilePath === null
+      ? 'Ask Codex: "List the contexture MCP tools."'
+      : `Ask Codex: "List the contexture MCP tools, then inspect ${documentFilePath}."`;
+  const copiedLabel =
+    copied === 'install'
+      ? 'Copied install command'
+      : copied === 'prompt'
+        ? 'Copied saved-document prompt'
+        : copied === 'smoke'
+          ? 'Copied smoke test'
+          : '';
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant={compact ? 'ghost' : 'secondary'}
+          className={
+            compact
+              ? 'h-7 shrink-0 gap-1.5 px-2 text-xs'
+              : 'h-auto w-full justify-start gap-2 px-2 py-2 text-left'
+          }
+          aria-label="Open Agent setup"
+          data-testid="agent-setup"
+        >
+          <PlugZap className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
+          <span className={compact ? 'sr-only' : 'min-w-0'}>
+            <span className="block text-xs font-semibold">Agent setup</span>
+            <span className="block text-[11px] font-normal text-muted-foreground">
+              {savedPrompt === null ? 'Save for prompt handoff' : 'Saved prompt ready'}
+            </span>
+          </span>
+          {compact ? <span className="text-xs">Agent</span> : null}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-2" align="end" data-testid="agent-setup-content">
+        <div className="mb-2 px-1">
+          <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
+            Agent setup
+          </h3>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Use this Contexture document from Codex or another MCP-capable agent.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <AgentCopyRow
+            label="Codex install command"
+            value={CODEX_MCP_INSTALL_COMMAND}
+            copied={copied === 'install'}
+            onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
+            copyLabel="Copy Codex MCP install command"
+            testId="agent-setup-install"
+          />
+
+          {savedPrompt === null ? (
+            <div
+              className="rounded border border-dashed border-border/80 bg-background/60 p-2 text-[11px] leading-snug text-muted-foreground"
+              data-testid="agent-setup-unsaved"
+            >
+              <p>
+                Save this document to create a stable .contexture.json path before handing it to an
+                agent.
+              </p>
+              {onRequestSave ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2 h-7 text-xs"
+                  onClick={onRequestSave}
+                >
+                  Save first
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <AgentCopyRow
+              label="Saved-document prompt"
+              value={savedPrompt}
+              copied={copied === 'prompt'}
+              onCopy={() => onCopy('prompt', savedPrompt)}
+              copyLabel="Copy saved-document prompt"
+              testId="agent-setup-prompt"
+            />
+          )}
+
+          <AgentCopyRow
+            label="Smoke test"
+            value={smokeTest}
+            copied={copied === 'smoke'}
+            onCopy={() => onCopy('smoke', smokeTest)}
+            copyLabel="Copy MCP smoke test"
+            testId="agent-setup-smoke"
+          />
+        </div>
+
+        <ul className="mt-2 flex flex-wrap gap-1 text-[10px]" aria-label="Contexture MCP tools">
+          {CONTEXTURE_MCP_TOOLS.map((tool) => (
+            <li key={tool}>
+              <code className="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-mono text-muted-foreground">
+                {tool}
+              </code>
+            </li>
+          ))}
+        </ul>
+        <p className="sr-only" aria-live="polite">
+          {copiedLabel}
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function AgentCopyRow({
+  label,
+  value,
+  copied,
+  onCopy,
+  copyLabel,
+  testId,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+  copyLabel: string;
+  testId: string;
+}): React.JSX.Element {
+  return (
+    <div className="rounded border border-border/70 bg-background/70 p-1.5" data-testid={testId}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase leading-none tracking-wider text-muted-foreground/70">
+          {label}
+        </span>
+        <Button
+          size="icon"
+          type="button"
+          variant="ghost"
+          className="size-6"
+          onClick={onCopy}
+          aria-label={copyLabel}
+          title={copied ? 'Copied' : copyLabel}
+          data-testid={`${testId}-copy`}
+        >
+          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+        </Button>
+      </div>
+      <pre
+        data-testid={`${testId}-value`}
+        className="max-h-20 overflow-auto whitespace-pre-wrap break-all rounded border border-border/50 bg-muted/20 p-1.5 font-mono text-[11px] leading-snug text-foreground"
+      >
+        {value}
+      </pre>
     </div>
   );
 }

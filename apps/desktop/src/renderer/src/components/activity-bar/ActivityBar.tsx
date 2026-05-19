@@ -21,6 +21,7 @@ export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React
           type="button"
           key={id}
           title={label}
+          aria-label={label}
           onClick={() => onTabChange(id)}
           className={cn(
             'relative w-8 h-8 rounded-md flex items-center justify-center transition-colors',

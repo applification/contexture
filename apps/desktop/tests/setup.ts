@@ -3,6 +3,9 @@ import { vi } from 'vitest';
 
 // Mock scrollIntoView for jsdom
 Element.prototype.scrollIntoView = vi.fn();
+Element.prototype.hasPointerCapture = vi.fn(() => false);
+Element.prototype.setPointerCapture = vi.fn();
+Element.prototype.releasePointerCapture = vi.fn();
 
 // Mock ResizeObserver for jsdom
 global.ResizeObserver = vi.fn().mockImplementation(() => ({

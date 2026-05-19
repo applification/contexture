@@ -31,7 +31,7 @@ All colors use OKLCH for perceptual uniformity. The palette is built around deep
 | `--secondary-foreground` | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Text on secondary                  |
 | `--muted`                | `oklch(0.95 0.01 270)`    | `oklch(0.2 0.02 270)`     | Muted backgrounds                  |
 | `--muted-foreground`     | `oklch(0.5 0.03 270)`     | `oklch(0.6 0.02 270)`     | Subdued text, labels, descriptions |
-| `--accent`               | `oklch(0.75 0.15 195)`    | `oklch(0.75 0.15 195)`    | Electric cyan — data, interactivity|
+| `--accent`               | `oklch(0.93 0.025 270)`   | `oklch(0.24 0.025 270)`   | Subtle hover/focus fill for shadcn chrome |
 | `--accent-foreground`    | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Text on accent surfaces            |
 | `--border`               | `oklch(0.9 0.01 270)`     | `oklch(0.25 0.02 270)`    | Borders and dividers               |
 | `--input`                | `oklch(0.9 0.01 270)`     | `oklch(0.25 0.02 270)`    | Input field borders                |
@@ -156,9 +156,11 @@ Built on **shadcn/ui** with **Tailwind CSS v4**. Prefer existing shadcn componen
 ```
 Primary:    bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity
 Secondary:  bg-secondary text-secondary-foreground border border-border/60 rounded-lg hover:bg-secondary/80 transition-colors
-Ghost:      text-muted-foreground rounded-lg hover:text-foreground hover:bg-muted/50 transition-colors
+Ghost:      text-muted-foreground rounded-lg hover:text-accent-foreground hover:bg-accent transition-colors
 Destructive: bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity
 ```
+
+In shadcn primitives, `--accent` is the routine hover/focus surface, so keep it subtle. Electric cyan remains available through graph-specific tokens such as `--graph-node-selected` and through brand/web contexts where it is used deliberately.
 
 ### Card Patterns
 
