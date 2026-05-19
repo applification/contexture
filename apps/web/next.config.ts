@@ -7,22 +7,36 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const scriptSrc = [
+  "script-src 'self' 'unsafe-inline'",
+  isProduction ? null : "'unsafe-eval'",
+  'https://*.i.posthog.com',
+]
+  .filter((source): source is string => source !== null)
+  .join(' ');
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  scriptSrc,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  isProduction ? "connect-src 'self' https:" : "connect-src 'self' http: https: ws: wss:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  isProduction ? 'upgrade-insecure-requests' : null,
+]
+  .filter((directive): directive is string => directive !== null)
+  .join('; ');
+
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' https:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-      "form-action 'self'",
-      'upgrade-insecure-requests',
-    ].join('; '),
+    value: contentSecurityPolicy,
   },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
