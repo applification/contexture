@@ -13,10 +13,14 @@
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
 import type { IndexDef, TypeDef } from '@contexture/core/ir';
+import { Plus, Trash2 } from 'lucide-react';
+import { useId } from 'react';
 import type { Op } from '../../store/ops';
+import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Textarea } from '../ui/textarea';
 
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
@@ -113,26 +117,36 @@ function ObjectBody({
   return (
     <div className="space-y-1">
       <Label>Fields</Label>
-      <ul className="text-xs space-y-1">
-        {type.fields.map((f) => {
-          const reserved = isTable && isConvexReservedName(f.name);
-          return (
-            <li
-              key={f.name}
-              data-testid="object-field-summary"
-              data-reserved={reserved || undefined}
-              title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
-              className={`flex justify-between ${reserved ? 'text-destructive' : ''}`}
-            >
-              <span>
-                {f.name}
-                {f.optional ? '?' : ''}
-              </span>
-              <span className="text-muted-foreground">{summariseKind(f.type.kind)}</span>
-            </li>
-          );
-        })}
-      </ul>
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-7 px-2">Name</TableHead>
+            <TableHead className="h-7 px-2 text-right">Type</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {type.fields.map((f) => {
+            const reserved = isTable && isConvexReservedName(f.name);
+            return (
+              <TableRow
+                key={f.name}
+                data-testid="object-field-summary"
+                data-reserved={reserved || undefined}
+                title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
+                className={reserved ? 'text-destructive' : undefined}
+              >
+                <TableCell className="px-2 py-1.5 font-medium">
+                  {f.name}
+                  {f.optional ? '?' : ''}
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
+                  {summariseKind(f.type.kind)}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -176,29 +190,46 @@ function ConvexSection({
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between">
             <Label>Indexes</Label>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={addIndex}
               disabled={fieldNames.length === 0}
-              className="text-xs underline disabled:opacity-40 disabled:no-underline"
+              className="h-7 px-2 text-xs"
             >
+              <Plus aria-hidden="true" />
               Add index
-            </button>
+            </Button>
           </div>
+          {fieldNames.length === 0 && (
+            <p className="text-xs text-muted-foreground">Add a field before creating an index.</p>
+          )}
           {indexes.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No indexes.</p>
+            <p className="text-xs text-muted-foreground">No indexes yet.</p>
           ) : (
-            <ul className="space-y-2">
-              {indexes.map((idx) => (
-                <IndexRow
-                  key={idx.name}
-                  typeName={type.name}
-                  index={idx}
-                  fieldNames={fieldNames}
-                  dispatch={dispatch}
-                />
-              ))}
-            </ul>
+            <Table className="text-xs">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-7 px-2">Index</TableHead>
+                  <TableHead className="h-7 px-2">Fields</TableHead>
+                  <TableHead className="h-7 w-9 px-1 text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {indexes.map((idx) => (
+                  <IndexRow
+                    key={idx.name}
+                    typeName={type.name}
+                    index={idx}
+                    fieldNames={fieldNames}
+                    dispatch={dispatch}
+                  />
+                ))}
+              </TableBody>
+            </Table>
           )}
         </div>
       )}
@@ -217,12 +248,16 @@ function IndexRow({
   fieldNames: string[];
   dispatch: (op: Op) => void;
 }) {
+  const fieldGroupId = useStableDomId('index-fields');
+  const fieldRequirementId = `${fieldGroupId}-requirement`;
+
   return (
-    <li className="space-y-1 rounded border p-2" data-testid="convex-index-row">
-      <div className="flex items-center gap-2">
+    <TableRow data-testid="convex-index-row">
+      <TableCell className="w-32 px-2 py-1.5 align-top">
         <Input
           aria-label={`Index name for ${index.name}`}
           defaultValue={index.name}
+          className="h-8 px-2 text-xs"
           onBlur={(ev) => {
             const next = ev.target.value.trim();
             if (next && next !== index.name) {
@@ -235,49 +270,72 @@ function IndexRow({
             }
           }}
         />
-        <button
+      </TableCell>
+      <TableCell className="px-2 py-1.5 align-top">
+        <fieldset aria-describedby={fieldRequirementId} className="flex flex-wrap gap-1.5">
+          <legend className="sr-only">Fields for index {index.name}</legend>
+          {fieldNames.map((fname) => {
+            const checked = index.fields.includes(fname);
+            const locked = checked && index.fields.length === 1;
+            const checkboxId = `${fieldGroupId}-${slugForDomId(fname)}`;
+
+            return (
+              <Label
+                key={fname}
+                htmlFor={checkboxId}
+                data-checked={checked || undefined}
+                className="flex min-h-7 items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 text-xs text-muted-foreground transition-colors data-[checked=true]:border-primary/40 data-[checked=true]:bg-primary/10 data-[checked=true]:text-foreground"
+              >
+                <Checkbox
+                  id={checkboxId}
+                  aria-label={`${index.name}: ${fname}`}
+                  aria-describedby={locked ? fieldRequirementId : undefined}
+                  checked={checked}
+                  disabled={locked}
+                  onCheckedChange={(v) => {
+                    const want = v === true;
+                    const nextFields = want
+                      ? [...index.fields, fname]
+                      : index.fields.filter((f) => f !== fname);
+                    dispatch({
+                      kind: 'update_index',
+                      typeName,
+                      name: index.name,
+                      patch: { fields: nextFields },
+                    });
+                  }}
+                />
+                <span className="max-w-24 truncate">{fname}</span>
+              </Label>
+            );
+          })}
+        </fieldset>
+        <p id={fieldRequirementId} className="mt-1 text-[11px] text-muted-foreground">
+          Indexes need at least one field.
+        </p>
+      </TableCell>
+      <TableCell className="w-9 px-1 py-1.5 text-right align-top">
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label={`Delete index ${index.name}`}
           onClick={() => dispatch({ kind: 'remove_index', typeName, name: index.name })}
-          className="text-xs text-destructive underline"
+          className="h-8 w-8 text-destructive hover:text-destructive"
         >
-          Delete
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {fieldNames.map((fname) => {
-          const checked = index.fields.includes(fname);
-          return (
-            <Label
-              key={fname}
-              htmlFor={`idx-${index.name}-${fname}`}
-              className="flex items-center gap-1 text-xs"
-            >
-              <Checkbox
-                id={`idx-${index.name}-${fname}`}
-                aria-label={`${index.name}: ${fname}`}
-                checked={checked}
-                onCheckedChange={(v) => {
-                  const want = v === true;
-                  const nextFields = want
-                    ? [...index.fields, fname]
-                    : index.fields.filter((f) => f !== fname);
-                  if (nextFields.length === 0) return;
-                  dispatch({
-                    kind: 'update_index',
-                    typeName,
-                    name: index.name,
-                    patch: { fields: nextFields },
-                  });
-                }}
-              />
-              {fname}
-            </Label>
-          );
-        })}
-      </div>
-    </li>
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
+}
+
+function useStableDomId(prefix: string): string {
+  return `${prefix}-${useId().replace(/:/g, '')}`;
+}
+
+function slugForDomId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
 function nextIndexName(existing: IndexDef[]): string {
