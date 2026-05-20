@@ -158,8 +158,12 @@ describe('TypeNode', () => {
       'title',
       'Planting time.',
     );
-    expect(screen.getAllByTestId('enum-value-badge')[0]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--chart-3) 82%, var(--background))',
+    const badges = screen.getAllByTestId('enum-value-badge');
+    expect(badges[0]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+    });
+    expect(badges[1]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
     });
   });
 });
