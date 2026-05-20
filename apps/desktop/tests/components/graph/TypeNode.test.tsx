@@ -191,9 +191,11 @@ describe('TypeNode', () => {
     const badges = screen.getAllByTestId('enum-value-badge');
     expect(badges[0]).toHaveStyle({
       background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+      color: 'var(--primary-foreground)',
     });
     expect(badges[1]).toHaveStyle({
       background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+      color: 'var(--primary-foreground)',
     });
   });
 });

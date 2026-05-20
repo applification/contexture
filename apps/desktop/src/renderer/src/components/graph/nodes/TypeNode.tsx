@@ -56,7 +56,7 @@ function headerColorFor(kind: TypeNodeData['kind']): string {
 const enumValueBadgeStyle: CSSProperties = {
   background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
   borderColor: 'color-mix(in oklch, var(--chart-1) 88%, transparent)',
-  color: 'var(--foreground)',
+  color: 'var(--primary-foreground)',
 };
 
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {

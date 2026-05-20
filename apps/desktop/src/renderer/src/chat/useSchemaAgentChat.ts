@@ -15,33 +15,21 @@ import {
   useSchemaAgentSettingsStore,
 } from '../store/schema-agent-settings';
 import { useUndoStore } from '../store/undo';
+import {
+  type SchemaAgentModelInfo,
+  type SchemaAgentModelOptionDescriptor,
+  useSchemaAgentModelsStore,
+} from './schemaAgentModelsStore';
 import { useSchemaAgentSessionStore } from './schemaAgentSessionStore';
 import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 
-export type { SchemaAgentModelOptions, SchemaAgentModelSettings, SchemaAgentProvider };
-
-export type SchemaAgentModelOptionDescriptor =
-  | {
-      id: string;
-      type: 'select';
-      label: string;
-      options: Array<{ id: string; label: string; isDefault?: boolean }>;
-      currentValue?: string;
-    }
-  | {
-      id: string;
-      type: 'boolean';
-      label: string;
-      defaultValue?: boolean;
-      currentValue?: boolean;
-    };
-
-export interface SchemaAgentModelInfo {
-  id: string;
-  label: string;
-  supportsReasoningEffort?: boolean;
-  optionDescriptors?: SchemaAgentModelOptionDescriptor[];
-}
+export type {
+  SchemaAgentModelInfo,
+  SchemaAgentModelOptionDescriptor,
+  SchemaAgentModelOptions,
+  SchemaAgentModelSettings,
+  SchemaAgentProvider,
+};
 
 export interface SchemaAgentChatState {
   provider: SchemaAgentProvider;
@@ -124,11 +112,12 @@ export function useSchemaAgentChat({
   const setModelSetting = useSchemaAgentSettingsStore((s) => s.setModel);
   const setEffortSetting = useSchemaAgentSettingsStore((s) => s.setEffort);
   const setModelOptionsSetting = useSchemaAgentSettingsStore((s) => s.setModelOptions);
-  const [models, setModels] = useState<SchemaAgentModelInfo[]>([]);
-  const [modelsProvider, setModelsProvider] = useState<SchemaAgentProvider | null>(null);
-  const [modelListState, setModelListState] = useState<'idle' | 'loading' | 'loaded' | 'error'>(
-    'idle',
-  );
+  const models = useSchemaAgentModelsStore((s) => s.models);
+  const modelsProvider = useSchemaAgentModelsStore((s) => s.provider);
+  const modelListState = useSchemaAgentModelsStore((s) => s.status);
+  const beginLoadingModels = useSchemaAgentModelsStore((s) => s.beginLoading);
+  const acceptLoadedModels = useSchemaAgentModelsStore((s) => s.acceptLoaded);
+  const failLoadingModels = useSchemaAgentModelsStore((s) => s.failLoading);
   const providerRef = useRef(provider);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const persistenceEnabled = useChatComposerStore((s) => s.chatHistoryPersistence);
@@ -220,16 +209,14 @@ export function useSchemaAgentChat({
 
   useEffect(() => {
     let cancelled = false;
-    setModels([]);
-    setModelsProvider(null);
-    setModelListState('loading');
+    beginLoadingModels(provider);
     api
       .setProvider(provider)
       .then(() => api.listModels(provider))
       .then((result) => {
         if (cancelled) return;
         if (!Array.isArray(result)) {
-          setModelListState('error');
+          failLoadingModels(provider);
           return;
         }
         const parsed = result
@@ -249,9 +236,7 @@ export function useSchemaAgentChat({
               ...(optionDescriptors ? { optionDescriptors } : {}),
             };
           });
-        setModels(parsed);
-        setModelsProvider(provider);
-        setModelListState('loaded');
+        acceptLoadedModels(provider, parsed);
         if (parsed.length === 0) {
           setModelSetting('');
           return;
@@ -282,12 +267,21 @@ export function useSchemaAgentChat({
         }
       })
       .catch(() => {
-        if (!cancelled) setModelListState('error');
+        if (!cancelled) failLoadingModels(provider);
       });
     return () => {
       cancelled = true;
     };
-  }, [api, provider, setEffortSetting, setModelOptionsSetting, setModelSetting]);
+  }, [
+    acceptLoadedModels,
+    api,
+    beginLoadingModels,
+    failLoadingModels,
+    provider,
+    setEffortSetting,
+    setModelOptionsSetting,
+    setModelSetting,
+  ]);
 
   useEffect(() => {
     if (!selectedModel) return;
@@ -431,35 +425,35 @@ export function useSchemaAgentChat({
 
   const restoreSettings = useCallback(
     (settings: SchemaAgentModelSettings) => {
-      const nextProvider = settings.provider ?? provider;
+      const currentProvider = useSchemaAgentSettingsStore.getState().provider;
+      const nextProvider = settings.provider ?? currentProvider;
       providerRef.current = nextProvider;
       restoreModelSettings(settings);
-      setModels([]);
-      setModelsProvider(null);
-      setModelListState('idle');
+      if (nextProvider !== useSchemaAgentModelsStore.getState().provider) {
+        beginLoadingModels(nextProvider);
+      }
       setProviderThread(undefined, false);
 
       api.setProvider(nextProvider).catch(() => undefined);
     },
-    [api, provider, restoreModelSettings, setProviderThread],
+    [api, beginLoadingModels, restoreModelSettings, setProviderThread],
   );
 
   const setProvider = useCallback(
     (next: SchemaAgentProvider) => {
-      if (next === provider) {
+      const currentProvider = useSchemaAgentSettingsStore.getState().provider;
+      if (next === currentProvider) {
         setProviderSetting(next);
         api.setProvider(next).catch(() => undefined);
         return;
       }
       providerRef.current = next;
       setProviderSetting(next);
-      setModels([]);
-      setModelsProvider(null);
-      setModelListState('idle');
+      beginLoadingModels(next);
       setProviderThread(undefined, false);
       api.setProvider(next).catch(() => undefined);
     },
-    [api, provider, setProviderSetting, setProviderThread],
+    [api, beginLoadingModels, setProviderSetting, setProviderThread],
   );
 
   const setModel = useCallback(
@@ -522,12 +516,14 @@ export function useSchemaAgentChat({
   );
   const hydrateHistory = useCallback(
     (history: ChatHistory) => {
-      restoreSettings({
-        provider: history.provider,
-        model: history.model,
-        effort: history.effort,
-        modelOptions: history.modelOptions,
-      });
+      if (hasModelSettings(history)) {
+        restoreSettings({
+          provider: history.provider,
+          model: history.model,
+          effort: history.effort,
+          modelOptions: history.modelOptions,
+        });
+      }
       hydrateHistoryState(history);
       if (history.providerThreadRef) {
         api.threadSet(history.providerThreadRef).catch(() => undefined);
@@ -622,6 +618,15 @@ function readinessToMessage(readiness: unknown, provider: unknown): string {
 
 function isAuthMessage(message: string): boolean {
   return /auth|sign.?in|unauthori[sz]ed|api key/i.test(message);
+}
+
+function hasModelSettings(history: ChatHistory): boolean {
+  return (
+    history.provider !== undefined ||
+    history.model !== undefined ||
+    history.effort !== undefined ||
+    history.modelOptions !== undefined
+  );
 }
 
 function defaultEffort(provider: SchemaAgentProvider): string {

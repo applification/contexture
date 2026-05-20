@@ -1,3 +1,4 @@
+import { useSchemaAgentModelsStore } from '@renderer/chat/schemaAgentModelsStore';
 import { useSchemaAgentSessionStore } from '@renderer/chat/schemaAgentSessionStore';
 import { useSchemaAgentChat } from '@renderer/chat/useSchemaAgentChat';
 import { useUndoStore } from '@renderer/store/undo';
@@ -162,6 +163,7 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
 describe('useSchemaAgentChat', () => {
   beforeEach(() => {
     localStorage.clear();
+    useSchemaAgentModelsStore.getState().reset();
     useSchemaAgentSessionStore.getState().reset();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
@@ -448,6 +450,53 @@ describe('useSchemaAgentChat', () => {
 
     expect(result.current.modelsLoading).toBe(false);
     expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
+  });
+
+  it('keeps the active model catalogue when hydrating an empty document chat', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+    ]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.modelsLoading).toBe(false);
+    });
+    vi.mocked(api.listModels).mockClear();
+
+    act(() => {
+      result.current.hydrateHistory({ version: '1', messages: [] });
+    });
+
+    expect(result.current.provider).toBe('codex');
+    expect(result.current.modelsLoading).toBe(false);
+    expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
+    expect(api.listModels).not.toHaveBeenCalled();
+    expect(api.threadClear).toHaveBeenCalled();
+  });
+
+  it('keeps chat hydration actions stable across provider changes', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockImplementation(async (provider) =>
+      provider === 'claude'
+        ? [{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' }]
+        : [{ id: 'gpt-5.4', label: 'GPT-5.4' }],
+    );
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    const hydrateHistory = result.current.hydrateHistory;
+    const restoreSettings = result.current.restoreSettings;
+
+    act(() => {
+      result.current.setProvider('claude');
+    });
+    await waitFor(() => {
+      expect(result.current.provider).toBe('claude');
+    });
+
+    expect(result.current.hydrateHistory).toBe(hydrateHistory);
+    expect(result.current.restoreSettings).toBe(restoreSettings);
   });
 
   it('surfaces an empty model state instead of pretending a model is selected', async () => {
