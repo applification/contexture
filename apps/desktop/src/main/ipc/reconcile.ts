@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { bundlePathsFor, type EmittedManifest, hashContent } from '@contexture/core';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { assertGeneratedTargetForIr } from '../security';
@@ -46,8 +47,33 @@ export async function writeGeneratedTarget(input: unknown): Promise<void> {
     input,
   );
   const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  const manifestPath = bundlePathsFor(parsed.irPath).emitted;
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, parsed.contents, 'utf8');
+  await writeGeneratedManifestHash(manifestPath, target, parsed.contents);
+}
+
+async function writeGeneratedManifestHash(
+  manifestPath: string,
+  targetPath: string,
+  contents: string,
+): Promise<void> {
+  const manifest = await readGeneratedManifest(manifestPath);
+  manifest.files[targetPath] = hashContent(contents);
+  await mkdir(dirname(manifestPath), { recursive: true });
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+}
+
+async function readGeneratedManifest(manifestPath: string): Promise<EmittedManifest> {
+  try {
+    const parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as Partial<EmittedManifest>;
+    return {
+      version: '1',
+      files: parsed.files && typeof parsed.files === 'object' ? parsed.files : {},
+    };
+  } catch {
+    return { version: '1', files: {} };
+  }
 }
 
 export function registerReconcileIpc(): void {
