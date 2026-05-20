@@ -180,6 +180,18 @@ describe('TypeDetail', () => {
       });
     });
 
+    it('disables the last selected index field with helper text', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author', fields: ['author'] }],
+      };
+      setup(typeWithIndex);
+      expect(screen.getByText('Indexes need at least one field.')).toBeInTheDocument();
+      expect(screen.getByLabelText('by_author: author')).toBeDisabled();
+      expect(screen.getByLabelText('by_author: title')).not.toBeDisabled();
+    });
+
     it('flags type name starting with "_" as reserved when table:true', () => {
       setup({ ...base, name: '_Post', table: true });
       const nameInput = screen.getByLabelText('Name') as HTMLInputElement;
