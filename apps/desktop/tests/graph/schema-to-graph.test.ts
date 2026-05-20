@@ -135,6 +135,62 @@ describe('buildGraph', () => {
     expect(edges).toEqual([expect.objectContaining({ source: 'Plot', target: 'Harvest' })]);
   });
 
+  it('emits variant edges from discriminated unions to their object variants', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'discriminatedUnion',
+          name: 'ArtworkSourceReference',
+          discriminator: 'kind',
+          variants: ['MusicianReference', 'GearReference'],
+        },
+        {
+          kind: 'object',
+          name: 'MusicianReference',
+          fields: [{ name: 'kind', type: { kind: 'literal', value: 'musician' } }],
+        },
+        {
+          kind: 'object',
+          name: 'GearReference',
+          fields: [{ name: 'kind', type: { kind: 'literal', value: 'gear' } }],
+        },
+      ],
+    };
+
+    const { nodes, edges } = buildGraph({ schema });
+
+    expect(nodes.map((n) => n.id)).toEqual([
+      'ArtworkSourceReference',
+      'MusicianReference',
+      'GearReference',
+    ]);
+    expect(edges).toEqual([
+      expect.objectContaining({
+        id: 'ArtworkSourceReference.variant->MusicianReference',
+        source: 'ArtworkSourceReference',
+        target: 'MusicianReference',
+        type: 'ref',
+        data: expect.objectContaining({
+          relation: 'unionVariant',
+          discriminator: 'kind',
+          crossBoundary: false,
+        }),
+      }),
+      expect.objectContaining({
+        id: 'ArtworkSourceReference.variant->GearReference',
+        source: 'ArtworkSourceReference',
+        target: 'GearReference',
+        type: 'ref',
+        data: expect.objectContaining({
+          relation: 'unionVariant',
+          discriminator: 'kind',
+          crossBoundary: false,
+        }),
+      }),
+    ]);
+  });
+
   it('applies sidecar positions and falls back to 0,0 for missing keys', () => {
     const schema: Schema = {
       version: '1',

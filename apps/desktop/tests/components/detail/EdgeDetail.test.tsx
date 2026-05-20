@@ -11,6 +11,7 @@ describe('EdgeDetail', () => {
 
   it('renders source type, source field, and target type', () => {
     const data: RefEdgeData = {
+      relation: 'fieldRef',
       sourceType: 'Plot',
       sourceField: 'harvest',
       targetType: 'Harvest',
@@ -25,6 +26,7 @@ describe('EdgeDetail', () => {
 
   it('badges cross-boundary edges', () => {
     const data: RefEdgeData = {
+      relation: 'fieldRef',
       sourceType: 'User',
       sourceField: 'email',
       targetType: 'common.Email',
@@ -36,6 +38,7 @@ describe('EdgeDetail', () => {
 
   it('invokes onEditField with source when the affordance is clicked', () => {
     const data: RefEdgeData = {
+      relation: 'fieldRef',
       sourceType: 'Plot',
       sourceField: 'harvest',
       targetType: 'Harvest',
@@ -45,5 +48,20 @@ describe('EdgeDetail', () => {
     render(<EdgeDetail data={data} onEditField={onEditField} />);
     fireEvent.click(screen.getByText('Edit field'));
     expect(onEditField).toHaveBeenCalledWith('Plot', 'harvest');
+  });
+
+  it('renders union variant edges without field-edit affordances', () => {
+    const data: RefEdgeData = {
+      relation: 'unionVariant',
+      sourceType: 'SourceReference',
+      targetType: 'MusicianReference',
+      discriminator: 'kind',
+      crossBoundary: false,
+    };
+    render(<EdgeDetail data={data} onEditField={vi.fn()} />);
+    expect(screen.getByText('Union variant edge')).toBeInTheDocument();
+    expect(screen.getByText('Discriminator')).toBeInTheDocument();
+    expect(screen.getByText('kind')).toBeInTheDocument();
+    expect(screen.queryByText('Edit field')).not.toBeInTheDocument();
   });
 });

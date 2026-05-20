@@ -6,7 +6,7 @@
  * the canvas uses so new users can decode the diagram at a glance.
  *
  * Matches the four `TypeDef` kinds (object / enum / discriminatedUnion
- * / raw) and the two `RefEdge` modes (same-schema ref vs cross-boundary
+ * / raw) and the edge modes (field ref, union variant, cross-boundary
  * import). Colours are pulled from `globals.css` so theme changes flow
  * through without edits here.
  */
@@ -23,6 +23,11 @@ const EDGE_ITEMS: readonly EdgeItem[] = [
   {
     label: 'Ref',
     color: 'var(--graph-edge-ref)',
+  },
+  {
+    label: 'Union variant',
+    color: 'var(--graph-edge-union)',
+    dash: '2,4',
   },
   {
     label: 'Import (cross-boundary)',
