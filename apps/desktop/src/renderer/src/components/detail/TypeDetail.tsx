@@ -103,7 +103,7 @@ function DescriptionField({ type, dispatch }: TypeDetailProps) {
 
 function ObjectBody({
   type,
-  dispatch: _dispatch,
+  dispatch,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
@@ -121,6 +121,7 @@ function ObjectBody({
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="h-7 px-2">Name</TableHead>
+            <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
             <TableHead className="h-7 px-2 text-right">Type</TableHead>
           </TableRow>
         </TableHeader>
@@ -137,7 +138,23 @@ function ObjectBody({
               >
                 <TableCell className="px-2 py-1.5 font-medium">
                   {f.name}
-                  {f.optional ? '?' : ''}
+                  <span aria-hidden="true" className="inline-block w-[1ch] text-muted-foreground">
+                    {f.optional ? '?' : ''}
+                  </span>
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center">
+                  <Checkbox
+                    aria-label={`${f.name} optional`}
+                    checked={f.optional === true}
+                    onCheckedChange={(v) =>
+                      dispatch({
+                        kind: 'update_field',
+                        typeName: type.name,
+                        fieldName: f.name,
+                        patch: { optional: v === true },
+                      })
+                    }
+                  />
                 </TableCell>
                 <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
                   {summariseKind(f.type.kind)}

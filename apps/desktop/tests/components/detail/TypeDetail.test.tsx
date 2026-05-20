@@ -37,6 +37,23 @@ describe('TypeDetail', () => {
       expect(rows[1]).toHaveTextContent('area?');
     });
 
+    it('renders field optionality as editable checkboxes', () => {
+      setup(type);
+      expect(screen.getByLabelText('name optional')).not.toBeChecked();
+      expect(screen.getByLabelText('area optional')).toBeChecked();
+    });
+
+    it('dispatches update_field when field optionality toggles', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByLabelText('name optional'));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_field',
+        typeName: 'Plot',
+        fieldName: 'name',
+        patch: { optional: true },
+      });
+    });
+
     it('dispatches rename_type when the name input blurs with a new value', () => {
       const { dispatch } = setup(type);
       const input = screen.getByLabelText('Name') as HTMLInputElement;
