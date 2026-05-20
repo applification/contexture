@@ -12,6 +12,7 @@ describe('Contexture path policy', () => {
     expect(paths.ir).toBe('/repo/packages/contexture/app.contexture.json');
     expect(paths.schemaIndex).toBe('/repo/packages/contexture/index.ts');
     expect(paths.convex).toBe('/repo/packages/contexture/convex/schema.ts');
+    expect(paths.convexValidators).toBe('/repo/packages/contexture/convex/validators.ts');
   });
 
   it('rejects non-IR paths', () => {
@@ -27,6 +28,7 @@ describe('Contexture path policy', () => {
       { kind: 'json-schema', path: '/repo/packages/contexture/app.schema.json' },
       { kind: 'schema-index', path: '/repo/packages/contexture/index.ts' },
       { kind: 'convex', path: '/repo/packages/contexture/convex/schema.ts' },
+      { kind: 'convex-validators', path: '/repo/packages/contexture/convex/validators.ts' },
       {
         kind: 'ai-tool-schemas',
         path: '/repo/packages/contexture/.contexture/ai-tool-schemas.json',

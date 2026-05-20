@@ -1,4 +1,4 @@
-import { emitConvexSchema } from '@contexture/core/emit-convex';
+import { emitConvexSchema, emitConvexValidators } from '@contexture/core/emit-convex';
 import type { Schema } from '@contexture/core/ir';
 import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -101,7 +101,7 @@ describe('emitConvexSchema', () => {
     expect(parses(out)).toBe(true);
   });
 
-  it('inlines non-table object types referenced from tables as v.object(...)', () => {
+  it('emits non-table object refs as reusable object validators', () => {
     const ir: Schema = {
       version: '1',
       types: [
@@ -122,11 +122,112 @@ describe('emitConvexSchema', () => {
       ],
     };
     const out = emitConvexSchema(ir);
-    expect(out).toMatch(
-      /home:\s*v\.object\(\{\s*city:\s*v\.string\(\),\s*zip:\s*v\.string\(\)\s*\}\)/,
-    );
+    expect(out).toContain(`import { address } from './validators';`);
+    expect(out).toContain('home: address');
     // Only User should be a defineTable entry.
     expect(out).not.toMatch(/Address:\s*defineTable/);
+    expect(parses(out)).toBe(true);
+  });
+
+  it('emits local enum refs as reusable literal unions', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'Status',
+          values: [{ value: 'draft' }, { value: 'published' }],
+        },
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'status', type: { kind: 'ref', typeName: 'Status' } }],
+        },
+      ],
+    };
+    const out = emitConvexSchema(ir);
+    expect(out).toContain(`import { status } from './validators';`);
+    expect(out).toContain('status: status');
+    expect(out).not.toContain('status: v.any()');
+    expect(parses(out)).toBe(true);
+  });
+
+  it('emits discriminated union refs as reusable unions of object variants', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ClickEvent',
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'click' } },
+            { name: 'x', type: { kind: 'number' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'HoverEvent',
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'hover' } },
+            { name: 'target', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'UiEvent',
+          discriminator: 'kind',
+          variants: ['ClickEvent', 'HoverEvent'],
+        },
+        {
+          kind: 'object',
+          name: 'AuditLog',
+          table: true,
+          fields: [{ name: 'event', type: { kind: 'ref', typeName: 'UiEvent' } }],
+        },
+      ],
+    };
+    const out = emitConvexSchema(ir);
+    expect(out).toContain(`import { uiEvent } from './validators';`);
+    expect(out).toContain('event: uiEvent');
+    expect(out).not.toContain('event: v.any()');
+    expect(parses(out)).toBe(true);
+  });
+
+  it('emits nested enum refs inside embedded object arrays', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'PaletteRole',
+          values: [{ value: 'primary' }, { value: 'accent' }],
+        },
+        {
+          kind: 'object',
+          name: 'PaletteColor',
+          fields: [
+            { name: 'hex', type: { kind: 'string' } },
+            { name: 'role', type: { kind: 'ref', typeName: 'PaletteRole' }, optional: true },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Artwork',
+          table: true,
+          fields: [
+            {
+              name: 'palette',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'PaletteColor' } },
+            },
+          ],
+        },
+      ],
+    };
+    const out = emitConvexSchema(ir);
+    expect(out).toContain(`import { paletteColor } from './validators';`);
+    expect(out).toContain('palette: v.array(paletteColor)');
+    expect(out).not.toContain('role: v.optional(v.any())');
     expect(parses(out)).toBe(true);
   });
 
@@ -199,5 +300,79 @@ describe('emitConvexSchema', () => {
     };
     // No table-flagged types — emitter should succeed.
     expect(() => emitConvexSchema(ir)).not.toThrow();
+  });
+});
+
+describe('emitConvexValidators', () => {
+  it('exports reusable validators for non-table objects and enums', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'Status',
+          values: [{ value: 'draft' }, { value: 'published' }],
+        },
+        {
+          kind: 'object',
+          name: 'PostMetadata',
+          fields: [{ name: 'status', type: { kind: 'ref', typeName: 'Status' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'metadata', type: { kind: 'ref', typeName: 'PostMetadata' } }],
+        },
+      ],
+    };
+    const out = emitConvexValidators(ir);
+    expect(out).toContain('@contexture-generated');
+    expect(out).toContain("import { v } from 'convex/values';");
+    expect(out).toContain(
+      'export const status = v.union(v.literal("draft"), v.literal("published"));',
+    );
+    expect(out).toContain('export const postMetadata = v.object({ status: status });');
+    expect(out).not.toMatch(/export const post =/);
+    expect(parses(out)).toBe(true);
+  });
+
+  it('exports discriminated unions using their variant validators', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ClickEvent',
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'click' } },
+            { name: 'x', type: { kind: 'number' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'HoverEvent',
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'hover' } },
+            { name: 'target', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'UiEvent',
+          discriminator: 'kind',
+          variants: ['ClickEvent', 'HoverEvent'],
+        },
+      ],
+    };
+    const out = emitConvexValidators(ir);
+    expect(out).toContain(
+      'export const clickEvent = v.object({ kind: v.literal("click"), x: v.number() });',
+    );
+    expect(out).toContain(
+      'export const hoverEvent = v.object({ kind: v.literal("hover"), target: v.string() });',
+    );
+    expect(out).toContain('export const uiEvent = v.union(clickEvent, hoverEvent);');
+    expect(parses(out)).toBe(true);
   });
 });

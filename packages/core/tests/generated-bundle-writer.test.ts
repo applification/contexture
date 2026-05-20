@@ -80,6 +80,7 @@ describe('generated bundle writer', () => {
         '/proj/packages/contexture/app.schema.json',
         '/proj/packages/contexture/app.schema.ts',
         '/proj/packages/contexture/convex/schema.ts',
+        '/proj/packages/contexture/convex/validators.ts',
         '/proj/packages/contexture/index.ts',
       ].sort(),
     );

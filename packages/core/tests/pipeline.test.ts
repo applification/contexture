@@ -18,6 +18,7 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',
       '/repo/packages/contexture/convex/schema.ts',
+      '/repo/packages/contexture/convex/validators.ts',
     ]);
   });
 
@@ -64,6 +65,7 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',
       '/repo/packages/contexture/convex/schema.ts',
+      '/repo/packages/contexture/convex/validators.ts',
     ]);
   });
 
