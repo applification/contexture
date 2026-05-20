@@ -189,45 +189,12 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           }}
         >
           {data.fields.map((f) => (
-            <button
-              type="button"
+            <FieldRowButton
               key={f.name}
-              data-testid="type-node-field"
-              data-field-name={f.name}
-              onClick={(ev) => onFieldClick(f.name, ev)}
-              className="contexture-type-node-field"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '2px 10px',
-                fontSize: 10,
-                gap: 8,
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
-                {f.name}
-                {f.optional ? '?' : ''}
-                {f.nullable ? ' | null' : ''}
-              </span>
-              <span
-                style={{
-                  color: f.refTarget ? 'var(--graph-edge-property)' : 'var(--muted-foreground)',
-                  fontFamily: f.refTarget ? 'inherit' : 'var(--font-mono)',
-                  fontSize: 9,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {f.summary}
-              </span>
-            </button>
+              field={f}
+              selectedTarget={primaryNodeId}
+              onFieldClick={onFieldClick}
+            />
           ))}
         </div>
       )}
@@ -274,3 +241,61 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     </HoverCard>
   );
 });
+
+function FieldRowButton({
+  field,
+  selectedTarget,
+  onFieldClick,
+}: {
+  field: TypeNodeData['fields'][number];
+  selectedTarget: string | null;
+  onFieldClick: (fieldName: string, ev: React.MouseEvent<HTMLElement>) => void;
+}) {
+  const refTargetSelected = field.refTarget !== undefined && field.refTarget === selectedTarget;
+  return (
+    <button
+      type="button"
+      data-testid="type-node-field"
+      data-field-name={field.name}
+      onClick={(ev) => onFieldClick(field.name, ev)}
+      className="contexture-type-node-field"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '2px 10px',
+        fontSize: 10,
+        gap: 8,
+        width: '100%',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+    >
+      <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
+        {field.name}
+        {field.optional ? '?' : ''}
+        {field.nullable ? ' | null' : ''}
+      </span>
+      <span
+        data-testid={field.refTarget ? 'type-node-field-ref-summary' : undefined}
+        style={{
+          color: refTargetSelected
+            ? 'var(--graph-node-selected)'
+            : field.refTarget
+              ? 'var(--graph-edge-property)'
+              : 'var(--muted-foreground)',
+          fontFamily: field.refTarget ? 'inherit' : 'var(--font-mono)',
+          fontSize: 9,
+          fontWeight: refTargetSelected ? 700 : 400,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {field.summary}
+      </span>
+    </button>
+  );
+}

@@ -10,10 +10,11 @@
  */
 import { TYPE_NODE_EVENT, TypeNode } from '@renderer/components/graph/nodes/TypeNode';
 import type { TypeNodeData } from '@renderer/components/graph/schema-to-graph';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function Wrapper({ children }: { children: ReactNode }) {
   return <ReactFlowProvider>{children}</ReactFlowProvider>;
@@ -41,6 +42,10 @@ function makeProps(data: TypeNodeData, selected = false) {
 }
 
 describe('TypeNode', () => {
+  beforeEach(() => {
+    useGraphSelectionStore.getState().clear();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     cleanup();
@@ -133,6 +138,31 @@ describe('TypeNode', () => {
     };
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
     expect(container.querySelectorAll('[data-testid="type-node-field"]')).toHaveLength(0);
+  });
+
+  it('highlights a ref summary when its target node is selected', () => {
+    const data: TypeNodeData = {
+      typeName: 'Artwork',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'medium',
+          summary: '→ ArtworkMedium',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkMedium',
+        },
+      ],
+    };
+    useGraphSelectionStore.getState().click('ArtworkMedium', 'replace');
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field-ref-summary')).toHaveStyle({
+      color: 'var(--graph-node-selected)',
+      fontWeight: '700',
+    });
   });
 
   it('shows enum description and values in a hover card', () => {
