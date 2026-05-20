@@ -55,8 +55,10 @@ export function useSessionPersistence({
       if (!raw) return;
       const session = JSON.parse(raw) as StoredSession;
       if (!session.schema || session.schema.types.length === 0) return;
+      const layout = session.layout ?? { version: '1', positions: {} };
       useUndoStore.getState().apply({ kind: 'replace_schema', schema: session.schema });
-      onRestoreRef.current(session.layout ?? { version: '1', positions: {} });
+      useDocumentStore.getState().acceptRestoredSession({ layout });
+      onRestoreRef.current(layout);
     } catch {
       store.removeItem(SESSION_KEY);
     }

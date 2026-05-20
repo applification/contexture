@@ -8,18 +8,16 @@
  * New unsaved documents stay manual-save until the user chooses a file path.
  */
 
-import type { ChatHistory, Layout } from '@contexture/core';
+import type { ChatHistory } from '@contexture/core';
 import { useEffect, useRef } from 'react';
 import { useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';
 
 const DEBOUNCE_MS = 500;
 
-const DEFAULT_LAYOUT: Layout = { version: '1', positions: {} };
 const DEFAULT_CHAT: ChatHistory = { version: '1', messages: [] };
 
 export interface UseProjectAutoSaveOptions {
-  getLayout?: () => Layout;
   getChat?: () => ChatHistory;
 }
 
@@ -39,11 +37,10 @@ export function useProjectAutoSave(options: UseProjectAutoSaveOptions = {}): voi
       const doc = useDocumentStore.getState();
       if (!doc.filePath) return;
       const schema = useUndoStore.getState().schema;
-      const layout = optionsRef.current.getLayout?.() ?? DEFAULT_LAYOUT;
       const chat = optionsRef.current.getChat?.() ?? DEFAULT_CHAT;
       void fileApi
-        .save({ irPath: doc.filePath, schema, layout, chat })
-        .then(() => useDocumentStore.getState().markClean());
+        .save({ irPath: doc.filePath, schema, layout: doc.layout, chat })
+        .then(() => useDocumentStore.getState().noteAutosaveSucceeded());
     };
 
     const unsub = useUndoStore.subscribe((s) => {

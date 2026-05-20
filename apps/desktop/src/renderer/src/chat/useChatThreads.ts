@@ -8,8 +8,8 @@
  * Storage is localStorage — the chat transcript is disposable by
  * design (see `plans/pivot.md` §sidecars) and shipping the full thread
  * collection in the git-tracked `.contexture/chat.json` would bloat
- * diffs. Threads are keyed by schema file path; "no file yet" threads
- * live under a `null` filePath bucket.
+ * diffs. Threads are keyed by schema file path; untitled chats stay
+ * ephemeral in the chat panel and are not restored from storage.
  *
  * Quota handling: on quota-exceeded we drop the oldest half and retry.
  * Silent failure is acceptable — losing transcripts never blocks
@@ -17,7 +17,7 @@
  */
 
 import type { ChatMessage } from '@contexture/core';
-import { useCallback, useEffect, useState } from 'react';
+import { create } from 'zustand';
 
 export type ProviderKind = 'codex' | 'claude';
 
@@ -84,19 +84,34 @@ export interface UseChatThreadsReturn {
   activeThreadId: string | null;
   showThreadList: boolean;
   setShowThreadList: (show: boolean) => void;
-  /** Create a new thread; returns the id. Sets it as active. */
-  createThread: (input: {
+  /**
+   * Enter a document chat scope and select the right thread for it.
+   * Untitled documents intentionally clear the active persisted thread.
+   */
+  enterDocumentScope: (filePath: string | null) => ChatThread | null;
+  /** Create a file-backed thread. Untitled chats are intentionally excluded. */
+  createFileThread: (input: {
+    provider: ProviderKind;
+    model?: string;
+    effort?: string;
+    modelOptions?: Record<string, string | boolean>;
+    filePath: string;
+    messages?: ChatMessage[];
+  }) => ChatThread;
+  /** Persist a transcript into the active file-backed thread, creating one if needed. */
+  persistActiveTranscript: (input: {
+    messages: ChatMessage[];
     provider: ProviderKind;
     model?: string;
     effort?: string;
     modelOptions?: Record<string, string | boolean>;
     filePath: string | null;
-  }) => string;
+  }) => ChatThread | null;
   /** All threads for a given file, newest-first. */
   threadsForFile: (filePath: string | null) => ChatThread[];
   /** Switch active thread. Returns the newly-active thread for convenience. */
   switchThread: (id: string) => ChatThread | undefined;
-  deleteThread: (id: string) => void;
+  deleteThread: (id: string, filePath?: string | null) => ChatThread | null;
   updateThreadMessages: (id: string, messages: ChatMessage[]) => void;
   updateThreadSettings: (
     id: string,
@@ -110,164 +125,200 @@ export interface UseChatThreadsReturn {
   updateThreadProviderRef: (id: string, providerThreadRef: unknown) => void;
   markThreadDesynced: (id: string) => void;
   getActiveThread: () => ChatThread | undefined;
-  setActiveThreadId: (id: string | null) => void;
+  reloadFromStorage: () => void;
 }
 
-export function useChatThreads(): UseChatThreadsReturn {
-  const [threads, setThreads] = useState<ChatThread[]>(loadThreads);
-  const [activeThreadId, setActiveThreadIdState] = useState<string | null>(() =>
-    localStorage.getItem(ACTIVE_THREAD_KEY),
-  );
-  const [showThreadList, setShowThreadList] = useState(false);
-
-  useEffect(() => {
+export const useChatThreadStore = create<UseChatThreadsReturn>((set, get) => {
+  function commitThreads(threads: ChatThread[]): void {
+    set({ threads });
     saveThreads(threads);
-  }, [threads]);
+  }
 
-  const setActiveThreadId = useCallback((id: string | null) => {
-    setActiveThreadIdState(id);
+  function commitActiveThread(id: string | null): void {
+    set({ activeThreadId: id });
     if (id) localStorage.setItem(ACTIVE_THREAD_KEY, id);
     else localStorage.removeItem(ACTIVE_THREAD_KEY);
-  }, []);
+  }
 
-  const createThread = useCallback(
-    (input: {
-      provider: ProviderKind;
-      model?: string;
-      effort?: string;
-      modelOptions?: Record<string, string | boolean>;
-      filePath: string | null;
-    }): string => {
-      const id = generateId();
-      const thread: ChatThread = {
-        id,
+  function createThreadRecord(input: {
+    provider: ProviderKind;
+    model?: string;
+    effort?: string;
+    modelOptions?: Record<string, string | boolean>;
+    filePath: string | null;
+    messages?: ChatMessage[];
+  }): ChatThread {
+    const now = Date.now();
+    const messages = input.messages ?? [];
+    const firstUser = messages.find((m) => m.role === 'user');
+    return {
+      id: generateId(),
+      provider: input.provider,
+      title: firstUser ? titleFromMessage(firstUser.content) : 'New chat',
+      messages,
+      model: input.model,
+      effort: input.effort,
+      modelOptions: input.modelOptions,
+      filePath: input.filePath,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  function replaceThread(
+    id: string,
+    updater: (thread: ChatThread) => ChatThread,
+  ): ChatThread | null {
+    let updated: ChatThread | null = null;
+    const threads = get().threads.map((thread) => {
+      if (thread.id !== id) return thread;
+      updated = updater(thread);
+      return updated;
+    });
+    if (updated) commitThreads(threads);
+    return updated;
+  }
+
+  return {
+    threads: loadThreads(),
+    activeThreadId: localStorage.getItem(ACTIVE_THREAD_KEY),
+    showThreadList: false,
+
+    setShowThreadList(show) {
+      set({ showThreadList: show });
+    },
+
+    enterDocumentScope(filePath) {
+      if (filePath === null) {
+        commitActiveThread(null);
+        return null;
+      }
+
+      const active = get().getActiveThread();
+      if (active?.filePath === filePath) return active;
+
+      const latest = get().threadsForFile(filePath)[0] ?? null;
+      commitActiveThread(latest?.id ?? null);
+      return latest;
+    },
+
+    createFileThread(input) {
+      const thread = createThreadRecord(input);
+      commitThreads([thread, ...get().threads].slice(0, MAX_THREADS));
+      commitActiveThread(thread.id);
+      return thread;
+    },
+
+    persistActiveTranscript(input) {
+      if (input.filePath === null || input.messages.length === 0) return null;
+      const active = get().getActiveThread();
+      const thread =
+        active?.filePath === input.filePath
+          ? active
+          : get().createFileThread({
+              provider: input.provider,
+              model: input.model,
+              effort: input.effort,
+              modelOptions: input.modelOptions,
+              filePath: input.filePath,
+            });
+
+      get().updateThreadMessages(thread.id, input.messages);
+      get().updateThreadSettings(thread.id, {
         provider: input.provider,
-        title: 'New chat',
-        messages: [],
         model: input.model,
         effort: input.effort,
         modelOptions: input.modelOptions,
-        filePath: input.filePath,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      setThreads((prev) => [thread, ...prev].slice(0, MAX_THREADS));
-      setActiveThreadId(id);
-      return id;
-    },
-    [setActiveThreadId],
-  );
-
-  const switchThread = useCallback(
-    (id: string): ChatThread | undefined => {
-      setActiveThreadId(id);
-      setShowThreadList(false);
-      return threads.find((t) => t.id === id);
-    },
-    [threads, setActiveThreadId],
-  );
-
-  const deleteThread = useCallback(
-    (id: string) => {
-      setThreads((prev) => {
-        const remaining = prev.filter((t) => t.id !== id);
-        if (activeThreadId === id) {
-          setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
-        }
-        return remaining;
       });
+      return get().threads.find((candidate) => candidate.id === thread.id) ?? thread;
     },
-    [activeThreadId, setActiveThreadId],
-  );
 
-  const updateThreadMessages = useCallback((id: string, messages: ChatMessage[]) => {
-    setThreads((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        // First real user message seeds the title so the thread list
-        // picks up something meaningful.
+    threadsForFile(filePath) {
+      return get()
+        .threads.filter((t) => t.filePath === filePath)
+        .slice()
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+
+    switchThread(id) {
+      const thread = get().threads.find((t) => t.id === id);
+      if (!thread) return undefined;
+      commitActiveThread(id);
+      set({ showThreadList: false });
+      return thread;
+    },
+
+    deleteThread(id, filePath) {
+      const state = get();
+      const remaining = state.threads.filter((t) => t.id !== id);
+      commitThreads(remaining);
+      if (state.activeThreadId !== id) return null;
+
+      const next =
+        filePath === undefined
+          ? remaining[0]
+          : remaining
+              .filter((thread) => thread.filePath === filePath)
+              .slice()
+              .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      commitActiveThread(next?.id ?? null);
+      return next ?? null;
+    },
+
+    updateThreadMessages(id, messages) {
+      replaceThread(id, (thread) => {
         const firstUser = messages.find((m) => m.role === 'user');
         const title =
-          t.title === 'New chat' && firstUser ? titleFromMessage(firstUser.content) : t.title;
-        return { ...t, messages, title, updatedAt: Date.now() };
-      }),
-    );
-  }, []);
+          thread.title === 'New chat' && firstUser
+            ? titleFromMessage(firstUser.content)
+            : thread.title;
+        return { ...thread, messages, title, updatedAt: Date.now() };
+      });
+    },
 
-  const updateThreadSettings = useCallback(
-    (
-      id: string,
-      settings: {
-        provider: ProviderKind;
-        model?: string;
-        effort?: string;
-        modelOptions?: Record<string, string | boolean>;
-      },
-    ) => {
-      setThreads((prev) =>
-        prev.map((t) => {
-          if (t.id !== id) return t;
-          if (
-            t.provider === settings.provider &&
-            t.model === settings.model &&
-            t.effort === settings.effort &&
-            modelOptionsEqual(t.modelOptions, settings.modelOptions)
-          ) {
-            return t;
-          }
-          return { ...t, ...settings, updatedAt: Date.now() };
-        }),
+    updateThreadSettings(id, settings) {
+      replaceThread(id, (thread) => {
+        if (
+          thread.provider === settings.provider &&
+          thread.model === settings.model &&
+          thread.effort === settings.effort &&
+          modelOptionsEqual(thread.modelOptions, settings.modelOptions)
+        ) {
+          return thread;
+        }
+        return { ...thread, ...settings, updatedAt: Date.now() };
+      });
+    },
+
+    updateThreadProviderRef(id, providerThreadRef) {
+      replaceThread(id, (thread) =>
+        thread.providerThreadRef !== providerThreadRef
+          ? { ...thread, providerThreadRef, updatedAt: Date.now() }
+          : thread,
       );
     },
-    [],
-  );
 
-  const updateThreadProviderRef = useCallback((id: string, providerThreadRef: unknown) => {
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === id && t.providerThreadRef !== providerThreadRef
-          ? { ...t, providerThreadRef, updatedAt: Date.now() }
-          : t,
-      ),
-    );
-  }, []);
+    markThreadDesynced(id) {
+      replaceThread(id, (thread) => (!thread.desynced ? { ...thread, desynced: true } : thread));
+    },
 
-  const markThreadDesynced = useCallback((id: string) => {
-    setThreads((prev) =>
-      prev.map((t) => (t.id === id && !t.desynced ? { ...t, desynced: true } : t)),
-    );
-  }, []);
+    getActiveThread() {
+      const activeThreadId = get().activeThreadId;
+      return get().threads.find((t) => t.id === activeThreadId);
+    },
 
-  const getActiveThread = useCallback(
-    (): ChatThread | undefined => threads.find((t) => t.id === activeThreadId),
-    [threads, activeThreadId],
-  );
-
-  const threadsForFile = useCallback(
-    (filePath: string | null): ChatThread[] =>
-      threads
-        .filter((t) => t.filePath === filePath)
-        .slice()
-        .sort((a, b) => b.updatedAt - a.updatedAt),
-    [threads],
-  );
-
-  return {
-    threads,
-    activeThreadId,
-    showThreadList,
-    setShowThreadList,
-    createThread,
-    switchThread,
-    deleteThread,
-    updateThreadMessages,
-    updateThreadSettings,
-    updateThreadProviderRef,
-    markThreadDesynced,
-    getActiveThread,
-    setActiveThreadId,
-    threadsForFile,
+    reloadFromStorage() {
+      set({
+        threads: loadThreads(),
+        activeThreadId: localStorage.getItem(ACTIVE_THREAD_KEY),
+        showThreadList: false,
+      });
+    },
   };
+});
+
+export function useChatThreads(): UseChatThreadsReturn {
+  return useChatThreadStore();
 }
 
 function modelOptionsEqual(

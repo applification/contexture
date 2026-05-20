@@ -89,6 +89,9 @@ build/                       # App icons and resources
 resources/                   # Bundled stdlib + skills (Phase 2)
 ```
 
+Renderer state ownership and lifecycle-action guidance lives in
+[`docs/desktop-renderer-state.md`](../../docs/desktop-renderer-state.md).
+
 ## Releases
 
 Releases are automated via GitHub Actions. Pushing a semver git tag

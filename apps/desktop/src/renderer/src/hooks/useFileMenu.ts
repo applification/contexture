@@ -6,16 +6,17 @@
  *
  * Flow:
  *   - **New**: replace the IR with an empty v1 schema, null the file
- *     path, clear layout + chat sidecars in-memory via the provided
- *     `onNew` callback (so App can reset positions + chat).
+ *     path, clear layout state, and let the provided `onNew` callback
+ *     clear chat sidecars in-memory.
  *   - **Open**: show the OS dialog (or consume the path handed in by a
  *     recent-files click); try `load()`; surface warnings / unknown-
  *     format dialog via `useDocumentStore`; on success, replace the IR,
- *     stash the path, and hand layout + chat to `onBundleLoaded` so
- *     App can rehydrate canvas positions + chat transcript.
- *   - **Save**: serialise the IR + sidecars (pulled from the injected
- *     `getLayout` / `getChat` getters) into the document bundle via
- *     `file:save`. If validation has errors, prompt first
+ *     stash the path + layout, and hand chat to `onBundleLoaded` so
+ *     App can rehydrate the chat transcript.
+ *   - **Save**: serialise the IR + sidecars into the document bundle via
+ *     `file:save`. Layout comes from `useDocumentStore`; chat can be
+ *     supplied by the schema-agent lifecycle because it owns provider
+ *     thread state. If validation has errors, prompt first
  *     (`saveWithErrorsPrompt`) and only save when the user confirms
  *     via the dialog's `Save anyway` path (`forceSave`).
  *   - **Save As**: run the OS save-as dialog, then fall through to the
@@ -31,7 +32,7 @@ import { load } from '@contexture/core/load';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useCallback, useEffect, useRef } from 'react';
 import { validate } from '../services/validation';
-import { useDocumentStore } from '../store/document';
+import { DEFAULT_LAYOUT, useDocumentStore } from '../store/document';
 import { useUndoStore } from '../store/undo';
 
 function genId(): string {
@@ -40,8 +41,6 @@ function genId(): string {
 }
 
 export interface UseFileMenuOptions {
-  /** Snapshot of current canvas layout — called on every save. */
-  getLayout?: () => Layout;
   /** Snapshot of current chat transcript — called on every save. */
   getChat?: () => ChatHistory;
   /** Rehydrate callback run after a successful open. */
@@ -60,7 +59,6 @@ export interface UseFileMenuReturn {
   handleForceSave: (promptId: string) => Promise<void>;
 }
 
-const DEFAULT_LAYOUT: Layout = { version: '1', positions: {} };
 const DEFAULT_CHAT: ChatHistory = { version: '1', messages: [] };
 
 export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn {
@@ -74,10 +72,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
   const handleNew = useCallback((): void => {
     optionsRef.current.onNew?.();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
-    const doc = useDocumentStore.getState();
-    doc.setFilePath(null);
-    doc.setMode('bundle');
-    doc.markClean();
+    useDocumentStore.getState().resetForNewBundle();
   }, []);
 
   const applyLoaded = useCallback(
@@ -93,9 +88,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
       try {
         const { schema, warnings: irWarnings } = load(opened.content);
         useUndoStore.getState().apply({ kind: 'replace_schema', schema });
-        doc.setFilePath(opened.irPath);
-        doc.setMode('bundle');
-        doc.markClean();
+        doc.acceptOpenedBundle({ filePath: opened.irPath, layout: opened.layout });
 
         optionsRef.current.onBundleLoaded?.({
           layout: opened.layout ?? DEFAULT_LAYOUT,
@@ -205,15 +198,15 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
     };
   }, [fileApi, handleNew, handleOpen, handleSave, handleSaveAs]);
 
-  // Any schema mutation flips the doc to dirty. `applyLoaded` and
-  // `writeBundle` call `markClean()` themselves, so the first schema
-  // change after a load/save correctly re-dirties the doc.
+  // Any schema mutation flips the document to dirty. Open/save
+  // lifecycle actions mark the document clean themselves, so the first
+  // schema change after a load/save correctly re-dirties it.
   useEffect(() => {
     let lastSchema = useUndoStore.getState().schema;
     return useUndoStore.subscribe((s) => {
       if (s.schema !== lastSchema) {
         lastSchema = s.schema;
-        useDocumentStore.getState().markDirty();
+        useDocumentStore.getState().noteSchemaChanged();
       }
     });
   }, []);
@@ -234,11 +227,8 @@ async function writeBundle(
   options: UseFileMenuOptions,
 ): Promise<void> {
   const schema = useUndoStore.getState().schema;
-  const layout = options.getLayout?.() ?? DEFAULT_LAYOUT;
-  const chat = options.getChat?.() ?? DEFAULT_CHAT;
-  await fileApi.save({ irPath, schema, layout, chat });
   const doc = useDocumentStore.getState();
-  doc.setFilePath(irPath);
-  doc.setMode('bundle');
-  doc.markClean();
+  const chat = options.getChat?.() ?? DEFAULT_CHAT;
+  await fileApi.save({ irPath, schema, layout: doc.layout, chat });
+  doc.markBundleSaved(irPath);
 }

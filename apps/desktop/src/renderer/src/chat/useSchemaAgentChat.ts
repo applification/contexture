@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatRole } from '@contexture/core';
+import type { ChatHistory, ChatMessage, ChatRole } from '@contexture/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ContextureSchemaAgentAPI } from '../../../preload/index.d';
 import { useChatComposerStore } from '../store/chat-composer';
@@ -15,6 +15,7 @@ import {
   useSchemaAgentSettingsStore,
 } from '../store/schema-agent-settings';
 import { useUndoStore } from '../store/undo';
+import { useSchemaAgentSessionStore } from './schemaAgentSessionStore';
 import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 
 export type { SchemaAgentModelOptions, SchemaAgentModelSettings, SchemaAgentProvider };
@@ -68,6 +69,8 @@ export interface SchemaAgentChatState {
   send: (text: string) => Promise<void>;
   abort: () => Promise<void>;
   hydrate: (messages: ChatMessage[]) => void;
+  hydrateHistory: (history: ChatHistory) => void;
+  toHistory: () => ChatHistory;
   clear: () => void;
 }
 
@@ -93,14 +96,25 @@ export function useSchemaAgentChat({
     useSchemaAgentSettingsStore.getState().reloadFromStorage();
     return null;
   });
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setStreaming] = useState(false);
-  const [liveAssistant, setLiveAssistant] = useState('');
-  const [authRequired, setAuthRequired] = useState(false);
-  const [isReady, setReady] = useState(false);
-  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
-  const [providerThreadRef, setProviderThreadRef] = useState<unknown>(undefined);
-  const [desynced, setDesynced] = useState(false);
+  const messages = useSchemaAgentSessionStore((s) => s.messages);
+  const isStreaming = useSchemaAgentSessionStore((s) => s.isStreaming);
+  const liveAssistant = useSchemaAgentSessionStore((s) => s.liveAssistant);
+  const authRequired = useSchemaAgentSessionStore((s) => s.authRequired);
+  const isReady = useSchemaAgentSessionStore((s) => s.isReady);
+  const unavailableMessage = useSchemaAgentSessionStore((s) => s.unavailableMessage);
+  const providerThreadRef = useSchemaAgentSessionStore((s) => s.providerThreadRef);
+  const desynced = useSchemaAgentSessionStore((s) => s.desynced);
+  const appendSessionMessage = useSchemaAgentSessionStore((s) => s.appendMessage);
+  const beginTurn = useSchemaAgentSessionStore((s) => s.beginTurn);
+  const finishAssistant = useSchemaAgentSessionStore((s) => s.finishAssistant);
+  const failTurn = useSchemaAgentSessionStore((s) => s.failTurn);
+  const setLiveAssistant = useSchemaAgentSessionStore((s) => s.setLiveAssistant);
+  const hydrateHistoryState = useSchemaAgentSessionStore((s) => s.hydrateHistoryState);
+  const clearTranscript = useSchemaAgentSessionStore((s) => s.clearTranscript);
+  const setProviderThread = useSchemaAgentSessionStore((s) => s.setProviderThread);
+  const clearAuthRequiredAction = useSchemaAgentSessionStore((s) => s.clearAuthRequired);
+  const setReadiness = useSchemaAgentSessionStore((s) => s.setReadiness);
+  const setUnavailableMessage = useSchemaAgentSessionStore((s) => s.setUnavailableMessage);
   const provider = useSchemaAgentSettingsStore((s) => s.provider);
   const model = useSchemaAgentSettingsStore((s) => s.model);
   const effort = useSchemaAgentSettingsStore((s) => s.effort);
@@ -124,7 +138,7 @@ export function useSchemaAgentChat({
   const flushLiveAssistant = useCallback(() => {
     rafHandleRef.current = null;
     setLiveAssistant(assistantBufferRef.current);
-  }, []);
+  }, [setLiveAssistant]);
 
   const scheduleLiveFlush = useCallback(() => {
     if (rafHandleRef.current !== null) return;
@@ -150,10 +164,10 @@ export function useSchemaAgentChat({
 
   const appendMessage = useCallback(
     (message: ChatMessage) => {
-      setMessages((prev) => [...prev, message]);
+      appendSessionMessage(message);
       if (persistenceEnabled) onMessagePersisted?.(message);
     },
-    [persistenceEnabled, onMessagePersisted],
+    [appendSessionMessage, persistenceEnabled, onMessagePersisted],
   );
 
   const visibleModels = useMemo(
@@ -193,17 +207,16 @@ export function useSchemaAgentChat({
       .then(() => api.getStatus())
       .then((status) => {
         if (cancelled) return;
-        applyStatus(status, setReady, setUnavailableMessage);
+        applyStatus(status, setReadiness);
       })
       .catch((err) => {
         if (cancelled) return;
-        setReady(false);
-        setUnavailableMessage(err instanceof Error ? err.message : String(err));
+        setReadiness(false, err instanceof Error ? err.message : String(err));
       });
     return () => {
       cancelled = true;
     };
-  }, [api, provider]);
+  }, [api, provider, setReadiness]);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,9 +302,9 @@ export function useSchemaAgentChat({
 
   useEffect(() => {
     return api.onStatusChanged((status) => {
-      applyStatus(status, setReady, setUnavailableMessage);
+      applyStatus(status, setReadiness);
     });
-  }, [api]);
+  }, [api, setReadiness]);
 
   useEffect(() => {
     return api.onToolRequest(({ id, op }) => {
@@ -302,17 +315,15 @@ export function useSchemaAgentChat({
 
   useEffect(() => {
     return api.onThreadUpdated(({ thread }) => {
-      setProviderThreadRef(thread);
-      setDesynced(false);
+      setProviderThread(thread, false);
     });
-  }, [api]);
+  }, [api, setProviderThread]);
 
   useEffect(() => {
     return api.onThreadDesynced(({ thread }) => {
-      setProviderThreadRef(thread);
-      setDesynced(true);
+      setProviderThread(thread, true);
     });
-  }, [api]);
+  }, [api, setProviderThread]);
 
   useEffect(() => {
     return api.onAssistantDelta(({ text }) => {
@@ -331,23 +342,22 @@ export function useSchemaAgentChat({
     return api.onAssistantFinal(({ text }) => {
       cancelLiveFlush();
       assistantBufferRef.current = '';
-      setLiveAssistant('');
       const trimmed = text.trim();
-      if (trimmed) appendMessage(mkMessage('assistant', trimmed));
-      setStreaming(false);
+      const message = trimmed ? mkMessage('assistant', trimmed) : null;
+      finishAssistant(message);
+      if (message && persistenceEnabled) onMessagePersisted?.(message);
     });
-  }, [api, appendMessage, cancelLiveFlush]);
+  }, [api, cancelLiveFlush, finishAssistant, onMessagePersisted, persistenceEnabled]);
 
   useEffect(() => {
     return api.onError(({ message }) => {
       cancelLiveFlush();
       assistantBufferRef.current = '';
-      setLiveAssistant('');
-      appendMessage(mkMessage('assistant', `Error: ${message}`));
-      setStreaming(false);
-      if (isAuthMessage(message)) setAuthRequired(true);
+      const errorMessage = mkMessage('assistant', `Error: ${message}`);
+      failTurn(errorMessage, isAuthMessage(message));
+      if (persistenceEnabled) onMessagePersisted?.(errorMessage);
     });
-  }, [api, appendMessage, cancelLiveFlush]);
+  }, [api, cancelLiveFlush, failTurn, onMessagePersisted, persistenceEnabled]);
 
   useEffect(() => {
     const subscriber: IpcSubscriber = {
@@ -385,29 +395,33 @@ export function useSchemaAgentChat({
         appendMessage(mkMessage('assistant', `Error: ${message}`));
         return;
       }
-      appendMessage(mkMessage('user', trimmed));
-      setStreaming(true);
-      setLiveAssistant('');
+      const userMessage = mkMessage('user', trimmed);
+      beginTurn(userMessage);
+      if (persistenceEnabled) onMessagePersisted?.(userMessage);
       assistantBufferRef.current = '';
-      setAuthRequired(false);
       api.setIR(schema);
       const result = await api.send(trimmed);
       if (!result.ok) {
         const message = result.error ?? 'Schema-agent send failed';
-        appendMessage(mkMessage('assistant', `Error: ${message}`));
-        setStreaming(false);
-        if (isAuthMessage(message)) setAuthRequired(true);
+        const errorMessage = mkMessage('assistant', `Error: ${message}`);
+        failTurn(errorMessage, isAuthMessage(message));
+        if (persistenceEnabled) onMessagePersisted?.(errorMessage);
       }
     },
     [
       api,
       appendMessage,
+      beginTurn,
+      failTurn,
       isReady,
       isStreaming,
+      onMessagePersisted,
+      persistenceEnabled,
       schema,
       selectedEffort,
       selectedModel,
       selectedModelOptions,
+      setUnavailableMessage,
     ],
   );
 
@@ -423,12 +437,11 @@ export function useSchemaAgentChat({
       setModels([]);
       setModelsProvider(null);
       setModelListState('idle');
-      setProviderThreadRef(undefined);
-      setDesynced(false);
+      setProviderThread(undefined, false);
 
       api.setProvider(nextProvider).catch(() => undefined);
     },
-    [api, provider, restoreModelSettings],
+    [api, provider, restoreModelSettings, setProviderThread],
   );
 
   const setProvider = useCallback(
@@ -443,11 +456,10 @@ export function useSchemaAgentChat({
       setModels([]);
       setModelsProvider(null);
       setModelListState('idle');
-      setProviderThreadRef(undefined);
-      setDesynced(false);
+      setProviderThread(undefined, false);
       api.setProvider(next).catch(() => undefined);
     },
-    [api, provider, setProviderSetting],
+    [api, provider, setProviderSetting, setProviderThread],
   );
 
   const setModel = useCallback(
@@ -504,14 +516,47 @@ export function useSchemaAgentChat({
     [model, modelOptions, models, provider, setEffortSetting, setModelOptionsSetting],
   );
 
-  const hydrate = useCallback((next: ChatMessage[]) => setMessages(next), []);
+  const hydrate = useCallback(
+    (next: ChatMessage[]) => hydrateHistoryState({ version: '1', messages: next }),
+    [hydrateHistoryState],
+  );
+  const hydrateHistory = useCallback(
+    (history: ChatHistory) => {
+      restoreSettings({
+        provider: history.provider,
+        model: history.model,
+        effort: history.effort,
+        modelOptions: history.modelOptions,
+      });
+      hydrateHistoryState(history);
+      if (history.providerThreadRef) {
+        api.threadSet(history.providerThreadRef).catch(() => undefined);
+      } else {
+        api.threadClear().catch(() => undefined);
+      }
+    },
+    [api, hydrateHistoryState, restoreSettings],
+  );
+  const toHistory = useCallback((): ChatHistory => {
+    const history: ChatHistory = {
+      version: '1',
+      messages,
+      provider,
+      ...(selectedModel ? { model: selectedModel } : {}),
+      ...(selectedEffort ? { effort: selectedEffort } : {}),
+      ...(Object.keys(selectedModelOptions).length > 0
+        ? { modelOptions: selectedModelOptions }
+        : {}),
+      ...(providerThreadRef ? { providerThreadRef } : {}),
+    };
+    return history;
+  }, [messages, provider, providerThreadRef, selectedEffort, selectedModel, selectedModelOptions]);
   const clear = useCallback(() => {
-    setMessages([]);
+    clearTranscript();
     cancelLiveFlush();
     assistantBufferRef.current = '';
-    setLiveAssistant('');
-  }, [cancelLiveFlush]);
-  const clearAuthRequired = useCallback(() => setAuthRequired(false), []);
+  }, [cancelLiveFlush, clearTranscript]);
+  const clearAuthRequired = useCallback(() => clearAuthRequiredAction(), [clearAuthRequiredAction]);
 
   return {
     provider,
@@ -539,31 +584,29 @@ export function useSchemaAgentChat({
     send,
     abort,
     hydrate,
+    hydrateHistory,
+    toHistory,
     clear,
   };
 }
 
 function applyStatus(
   status: unknown,
-  setReady: (ready: boolean) => void,
-  setUnavailableMessage: (message: string | null) => void,
+  setReadiness: (ready: boolean, message: string | null) => void,
 ): void {
   const readiness =
     status && typeof status === 'object' ? (status as { readiness?: unknown }).readiness : null;
   if (readiness === 'authenticated_chatgpt' || readiness === 'authenticated_api_key') {
-    setReady(true);
-    setUnavailableMessage(null);
+    setReadiness(true, null);
     return;
   }
   if (readiness === 'authenticated_cli') {
-    setReady(true);
-    setUnavailableMessage(null);
+    setReadiness(true, null);
     return;
   }
-  setReady(false);
   const provider =
     status && typeof status === 'object' ? (status as { provider?: unknown }).provider : null;
-  setUnavailableMessage(readinessToMessage(readiness, provider));
+  setReadiness(false, readinessToMessage(readiness, provider));
 }
 
 function readinessToMessage(readiness: unknown, provider: unknown): string {

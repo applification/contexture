@@ -34,6 +34,7 @@ beforeEach(() => {
   const d = useDocumentStore.getState();
   d.setFilePath(null);
   d.setMode('bundle');
+  d.resetLayout();
   d.markClean();
 });
 
@@ -121,18 +122,18 @@ describe('useProjectAutoSave', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('passes the current layout and chat through the getters', async () => {
+  it('passes document layout and the current chat through autosave', async () => {
     const { save } = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/a.contexture.json');
     useDocumentStore.getState().setMode('bundle');
     const layout = { version: '1' as const, positions: { Plot: { x: 1, y: 2 } } };
+    useDocumentStore.getState().setLayout(layout);
     const chat = {
       version: '1' as const,
       messages: [{ id: 'm', role: 'user' as const, content: 'hi', createdAt: 1 }],
     };
     renderHook(() =>
       useProjectAutoSave({
-        getLayout: () => layout,
         getChat: () => chat,
       }),
     );

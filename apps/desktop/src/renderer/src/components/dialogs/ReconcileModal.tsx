@@ -240,19 +240,20 @@ export function ReconcileModal(): React.JSX.Element {
     const provider = window.contexture?.schemaAgent
       ? useSchemaAgentSettingsStore.getState().provider
       : 'claude';
-    const threadId = history.createThread({
+    if (!filePath) return;
+    history.createFileThread({
       provider,
       ...(provider === 'claude' ? { model: 'claude-sonnet-4-6' } : {}),
       filePath,
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: message,
+          createdAt: Date.now(),
+        },
+      ],
     });
-    history.updateThreadMessages(threadId, [
-      {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content: message,
-        createdAt: Date.now(),
-      },
-    ]);
     useUIChromeStore.getState().setSidebarTab('chat');
     useUIChromeStore.getState().setSidebarVisible(true);
     close();

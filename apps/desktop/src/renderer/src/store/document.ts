@@ -1,21 +1,19 @@
 /**
  * Document-level state — the path and dirty flag for the open
- * `.contexture.json` file, plus a slot for dialog payloads that
- * belong to the file lifecycle (import warnings, failed-format open,
- * save-while-invalid prompt).
+ * `.contexture.json` file, the bundle layout sidecar, plus a slot for
+ * dialog payloads that belong to the file lifecycle (import warnings,
+ * failed-format open, save-while-invalid prompt).
  *
  * Kept separate from the IR (`useUndoStore`) and UI chrome / selection
  * stores because it has different lifetimes:
  *   - The IR changes on every op; the path only changes on open/save-as.
- *   - The dirty flag flips on any `apply` that lands outside an open
- *     transaction.
- *
- * Callers from the app shell (`App.tsx`, StatusBar, file-menu handlers)
- * coordinate between this and the undo store: a successful save calls
- * `markClean()`, an `apply` that produces a history entry calls
- * `markDirty()`, and the three dialog setters are called as the file
- * path fires or fails.
+ *   - Layout changes are document sidecar state, so they live with the
+ *     document lifecycle rather than in App component state.
+ *   - The document lifecycle records schema changes, opened bundles,
+ *     explicit saves, and autosave completion as domain events instead
+ *     of making callers coordinate path/mode/dirty/layout fields.
  */
+import type { Layout } from '@contexture/core';
 import { create } from 'zustand';
 
 /** Desktop documents always save as full Contexture bundles. */
@@ -35,6 +33,8 @@ export interface SaveWithErrorsPrompt {
   messages: string[];
 }
 
+export const DEFAULT_LAYOUT: Layout = { version: '1', positions: {} };
+
 interface DocumentState {
   /** Absolute path of the open `.contexture.json`, or `null` for a new file. */
   filePath: string | null;
@@ -42,6 +42,8 @@ interface DocumentState {
   isDirty: boolean;
   /** Desktop document persistence mode. */
   mode: DocumentMode;
+  /** Graph layout sidecar for the current document or untitled session. */
+  layout: Layout;
 
   /** Non-empty while the import-warnings dialog is visible. */
   importWarnings: ImportWarning[];
@@ -52,6 +54,14 @@ interface DocumentState {
 
   setFilePath: (path: string | null) => void;
   setMode: (mode: DocumentMode) => void;
+  setLayout: (layout: Layout) => void;
+  resetLayout: () => void;
+  resetForNewBundle: () => void;
+  acceptOpenedBundle: (input: { filePath: string; layout?: Layout }) => void;
+  acceptRestoredSession: (input: { layout?: Layout }) => void;
+  markBundleSaved: (filePath: string) => void;
+  noteSchemaChanged: () => void;
+  noteAutosaveSucceeded: () => void;
   markDirty: () => void;
   markClean: () => void;
 
@@ -69,12 +79,43 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   filePath: null,
   isDirty: false,
   mode: 'bundle',
+  layout: DEFAULT_LAYOUT,
   importWarnings: [],
   unknownFormatPath: null,
   saveWithErrorsPrompt: null,
 
   setFilePath: (filePath) => set({ filePath }),
   setMode: (mode) => set({ mode }),
+  setLayout: (layout) => set({ layout }),
+  resetLayout: () => set({ layout: DEFAULT_LAYOUT }),
+  resetForNewBundle: () =>
+    set({
+      filePath: null,
+      mode: 'bundle',
+      layout: DEFAULT_LAYOUT,
+      isDirty: false,
+    }),
+  acceptOpenedBundle: ({ filePath, layout }) =>
+    set({
+      filePath,
+      mode: 'bundle',
+      layout: layout ?? DEFAULT_LAYOUT,
+      isDirty: false,
+    }),
+  acceptRestoredSession: ({ layout }) =>
+    set({
+      filePath: null,
+      mode: 'bundle',
+      layout: layout ?? DEFAULT_LAYOUT,
+    }),
+  markBundleSaved: (filePath) =>
+    set({
+      filePath,
+      mode: 'bundle',
+      isDirty: false,
+    }),
+  noteSchemaChanged: () => set({ isDirty: true }),
+  noteAutosaveSucceeded: () => set({ isDirty: false }),
   markDirty: () => set({ isDirty: true }),
   markClean: () => set({ isDirty: false }),
 
