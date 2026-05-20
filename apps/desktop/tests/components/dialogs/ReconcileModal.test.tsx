@@ -1,3 +1,4 @@
+import { useChatThreadStore } from '@renderer/chat/useChatThreads';
 import { ReconcileModal } from '@renderer/components/dialogs/ReconcileModal';
 import { useDocumentStore } from '@renderer/store/document';
 import { useDriftStore } from '@renderer/store/drift';
@@ -31,6 +32,8 @@ const SCHEMA = {
 } as const;
 
 beforeEach(() => {
+  localStorage.clear();
+  useChatThreadStore.getState().reloadFromStorage();
   useUndoStore.setState({
     schema: SCHEMA,
     past: [],
@@ -41,6 +44,7 @@ beforeEach(() => {
     canRedo: false,
   });
   useDocumentStore.setState({ filePath: IR_PATH, mode: 'bundle' });
+  useDocumentStore.getState().resetLayout();
   useDriftStore.getState().setResolved();
   useReconcileStore.getState().reset();
   Object.defineProperty(window, 'contexture', {

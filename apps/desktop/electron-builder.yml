@@ -40,6 +40,12 @@ extraResources:
     filter:
       - '.claude-plugin/**'
       - 'skills/**'
+  # Non-Electron MCP stdio command for agent integrations. This avoids
+  # launching the GUI app bundle just to serve MCP over stdio.
+  - from: build/bin
+    to: bin
+    filter:
+      - 'contexture-mcp*'
 win:
   executableName: Contexture
   icon: build/icon.ico

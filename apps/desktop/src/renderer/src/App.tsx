@@ -19,7 +19,6 @@
  * sidebar button).
  */
 
-import type { Layout } from '@contexture/core';
 import {
   emitGeneratedTarget,
   enableGeneratedTarget,
@@ -68,7 +67,15 @@ export default function App(): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const hasSchema = schema.types.length > 0;
 
-  const [positions, setPositions] = useState<Record<string, CanvasPosition>>({});
+  const layout = useDocumentStore((s) => s.layout);
+  const setLayout = useDocumentStore((s) => s.setLayout);
+  const positions = layout.positions;
+  const setPositions = useCallback(
+    (nextPositions: Record<string, CanvasPosition>) => {
+      setLayout({ version: '1', positions: nextPositions });
+    },
+    [setLayout],
+  );
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
@@ -142,68 +149,25 @@ export default function App(): React.JSX.Element {
   );
   const chat = useSchemaAgentChat({ api: schemaAgentApi });
 
-  // Track positions + chat in refs so `useFileMenu` getters can read
-  // the live values on save without re-subscribing on every change.
-  const positionsRef = useRef(positions);
-  positionsRef.current = positions;
-  const chatMessagesRef = useRef(chat.messages);
-  chatMessagesRef.current = chat.messages;
-  const chatHydrateRef = useRef(chat.hydrate);
-  chatHydrateRef.current = chat.hydrate;
-
   useDrift();
 
   const fileMenu = useFileMenu({
-    getLayout: () => ({ version: '1', positions: positionsRef.current }),
-    getChat: () => ({
-      version: '1',
-      messages: chatMessagesRef.current,
-      provider: readProviderProp(chat),
-      ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
-      ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
-      ...(readModelOptionsProp(chat) ? { modelOptions: readModelOptionsProp(chat) } : {}),
-      ...('providerThreadRef' in chat && chat.providerThreadRef
-        ? { providerThreadRef: chat.providerThreadRef }
-        : {}),
-    }),
-    onBundleLoaded: ({ layout, chat: loadedChat }) => {
-      setPositions(layout.positions);
-      restoreChatSettings(chat, loadedChat);
-      chatHydrateRef.current(loadedChat.messages);
-      if (loadedChat.providerThreadRef) {
-        void window.contexture?.schemaAgent?.threadSet(loadedChat.providerThreadRef);
-      } else {
-        void window.contexture?.schemaAgent?.threadClear();
-      }
+    getChat: chat.toHistory,
+    onBundleLoaded: ({ chat: loadedChat }) => {
+      chat.hydrateHistory(loadedChat);
     },
     onNew: () => {
-      setPositions({});
-      chatHydrateRef.current([]);
-      void window.contexture?.schemaAgent?.threadClear();
+      chat.hydrateHistory({ version: '1', messages: [] });
     },
   });
 
   useProjectAutoSave({
-    getLayout: () => ({ version: '1', positions: positionsRef.current }),
-    getChat: () => ({
-      version: '1',
-      messages: chatMessagesRef.current,
-      provider: readProviderProp(chat),
-      ...(readStringProp(chat, 'model') ? { model: readStringProp(chat, 'model') } : {}),
-      ...(readStringProp(chat, 'effort') ? { effort: readStringProp(chat, 'effort') } : {}),
-      ...(readModelOptionsProp(chat) ? { modelOptions: readModelOptionsProp(chat) } : {}),
-      ...('providerThreadRef' in chat && chat.providerThreadRef
-        ? { providerThreadRef: chat.providerThreadRef }
-        : {}),
-    }),
+    getChat: chat.toHistory,
   });
 
-  const sessionLayout = useMemo<Layout>(() => ({ version: '1', positions }), [positions]);
   useSessionPersistence({
-    layout: sessionLayout,
-    onRestoreSession: (layout) => {
-      setPositions(layout.positions);
-    },
+    layout,
+    onRestoreSession: () => undefined,
   });
 
   // Pull the recent-files list when the empty state might need it and
@@ -344,7 +308,7 @@ export default function App(): React.JSX.Element {
                   onOpenRecent={fileMenu.handleOpenPath}
                   isBundle={filePath !== null}
                   projectName={filePath?.split('/').at(-1)?.replace('.contexture.json', '') ?? null}
-                  providerLabel={readProviderLabelProp(chat)}
+                  providerLabel={chat.providerLabel}
                 />
               )}
             </div>
@@ -488,63 +452,6 @@ function EmptyState({
 function copyToClipboard(text: string): void {
   if (typeof navigator === 'undefined') return;
   navigator.clipboard?.writeText(text).catch(() => undefined);
-}
-
-function readStringProp(value: unknown, key: string): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const prop = (value as Record<string, unknown>)[key];
-  return typeof prop === 'string' && prop.length > 0 ? prop : undefined;
-}
-
-function readProviderProp(value: unknown): 'codex' | 'claude' {
-  if (!value || typeof value !== 'object') return 'claude';
-  const provider = (value as { provider?: unknown }).provider;
-  return provider === 'codex' || provider === 'claude' ? provider : 'claude';
-}
-
-function readModelOptionsProp(value: unknown): Record<string, string | boolean> | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const modelOptions = (value as { modelOptions?: unknown }).modelOptions;
-  if (!modelOptions || typeof modelOptions !== 'object' || Array.isArray(modelOptions)) {
-    return undefined;
-  }
-  const entries = Object.entries(modelOptions as Record<string, unknown>).filter(
-    (entry): entry is [string, string | boolean] =>
-      typeof entry[1] === 'string' || typeof entry[1] === 'boolean',
-  );
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
-}
-
-function readProviderLabelProp(value: unknown): 'Codex' | 'Claude' {
-  if (!value || typeof value !== 'object') return 'Claude';
-  const providerLabel = (value as { providerLabel?: unknown }).providerLabel;
-  return providerLabel === 'Codex' || providerLabel === 'Claude' ? providerLabel : 'Claude';
-}
-
-function restoreChatSettings(
-  chat: unknown,
-  loadedChat: {
-    provider?: 'codex' | 'claude';
-    model?: string;
-    effort?: string;
-    modelOptions?: Record<string, string | boolean>;
-  },
-): void {
-  const restorer = (chat as { restoreSettings?: unknown }).restoreSettings;
-  if (typeof restorer === 'function') {
-    restorer({
-      provider: loadedChat.provider,
-      model: loadedChat.model,
-      effort: loadedChat.effort,
-      modelOptions: loadedChat.modelOptions,
-    });
-    return;
-  }
-
-  const modelSetter = (chat as { setModel?: unknown }).setModel;
-  if (loadedChat.model && typeof modelSetter === 'function') modelSetter(loadedChat.model);
-  const effortSetter = (chat as { setEffort?: unknown }).setEffort;
-  if (loadedChat.effort && typeof effortSetter === 'function') effortSetter(loadedChat.effort);
 }
 
 function noopSchemaAgentApi() {

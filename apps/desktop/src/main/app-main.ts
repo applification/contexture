@@ -20,6 +20,10 @@ import { isSafeExternalUrl } from './security';
 
 const isE2E = process.env.E2E === '1';
 
+if (is.dev && !isE2E) {
+  app.setPath('userData', join(app.getPath('appData'), '@contexture/desktop-dev'));
+}
+
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -40,6 +44,7 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
+    if (is.dev) mainWindow.focus();
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

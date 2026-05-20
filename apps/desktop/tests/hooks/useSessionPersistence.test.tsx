@@ -29,6 +29,7 @@ beforeEach(() => {
   const d = useDocumentStore.getState();
   d.setFilePath(null);
   d.setMode('bundle');
+  d.resetLayout();
   d.markClean();
 });
 
@@ -61,6 +62,10 @@ describe('useSessionPersistence', () => {
     expect(useUndoStore.getState().schema.types).toHaveLength(1);
     expect(useUndoStore.getState().schema.types[0].name).toBe('Plot');
     expect(onRestore).toHaveBeenCalledWith({
+      version: '1',
+      positions: { Plot: { x: 10, y: 20 } },
+    });
+    expect(useDocumentStore.getState().layout).toEqual({
       version: '1',
       positions: { Plot: { x: 10, y: 20 } },
     });

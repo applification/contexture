@@ -43,6 +43,7 @@ beforeEach(() => {
   useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   const d = useDocumentStore.getState();
   d.setFilePath(null);
+  d.resetLayout();
   d.markClean();
   d.clearImportWarnings();
   d.clearUnknownFormat();
@@ -63,10 +64,15 @@ describe('useFileMenu', () => {
       type: { kind: 'object', name: 'Plot', fields: [] },
     });
     useDocumentStore.getState().setFilePath('/tmp/old.contexture.json');
+    useDocumentStore.getState().setLayout({
+      version: '1',
+      positions: { Plot: { x: 1, y: 2 } },
+    });
     const { result } = renderHook(() => useFileMenu());
     act(() => result.current.handleNew());
     expect(useUndoStore.getState().schema.types).toEqual([]);
     expect(useDocumentStore.getState().filePath).toBeNull();
+    expect(useDocumentStore.getState().layout.positions).toEqual({});
     expect(useDocumentStore.getState().isDirty).toBe(false);
   });
 
@@ -193,18 +199,25 @@ describe('useFileMenu', () => {
         providerThreadRef: { provider: 'codex', threadId: 'thread-42' },
       }),
     });
+    expect(useDocumentStore.getState().layout).toEqual({
+      version: '1',
+      positions: { Plot: { x: 10, y: 20 } },
+    });
   });
 
-  it('handleSave pulls the current layout + chat via the injected getters', async () => {
+  it('handleSave pulls layout from document state and chat via the injected getter', async () => {
     const bridge = mockFileBridge();
     useDocumentStore.getState().setFilePath('/tmp/x.contexture.json');
+    useDocumentStore.getState().setLayout({
+      version: '1',
+      positions: { Plot: { x: 5, y: 6 } },
+    });
     useUndoStore.getState().apply({
       kind: 'add_type',
       type: { kind: 'object', name: 'Plot', fields: [] },
     });
     const { result } = renderHook(() =>
       useFileMenu({
-        getLayout: () => ({ version: '1', positions: { Plot: { x: 5, y: 6 } } }),
         getChat: () => ({
           version: '1',
           messages: [{ id: 'm', role: 'user', content: 'yo', createdAt: 1 }],

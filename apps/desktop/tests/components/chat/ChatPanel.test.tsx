@@ -3,8 +3,10 @@
  * schema-agent chat state.
  */
 
+import { useChatThreadStore } from '@renderer/chat/useChatThreads';
 import type { SchemaAgentChatState } from '@renderer/chat/useSchemaAgentChat';
 import { ChatPanel } from '@renderer/components/chat/ChatPanel';
+import { useDocumentStore } from '@renderer/store/document';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,6 +56,8 @@ function makeChat(overrides: Partial<SchemaAgentChatState> = {}): SchemaAgentCha
     send: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     hydrate: vi.fn(),
+    hydrateHistory: vi.fn(),
+    toHistory: vi.fn(() => ({ version: '1', messages: [] })),
     clear: vi.fn(),
     ...overrides,
   };
@@ -70,6 +74,16 @@ function mockBridge(): void {
 
 beforeEach(() => {
   localStorage.clear();
+  useChatThreadStore.getState().reloadFromStorage();
+  useDocumentStore.setState({
+    filePath: null,
+    isDirty: false,
+    mode: 'bundle',
+    importWarnings: [],
+    unknownFormatPath: null,
+    saveWithErrorsPrompt: null,
+  });
+  useDocumentStore.getState().resetLayout();
   mockBridge();
 });
 
@@ -161,8 +175,9 @@ describe('ChatPanel', () => {
     expect(screen.getByTestId('chat-effort-select')).toHaveTextContent(/Extra High/i);
   });
 
-  it('restores provider model options when hydrating the active schema-agent thread', () => {
-    const restoreSettings = vi.fn();
+  it('hydrates the active schema-agent thread through the chat lifecycle action', () => {
+    const hydrateHistory = vi.fn();
+    useDocumentStore.setState({ filePath: '/tmp/record-shop.contexture.json' });
     localStorage.setItem('contexture-active-thread', 'thread-1');
     localStorage.setItem(
       'contexture-chat-threads',
@@ -175,21 +190,68 @@ describe('ChatPanel', () => {
           model: 'opus',
           effort: 'xhigh',
           modelOptions: { reasoningEffort: 'xhigh', fastMode: true },
-          filePath: null,
+          filePath: '/tmp/record-shop.contexture.json',
           createdAt: 1,
           updatedAt: 1,
         },
       ]),
     );
+    useChatThreadStore.getState().reloadFromStorage();
 
-    render(<ChatPanel chat={makeChat({ restoreSettings })} />);
+    render(<ChatPanel chat={makeChat({ hydrateHistory })} />);
 
-    expect(restoreSettings).toHaveBeenCalledWith({
+    expect(hydrateHistory).toHaveBeenCalledWith({
+      version: '1',
+      messages: [{ id: 'u', role: 'user', content: 'hello', createdAt: 1 }],
       provider: 'claude',
       model: 'opus',
       effort: 'xhigh',
       modelOptions: { reasoningEffort: 'xhigh', fastMode: true },
     });
+  });
+
+  it('starts with an empty chat when no Contexture file is selected', async () => {
+    const hydrate = vi.fn();
+    const hydrateHistory = vi.fn();
+    const restoreSettings = vi.fn();
+    localStorage.setItem('contexture-active-thread', 'thread-1');
+    localStorage.setItem(
+      'contexture-chat-threads',
+      JSON.stringify([
+        {
+          id: 'thread-1',
+          provider: 'codex',
+          title: 'Existing project chat',
+          messages: [{ id: 'u', role: 'user', content: 'old chat', createdAt: 1 }],
+          model: 'gpt-5.4',
+          effort: 'high',
+          filePath: '/tmp/project.contexture.json',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ]),
+    );
+    useChatThreadStore.getState().reloadFromStorage();
+
+    render(<ChatPanel chat={makeChat({ hydrate, hydrateHistory, restoreSettings })} />);
+
+    await waitFor(() => expect(localStorage.getItem('contexture-active-thread')).toBeNull());
+    expect(hydrate).not.toHaveBeenCalled();
+    expect(restoreSettings).not.toHaveBeenCalled();
+    expect(hydrateHistory).toHaveBeenCalledWith({ version: '1', messages: [] });
+  });
+
+  it('does not persist untitled chat messages as a saved thread', async () => {
+    render(
+      <ChatPanel
+        chat={makeChat({
+          messages: [{ id: 'u', role: 'user', content: 'draft a schema', createdAt: 1 }],
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(localStorage.getItem('contexture-active-thread')).toBeNull());
+    expect(JSON.parse(localStorage.getItem('contexture-chat-threads') ?? '[]')).toEqual([]);
   });
 
   it('auto-grows the textarea via CSS field-sizing with an 8-line cap and scroll overflow', async () => {

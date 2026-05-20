@@ -8,9 +8,20 @@ export function isMcpMode(argv: readonly string[]): boolean {
 
 export async function startMcpServer(): Promise<void> {
   const server = createContextureMcpServer({ stdlib: STDLIB_REGISTRY });
+  const transport = new StdioServerTransport();
+
+  let shuttingDown = false;
+  function shutdown(): void {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void transport.close().finally(() => process.exit(0));
+  }
+
+  process.stdin.once('end', shutdown);
+  process.stdin.once('close', shutdown);
 
   try {
-    await server.connect(new StdioServerTransport());
+    await server.connect(transport);
   } catch (err) {
     process.stderr.write(
       `Contexture MCP server failed: ${err instanceof Error ? err.message : String(err)}\n`,

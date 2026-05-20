@@ -1,3 +1,5 @@
+import { useSchemaAgentModelsStore } from '@renderer/chat/schemaAgentModelsStore';
+import { useSchemaAgentSessionStore } from '@renderer/chat/schemaAgentSessionStore';
 import { useSchemaAgentChat } from '@renderer/chat/useSchemaAgentChat';
 import { useUndoStore } from '@renderer/store/undo';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
@@ -161,6 +163,8 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
 describe('useSchemaAgentChat', () => {
   beforeEach(() => {
     localStorage.clear();
+    useSchemaAgentModelsStore.getState().reset();
+    useSchemaAgentSessionStore.getState().reset();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
   afterEach(cleanup);
@@ -448,6 +452,53 @@ describe('useSchemaAgentChat', () => {
     expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
   });
 
+  it('keeps the active model catalogue when hydrating an empty document chat', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockResolvedValue([
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+    ]);
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.modelsLoading).toBe(false);
+    });
+    vi.mocked(api.listModels).mockClear();
+
+    act(() => {
+      result.current.hydrateHistory({ version: '1', messages: [] });
+    });
+
+    expect(result.current.provider).toBe('codex');
+    expect(result.current.modelsLoading).toBe(false);
+    expect(result.current.models.map((model) => model.id)).toEqual(['gpt-5.4', 'gpt-5.5']);
+    expect(api.listModels).not.toHaveBeenCalled();
+    expect(api.threadClear).toHaveBeenCalled();
+  });
+
+  it('keeps chat hydration actions stable across provider changes', async () => {
+    const { api } = makeApi();
+    vi.mocked(api.listModels).mockImplementation(async (provider) =>
+      provider === 'claude'
+        ? [{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' }]
+        : [{ id: 'gpt-5.4', label: 'GPT-5.4' }],
+    );
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    const hydrateHistory = result.current.hydrateHistory;
+    const restoreSettings = result.current.restoreSettings;
+
+    act(() => {
+      result.current.setProvider('claude');
+    });
+    await waitFor(() => {
+      expect(result.current.provider).toBe('claude');
+    });
+
+    expect(result.current.hydrateHistory).toBe(hydrateHistory);
+    expect(result.current.restoreSettings).toBe(restoreSettings);
+  });
+
   it('surfaces an empty model state instead of pretending a model is selected', async () => {
     const { api } = makeApi();
     vi.mocked(api.listModels).mockResolvedValue([]);
@@ -592,5 +643,55 @@ describe('useSchemaAgentChat', () => {
 
     expect(result.current.providerThreadRef).toEqual(thread);
     expect(result.current.desynced).toBe(true);
+  });
+
+  it('serializes the current chat sidecar from schema-agent state', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+    const thread = { provider: 'codex', threadId: 'thread-1' };
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('hello');
+    });
+    act(() => {
+      emit.threadUpdated({ thread });
+    });
+
+    expect(result.current.toHistory()).toMatchObject({
+      version: '1',
+      messages: [expect.objectContaining({ role: 'user', content: 'hello' })],
+      provider: 'codex',
+      model: 'gpt-5.4',
+      effort: 'high',
+      modelOptions: { reasoningEffort: 'high' },
+      providerThreadRef: thread,
+    });
+  });
+
+  it('hydrates chat sidecar state and provider thread through one lifecycle action', async () => {
+    const { api } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+    const thread = { provider: 'codex', threadId: 'thread-42' };
+
+    act(() => {
+      result.current.hydrateHistory({
+        version: '1',
+        provider: 'codex',
+        model: 'gpt-5.4',
+        effort: 'high',
+        modelOptions: { reasoningEffort: 'high' },
+        providerThreadRef: thread,
+        messages: [{ id: 'm', role: 'user', content: 'loaded', createdAt: 1 }],
+      });
+    });
+
+    expect(result.current.messages).toEqual([
+      { id: 'm', role: 'user', content: 'loaded', createdAt: 1 },
+    ]);
+    expect(result.current.providerThreadRef).toEqual(thread);
+    expect(api.threadSet).toHaveBeenCalledWith(thread);
   });
 });
