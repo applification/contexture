@@ -17,6 +17,7 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -50,6 +51,33 @@ function headerColorFor(kind: TypeNodeData['kind']): string {
     default:
       return 'var(--graph-node-header-bg)';
   }
+}
+
+const enumValueBadgeStyles: readonly CSSProperties[] = [
+  {
+    background: 'color-mix(in oklch, var(--chart-3) 82%, var(--background))',
+    borderColor: 'color-mix(in oklch, var(--chart-3) 92%, transparent)',
+    color: 'var(--foreground)',
+  },
+  {
+    background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+    borderColor: 'color-mix(in oklch, var(--chart-1) 88%, transparent)',
+    color: 'var(--foreground)',
+  },
+  {
+    background: 'color-mix(in oklch, var(--chart-4) 78%, var(--background))',
+    borderColor: 'color-mix(in oklch, var(--chart-4) 88%, transparent)',
+    color: 'var(--foreground)',
+  },
+  {
+    background: 'color-mix(in oklch, var(--chart-2) 78%, var(--background))',
+    borderColor: 'color-mix(in oklch, var(--chart-2) 88%, transparent)',
+    color: 'var(--foreground)',
+  },
+];
+
+function enumValueBadgeStyle(index: number): CSSProperties {
+  return enumValueBadgeStyles[index % enumValueBadgeStyles.length] ?? enumValueBadgeStyles[0];
 }
 
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
@@ -248,12 +276,14 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
               Values
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {(data.enumValues ?? []).map((value) => (
+              {(data.enumValues ?? []).map((value, index) => (
                 <Badge
                   key={value.value}
-                  variant="outline"
+                  data-testid="enum-value-badge"
+                  variant="default"
                   title={value.description}
-                  className="max-w-full rounded px-1.5 py-0 text-[10px] font-medium"
+                  className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
+                  style={enumValueBadgeStyle(index)}
                 >
                   <span className="truncate">{value.value}</span>
                 </Badge>

@@ -135,7 +135,7 @@ describe('TypeNode', () => {
     expect(container.querySelectorAll('[data-testid="type-node-field"]')).toHaveLength(0);
   });
 
-  it('shows enum description and values in a hover card', async () => {
+  it('shows enum description and values in a hover card', () => {
     vi.useFakeTimers();
     const data: TypeNodeData = {
       typeName: 'Season',
@@ -158,5 +158,8 @@ describe('TypeNode', () => {
       'title',
       'Planting time.',
     );
+    expect(screen.getAllByTestId('enum-value-badge')[0]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-3) 82%, var(--background))',
+    });
   });
 });
