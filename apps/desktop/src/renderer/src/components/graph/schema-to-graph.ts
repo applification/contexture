@@ -31,10 +31,16 @@ export interface TypeNodeData extends Record<string, unknown> {
   typeName: string;
   kind: TypeDef['kind'];
   description?: string;
+  enumValues?: ReadonlyArray<EnumValueRow>;
   fields: ReadonlyArray<FieldRow>;
   imported: boolean;
   /** True when the source `ObjectTypeDef` carries `table: true`. */
   table?: boolean;
+}
+
+export interface EnumValueRow {
+  value: string;
+  description?: string;
 }
 
 export interface FieldRow {
@@ -150,6 +156,7 @@ function localNodeFor(type: TypeDef, position: { x: number; y: number }): Node<T
       typeName: type.name,
       kind: type.kind,
       description: type.description,
+      enumValues: type.kind === 'enum' ? type.values.map(enumValueRow) : undefined,
       fields: type.kind === 'object' ? type.fields.map(fieldRow) : [],
       imported: false,
       table: type.kind === 'object' && type.table === true ? true : undefined,
@@ -179,6 +186,13 @@ function unwrapRefTarget(t: FieldType): string | undefined {
   let cur: FieldType = t;
   while (cur.kind === 'array') cur = cur.element;
   return cur.kind === 'ref' ? cur.typeName : undefined;
+}
+
+function enumValueRow(value: { value: string; description?: string }): EnumValueRow {
+  return {
+    value: value.value,
+    description: value.description,
+  };
 }
 
 function fieldRow(field: FieldDef): FieldRow {

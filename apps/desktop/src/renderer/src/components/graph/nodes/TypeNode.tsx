@@ -17,7 +17,10 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useGraphSelectionStore } from '../../../store/selection';
 import type { TypeNodeData } from '../schema-to-graph';
 
@@ -50,6 +53,12 @@ function headerColorFor(kind: TypeNodeData['kind']): string {
   }
 }
 
+const enumValueBadgeStyle: CSSProperties = {
+  background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+  borderColor: 'color-mix(in oklch, var(--chart-1) 88%, transparent)',
+  color: 'var(--foreground)',
+};
+
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const { data, id } = props;
   const click = useGraphSelectionStore((s) => s.click);
@@ -78,8 +87,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const borderWidth = isSelected || isAdjacent ? 2 : 1;
   const borderStyle = data.imported ? 'dashed' : 'solid';
   const headerColor = useMemo(() => headerColorFor(data.kind), [data.kind]);
-
-  return (
+  const node = (
     <div
       data-testid="type-node"
       data-type-name={data.typeName}
@@ -181,48 +189,113 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           }}
         >
           {data.fields.map((f) => (
-            <button
-              type="button"
+            <FieldRowButton
               key={f.name}
-              data-testid="type-node-field"
-              data-field-name={f.name}
-              onClick={(ev) => onFieldClick(f.name, ev)}
-              className="contexture-type-node-field"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '2px 10px',
-                fontSize: 10,
-                gap: 8,
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
-                {f.name}
-                {f.optional ? '?' : ''}
-                {f.nullable ? ' | null' : ''}
-              </span>
-              <span
-                style={{
-                  color: f.refTarget ? 'var(--graph-edge-property)' : 'var(--muted-foreground)',
-                  fontFamily: f.refTarget ? 'inherit' : 'var(--font-mono)',
-                  fontSize: 9,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {f.summary}
-              </span>
-            </button>
+              field={f}
+              selectedTarget={primaryNodeId}
+              onFieldClick={onFieldClick}
+            />
           ))}
         </div>
       )}
     </div>
   );
+
+  if (data.kind !== 'enum' || data.imported) return node;
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{node}</HoverCardTrigger>
+      <HoverCardContent side="right" align="start" className="w-72 p-3 text-xs">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <div className="text-sm font-semibold text-foreground">{data.typeName}</div>
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Enum
+            </div>
+            {data.description && (
+              <p className="text-xs leading-snug text-muted-foreground">{data.description}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Values
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(data.enumValues ?? []).map((value) => (
+                <Badge
+                  key={value.value}
+                  data-testid="enum-value-badge"
+                  variant="default"
+                  title={value.description}
+                  className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
+                  style={enumValueBadgeStyle}
+                >
+                  <span className="truncate">{value.value}</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
 });
+
+function FieldRowButton({
+  field,
+  selectedTarget,
+  onFieldClick,
+}: {
+  field: TypeNodeData['fields'][number];
+  selectedTarget: string | null;
+  onFieldClick: (fieldName: string, ev: React.MouseEvent<HTMLElement>) => void;
+}) {
+  const refTargetSelected = field.refTarget !== undefined && field.refTarget === selectedTarget;
+  return (
+    <button
+      type="button"
+      data-testid="type-node-field"
+      data-field-name={field.name}
+      onClick={(ev) => onFieldClick(field.name, ev)}
+      className="contexture-type-node-field"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '2px 10px',
+        fontSize: 10,
+        gap: 8,
+        width: '100%',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+    >
+      <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
+        {field.name}
+        {field.optional ? '?' : ''}
+        {field.nullable ? ' | null' : ''}
+      </span>
+      <span
+        data-testid={field.refTarget ? 'type-node-field-ref-summary' : undefined}
+        style={{
+          color: refTargetSelected
+            ? 'var(--graph-node-selected)'
+            : field.refTarget
+              ? 'var(--graph-edge-property)'
+              : 'var(--muted-foreground)',
+          fontFamily: field.refTarget ? 'inherit' : 'var(--font-mono)',
+          fontSize: 9,
+          fontWeight: refTargetSelected ? 700 : 400,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {field.summary}
+      </span>
+    </button>
+  );
+}

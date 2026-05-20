@@ -1,6 +1,6 @@
 {
   "name": "@contexture/desktop",
-  "version": "0.15.8",
+  "version": "0.15.9",
   "description": "Visual Zod schema editor with LLM support",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/applification/contexture",
@@ -44,6 +44,7 @@
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-hover-card": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-select": "^2.2.6",

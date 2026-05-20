@@ -10,10 +10,11 @@
  */
 import { TYPE_NODE_EVENT, TypeNode } from '@renderer/components/graph/nodes/TypeNode';
 import type { TypeNodeData } from '@renderer/components/graph/schema-to-graph';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useGraphSelectionStore } from '@renderer/store/selection';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function Wrapper({ children }: { children: ReactNode }) {
   return <ReactFlowProvider>{children}</ReactFlowProvider>;
@@ -41,7 +42,14 @@ function makeProps(data: TypeNodeData, selected = false) {
 }
 
 describe('TypeNode', () => {
-  afterEach(cleanup);
+  beforeEach(() => {
+    useGraphSelectionStore.getState().clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
 
   it('renders type name, kind, and each field row', () => {
     const data: TypeNodeData = {
@@ -130,5 +138,62 @@ describe('TypeNode', () => {
     };
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
     expect(container.querySelectorAll('[data-testid="type-node-field"]')).toHaveLength(0);
+  });
+
+  it('highlights a ref summary when its target node is selected', () => {
+    const data: TypeNodeData = {
+      typeName: 'Artwork',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'medium',
+          summary: '→ ArtworkMedium',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkMedium',
+        },
+      ],
+    };
+    useGraphSelectionStore.getState().click('ArtworkMedium', 'replace');
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field-ref-summary')).toHaveStyle({
+      color: 'var(--graph-node-selected)',
+      fontWeight: '700',
+    });
+  });
+
+  it('shows enum description and values in a hover card', () => {
+    vi.useFakeTimers();
+    const data: TypeNodeData = {
+      typeName: 'Season',
+      kind: 'enum',
+      description: 'The growing season.',
+      imported: false,
+      enumValues: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+      fields: [],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.pointerEnter(screen.getByTestId('type-node'));
+    act(() => vi.advanceTimersByTime(120));
+
+    expect(screen.getByText('The growing season.')).toBeInTheDocument();
+    expect(screen.getByText('Values')).toBeInTheDocument();
+    expect(screen.getByText('spring')).toBeInTheDocument();
+    expect(screen.getByText('summer')).toBeInTheDocument();
+    expect(screen.getByText('spring').closest('[title]')).toHaveAttribute(
+      'title',
+      'Planting time.',
+    );
+    const badges = screen.getAllByTestId('enum-value-badge');
+    expect(badges[0]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+    });
+    expect(badges[1]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
+    });
   });
 });
