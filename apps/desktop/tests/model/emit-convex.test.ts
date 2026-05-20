@@ -36,7 +36,7 @@ describe('emitConvexSchema', () => {
       ],
     };
     const out = emitConvexSchema(ir);
-    expect(out).toMatch(/Post:\s*defineTable\(\{/);
+    expect(out).toMatch(/post:\s*defineTable\(\{/);
     expect(out).toContain('title: v.string()');
     expect(out).toContain('views: v.number()');
     expect(out).toContain('published: v.boolean()');
@@ -97,7 +97,7 @@ describe('emitConvexSchema', () => {
       ],
     };
     const out = emitConvexSchema(ir);
-    expect(out).toContain('author: v.id("Author")');
+    expect(out).toContain('author: v.id("author")');
     expect(parses(out)).toBe(true);
   });
 
@@ -126,6 +126,7 @@ describe('emitConvexSchema', () => {
     expect(out).toContain('home: address');
     // Only User should be a defineTable entry.
     expect(out).not.toMatch(/Address:\s*defineTable/);
+    expect(out).toMatch(/user:\s*defineTable/);
     expect(parses(out)).toBe(true);
   });
 
@@ -256,6 +257,52 @@ describe('emitConvexSchema', () => {
     expect(parses(out)).toBe(true);
   });
 
+  it('emits lower camel case Convex table names', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Artwork', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'ArtworkRevision',
+          table: true,
+          fields: [{ name: 'artworkId', type: { kind: 'ref', typeName: 'Artwork' } }],
+        },
+      ],
+    };
+
+    const out = emitConvexSchema(ir);
+
+    expect(out).toContain('artwork: defineTable({');
+    expect(out).toContain('artworkRevision: defineTable({');
+    expect(out).toContain('artworkId: v.id("artwork")');
+    expect(out).not.toContain('Artwork: defineTable({');
+    expect(parses(out)).toBe(true);
+  });
+
+  it('uses explicit Convex table names for schema keys and refs', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Artwork', table: true, tableName: 'artworks', fields: [] },
+        {
+          kind: 'object',
+          name: 'ArtworkRevision',
+          table: true,
+          tableName: 'artworkRevisions',
+          fields: [{ name: 'artworkId', type: { kind: 'ref', typeName: 'Artwork' } }],
+        },
+      ],
+    };
+
+    const out = emitConvexSchema(ir);
+
+    expect(out).toContain('artworks: defineTable({');
+    expect(out).toContain('artworkRevisions: defineTable({');
+    expect(out).toContain('artworkId: v.id("artworks")');
+    expect(parses(out)).toBe(true);
+  });
+
   it('throws when a table name starts with "_"', () => {
     const ir: Schema = {
       version: '1',
@@ -334,6 +381,53 @@ describe('emitConvexValidators', () => {
     );
     expect(out).toContain('export const postMetadata = v.object({ status: status });');
     expect(out).not.toMatch(/export const post =/);
+    expect(parses(out)).toBe(true);
+  });
+
+  it('emits reusable validators before validators that reference them', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Artwork',
+          fields: [
+            { name: 'medium', type: { kind: 'ref', typeName: 'ArtworkMedium' } },
+            {
+              name: 'palette',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'PaletteColor' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'PaletteColor',
+          fields: [{ name: 'role', type: { kind: 'ref', typeName: 'PaletteRole' } }],
+        },
+        {
+          kind: 'enum',
+          name: 'ArtworkMedium',
+          values: [{ value: 'print' }, { value: 'poster' }],
+        },
+        {
+          kind: 'enum',
+          name: 'PaletteRole',
+          values: [{ value: 'primary' }, { value: 'accent' }],
+        },
+      ],
+    };
+
+    const out = emitConvexValidators(ir);
+
+    expect(out.indexOf('export const artworkMedium')).toBeLessThan(
+      out.indexOf('export const artwork ='),
+    );
+    expect(out.indexOf('export const paletteRole')).toBeLessThan(
+      out.indexOf('export const paletteColor'),
+    );
+    expect(out.indexOf('export const paletteColor')).toBeLessThan(
+      out.indexOf('export const artwork ='),
+    );
     expect(parses(out)).toBe(true);
   });
 

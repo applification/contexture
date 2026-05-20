@@ -188,6 +188,20 @@ describe('checkSemantic — duplicates', () => {
     const issues = checkSemantic(schema, STDLIB);
     expect(issues.some((i) => i.code === 'duplicate_type_name')).toBe(true);
   });
+
+  it('rejects duplicate emitted Convex table names', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Artwork', table: true, tableName: 'artworks', fields: [] },
+        { kind: 'object', name: 'Artworks', table: true, fields: [] },
+      ],
+    };
+
+    const issues = checkSemantic(schema, STDLIB);
+
+    expect(issues.some((i) => i.code === 'duplicate_convex_table_name')).toBe(true);
+  });
 });
 
 describe('checkSemantic — discriminated unions', () => {

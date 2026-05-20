@@ -34,7 +34,9 @@ export function emit(schema: Schema, sourcePath: string, options: EmitOptions = 
   const header = `// @contexture-generated — do not edit by hand. Regenerated on every IR save. Source: ${sourcePath}\n`;
   const zodImport = `import { z } from 'zod';\n`;
   const externalImports = renderExternalImports(ctx);
-  const body = schema.types.map((t) => emitTypeDef(t, ctx)).join('');
+  const body = sortTypeDefs(schema.types, ctx)
+    .map((t) => emitTypeDef(t, ctx))
+    .join('');
   return header + zodImport + externalImports + body;
 }
 
@@ -51,6 +53,8 @@ interface EmitContext {
   usedByAlias: Map<string, Set<string>>;
   /** `raw` types with an external import hint, keyed by name. */
   rawExternal: Map<string, { from: string; name: string }>;
+  /** Local types by name, used to order declarations before consumers. */
+  types: Map<string, TypeDef>;
 }
 
 function buildContext(schema: Schema, options: EmitOptions): EmitContext {
@@ -64,6 +68,7 @@ function buildContext(schema: Schema, options: EmitOptions): EmitContext {
   const stdlibNs = new Set(options.stdlibNamespaces ?? []);
   const usedByAlias = new Map<string, Set<string>>();
   const rawExternal = new Map<string, { from: string; name: string }>();
+  const types = new Map(schema.types.map((type) => [type.name, type]));
 
   const walkField = (t: FieldType) => {
     if (t.kind === 'ref') {
@@ -101,7 +106,7 @@ function buildContext(schema: Schema, options: EmitOptions): EmitContext {
     }
   });
 
-  return { aliases, imports, usedByAlias, rawExternal };
+  return { aliases, imports, usedByAlias, rawExternal, types };
 }
 
 function renderExternalImports(ctx: EmitContext): string {
@@ -199,7 +204,7 @@ function emitFieldType(t: FieldType, ctx: EmitContext): string {
     case 'boolean':
       return `z.boolean()`;
     case 'date':
-      return `z.date()`;
+      return `z.number()`;
     case 'literal':
       return `z.literal(${renderLiteral(t.value)})`;
     case 'ref': {
@@ -215,4 +220,60 @@ function emitFieldType(t: FieldType, ctx: EmitContext): string {
       return s;
     }
   }
+}
+
+function sortTypeDefs(types: TypeDef[], ctx: EmitContext): TypeDef[] {
+  const localByName = new Map(types.map((type) => [type.name, type]));
+  const sorted: TypeDef[] = [];
+  const temporary = new Set<string>();
+  const permanent = new Set<string>();
+
+  function visit(type: TypeDef): void {
+    if (permanent.has(type.name)) return;
+    if (temporary.has(type.name)) return;
+
+    temporary.add(type.name);
+    for (const depName of localDependencyNames(type, ctx)) {
+      const dep = localByName.get(depName);
+      if (dep) visit(dep);
+    }
+    temporary.delete(type.name);
+    permanent.add(type.name);
+    sorted.push(type);
+  }
+
+  for (const type of types) visit(type);
+  return sorted;
+}
+
+function localDependencyNames(type: TypeDef, ctx: EmitContext): string[] {
+  const dependencies = new Set<string>();
+
+  if (type.kind === 'object') {
+    for (const field of type.fields) {
+      collectLocalDependenciesForType(field.type, ctx, dependencies);
+    }
+  }
+
+  if (type.kind === 'discriminatedUnion') {
+    for (const variantName of type.variants) {
+      if (ctx.types.has(variantName)) dependencies.add(variantName);
+    }
+  }
+
+  dependencies.delete(type.name);
+  return [...dependencies].sort();
+}
+
+function collectLocalDependenciesForType(
+  t: FieldType,
+  ctx: EmitContext,
+  dependencies: Set<string>,
+): void {
+  if (t.kind === 'array') {
+    collectLocalDependenciesForType(t.element, ctx, dependencies);
+    return;
+  }
+  if (t.kind !== 'ref') return;
+  if (ctx.types.has(t.typeName)) dependencies.add(t.typeName);
 }

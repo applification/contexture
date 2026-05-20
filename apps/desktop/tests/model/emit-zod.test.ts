@@ -74,7 +74,7 @@ describe('emit (Zod)', () => {
         title: z.string().min(1).max(120),
         views: z.number().int().min(0),
         published: z.boolean().default(false),
-        createdAt: z.date(),
+        createdAt: z.number(),
         kind: z.literal('post'),
         author: Email,
         linked: Ref,
@@ -206,6 +206,52 @@ describe('emit (Zod)', () => {
     };
     const src = emit(schema, 'x.contexture.json');
     expect(src).toContain(`on: Post,`);
+  });
+
+  it('emits local dependencies before consumers', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Artwork',
+          fields: [
+            { name: 'medium', type: { kind: 'ref', typeName: 'ArtworkMedium' } },
+            {
+              name: 'palette',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'PaletteColor' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'PaletteColor',
+          fields: [{ name: 'role', type: { kind: 'ref', typeName: 'PaletteRole' } }],
+        },
+        {
+          kind: 'enum',
+          name: 'ArtworkMedium',
+          values: [{ value: 'print' }, { value: 'poster' }],
+        },
+        {
+          kind: 'enum',
+          name: 'PaletteRole',
+          values: [{ value: 'primary' }, { value: 'accent' }],
+        },
+      ],
+    };
+
+    const src = emit(schema, 'x.contexture.json');
+
+    expect(src.indexOf('export const ArtworkMedium')).toBeLessThan(
+      src.indexOf('export const Artwork ='),
+    );
+    expect(src.indexOf('export const PaletteRole')).toBeLessThan(
+      src.indexOf('export const PaletteColor'),
+    );
+    expect(src.indexOf('export const PaletteColor')).toBeLessThan(
+      src.indexOf('export const Artwork ='),
+    );
   });
 
   it('emits an import for a stdlib qualified ref and uses the bare name', () => {
@@ -397,7 +443,7 @@ describe('emit (Zod)', () => {
         `  title: z.string(),\n` +
         `  views: z.number(),\n` +
         `  published: z.boolean(),\n` +
-        `  createdAt: z.date(),\n` +
+        `  createdAt: z.number(),\n` +
         `});`,
     );
   });

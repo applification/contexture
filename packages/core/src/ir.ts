@@ -84,6 +84,7 @@ export const FieldDefSchema = z.object({
   optional: z.boolean().optional(),
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
+  serverDerived: z.boolean().optional(),
 });
 
 export type FieldDef = z.infer<typeof FieldDefSchema>;
@@ -101,6 +102,7 @@ const ObjectTypeDefSchema = z.object({
   description: z.string().optional(),
   fields: z.array(FieldDefSchema),
   table: z.boolean().optional(),
+  tableName: z.string().min(1).optional(),
   indexes: z.array(IndexDefSchema).optional(),
 });
 
