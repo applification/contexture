@@ -129,7 +129,7 @@ const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
 ];
 
 const CODEX_MCP_INSTALL_COMMAND =
-  'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp';
+  'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp';
 
 const CONTEXTURE_MCP_TOOLS = [
   'inspect_contexture',

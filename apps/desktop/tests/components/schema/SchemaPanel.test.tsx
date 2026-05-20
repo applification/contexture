@@ -64,7 +64,7 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-install-value')).toHaveTextContent(
-      'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
+      'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
     );
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_contexture');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('validate_contexture');
@@ -80,7 +80,7 @@ describe('SchemaPanel', () => {
     fireEvent.click(screen.getByTestId('agent-setup'));
     fireEvent.click(screen.getByTestId('agent-setup-install-copy'));
     expect(onCopy).toHaveBeenCalledWith(
-      'codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp',
+      'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
     );
     expect(screen.getByText('Copied install command')).toBeInTheDocument();
   });

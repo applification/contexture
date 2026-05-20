@@ -273,8 +273,7 @@ Desktop and docs should provide copyable setup for the installed app entrypoint:
 {
   "mcpServers": {
     "contexture": {
-      "command": "/Applications/Contexture.app/Contents/MacOS/Contexture",
-      "args": ["--mcp", "--ir", "/absolute/path/to/app.contexture.json"]
+      "command": "/Applications/Contexture.app/Contents/Resources/bin/contexture-mcp"
     }
   }
 }

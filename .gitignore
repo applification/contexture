@@ -13,6 +13,7 @@ next-env.d.ts
 storybook-static/
 test-results/
 playwright-report/
+apps/desktop/build/bin/
 
 # Environment files. Real values are resolved via varlock + Infisical; the
 # committed `.env.schema` files declare structure only. Any local `.env*`

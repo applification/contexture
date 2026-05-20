@@ -1,22 +1,21 @@
 # Agent MCP Server
 
 Contexture exposes an MCP server for agents that need to inspect, validate,
-mutate, emit, and check drift for `.contexture.json` files. The source-checkout
-command is still available as `contexture-mcp`, but installed app users should
-register the packaged app entrypoint so every agent uses the same central
-install.
+mutate, emit, and check drift for `.contexture.json` files. The installed app
+bundles a non-Electron `contexture-mcp` executable for stdio MCP, so agents do
+not need to launch the GUI app bundle headlessly.
 
 ## Register the Installed App
 
-On macOS, register the installed app with Codex:
+On macOS, register the bundled MCP command with Codex:
 
 ```bash
-codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp
+codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp
 ```
 
 Use the real installed app path. Avoid `~/Apps` or a source checkout path for
-shared agent setup, because the packaged entrypoint is the stable command users
-already install and update.
+shared agent setup, because the bundled MCP executable is the stable command
+users already install and update.
 
 ## Smoke Test
 
@@ -52,12 +51,13 @@ op path as the CLI. `emit_contexture` is available when the agent only needs to
 regenerate artifacts from the current IR, and `check_contexture_drift` verifies
 that generated files still match the IR.
 
-For local release verification before packaging, build the desktop app and start
-the built main entrypoint with the same flag:
+For local release verification before packaging, build the bundled MCP command
+directly:
 
 ```bash
-bun run --filter=@contexture/desktop build
-node apps/desktop/out/main/index.js --mcp
+cd apps/desktop
+bun run build:mcp-cli
+./build/bin/contexture-mcp
 ```
 
-The process speaks MCP over stdio and should not open the desktop window.
+The process speaks MCP over stdio and does not open the desktop window.

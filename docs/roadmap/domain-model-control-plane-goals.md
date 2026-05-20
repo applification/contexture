@@ -107,21 +107,19 @@ to register after the user has created a `.contexture.json` file.
 Target registration shape:
 
 ```bash
-codex mcp add contexture -- /Applications/Contexture.app/Contents/MacOS/Contexture --mcp
+codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp
 ```
 
 Completion evidence:
 
-- The packaged macOS app can launch the MCP stdio server via `--mcp`
-  without opening the desktop window.
-- The Electron main entrypoint routes `--mcp` to the shared
-  `@contexture/core/mcp-server` factory before loading the desktop UI.
-- The built `apps/desktop/out/main/index.js --mcp` runtime does not require
-  `bun` or dev-only TypeScript execution.
+- The packaged macOS app includes a non-Electron `contexture-mcp` stdio
+  executable under `Contents/Resources/bin`.
+- The bundled MCP executable does not require `bun`, dev-only TypeScript
+  execution, or launching the desktop UI.
 - The registered installed-app command exposes the same
   `inspect_contexture` and `validate_contexture` tools as Goal 4.
-- Tests cover the `--mcp` launch flag, CLI MCP compatibility, and a built
-  main-process smoke test against `inspect_contexture`.
+- Tests cover CLI MCP compatibility and a built MCP smoke test against
+  `inspect_contexture`.
 - Developer docs explain how agents register and smoke-test the installed
   MCP server.
 
