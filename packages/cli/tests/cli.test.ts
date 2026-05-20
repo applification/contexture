@@ -275,7 +275,7 @@ describe('@contexture/cli', () => {
       '--json',
     ]);
     expect(result.exitCode).toBe(0);
-    await expect(readFile(join(dir, 'bare.schema.ts'), 'utf8')).resolves.toContain('body');
+    await expect(readFile(join(dir, 'schema/bare.schema.ts'), 'utf8')).resolves.toContain('body');
     await expect(readFile(join(dir, '.contexture/emitted.json'), 'utf8')).resolves.toContain(
       'bare.schema.ts',
     );

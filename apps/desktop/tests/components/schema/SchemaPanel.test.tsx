@@ -348,14 +348,14 @@ describe('SchemaPanel', () => {
       );
 
       fireEvent.click(screen.getByTestId('schema-open-generated'));
-      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.ts');
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/schema/garden.schema.ts');
       screen.getByTestId('schema-copy').focus();
       await user.tab();
       expect(screen.getByTestId('schema-open-generated')).toHaveFocus();
 
       await chooseOutput('schema-output-json-schema');
       fireEvent.click(screen.getByTestId('schema-open-generated'));
-      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/garden.schema.json');
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/schema/garden.schema.json');
 
       await chooseOutput('schema-output-mcp-definitions');
       fireEvent.click(screen.getByTestId('schema-open-generated'));

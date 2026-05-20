@@ -71,7 +71,7 @@ describe('document bundle policy', () => {
     expect(files.has('/repo/.contexture/layout.json')).toBe(true);
     expect(files.has('/repo/.contexture/chat.json')).toBe(true);
     expect(files.has('/repo/.contexture/emitted.json')).toBe(true);
-    expect(files.has('/repo/app.schema.ts')).toBe(true);
+    expect(files.has('/repo/schema/app.schema.ts')).toBe(true);
     expect(files.has('/repo/AGENTS.md')).toBe(false);
     expect(files.has('/repo/CLAUDE.md')).toBe(false);
     expect(files.has('/repo/convex/Plot.ts')).toBe(false);
