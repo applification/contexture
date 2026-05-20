@@ -2,7 +2,7 @@ import { DEFAULT_CHAT_HISTORY, saveChatHistory } from './chat-history';
 import type { Schema } from './ir';
 import { DEFAULT_LAYOUT, saveLayout } from './layout';
 import { save } from './load';
-import { type BundlePaths, bundlePathsFor, contextureDirFor } from './paths';
+import { type BundlePaths, bundlePathsFor } from './paths';
 import {
   type EmitPipelineDeps,
   type EmittedManifest,
@@ -155,9 +155,6 @@ export async function writeGeneratedBundle(
     const collisions = await checkGeneratedTargetCollisions(bundle.emitted, fs);
     if (collisions.length > 0) throw new GeneratedBundleDriftError(collisions);
   }
-  await fs.mkdirp?.(contextureDirFor(irPath));
-  await fs.mkdirp?.(dirname(bundle.paths.convex));
-
   const defaultSidecars = await missingDefaultSidecars(bundle.paths, fs, sidecars);
   const files = [
     ...(includeIr ? [{ path: bundle.paths.ir, content: `${save(schema)}\n` }] : []),
@@ -166,6 +163,12 @@ export async function writeGeneratedBundle(
     ...bundle.emitted,
     bundle.manifestFile,
   ];
+
+  if (fs.mkdirp) {
+    for (const dir of new Set(files.map((file) => dirname(file.path)))) {
+      await fs.mkdirp(dir);
+    }
+  }
 
   await writeFilesAtomic(fs, files);
   return { ...bundle, files };

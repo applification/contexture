@@ -22,6 +22,18 @@ describe('runEmitPipeline output config', () => {
     ]);
   });
 
+  it('emits schemas and Convex under app-root folders for a root app IR', () => {
+    const { emitted } = runEmitPipeline(baseSchema, '/repo/apps/misprint/misprint.contexture.json');
+
+    expect(emitted.map((file) => file.path)).toEqual([
+      '/repo/apps/misprint/schema/misprint.schema.ts',
+      '/repo/apps/misprint/schema/misprint.schema.json',
+      '/repo/apps/misprint/schema/index.ts',
+      '/repo/apps/misprint/convex/schema.ts',
+      '/repo/apps/misprint/convex/validators.ts',
+    ]);
+  });
+
   it('can disable existing generated targets explicitly', () => {
     const schema: Schema = {
       ...baseSchema,

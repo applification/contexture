@@ -24,6 +24,7 @@ export {
   generatedTargetsFor,
   IR_SUFFIX,
   LAYOUT_FILE,
+  SCHEMA_DIR,
   SCHEMA_JSON_SUFFIX,
   SCHEMA_TS_SUFFIX,
 } from './paths';

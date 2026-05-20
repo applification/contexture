@@ -25,8 +25,8 @@ const irPath = '/work/garden.contexture.json';
 // package API).
 const layoutPath = '/work/.contexture/layout.json';
 const chatPath = '/work/.contexture/chat.json';
-const schemaTsPath = '/work/garden.schema.ts';
-const schemaJsonPath = '/work/garden.schema.json';
+const schemaTsPath = '/work/schema/garden.schema.ts';
+const schemaJsonPath = '/work/schema/garden.schema.json';
 
 const sampleIR: Schema = {
   version: '1',
@@ -220,14 +220,14 @@ describe('DocumentStore', () => {
     expect(validators).toContain(`import { v } from 'convex/values';`);
   });
 
-  it('bundle-mode save writes a schema index re-export next to the IR', async () => {
+  it('bundle-mode save writes a schema index re-export in the schema directory', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
       layout: sampleLayout,
       chat: sampleChat,
     });
-    const indexPath = '/work/index.ts';
+    const indexPath = '/work/schema/index.ts';
     expect(harness.fs.exists(indexPath)).toBe(true);
     const source = await harness.fs.readFile(indexPath);
     expect(source).toContain('@contexture-generated');
@@ -316,9 +316,9 @@ describe('DocumentStore', () => {
     // (it's the source of truth) so it is not in the manifest.
     expect(Object.keys(manifest.files).sort()).toEqual(
       [
-        '/work/garden.schema.ts',
-        '/work/garden.schema.json',
-        '/work/index.ts',
+        '/work/schema/garden.schema.ts',
+        '/work/schema/garden.schema.json',
+        '/work/schema/index.ts',
         '/work/convex/schema.ts',
         '/work/convex/validators.ts',
       ].sort(),
@@ -362,7 +362,7 @@ describe('DocumentStore', () => {
     expect(fs.exists('/work/.contexture/layout.json')).toBe(true);
     expect(fs.exists('/work/.contexture/chat.json')).toBe(true);
     expect(fs.exists('/work/.contexture/emitted.json')).toBe(true);
-    expect(fs.exists('/work/index.ts')).toBe(true);
+    expect(fs.exists('/work/schema/index.ts')).toBe(true);
   });
 
   it('saving a bare legacy IR refuses to overwrite existing generated targets', async () => {

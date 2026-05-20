@@ -391,7 +391,7 @@ describe('Contexture MCP server', () => {
         opKind: 'add_field',
       });
       await expect(
-        readFile(irPath.replace(/\.contexture\.json$/, '.schema.ts'), 'utf8'),
+        readFile(join(irPath, '..', 'schema', 'bare.schema.ts'), 'utf8'),
       ).resolves.toContain('body');
     });
   });
@@ -464,7 +464,7 @@ describe('Contexture MCP server', () => {
       });
       expect(emitResult.structuredContent).toMatchObject({
         path: irPath,
-        emitted: expect.arrayContaining([irPath.replace(/\.contexture\.json$/, '.schema.ts')]),
+        emitted: expect.arrayContaining([join(irPath, '..', 'schema', 'bare.schema.ts')]),
       });
       await expect(
         readFile(join(irPath, '..', '.contexture/emitted.json'), 'utf8'),
@@ -487,7 +487,7 @@ describe('Contexture MCP server', () => {
         opKind: 'add_field',
       });
       await expect(
-        readFile(irPath.replace(/\.contexture\.json$/, '.schema.ts'), 'utf8'),
+        readFile(join(irPath, '..', 'schema', 'bare.schema.ts'), 'utf8'),
       ).resolves.toContain('body');
     });
   });

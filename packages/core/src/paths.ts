@@ -9,6 +9,7 @@ export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
 export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
 export const FORM_VALIDATORS_FILE = 'form-validators.ts';
 export const CONVEX_VALIDATORS_FILE = 'validators.ts';
+export const SCHEMA_DIR = 'schema';
 
 export interface BundlePaths {
   ir: string;
@@ -43,9 +44,9 @@ export interface GeneratedTarget {
 }
 
 export function contextureDirFor(irPath: string): string {
-  const slash = irPath.lastIndexOf('/');
-  const dir = slash === -1 ? '' : irPath.slice(0, slash);
-  return `${dir}/.contexture`;
+  const normalized = normalizeContexturePath(irPath);
+  const irDir = dirname(normalized);
+  return `${bundleLayoutFor(irDir).projectDir}/.contexture`;
 }
 
 export function baseNameFor(irPath: string): string {
@@ -64,23 +65,25 @@ export function assertContextureIrPath(path: string): string {
 
 export function bundlePathsFor(irPath: string): BundlePaths {
   const resolvedIrPath = assertContextureIrPath(irPath);
-  const base = resolvedIrPath.slice(0, -IR_SUFFIX.length);
+  const baseName = baseNameFor(resolvedIrPath);
   const ctxDir = contextureDirFor(resolvedIrPath);
-  const dir = ctxDir.slice(0, -'/.contexture'.length);
+  const irDir = dirname(resolvedIrPath);
+  const layout = bundleLayoutFor(irDir);
+  const schemaBase = `${layout.schemaDir}/${baseName}`;
   return {
     ir: resolvedIrPath,
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
     emitted: `${ctxDir}/${EMITTED_FILE}`,
-    schemaTs: `${base}${SCHEMA_TS_SUFFIX}`,
-    schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
-    schemaIndex: `${dir}/index.ts`,
-    convex: `${dir}/convex/schema.ts`,
-    convexValidators: `${dir}/convex/${CONVEX_VALIDATORS_FILE}`,
+    schemaTs: `${schemaBase}${SCHEMA_TS_SUFFIX}`,
+    schemaJson: `${schemaBase}${SCHEMA_JSON_SUFFIX}`,
+    schemaIndex: `${layout.schemaDir}/index.ts`,
+    convex: `${layout.projectDir}/convex/schema.ts`,
+    convexValidators: `${layout.projectDir}/convex/${CONVEX_VALIDATORS_FILE}`,
     aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
     structuredOutputSchemas: `${ctxDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
     mcpDefinitions: `${ctxDir}/${MCP_DEFINITIONS_FILE}`,
-    formValidators: `${dir}/${FORM_VALIDATORS_FILE}`,
+    formValidators: `${layout.schemaDir}/${FORM_VALIDATORS_FILE}`,
   };
 }
 
@@ -127,4 +130,40 @@ function normalizeContexturePath(path: string): string {
 
   if (prefix) return `${prefix}${parts.join('/')}`;
   return parts.length > 0 ? parts.join('/') : '.';
+}
+
+interface BundleLayout {
+  projectDir: string;
+  schemaDir: string;
+}
+
+function bundleLayoutFor(irDir: string): BundleLayout {
+  const parent = dirname(irDir);
+
+  if (leafName(irDir) === 'contexture' && isWorkspaceCollectionDir(leafName(parent))) {
+    return {
+      projectDir: irDir,
+      schemaDir: irDir,
+    };
+  }
+
+  return {
+    projectDir: irDir,
+    schemaDir: `${irDir}/${SCHEMA_DIR}`,
+  };
+}
+
+function isWorkspaceCollectionDir(name: string): boolean {
+  return name === 'apps' || name === 'packages';
+}
+
+function dirname(path: string): string {
+  const slash = path.lastIndexOf('/');
+  if (slash <= 0) return slash === 0 ? '/' : '.';
+  return path.slice(0, slash);
+}
+
+function leafName(path: string): string {
+  const slash = path.lastIndexOf('/');
+  return slash === -1 ? path : path.slice(slash + 1);
 }

@@ -15,6 +15,18 @@ describe('Contexture path policy', () => {
     expect(paths.convexValidators).toBe('/repo/packages/contexture/convex/validators.ts');
   });
 
+  it('emits app-root schema and framework outputs when the IR lives at the app root', () => {
+    const paths = bundlePathsFor('/repo/apps/misprint/misprint.contexture.json');
+    expect(paths.ir).toBe('/repo/apps/misprint/misprint.contexture.json');
+    expect(paths.schemaTs).toBe('/repo/apps/misprint/schema/misprint.schema.ts');
+    expect(paths.schemaJson).toBe('/repo/apps/misprint/schema/misprint.schema.json');
+    expect(paths.schemaIndex).toBe('/repo/apps/misprint/schema/index.ts');
+    expect(paths.formValidators).toBe('/repo/apps/misprint/schema/form-validators.ts');
+    expect(paths.convex).toBe('/repo/apps/misprint/convex/schema.ts');
+    expect(paths.convexValidators).toBe('/repo/apps/misprint/convex/validators.ts');
+    expect(paths.emitted).toBe('/repo/apps/misprint/.contexture/emitted.json');
+  });
+
   it('rejects non-IR paths', () => {
     expect(() => assertContextureIrPath('/repo/packages/contexture/app.schema.json')).toThrow(
       /Expected a \.contexture\.json path/,
