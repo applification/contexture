@@ -1,5 +1,5 @@
 import { emitAiToolSchemas } from './emit-ai-tool-schemas';
-import { emitConvexSchema } from './emit-convex';
+import { emitConvexSchema, emitConvexValidators } from './emit-convex';
 import { emitFormValidators } from './emit-form-validators';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import { emitMcpDefinitions } from './emit-mcp-definitions';
@@ -35,6 +35,7 @@ export interface EmitPipelineDeps {
   ) => unknown;
   emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
+  emitConvexValidators?: (schema: Schema, sourcePath?: string) => string;
   emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitStructuredOutputSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitMcpDefinitions?: (schema: Schema, sourcePath?: string) => unknown;
@@ -155,6 +156,20 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     enabled: (schema) => coreOutputEnabled(schema, 'convex'),
     enable: (schema) => enableCoreOutput(schema, 'convex'),
     emit: (schema, irPath, deps) => (deps.emitConvex ?? emitConvexSchema)(schema, irPath),
+  },
+  {
+    kind: 'convex-validators',
+    group: 'core',
+    label: 'Convex validators',
+    help: 'Reusable Convex validators for schema fields and function args.',
+    language: 'typescript',
+    previewable: true,
+    displayPath: () => 'convex/validators.ts',
+    path: (paths) => paths.convexValidators,
+    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
+    enable: (schema) => enableCoreOutput(schema, 'convex'),
+    emit: (schema, irPath, deps) =>
+      (deps.emitConvexValidators ?? emitConvexValidators)(schema, irPath),
   },
   {
     kind: 'ai-tool-schemas',

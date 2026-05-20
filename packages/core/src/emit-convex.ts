@@ -1,11 +1,12 @@
 /**
  * Pure IR → Convex schema source emitter.
  *
- * Turns the IR into the contents of `convex/schema.ts`:
+ * Turns the IR into the contents of `convex/schema.ts` and
+ * `convex/validators.ts`:
  * table-flagged `ObjectTypeDef`s become `defineTable(...)` entries on
  * `defineSchema`; indexes chain on via `.index("name", [fields])`.
- * Non-table object types that are referenced via `ref` are inlined as
- * `v.object({...})`.
+ * Non-table object, enum, and discriminated-union types become reusable
+ * exported Convex validators.
  *
  * Convex reserves names starting with `_` (including `_id` and
  * `_creationTime`). The emitter is the final backstop for that rule —
@@ -22,22 +23,27 @@ function banner(sourcePath?: string): string {
 }
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
+type EnumType = Extract<TypeDef, { kind: 'enum' }>;
+type DiscriminatedUnionType = Extract<TypeDef, { kind: 'discriminatedUnion' }>;
+type ConvexReusableType = ObjectType | EnumType | DiscriminatedUnionType;
+
+interface RenderContext {
+  types: Map<string, TypeDef>;
+}
+
+interface RenderOptions {
+  preferNamedRefs: boolean;
+}
 
 export function emitConvexSchema(schema: Schema, sourcePath?: string): string {
   validateReservedNames(schema);
-  const objectByName = new Map<string, ObjectType>();
-  for (const t of schema.types) {
-    if (t.kind === 'object') objectByName.set(t.name, t);
-  }
+  const ctx = buildContext(schema);
 
   const tables = schema.types.filter(
     (t): t is ObjectType => t.kind === 'object' && t.table === true,
   );
-
-  const tableEntries = tables
-    .map((t) => `  ${t.name}: ${renderTable(t, objectByName)},`)
-    .join('\n');
-
+  const validatorImports = collectTableValidatorImports(tables, ctx);
+  const tableEntries = tables.map((t) => `  ${t.name}: ${renderTable(t, ctx)},`).join('\n');
   const body =
     tableEntries.length > 0
       ? `export default defineSchema({\n${tableEntries}\n});\n`
@@ -48,27 +54,52 @@ export function emitConvexSchema(schema: Schema, sourcePath?: string): string {
     '',
     `import { defineSchema, defineTable } from 'convex/server';`,
     `import { v } from 'convex/values';`,
+    renderValidatorImports(validatorImports),
     '',
     body,
-  ].join('\n');
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
 }
 
-function renderTable(t: ObjectType, objects: Map<string, ObjectType>): string {
-  const fields = t.fields.map((f) => `    ${f.name}: ${renderFieldDef(f, objects)},`).join('\n');
+export function emitConvexValidators(schema: Schema, sourcePath?: string): string {
+  const ctx = buildContext(schema);
+  const validators = schema.types
+    .filter(isReusableValidatorType)
+    .map((t) => `export const ${validatorName(t.name)} = ${renderTypeDef(t, ctx)};`)
+    .join('\n');
+
+  const body = validators.length > 0 ? `${validators}\n` : '';
+
+  return [banner(sourcePath), '', `import { v } from 'convex/values';`, '', body].join('\n');
+}
+
+function buildContext(schema: Schema): RenderContext {
+  const typeByName = new Map<string, TypeDef>();
+  for (const t of schema.types) {
+    typeByName.set(t.name, t);
+  }
+  return { types: typeByName };
+}
+
+function renderTable(t: ObjectType, ctx: RenderContext): string {
+  const fields = t.fields
+    .map((f) => `    ${f.name}: ${renderFieldDef(f, ctx, { preferNamedRefs: true })},`)
+    .join('\n');
   const indexChain = (t.indexes ?? [])
     .map((i) => `.index("${i.name}", [${i.fields.map((f) => `"${f}"`).join(', ')}])`)
     .join('');
   return `defineTable({\n${fields}\n  })${indexChain}`;
 }
 
-function renderFieldDef(f: FieldDef, objects: Map<string, ObjectType>): string {
-  let expr = renderType(f.type, objects);
+function renderFieldDef(f: FieldDef, ctx: RenderContext, options: RenderOptions): string {
+  let expr = renderType(f.type, ctx, options);
   if (f.nullable) expr = `v.union(${expr}, v.null())`;
   if (f.optional) expr = `v.optional(${expr})`;
   return expr;
 }
 
-function renderType(t: FieldType, objects: Map<string, ObjectType>): string {
+function renderType(t: FieldType, ctx: RenderContext, options: RenderOptions): string {
   switch (t.kind) {
     case 'string':
       return 'v.string()';
@@ -83,25 +114,91 @@ function renderType(t: FieldType, objects: Map<string, ObjectType>): string {
     case 'literal':
       return `v.literal(${JSON.stringify(t.value)})`;
     case 'ref': {
-      const target = objects.get(t.typeName);
+      const target = ctx.types.get(t.typeName);
       if (!target) {
         // Unknown / qualified ref — fall back to `v.any()` rather than
         // throwing; semantic validation lives elsewhere.
         return 'v.any()';
       }
-      if (target.table === true) {
+      if (target.kind === 'raw') return 'v.any()';
+      if (target.kind === 'object' && target.table === true) {
         return `v.id("${target.name}")`;
       }
-      return renderInlineObject(target, objects);
+      if (!options.preferNamedRefs) return renderTypeDef(target, ctx);
+      return validatorName(target.name);
     }
     case 'array':
-      return `v.array(${renderType(t.element, objects)})`;
+      return `v.array(${renderType(t.element, ctx, options)})`;
   }
 }
 
-function renderInlineObject(t: ObjectType, objects: Map<string, ObjectType>): string {
-  const fields = t.fields.map((f) => `${f.name}: ${renderFieldDef(f, objects)}`).join(', ');
+function isReusableValidatorType(t: TypeDef): t is ConvexReusableType {
+  return t.kind !== 'raw' && !(t.kind === 'object' && t.table === true);
+}
+
+function renderTypeDef(t: ConvexReusableType, ctx: RenderContext): string {
+  if (t.kind === 'object') return renderInlineObject(t, ctx, { preferNamedRefs: true });
+  if (t.kind === 'enum') return renderEnum(t);
+  return renderDiscriminatedUnion(t, ctx);
+}
+
+function renderEnum(t: EnumType): string {
+  if (t.values.length === 1) {
+    const [value] = t.values;
+    if (!value) return 'v.any()';
+    return `v.literal(${JSON.stringify(value.value)})`;
+  }
+  return `v.union(${t.values.map((value) => `v.literal(${JSON.stringify(value.value)})`).join(', ')})`;
+}
+
+function renderDiscriminatedUnion(t: DiscriminatedUnionType, ctx: RenderContext): string {
+  return `v.union(${t.variants.map((name) => renderVariant(name, ctx)).join(', ')})`;
+}
+
+function renderVariant(name: string, ctx: RenderContext): string {
+  const target = ctx.types.get(name);
+  if (!target || target.kind !== 'object') return 'v.any()';
+  if (target.table === true) return renderInlineObject(target, ctx, { preferNamedRefs: true });
+  return validatorName(target.name);
+}
+
+function renderInlineObject(t: ObjectType, ctx: RenderContext, options: RenderOptions): string {
+  const fields = t.fields.map((f) => `${f.name}: ${renderFieldDef(f, ctx, options)}`).join(', ');
   return `v.object({ ${fields} })`;
+}
+
+function validatorName(name: string): string {
+  return `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+}
+
+function collectTableValidatorImports(tables: ObjectType[], ctx: RenderContext): string[] {
+  const imports = new Set<string>();
+  for (const table of tables) {
+    for (const field of table.fields) {
+      collectValidatorImportsForType(field.type, ctx, imports);
+    }
+  }
+  return [...imports].sort();
+}
+
+function collectValidatorImportsForType(
+  t: FieldType,
+  ctx: RenderContext,
+  imports: Set<string>,
+): void {
+  if (t.kind === 'array') {
+    collectValidatorImportsForType(t.element, ctx, imports);
+    return;
+  }
+  if (t.kind !== 'ref') return;
+  const target = ctx.types.get(t.typeName);
+  if (!target || !isReusableValidatorType(target)) return;
+  imports.add(validatorName(target.name));
+}
+
+function renderValidatorImports(names: string[]): string | null {
+  if (names.length === 0) return null;
+  return `import { ${names.join(', ')} } from './validators';`;
 }
 
 function validateReservedNames(schema: Schema): void {

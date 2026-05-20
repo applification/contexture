@@ -1,7 +1,7 @@
 export * from './chat-history';
 export * from './document-bundle';
 export { emitAiToolSchemas } from './emit-ai-tool-schemas';
-export { emitConvexSchema } from './emit-convex';
+export { emitConvexSchema, emitConvexValidators } from './emit-convex';
 export { emitFormValidators } from './emit-form-validators';
 export { emit as emitJsonSchema } from './emit-json-schema';
 export { emitMcpDefinitions } from './emit-mcp-definitions';

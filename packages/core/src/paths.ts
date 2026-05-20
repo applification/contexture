@@ -8,6 +8,7 @@ export const AI_TOOL_SCHEMAS_FILE = 'ai-tool-schemas.json';
 export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
 export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
 export const FORM_VALIDATORS_FILE = 'form-validators.ts';
+export const CONVEX_VALIDATORS_FILE = 'validators.ts';
 
 export interface BundlePaths {
   ir: string;
@@ -18,6 +19,7 @@ export interface BundlePaths {
   schemaJson: string;
   schemaIndex: string;
   convex: string;
+  convexValidators: string;
   aiToolSchemas: string;
   structuredOutputSchemas: string;
   mcpDefinitions: string;
@@ -29,6 +31,7 @@ export type GeneratedTargetKind =
   | 'json-schema'
   | 'schema-index'
   | 'convex'
+  | 'convex-validators'
   | 'ai-tool-schemas'
   | 'structured-output-schemas'
   | 'mcp-definitions'
@@ -73,6 +76,7 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     schemaJson: `${base}${SCHEMA_JSON_SUFFIX}`,
     schemaIndex: `${dir}/index.ts`,
     convex: `${dir}/convex/schema.ts`,
+    convexValidators: `${dir}/convex/${CONVEX_VALIDATORS_FILE}`,
     aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
     structuredOutputSchemas: `${ctxDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
     mcpDefinitions: `${ctxDir}/${MCP_DEFINITIONS_FILE}`,
@@ -87,6 +91,7 @@ export function generatedTargetsFor(irPath: string): GeneratedTarget[] {
     { kind: 'json-schema', path: paths.schemaJson },
     { kind: 'schema-index', path: paths.schemaIndex },
     { kind: 'convex', path: paths.convex },
+    { kind: 'convex-validators', path: paths.convexValidators },
     { kind: 'ai-tool-schemas', path: paths.aiToolSchemas },
     { kind: 'structured-output-schemas', path: paths.structuredOutputSchemas },
     { kind: 'mcp-definitions', path: paths.mcpDefinitions },

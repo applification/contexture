@@ -15,6 +15,7 @@ export {
   baseNameFor,
   bundlePathsFor,
   CHAT_FILE,
+  CONVEX_VALIDATORS_FILE,
   contextureDirFor,
   EMITTED_FILE,
   type GeneratedTarget,

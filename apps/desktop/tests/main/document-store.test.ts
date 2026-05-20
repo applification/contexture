@@ -206,6 +206,20 @@ describe('DocumentStore', () => {
     expect(convex).toMatch(/defineSchema\s*\(/);
   });
 
+  it('bundle-mode save writes Convex validators.ts next to the schema', async () => {
+    await harness.store.save({
+      irPath,
+      schema: sampleIR,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
+    const validatorsPath = '/work/convex/validators.ts';
+    expect(harness.fs.exists(validatorsPath)).toBe(true);
+    const validators = await harness.fs.readFile(validatorsPath);
+    expect(validators).toContain('@contexture-generated');
+    expect(validators).toContain(`import { v } from 'convex/values';`);
+  });
+
   it('bundle-mode save writes a schema index re-export next to the IR', async () => {
     await harness.store.save({
       irPath,
@@ -306,6 +320,7 @@ describe('DocumentStore', () => {
         '/work/garden.schema.json',
         '/work/index.ts',
         '/work/convex/schema.ts',
+        '/work/convex/validators.ts',
       ].sort(),
     );
     for (const hash of Object.values(manifest.files)) {
