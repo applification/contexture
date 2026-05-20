@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { buildMcpCli } = require('./build-mcp-cli.cjs');
 
 function findWorkspaceRoot(startDir) {
   let current = startDir;
@@ -87,38 +88,53 @@ function readPackageJson(packageDir) {
   return JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
 }
 
-exports.default = async function beforePack(context) {
-  const appDir = context.packager.projectDir;
-  const workspaceRoot = findWorkspaceRoot(appDir);
-  const claudeAgentSdkDir = fs.realpathSync(
-    path.join(appDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk'),
-  );
-  const claudeAgentSdkPackageJsonPath = path.join(claudeAgentSdkDir, 'package.json');
-  const claudeAgentSdkPackageJson = JSON.parse(fs.readFileSync(claudeAgentSdkPackageJsonPath, 'utf8'));
-  const sdkRange = claudeAgentSdkPackageJson.dependencies?.['@anthropic-ai/sdk'];
+function createBeforePack(options = {}) {
+  const buildPackagedMcpCli = options.buildMcpCli ?? buildMcpCli;
 
-  if (!sdkRange) {
-    return;
-  }
+  return async function beforePack(context) {
+    buildPackagedMcpCli();
 
-  const sdkDir = fs.realpathSync(
-    findResolvedPackage(appDir, '@anthropic-ai/sdk') ?? findInstalledPackage(workspaceRoot, '@anthropic-ai/sdk', sdkRange),
-  );
-  const sdkPackageJson = readPackageJson(sdkDir);
-  const linkDir = path.join(claudeAgentSdkDir, 'node_modules', '@anthropic-ai');
-  const linkPath = path.join(linkDir, 'sdk');
+    const appDir = context.packager.projectDir;
+    const workspaceRoot = findWorkspaceRoot(appDir);
+    const claudeAgentSdkDir = fs.realpathSync(
+      path.join(appDir, 'node_modules', '@anthropic-ai', 'claude-agent-sdk'),
+    );
+    const claudeAgentSdkPackageJsonPath = path.join(claudeAgentSdkDir, 'package.json');
+    const claudeAgentSdkPackageJson = JSON.parse(
+      fs.readFileSync(claudeAgentSdkPackageJsonPath, 'utf8'),
+    );
+    const sdkRange = claudeAgentSdkPackageJson.dependencies?.['@anthropic-ai/sdk'];
 
-  claudeAgentSdkPackageJson.dependencies['@anthropic-ai/sdk'] = sdkPackageJson.version;
-  fs.writeFileSync(claudeAgentSdkPackageJsonPath, `${JSON.stringify(claudeAgentSdkPackageJson, null, 2)}\n`);
+    if (!sdkRange) {
+      return;
+    }
 
-  fs.mkdirSync(linkDir, { recursive: true });
+    const sdkDir = fs.realpathSync(
+      findResolvedPackage(appDir, '@anthropic-ai/sdk') ??
+        findInstalledPackage(workspaceRoot, '@anthropic-ai/sdk', sdkRange),
+    );
+    const sdkPackageJson = readPackageJson(sdkDir);
+    const linkDir = path.join(claudeAgentSdkDir, 'node_modules', '@anthropic-ai');
+    const linkPath = path.join(linkDir, 'sdk');
 
-  if (fs.existsSync(linkPath)) {
-    return;
-  }
+    claudeAgentSdkPackageJson.dependencies['@anthropic-ai/sdk'] = sdkPackageJson.version;
+    fs.writeFileSync(
+      claudeAgentSdkPackageJsonPath,
+      `${JSON.stringify(claudeAgentSdkPackageJson, null, 2)}\n`,
+    );
 
-  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
-  const linkTarget = linkType === 'junction' ? sdkDir : path.relative(linkDir, sdkDir);
+    fs.mkdirSync(linkDir, { recursive: true });
 
-  fs.symlinkSync(linkTarget, linkPath, linkType);
-};
+    if (fs.existsSync(linkPath)) {
+      return;
+    }
+
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+    const linkTarget = linkType === 'junction' ? sdkDir : path.relative(linkDir, sdkDir);
+
+    fs.symlinkSync(linkTarget, linkPath, linkType);
+  };
+}
+
+exports.createBeforePack = createBeforePack;
+exports.default = createBeforePack();
