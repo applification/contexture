@@ -54,6 +54,7 @@ describe('DetailPanel', () => {
 
   it('renders EdgeDetail when an edge is selected', () => {
     const edge: RefEdgeData = {
+      relation: 'fieldRef',
       sourceType: 'Plot',
       sourceField: 'harvest',
       targetType: 'Harvest',

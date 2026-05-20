@@ -70,8 +70,10 @@
   --graph-edge-subclass: oklch(0.50 0.02 270);
   --graph-edge-restriction: oklch(0.65 0.15 280);
   /* Zod-era edge tokens. `ref` is the default relationship edge;
-     `import` is the dashed cross-boundary (stdlib / cross-project) edge. */
+     `union` is the discriminated-union variant edge; `import` is the
+     dashed cross-boundary (stdlib / cross-project) edge. */
   --graph-edge-ref: oklch(0.65 0.12 280);
+  --graph-edge-union: oklch(0.55 0.17 155);
   --graph-edge-import: oklch(0.55 0.04 240);
   /* Background dot colour — deliberately subdued so the grid reads as
      texture, not noise. */
@@ -130,6 +132,7 @@
   --graph-edge-restriction: oklch(0.65 0.15 280);
   /* Zod-era edge tokens (dark). */
   --graph-edge-ref: oklch(0.65 0.08 280);
+  --graph-edge-union: oklch(0.65 0.16 155);
   --graph-edge-import: oklch(0.7 0.04 240);
   /* Subdued dot grid on dark canvases too. */
   --graph-dot: oklch(0.7 0.02 270 / 0.14);

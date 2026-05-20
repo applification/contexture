@@ -1,11 +1,9 @@
 /**
- * EdgeDetail — read-only ref metadata for a selected edge.
+ * EdgeDetail — read-only graph-edge metadata for a selected edge.
  *
- * Edges are purely derived from the IR (a field's `ref` target) — there
- * is no "edge entity" to mutate directly. Editing the source field
- * belongs in `FieldDetail`, so this panel just surfaces the source
- * type, source field, and target type plus a "edit field" affordance
- * that flips the selection to the driving field.
+ * Edges are purely derived from the IR — field refs come from object
+ * fields, and union-variant edges come from discriminated-union
+ * `variants`. There is no edge entity to mutate directly.
  */
 import type { RefEdgeData } from '../graph/schema-to-graph';
 
@@ -15,10 +13,15 @@ export interface EdgeDetailProps {
 }
 
 export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
+  const isUnionVariant = data.relation === 'unionVariant';
+  const editableSourceField = isUnionVariant ? undefined : data.sourceField;
+
   return (
     <div className="space-y-2 p-3 text-xs">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">Ref edge</span>
+        <span className="text-sm font-semibold">
+          {isUnionVariant ? 'Union variant edge' : 'Ref edge'}
+        </span>
         {data.crossBoundary && (
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             cross-boundary
@@ -27,14 +30,18 @@ export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
       </div>
       <dl className="space-y-1">
         <Row term="Source type" detail={data.sourceType} />
-        <Row term="Source field" detail={data.sourceField} />
+        {isUnionVariant ? (
+          <Row term="Discriminator" detail={data.discriminator ?? ''} />
+        ) : (
+          <Row term="Source field" detail={data.sourceField ?? ''} />
+        )}
         <Row term="Target" detail={data.targetType} />
       </dl>
-      {onEditField && (
+      {editableSourceField && onEditField && (
         <button
           type="button"
           className="text-xs underline text-muted-foreground hover:text-foreground"
-          onClick={() => onEditField(data.sourceType, data.sourceField)}
+          onClick={() => onEditField(data.sourceType, editableSourceField)}
         >
           Edit field
         </button>

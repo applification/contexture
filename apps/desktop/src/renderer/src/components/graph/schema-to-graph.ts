@@ -8,8 +8,10 @@
  * nodes are marked as imported) lives in one tested function.
  *
  * Edge policy:
- *   - Only `object` TypeDefs contribute edges — their `ref` fields and
- *     `ref`-typed array elements point at target types.
+ *   - `object` TypeDefs contribute field-ref edges — their `ref` fields
+ *     and `ref`-typed array elements point at target types.
+ *   - `discriminatedUnion` TypeDefs contribute variant edges to each
+ *     object type listed in `variants`.
  *   - Qualified refs (`alias.Name`) always point at the imported
  *     namespace; the target node id is the same alias-qualified name so
  *     the renderer can choose to hide/show or badge external targets.
@@ -48,9 +50,11 @@ export interface FieldRow {
 }
 
 export interface RefEdgeData extends Record<string, unknown> {
+  relation: 'fieldRef' | 'unionVariant';
   sourceType: string;
-  sourceField: string;
+  sourceField?: string;
   targetType: string;
+  discriminator?: string;
   /** True when the target is an imported (out-of-file) type. */
   crossBoundary: boolean;
 }
@@ -74,22 +78,49 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
     localNodeFor(t, positions?.[t.name] ?? DEFAULT_POSITION),
   );
 
-  // Collect edges + shadow nodes for qualified refs that point outside
-  // the local schema.
+  // Collect edges + shadow nodes for targets that point outside the local
+  // schema. Discriminated-union variants should normally be local, but the
+  // fallback keeps invalid/in-progress schemas renderable while validation
+  // reports the semantic issue elsewhere.
   const edges: Edge<RefEdgeData>[] = [];
   const externalNodeIds = new Set<string>();
 
+  const ensureExternalNode = (target: string): boolean => {
+    const crossBoundary = target.includes('.') || !localNames.has(target);
+    if (crossBoundary && !externalNodeIds.has(target)) {
+      externalNodeIds.add(target);
+      nodes.push(externalNodeFor(target, positions?.[target] ?? DEFAULT_POSITION));
+    }
+    return crossBoundary;
+  };
+
   for (const type of schema.types) {
+    if (type.kind === 'discriminatedUnion') {
+      for (const variant of type.variants) {
+        const crossBoundary = ensureExternalNode(variant);
+        edges.push({
+          id: `${type.name}.variant->${variant}`,
+          source: type.name,
+          target: variant,
+          type: 'ref',
+          data: {
+            relation: 'unionVariant',
+            sourceType: type.name,
+            targetType: variant,
+            discriminator: type.discriminator,
+            crossBoundary,
+          },
+        });
+      }
+      continue;
+    }
+
     if (type.kind !== 'object') continue;
     for (const field of type.fields) {
       const target = unwrapRefTarget(field.type);
       if (!target) continue;
 
-      const crossBoundary = target.includes('.') || !localNames.has(target);
-      if (crossBoundary && !externalNodeIds.has(target)) {
-        externalNodeIds.add(target);
-        nodes.push(externalNodeFor(target, positions?.[target] ?? DEFAULT_POSITION));
-      }
+      const crossBoundary = ensureExternalNode(target);
 
       edges.push({
         id: `${type.name}.${field.name}->${target}`,
@@ -97,6 +128,7 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
         target,
         type: 'ref',
         data: {
+          relation: 'fieldRef',
           sourceType: type.name,
           sourceField: field.name,
           targetType: target,

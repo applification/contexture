@@ -4,14 +4,11 @@
  * clips the node body.
  *
  * Styling:
- *   - Local ref (`crossBoundary: false`): solid edge in the property
- *     accent, thicker when selected or adjacent to the selected node.
- *   - Cross-boundary (stdlib / imported) ref: dashed, muted stroke so
- *     the boundary between the user's schema and an imported namespace
- *     reads at a glance.
- *   - A tiny label near the midpoint shows the source field name
- *     (`plot.crop`, etc.) so the user can tell which field carries the
- *     ref without selecting the edge.
+ *   - Field refs use the property accent and label the source field.
+ *   - Union variants use the discriminated-union accent and a dotted
+ *     stroke so inheritance-like membership does not read as a field.
+ *   - Cross-boundary refs are dashed and muted so imported namespaces read
+ *     at a glance.
  */
 import {
   BaseEdge,
@@ -52,6 +49,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   });
 
   const crossBoundary = data?.crossBoundary === true;
+  const isUnionVariant = data?.relation === 'unionVariant';
   const isAdjacent = adjacentEdgeIds.has(id);
   // Dim edges that touch neither the selected node nor an adjacent one.
   const isDimmed =
@@ -63,10 +61,14 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const stroke =
     selected || isAdjacent
       ? 'var(--graph-node-selected)'
-      : crossBoundary
-        ? 'var(--graph-edge-import, var(--muted-foreground))'
-        : 'var(--graph-edge-property)';
+      : isUnionVariant
+        ? 'var(--graph-edge-union, var(--chart-4))'
+        : crossBoundary
+          ? 'var(--graph-edge-import, var(--muted-foreground))'
+          : 'var(--graph-edge-ref, var(--graph-edge-property))';
   const strokeWidth = selected || isAdjacent ? 2 : 1.25;
+  const strokeDasharray = isUnionVariant ? '2 4' : crossBoundary ? '6 4' : undefined;
+  const label = isUnionVariant ? 'variant' : data?.sourceField;
 
   return (
     <>
@@ -76,13 +78,13 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
         style={{
           stroke,
           strokeWidth,
-          strokeDasharray: crossBoundary ? '6 4' : undefined,
+          strokeDasharray,
           opacity: isDimmed ? 0.2 : 1,
           transition: 'opacity 0.15s ease, stroke 0.1s ease',
           fill: 'none',
         }}
       />
-      {data && (
+      {label && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -101,8 +103,9 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
             }}
             data-testid="ref-edge"
             data-cross-boundary={crossBoundary ? 'true' : 'false'}
+            data-relation={data?.relation ?? 'fieldRef'}
           >
-            {data.sourceField}
+            {label}
           </div>
         </EdgeLabelRenderer>
       )}
