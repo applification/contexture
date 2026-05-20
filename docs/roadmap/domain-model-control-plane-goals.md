@@ -7,6 +7,9 @@ layered and independently verifiable, but land the security floor,
 MCP surface, and multi-target emitters together so the generated bundle and
 agent surfaces agree end to end.
 
+For the next product arc after these control-plane foundations, see
+[Faithful Domain-Model Control Plane Plan](faithful-domain-model-control-plane-plan.md).
+
 Historical entries below were originally tracked as separate Codex-sized goals.
 For the current consolidation PR, treat them as evidence and acceptance
 criteria, not as instructions to split the work into separate initiatives.
