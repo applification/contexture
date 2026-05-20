@@ -10,7 +10,7 @@
  */
 import { TYPE_NODE_EVENT, TypeNode } from '@renderer/components/graph/nodes/TypeNode';
 import type { TypeNodeData } from '@renderer/components/graph/schema-to-graph';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -41,7 +41,10 @@ function makeProps(data: TypeNodeData, selected = false) {
 }
 
 describe('TypeNode', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
 
   it('renders type name, kind, and each field row', () => {
     const data: TypeNodeData = {
@@ -130,5 +133,30 @@ describe('TypeNode', () => {
     };
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
     expect(container.querySelectorAll('[data-testid="type-node-field"]')).toHaveLength(0);
+  });
+
+  it('shows enum description and values in a hover card', async () => {
+    vi.useFakeTimers();
+    const data: TypeNodeData = {
+      typeName: 'Season',
+      kind: 'enum',
+      description: 'The growing season.',
+      imported: false,
+      enumValues: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+      fields: [],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.pointerEnter(screen.getByTestId('type-node'));
+    act(() => vi.advanceTimersByTime(120));
+
+    expect(screen.getByText('The growing season.')).toBeInTheDocument();
+    expect(screen.getByText('Values')).toBeInTheDocument();
+    expect(screen.getByText('spring')).toBeInTheDocument();
+    expect(screen.getByText('summer')).toBeInTheDocument();
+    expect(screen.getByText('spring').closest('[title]')).toHaveAttribute(
+      'title',
+      'Planting time.',
+    );
   });
 });

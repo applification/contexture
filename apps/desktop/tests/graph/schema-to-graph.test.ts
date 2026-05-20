@@ -21,7 +21,36 @@ describe('buildGraph', () => {
     const { nodes } = buildGraph({ schema });
     expect(nodes).toHaveLength(2);
     expect(nodes[0]).toMatchObject({ id: 'Plot', type: 'type', data: { kind: 'object' } });
-    expect(nodes[1]).toMatchObject({ id: 'Season', type: 'type', data: { kind: 'enum' } });
+    expect(nodes[1]).toMatchObject({
+      id: 'Season',
+      type: 'type',
+      data: {
+        kind: 'enum',
+        enumValues: [{ value: 'spring' }, { value: 'summer' }],
+      },
+    });
+  });
+
+  it('passes enum descriptions and value descriptions into node data', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'enum',
+          name: 'Season',
+          description: 'The growing season.',
+          values: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+        },
+      ],
+    };
+
+    const { nodes } = buildGraph({ schema });
+
+    expect(nodes[0].data).toMatchObject({
+      kind: 'enum',
+      description: 'The growing season.',
+      enumValues: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+    });
   });
 
   it('renders object fields as field rows with summaries', () => {

@@ -18,6 +18,8 @@
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
 import { memo, useCallback, useMemo } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useGraphSelectionStore } from '../../../store/selection';
 import type { TypeNodeData } from '../schema-to-graph';
 
@@ -78,8 +80,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const borderWidth = isSelected || isAdjacent ? 2 : 1;
   const borderStyle = data.imported ? 'dashed' : 'solid';
   const headerColor = useMemo(() => headerColorFor(data.kind), [data.kind]);
-
-  return (
+  const node = (
     <div
       data-testid="type-node"
       data-type-name={data.typeName}
@@ -224,5 +225,43 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         </div>
       )}
     </div>
+  );
+
+  if (data.kind !== 'enum' || data.imported) return node;
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{node}</HoverCardTrigger>
+      <HoverCardContent side="right" align="start" className="w-72 p-3 text-xs">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <div className="text-sm font-semibold text-foreground">{data.typeName}</div>
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Enum
+            </div>
+            {data.description && (
+              <p className="text-xs leading-snug text-muted-foreground">{data.description}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Values
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(data.enumValues ?? []).map((value) => (
+                <Badge
+                  key={value.value}
+                  variant="outline"
+                  title={value.description}
+                  className="max-w-full rounded px-1.5 py-0 text-[10px] font-medium"
+                >
+                  <span className="truncate">{value.value}</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 });
