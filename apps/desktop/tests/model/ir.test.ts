@@ -115,7 +115,7 @@ describe('IRSchema', () => {
     expect(nested.element.kind).toBe('array');
   });
 
-  it('accepts FieldDef optional/nullable/default/description', () => {
+  it('accepts FieldDef optional/nullable/default/description/serverDerived', () => {
     const input = {
       version: '1',
       types: [
@@ -130,6 +130,7 @@ describe('IRSchema', () => {
               optional: true,
               nullable: true,
               default: 'anon',
+              serverDerived: true,
             },
           ],
         },
@@ -144,6 +145,7 @@ describe('IRSchema', () => {
       optional: true,
       nullable: true,
       default: 'anon',
+      serverDerived: true,
     });
   });
 
@@ -271,7 +273,7 @@ describe('IRSchema', () => {
     expect(path).toContain('types.0.fields.0.type');
   });
 
-  it('accepts an object TypeDef with table:true and indexes', () => {
+  it('accepts an object TypeDef with table:true, tableName, and indexes', () => {
     const input = {
       version: '1',
       types: [
@@ -279,6 +281,7 @@ describe('IRSchema', () => {
           kind: 'object',
           name: 'Post',
           table: true,
+          tableName: 'posts',
           indexes: [
             { name: 'by_author', fields: ['author'] },
             { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },
@@ -294,6 +297,7 @@ describe('IRSchema', () => {
     const td = parsed.types[0];
     if (td.kind !== 'object') throw new Error('expected object');
     expect(td.table).toBe(true);
+    expect(td.tableName).toBe('posts');
     expect(td.indexes).toEqual([
       { name: 'by_author', fields: ['author'] },
       { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },

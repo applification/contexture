@@ -15,7 +15,7 @@
  * import validation. Callers without stdlib context (e.g. core unit tests)
  * pass nothing and get import-only resolution.
  */
-import type { FieldType, ImportDecl, Schema } from './ir';
+import type { FieldType, ImportDecl, Schema, TypeDef } from './ir';
 
 /**
  * Stdlib namespace catalog. The renderer / main process build one from
@@ -38,7 +38,8 @@ export type SemanticIssueCode =
   | 'discriminator_variant_not_object'
   | 'discriminator_missing_on_variant'
   | 'enum_empty'
-  | 'enum_duplicate_value';
+  | 'enum_duplicate_value'
+  | 'duplicate_convex_table_name';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
@@ -54,9 +55,38 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkImports(schema, catalog),
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
+    ...checkDuplicateConvexTableNames(schema),
     ...checkDiscriminatedUnions(schema),
     ...checkEnums(schema),
   ];
+}
+
+type ObjectType = Extract<TypeDef, { kind: 'object' }>;
+
+function checkDuplicateConvexTableNames(schema: Schema): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  const seen = new Map<string, number>();
+
+  schema.types.forEach((type, i) => {
+    if (type.kind !== 'object' || type.table !== true) return;
+    const name = convexTableName(type);
+    const first = seen.get(name);
+    if (first !== undefined) {
+      issues.push({
+        code: 'duplicate_convex_table_name',
+        path: `types.${i}.tableName`,
+        message: `Convex table name "${name}" is already used by types.${first}.`,
+      });
+      return;
+    }
+    seen.set(name, i);
+  });
+
+  return issues;
+}
+
+function convexTableName(type: ObjectType): string {
+  return type.tableName ?? `${type.name.charAt(0).toLowerCase()}${type.name.slice(1)}`;
 }
 
 function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {

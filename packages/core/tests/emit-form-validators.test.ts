@@ -30,4 +30,29 @@ describe('emitFormValidators', () => {
     expect(source).toContain('export const PlanValidator = createFormValidator(Plan);');
     expect(source).toContain('safeParse');
   });
+
+  it('emits create validators that omit server-derived fields', () => {
+    const source = emitFormValidators(
+      {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Artwork',
+            fields: [
+              { name: 'title', type: { kind: 'string' } },
+              { name: 'sourceSearchText', type: { kind: 'string' }, serverDerived: true },
+            ],
+          },
+        ],
+      },
+      'artwork',
+      '/repo/packages/contexture/artwork.json',
+    );
+
+    expect(source).toContain('export const ArtworkValidator = createFormValidator(Artwork);');
+    expect(source).toContain(
+      'export const ArtworkCreateValidator = createFormValidator(Artwork.omit({ sourceSearchText: true }));',
+    );
+  });
 });
