@@ -1,0 +1,262 @@
+import type { FieldDef, FieldType, Schema, TypeDef } from './ir';
+
+export const MODELING_HINT_ANALYZER_VERSION = 1;
+
+export type ModelingHintKind =
+  | 'owned_value_object'
+  | 'possible_entity'
+  | 'query_handle'
+  | 'embedded_collection';
+
+export type ModelingSignal =
+  | 'identity_pressure'
+  | 'query_pressure'
+  | 'embedded_collection_pressure'
+  | 'lifecycle_pressure'
+  | 'relationship_pressure';
+
+export interface ModelingHint {
+  id: string;
+  kind: ModelingHintKind;
+  signals: ModelingSignal[];
+  path: string;
+  typeName: string;
+  fieldName?: string;
+  title: string;
+  message: string;
+  rationale: string;
+  fieldNames: string[];
+}
+
+type ObjectType = Extract<TypeDef, { kind: 'object' }>;
+
+interface TypeUsage {
+  ownerTypeName: string;
+  fieldName: string;
+  collection: boolean;
+}
+
+const QUERY_HANDLE_NAME = /(^|_)(kind|state|status|slug|key)$|name$|searchtext$|date$|at$|year$/i;
+
+const IDENTITY_FIELD_NAMES = new Set([
+  'id',
+  'name',
+  'slug',
+  'email',
+  'externalId',
+  'storageId',
+  'catalogNumber',
+  'url',
+  'key',
+]);
+
+export function analyzeModelingHints(schema: Schema): ModelingHint[] {
+  const objects = schema.types.filter(isObjectType);
+  const byName = new Map(schema.types.map((type) => [type.name, type]));
+  const usages = collectTypeUsages(objects);
+  const hints: ModelingHint[] = [];
+
+  objects.forEach((type, typeIndex) => {
+    const typePath = `types.${typeIndex}`;
+    const isTable = type.table === true;
+    const typeUsages = usages.get(type.name) ?? [];
+
+    if (!isTable) {
+      const identityFields = type.fields.filter(isIdentityLikeField);
+      if (identityFields.length > 0) {
+        hints.push(
+          possibleEntityHint({
+            type,
+            path: typePath,
+            identityFields,
+            ownerName: ownerLabel(typeUsages),
+          }),
+        );
+      } else if (looksOwnedValueObject(type, typeUsages)) {
+        hints.push(ownedValueObjectHint(type, typePath, ownerLabel(typeUsages)));
+      }
+    }
+
+    type.fields.forEach((field, fieldIndex) => {
+      const fieldPath = `${typePath}.fields.${fieldIndex}`;
+      const refTarget = unwrapRefTarget(field.type);
+      if (field.type.kind === 'array' && refTarget) {
+        const target = byName.get(refTarget);
+        if (target?.kind === 'object') {
+          hints.push(embeddedCollectionHint(type, field, fieldPath, target));
+        }
+      }
+
+      if (isTable && isQueryHandleField(field, type)) {
+        hints.push(queryHandleHint(type, field, fieldPath));
+      }
+    });
+  });
+
+  return hints;
+}
+
+function possibleEntityHint({
+  type,
+  path,
+  identityFields,
+  ownerName,
+}: {
+  type: ObjectType;
+  path: string;
+  identityFields: FieldDef[];
+  ownerName?: string;
+}): ModelingHint {
+  const fieldNames = identityFields.map((field) => field.name);
+  const belongsTo = ownerName
+    ? ` if it only belongs to ${ownerName}`
+    : ' if it only belongs to its parent record';
+  return {
+    id: hintId('possible_entity', type.name, undefined, fieldNames),
+    kind: 'possible_entity',
+    signals: ['identity_pressure'],
+    path,
+    typeName: type.name,
+    title: 'Possible entity',
+    message: `This embedded object has identity-like fields. Keep it embedded${belongsTo}. Consider a table if users need to browse, edit, reuse, or link it independently.`,
+    rationale:
+      'Identity-like fields often become useful handles when a concept gains its own lifecycle.',
+    fieldNames,
+  };
+}
+
+function ownedValueObjectHint(
+  type: ObjectType,
+  path: string,
+  ownerName: string | undefined,
+): ModelingHint {
+  const parent = ownerName ? ` to ${ownerName}` : ' to its parent record';
+  return {
+    id: hintId('owned_value_object', type.name),
+    kind: 'owned_value_object',
+    signals: [],
+    path,
+    typeName: type.name,
+    title: 'Owned value object',
+    message: `This object appears to belong entirely${parent}. Embedding is a good fit while it has no independent identity or lifecycle.`,
+    rationale:
+      'Owned structure can stay close to the parent record instead of becoming a table too early.',
+    fieldNames: [],
+  };
+}
+
+function embeddedCollectionHint(
+  ownerType: ObjectType,
+  field: FieldDef,
+  path: string,
+  elementType: ObjectType,
+): ModelingHint {
+  return {
+    id: hintId('embedded_collection', ownerType.name, field.name, [elementType.name]),
+    kind: 'embedded_collection',
+    signals: ['embedded_collection_pressure', 'relationship_pressure'],
+    path,
+    typeName: ownerType.name,
+    fieldName: field.name,
+    title: 'Embedded collection',
+    message: `This field stores a collection of ${elementType.name} objects. Keep it embedded if the items only belong to ${ownerType.name}. Consider a table if items need independent lifecycle, reuse, or querying.`,
+    rationale:
+      'Arrays are a good fit for owned child data, but shared or independently queried items often want table identity.',
+    fieldNames: [field.name],
+  };
+}
+
+function queryHandleHint(type: ObjectType, field: FieldDef, path: string): ModelingHint {
+  return {
+    id: hintId('query_handle', type.name, field.name),
+    kind: 'query_handle',
+    signals: ['query_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Query handle',
+    message:
+      'This field looks useful for filtering, sorting, indexing, or search. It can stay denormalized on the table as a query handle over embedded data.',
+    rationale:
+      'A top-level query handle can preserve an embedded shape while keeping common queries efficient.',
+    fieldNames: [field.name],
+  };
+}
+
+function collectTypeUsages(objects: ObjectType[]): Map<string, TypeUsage[]> {
+  const usages = new Map<string, TypeUsage[]>();
+  for (const owner of objects) {
+    for (const field of owner.fields) {
+      const target = unwrapRefTarget(field.type);
+      if (!target) continue;
+      const existing = usages.get(target) ?? [];
+      existing.push({
+        ownerTypeName: owner.name,
+        fieldName: field.name,
+        collection: field.type.kind === 'array',
+      });
+      usages.set(target, existing);
+    }
+  }
+  return usages;
+}
+
+function looksOwnedValueObject(type: ObjectType, usages: TypeUsage[]): boolean {
+  if (type.fields.length === 0) return false;
+  if (usages.length > 1) return false;
+  return type.fields.every((field) => {
+    const target = unwrapRefTarget(field.type);
+    if (target) return true;
+    return !isIdentityLikeField(field) && field.type.kind !== 'array';
+  });
+}
+
+function isQueryHandleField(field: FieldDef, type: ObjectType): boolean {
+  if ((type.indexes ?? []).some((index) => index.fields.includes(field.name))) return true;
+  if (QUERY_HANDLE_NAME.test(field.name)) return true;
+  const description = field.description?.toLowerCase() ?? '';
+  return (
+    description.includes('denormalized') ||
+    description.includes('filter') ||
+    description.includes('search') ||
+    description.includes('index')
+  );
+}
+
+function isIdentityLikeField(field: FieldDef): boolean {
+  const fieldName = field.name;
+  if (IDENTITY_FIELD_NAMES.has(fieldName)) return true;
+  if (/(^|[a-z])(Id|Name|StorageId)$/.test(fieldName)) return true;
+  if (field.type.kind === 'string') {
+    return (
+      field.type.format === 'email' || field.type.format === 'url' || field.type.format === 'uuid'
+    );
+  }
+  return false;
+}
+
+function unwrapRefTarget(type: FieldType): string | undefined {
+  let current = type;
+  while (current.kind === 'array') current = current.element;
+  return current.kind === 'ref' ? current.typeName : undefined;
+}
+
+function ownerLabel(usages: TypeUsage[]): string | undefined {
+  if (usages.length !== 1) return undefined;
+  return usages[0]?.ownerTypeName;
+}
+
+function isObjectType(type: TypeDef): type is ObjectType {
+  return type.kind === 'object';
+}
+
+function hintId(
+  kind: ModelingHintKind,
+  typeName: string,
+  fieldName?: string,
+  fieldNames = [] as string[],
+): string {
+  return [`v${MODELING_HINT_ANALYZER_VERSION}`, kind, typeName, fieldName, ...fieldNames]
+    .filter((part): part is string => Boolean(part))
+    .join(':');
+}

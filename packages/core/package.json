@@ -23,6 +23,7 @@
     "./load": "./src/load.ts",
     "./mcp-server": "./src/mcp-server.ts",
     "./migrations": "./src/migrations/index.ts",
+    "./modeling-hints": "./src/modeling-hints.ts",
     "./ops": "./src/ops.ts",
     "./op-tools": "./src/op-tools.ts",
     "./paths": "./src/paths.ts",

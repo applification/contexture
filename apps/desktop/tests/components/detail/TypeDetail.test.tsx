@@ -4,14 +4,15 @@
  */
 
 import type { TypeDef } from '@contexture/core/ir';
+import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { TypeDetail } from '@renderer/components/detail/TypeDetail';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-function setup(type: TypeDef) {
+function setup(type: TypeDef, modelingHints: ModelingHint[] = []) {
   const dispatch = vi.fn<(op: Op) => void>();
-  render(<TypeDetail type={type} dispatch={dispatch} />);
+  render(<TypeDetail type={type} dispatch={dispatch} modelingHints={modelingHints} />);
   return { dispatch };
 }
 
@@ -76,6 +77,28 @@ describe('TypeDetail', () => {
         name: 'Plot',
         patch: { description: 'A plot of land.' },
       });
+    });
+
+    it('renders advisory model shape guidance when hints are supplied', () => {
+      setup(type, [
+        {
+          id: 'v1:possible_entity:Plot:name',
+          kind: 'possible_entity',
+          signals: ['identity_pressure'],
+          path: 'types.0',
+          typeName: 'Plot',
+          title: 'Possible entity',
+          message:
+            'This embedded object has identity-like fields. Keep it embedded if it only belongs to Garden.',
+          rationale: 'Identity-like fields often become useful handles.',
+          fieldNames: ['name'],
+        },
+      ]);
+
+      expect(screen.getByRole('region', { name: 'Model shape' })).toBeInTheDocument();
+      expect(screen.getByText('Embed for ownership. Extract for identity.')).toBeInTheDocument();
+      expect(screen.getByText('Possible entity')).toBeInTheDocument();
+      expect(screen.queryByText(/warning/i)).not.toBeInTheDocument();
     });
   });
 
@@ -179,16 +202,15 @@ describe('TypeDetail', () => {
       });
     });
 
-    it('dispatches update_index when a field checkbox toggles', () => {
+    it('dispatches update_index when a field is added from the picker', () => {
       const typeWithIndex: TypeDef = {
         ...base,
         table: true,
         indexes: [{ name: 'by_author', fields: ['author'] }],
       };
       const { dispatch } = setup(typeWithIndex);
-      // The "title" field is not in the index — toggling it on should patch fields.
-      const titleCheckbox = screen.getByLabelText('by_author: title');
-      fireEvent.click(titleCheckbox);
+      fireEvent.click(screen.getByRole('button', { name: /add field to index by_author/i }));
+      fireEvent.click(screen.getByRole('option', { name: 'title' }));
       expect(dispatch).toHaveBeenCalledWith({
         kind: 'update_index',
         typeName: 'Post',
@@ -197,16 +219,66 @@ describe('TypeDetail', () => {
       });
     });
 
-    it('disables the last selected index field with helper text', () => {
+    it('dispatches update_index when a selected field is removed', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author_title', fields: ['author', 'title'] }],
+      };
+      const { dispatch } = setup(typeWithIndex);
+      fireEvent.click(
+        screen.getByRole('button', { name: /remove author from index by_author_title/i }),
+      );
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author_title',
+        patch: { fields: ['title'] },
+      });
+    });
+
+    it('disables removing the last selected index field', () => {
       const typeWithIndex: TypeDef = {
         ...base,
         table: true,
         indexes: [{ name: 'by_author', fields: ['author'] }],
       };
       setup(typeWithIndex);
-      expect(screen.getByText('Indexes need at least one field.')).toBeInTheDocument();
-      expect(screen.getByLabelText('by_author: author')).toBeDisabled();
-      expect(screen.getByLabelText('by_author: title')).not.toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: /remove author from index by_author/i }),
+      ).toBeDisabled();
+      expect(screen.getByText('Field order affects Convex query prefixes.')).toBeInTheDocument();
+    });
+
+    it('dispatches update_index when a selected field is moved later', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_author_title', fields: ['author', 'title'] }],
+      };
+      const { dispatch } = setup(typeWithIndex);
+      fireEvent.click(
+        screen.getByRole('button', { name: /move author later in index by_author_title/i }),
+      );
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_index',
+        typeName: 'Post',
+        name: 'by_author_title',
+        patch: { fields: ['title', 'author'] },
+      });
+    });
+
+    it('renders selected index fields in index order without showing unselected fields inline', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_title', fields: ['title'] }],
+      };
+      setup(typeWithIndex);
+      const row = screen.getByTestId('convex-index-row');
+      expect(row).toHaveTextContent('1');
+      expect(row).toHaveTextContent('title');
+      expect(row).not.toHaveTextContent('author');
     });
 
     it('flags type name starting with "_" as reserved when table:true', () => {

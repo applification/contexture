@@ -4,14 +4,17 @@
  */
 
 import type { FieldDef } from '@contexture/core/ir';
+import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { FieldDetail } from '@renderer/components/detail/FieldDetail';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-function setup(field: FieldDef) {
+function setup(field: FieldDef, modelingHints: ModelingHint[] = []) {
   const dispatch = vi.fn<(op: Op) => void>();
-  render(<FieldDetail typeName="Plot" field={field} dispatch={dispatch} />);
+  render(
+    <FieldDetail typeName="Plot" field={field} dispatch={dispatch} modelingHints={modelingHints} />,
+  );
   return { dispatch };
 }
 
@@ -121,5 +124,28 @@ describe('FieldDetail', () => {
       fieldName: 'n',
       patch: { optional: true },
     });
+  });
+
+  it('renders field-level query handle guidance when supplied', () => {
+    setup({ name: 'sourceSearchText', type: { kind: 'string' } }, [
+      {
+        id: 'v1:query_handle:Plot:sourceSearchText',
+        kind: 'query_handle',
+        signals: ['query_pressure'],
+        path: 'types.0.fields.0',
+        typeName: 'Plot',
+        fieldName: 'sourceSearchText',
+        title: 'Query handle',
+        message:
+          'This field looks useful for filtering, sorting, indexing, or search. It can stay denormalized on the table as a query handle over embedded data.',
+        rationale:
+          'A top-level query handle can preserve an embedded shape while keeping common queries efficient.',
+        fieldNames: ['sourceSearchText'],
+      },
+    ]);
+
+    expect(screen.getByRole('region', { name: 'Model shape' })).toBeInTheDocument();
+    expect(screen.getByText('Query handle')).toBeInTheDocument();
+    expect(screen.getByText(/stay denormalized/i)).toBeInTheDocument();
   });
 });
