@@ -1,7 +1,16 @@
 # ADR 0011: Chat→IR channel uses Claude Agent SDK + MCP `op_tools`, not structured output
 
-- **Status:** Accepted (backfilled)
+- **Status:** Deprecated / superseded by provider-neutral schema-agent runtime
 - **Date:** 2026-05-01
+
+## Deprecation note
+
+This ADR no longer describes the global schema-chat architecture. Contexture now
+routes chat through a provider-neutral `ProviderRuntime` and `SchemaAgentDriver`
+with Codex as the default runtime and Claude as a secondary adapter. The still
+active architectural principle is that models mutate the IR through the
+closed-world Contexture Op vocabulary rather than by producing whole-IR blobs.
+Claude-specific Agent SDK/MCP details are historical adapter context only.
 
 ## Context
 

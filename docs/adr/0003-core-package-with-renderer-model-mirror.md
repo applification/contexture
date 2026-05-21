@@ -7,9 +7,10 @@
 
 The renderer mirror described here was removed during the single-PR roadmap
 consolidation. Renderer code now imports IR, load, migrations, and emitters
-directly from `@contexture/core/*`. Renderer-local model helpers that do not
-belong in core, such as layout, chat history, project-name validation, and
-preflight copy, remain under `apps/desktop/src/renderer/src/model/`.
+directly from `@contexture/core/*`. The old
+`apps/desktop/src/renderer/src/model/` mirror no longer exists; renderer-local
+state now lives under the renderer's `store`, `services`, `hooks`, and
+component modules.
 
 The still-active part of this ADR is that `packages/core` is the canonical home
 for shared IR, ops, validation, emitters, bundle paths, drift metadata, and MCP

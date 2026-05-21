@@ -2,13 +2,14 @@
 
 Load-bearing decisions in Contexture's architecture. New ADRs append; existing ADRs are superseded rather than rewritten.
 
-Format: Context → Decision → Consequences → Alternatives. Status is `Proposed` / `Accepted` / `Superseded by NNNN`.
+Format: Context → Decision → Consequences → Alternatives. Status is
+`Proposed` / `Accepted` / `Superseded by NNNN` / `Deprecated`.
 
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-turborepo-bun-monorepo.md) | Turborepo monorepo with Bun workspaces | Accepted |
 | [0002](0002-stdlib-runtime-package-boundary.md) | `stdlib` owns implementation; `runtime` is a thin re-export | Accepted |
-| [0003](0003-core-package-with-renderer-model-mirror.md) | `@contexture/core` as the shared IR kernel, mirrored under `renderer/src/model/` | Accepted |
+| [0003](0003-core-package-with-renderer-model-mirror.md) | `@contexture/core` as the shared IR kernel, mirrored under `renderer/src/model/` | Superseded |
 | [0004](0004-electron-desktop-not-web.md) | Desktop editor is Electron, not Tauri or browser-only | Accepted |
 | [0005](0005-zod-meta-schema-as-ir.md) | Zod meta-schema is the authoritative IR; TS types via `z.infer` | Accepted |
 | [0006](0006-versioned-ir-with-migration-chain.md) | Versioned IR with a migration chain, even when empty | Accepted |
@@ -16,7 +17,7 @@ Format: Context → Decision → Consequences → Alternatives. Status is `Propo
 | [0008](0008-pure-ops-reducer-no-exceptions.md) | Ops reducer is pure and returns `{schema} \| {error}` | Accepted |
 | [0009](0009-file-bundle-and-sidecar-layout.md) | `.contexture.json` + `.contexture/` sidecars + emitted `.schema.{ts,json}` | Accepted |
 | [0010](0010-sha256-manifest-for-drift-detection.md) | SHA-256 manifest of emitted artefacts for drift detection | Accepted |
-| [0011](0011-claude-agent-sdk-with-mcp-op-tools.md) | Chat→IR channel uses Claude Agent SDK + MCP `op_tools` | Accepted |
+| [0011](0011-claude-agent-sdk-with-mcp-op-tools.md) | Chat→IR channel uses Claude Agent SDK + MCP `op_tools` | Deprecated / superseded |
 | [0012](0012-claude-cli-detection-for-max-mode.md) | Detect a local `claude` CLI to enable Max-mode auth fallback | Accepted |
 | [0013](0013-biome-over-eslint-prettier.md) | Biome instead of ESLint + Prettier | Accepted |
 | [0014](0014-vitest-not-bun-test.md) | Vitest as the test runner; `bun test` rejected | Accepted |
