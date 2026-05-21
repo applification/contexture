@@ -17,9 +17,11 @@ Labels and assignees are racy across iterations and easy to forget. A claim mode
 ## Decision
 
 - **Sandboxing:** each per-issue pipeline runs inside a fresh Docker container created from a pre-built image (`bun run sandcastle:build`). The host filesystem is not mounted; secrets are scoped to the container's environment.
-- **Branching:** one branch per issue, named via the `<plan>` tag contract in `.sandcastle/plan.ts`. Concurrent runs operate on disjoint branches.
+- **Branching:** one branch per issue, named by the Sandcastle issue/plan
+  contract. Concurrent runs operate on disjoint branches.
 - **Claim:** the PR body must include `Closes #N` (or `Fixes`/`Resolves`). The eligibility filter (ADR 0017) parses this from open PRs to exclude already-claimed issues. The same convention closes the issue automatically when the PR merges.
-- **Retry:** sandbox-creation failures are retried with backoff (`.sandcastle/retry.ts`); concurrency is bounded by `MAX_PARALLEL` (`.sandcastle/concurrency.ts`).
+- **Concurrency:** the orchestrator bounds parallel work with `MAX_PARALLEL` and
+  reconciles issue/PR state before starting each sandbox.
 
 ## Consequences
 

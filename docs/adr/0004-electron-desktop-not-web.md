@@ -21,7 +21,8 @@ Ship the editor as Electron, with React 19 + Vite (`electron-vite`) in the rende
 ## Consequences
 
 - One codebase, one binary, one update channel. Sentry wired up for both main and renderer.
-- The Claude Agent SDK runs in main, calling out to the user's local `claude` CLI when no API key is set — possible because we're a real Node process.
+- Provider runtimes for Codex and Claude run in main, including CLI/app-server
+  process management that would not be available in a browser-only app.
 - Cost: bundle size, security model (sandbox: false in webPreferences for IPC ergonomics — accepted because we ship our own renderer code and validate everything that crosses IPC).
 - Cost: cross-platform packaging (electron-builder for win/mac/linux).
 

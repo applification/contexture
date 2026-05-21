@@ -5,10 +5,12 @@
 
 ## Context
 
-Two channels mutate the IR: the human (clicking, typing, dragging in the renderer) and Claude (chat turns producing structured edits). They must converge on the same model. We need:
+Two channels mutate the IR: the human (clicking, typing, dragging in the
+renderer) and the schema-agent surface (provider runtimes producing structured
+edits). They must converge on the same model. We need:
 
 - An undo stack that can replay edits.
-- A clear diff Claude can describe in natural language ("I added a `User` class with three fields").
+- A clear diff an agent can describe in natural language ("I added a `User` type with three fields").
 - A validation surface that can reject bad edits before they corrupt the live store.
 - A persistence story — what gets saved, what gets logged.
 
@@ -22,13 +24,15 @@ Each op mutates one well-defined region. `rename_type` is the deliberate excepti
 
 ## Consequences
 
-- Claude's tool surface is the same op set the UI uses — one validator, one replay engine, one audit trail.
+- The agent tool surface is the same op set the UI uses — one validator, one replay engine, one audit trail.
 - Undo is "apply the inverse op" rather than "diff and reconstruct".
 - Adding a new editing capability is a single new op variant + reducer case + tool registration — easy to grep for and easy to test.
 - Cost: any edit the user can imagine but the op set doesn't model is a feature request, not a bypass. Accepted — closed-world is the point.
 
 ## Alternatives considered
 
-- **JSON Patch:** maximum flexibility, minimum semantics. Claude could produce unintelligible patches; validation becomes whole-IR-shape only; undo is generic but rename-cascade has to be reinvented.
-- **Free-form Claude output ("here's the new IR"):** loses the per-edit granularity needed for animation, undo, and audit.
+- **JSON Patch:** maximum flexibility, minimum semantics. Agents could produce
+  unintelligible patches; validation becomes whole-IR-shape only; undo is
+  generic but rename-cascade has to be reinvented.
+- **Free-form agent output ("here's the new IR"):** loses the per-edit granularity needed for animation, undo, and audit.
 - **Per-field RPCs:** hundreds of methods, no discriminated union to grep.

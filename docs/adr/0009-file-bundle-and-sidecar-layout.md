@@ -9,7 +9,9 @@ A Contexture document needs to persist:
 
 - The IR itself (canonical, hand-readable, diff-friendly).
 - Editor state — graph layout, chat history — that the user shouldn't have to think about.
-- Generated artefacts that downstream code imports — Zod `.schema.ts`, JSON Schema `.schema.json`, Convex schema, a barrel index.
+- Generated artefacts that downstream code imports — Zod `.schema.ts`, JSON
+  Schema `.schema.json`, Convex schema and validators, a barrel index, and
+  enabled AI/form integration outputs.
 - A manifest of generated artefacts for drift detection.
 
 Mixing all of this into one file would conflict every time the layout shifts a node. Hiding everything inside an opaque binary blob would defeat git review. Putting the editor state in user-visible files would clutter their tree.
@@ -22,7 +24,10 @@ For an IR file `Foo.contexture.json` the bundle is:
 - `.contexture/layout.json` — graph layout sidecar.
 - `.contexture/chat.json` — chat history sidecar.
 - `.contexture/emitted.json` — SHA-256 manifest of generated artefacts (see ADR 0010).
-- `Foo.schema.ts` and `Foo.schema.json` — generated artefacts, written alongside the IR for ergonomic imports.
+- `Foo.schema.ts`, `Foo.schema.json`, `index.ts`, `convex/schema.ts`,
+  `convex/validators.ts`, `form-validators.ts`, and enabled `.contexture/*.json`
+  integration outputs — generated artefacts resolved by
+  `packages/core/src/paths.ts` and `packages/core/src/generated-targets.ts`.
 
 Path conventions live in `packages/core/src/paths.ts`. The `DocumentStore` (`apps/desktop/src/main/documents/document-store.ts`) writes the whole bundle atomically.
 

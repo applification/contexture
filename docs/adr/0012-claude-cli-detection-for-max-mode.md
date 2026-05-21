@@ -3,6 +3,13 @@
 - **Status:** Accepted (backfilled)
 - **Date:** 2026-05-01
 
+## Current scope
+
+This ADR still applies to the Claude provider adapter only. Contexture's
+schema-agent surface is now provider-neutral and defaults to Codex, but the
+Claude runtime still detects a local `claude` CLI so Claude users can run via a
+CLI session instead of an API key.
+
 ## Context
 
 Two kinds of users run the editor:
@@ -17,7 +24,9 @@ The Agent SDK shells out to the `claude` CLI when no `ANTHROPIC_API_KEY` is set.
 On startup (and when the auth popover opens) the main process probes for a `claude` binary:
 
 - `which claude` (or `where claude` on Windows) via `execFile`.
-- The first hit is cached in `detectedClaudePath` and passed to the Agent SDK as `pathToClaudeCodeExecutable` so packaged apps work regardless of PATH inheritance.
+- The resolved CLI path is kept in the Claude provider runtime and passed to the
+  Agent SDK as `pathToClaudeCodeExecutable` so packaged apps work regardless of
+  PATH inheritance.
 - The result (`{installed, path}`) is exposed over IPC so the renderer can show a Max-mode-viable indicator before the user starts a turn.
 
 The same detection predicts whether a turn will succeed without an API key, so the UI can fail fast with a clear message instead of waiting for an SDK error.
