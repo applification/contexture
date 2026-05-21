@@ -6,9 +6,9 @@
  * the canvas uses so new users can decode the diagram at a glance.
  *
  * Matches the four `TypeDef` kinds (object / enum / discriminatedUnion
- * / raw) and the edge modes (field ref, union variant, cross-boundary
- * import). Colours are pulled from `globals.css` so theme changes flow
- * through without edits here.
+ * / raw) and the edge modes (field ref, inferred table id, union variant,
+ * cross-boundary import). Colours are pulled from `globals.css` so theme
+ * changes flow through without edits here.
  */
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -23,6 +23,11 @@ const EDGE_ITEMS: readonly EdgeItem[] = [
   {
     label: 'Ref',
     color: 'var(--graph-edge-ref)',
+  },
+  {
+    label: 'Inferred table id',
+    color: 'var(--graph-edge-ref)',
+    dash: '6,4',
   },
   {
     label: 'Union variant',

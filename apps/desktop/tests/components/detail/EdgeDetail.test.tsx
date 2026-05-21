@@ -50,6 +50,21 @@ describe('EdgeDetail', () => {
     expect(onEditField).toHaveBeenCalledWith('Plot', 'harvest');
   });
 
+  it('renders inferred table id edges as field-backed diagram relationships', () => {
+    const data: RefEdgeData = {
+      relation: 'tableId',
+      sourceType: 'Member',
+      sourceField: 'teamId',
+      targetType: 'Team',
+      crossBoundary: false,
+    };
+    const onEditField = vi.fn();
+    render(<EdgeDetail data={data} onEditField={onEditField} />);
+    expect(screen.getByText('Inferred table id edge')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Edit field'));
+    expect(onEditField).toHaveBeenCalledWith('Member', 'teamId');
+  });
+
   it('renders union variant edges without field-edit affordances', () => {
     const data: RefEdgeData = {
       relation: 'unionVariant',

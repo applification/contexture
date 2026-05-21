@@ -164,6 +164,106 @@ describe('buildGraph', () => {
     expect(edges).toEqual([expect.objectContaining({ source: 'Plot', target: 'Harvest' })]);
   });
 
+  it('emits a diagram-only edge for table Id fields whose description names a table', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Team', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Member',
+          table: true,
+          fields: [
+            {
+              name: 'teamId',
+              description: 'Convex Id of the Team table.',
+              type: { kind: 'string' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { nodes, edges } = buildGraph({ schema });
+
+    expect(nodes.map((n) => n.id)).toEqual(['Team', 'Member']);
+    expect(edges).toEqual([
+      expect.objectContaining({
+        id: 'Member.teamId~>Team',
+        source: 'Member',
+        target: 'Team',
+        type: 'ref',
+        data: expect.objectContaining({
+          relation: 'tableId',
+          sourceField: 'teamId',
+          targetType: 'Team',
+          crossBoundary: false,
+        }),
+      }),
+    ]);
+  });
+
+  it('uses tableName aliases when inferring diagram-only table Id edges', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Team', table: true, tableName: 'teams', fields: [] },
+        {
+          kind: 'object',
+          name: 'Member',
+          table: true,
+          fields: [
+            {
+              name: 'teamId',
+              description: 'References a document in the teams table.',
+              type: { kind: 'string' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { edges } = buildGraph({ schema });
+
+    expect(edges).toEqual([expect.objectContaining({ source: 'Member', target: 'Team' })]);
+  });
+
+  it('does not infer table Id edges for non-table objects or fields without table descriptions', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Team', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'DraftMember',
+          fields: [
+            {
+              name: 'teamId',
+              description: 'Convex Id of the Team table.',
+              type: { kind: 'string' },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Member',
+          table: true,
+          fields: [
+            {
+              name: 'teamId',
+              description: 'Persisted owner identifier.',
+              type: { kind: 'string' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { edges } = buildGraph({ schema });
+
+    expect(edges).toEqual([]);
+  });
+
   it('emits variant edges from discriminated unions to their object variants', () => {
     const schema: Schema = {
       version: '1',

@@ -1,9 +1,10 @@
 /**
  * EdgeDetail — read-only graph-edge metadata for a selected edge.
  *
- * Edges are purely derived from the IR — field refs come from object
- * fields, and union-variant edges come from discriminated-union
- * `variants`. There is no edge entity to mutate directly.
+ * Edges are derived from the IR — field refs come from object fields,
+ * inferred table-id edges come from a diagram-only field convention, and
+ * union-variant edges come from discriminated-union `variants`. There is
+ * no edge entity to mutate directly.
  */
 import type { RefEdgeData } from '../graph/schema-to-graph';
 
@@ -14,13 +15,18 @@ export interface EdgeDetailProps {
 
 export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
   const isUnionVariant = data.relation === 'unionVariant';
+  const isTableId = data.relation === 'tableId';
   const editableSourceField = isUnionVariant ? undefined : data.sourceField;
 
   return (
     <div className="space-y-2 p-3 text-xs">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold">
-          {isUnionVariant ? 'Union variant edge' : 'Ref edge'}
+          {isUnionVariant
+            ? 'Union variant edge'
+            : isTableId
+              ? 'Inferred table id edge'
+              : 'Ref edge'}
         </span>
         {data.crossBoundary && (
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">

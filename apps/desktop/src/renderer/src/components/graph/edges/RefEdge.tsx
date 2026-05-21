@@ -5,6 +5,8 @@
  *
  * Styling:
  *   - Field refs use the property accent and label the source field.
+ *   - Inferred table id relationships are dashed because they are a
+ *     diagram-only convention, not an IR ref.
  *   - Union variants use the discriminated-union accent and a dotted
  *     stroke so inheritance-like membership does not read as a field.
  *   - Cross-boundary refs are dashed and muted so imported namespaces read
@@ -50,6 +52,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
 
   const crossBoundary = data?.crossBoundary === true;
   const isUnionVariant = data?.relation === 'unionVariant';
+  const isTableId = data?.relation === 'tableId';
   const isAdjacent = adjacentEdgeIds.has(id);
   // Dim edges that touch neither the selected node nor an adjacent one.
   const isDimmed =
@@ -67,7 +70,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
           ? 'var(--graph-edge-import, var(--muted-foreground))'
           : 'var(--graph-edge-ref, var(--graph-edge-property))';
   const strokeWidth = selected || isAdjacent ? 2 : 1.25;
-  const strokeDasharray = isUnionVariant ? '2 4' : crossBoundary ? '6 4' : undefined;
+  const strokeDasharray = isUnionVariant ? '2 4' : isTableId || crossBoundary ? '6 4' : undefined;
   const label = isUnionVariant ? 'variant' : data?.sourceField;
 
   return (
