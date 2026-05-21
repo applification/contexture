@@ -10,6 +10,10 @@
  * Edge policy:
  *   - `object` TypeDefs contribute field-ref edges — their `ref` fields
  *     and `ref`-typed array elements point at target types.
+ *   - Convex table id fields may contribute diagram-only inferred edges:
+ *     non-ref fields ending in `Id` whose description mentions another
+ *     local table render as dashed relationships without changing IR
+ *     semantics.
  *   - `discriminatedUnion` TypeDefs contribute variant edges to each
  *     object type listed in `variants`.
  *   - Qualified refs (`alias.Name`) always point at the imported
@@ -25,6 +29,8 @@
 
 import type { FieldDef, FieldType, Schema, TypeDef } from '@contexture/core/ir';
 import type { Edge, Node } from '@xyflow/react';
+
+type TableTypeDef = Extract<TypeDef, { kind: 'object' }> & { table: true };
 
 export interface TypeNodeData extends Record<string, unknown> {
   /** Fully-qualified type name (local or `<alias>.<Name>`). */
@@ -56,7 +62,7 @@ export interface FieldRow {
 }
 
 export interface RefEdgeData extends Record<string, unknown> {
-  relation: 'fieldRef' | 'unionVariant';
+  relation: 'fieldRef' | 'tableId' | 'unionVariant';
   sourceType: string;
   sourceField?: string;
   targetType: string;
@@ -79,6 +85,7 @@ const DEFAULT_POSITION = { x: 0, y: 0 };
 
 export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphResult {
   const localNames = new Set(schema.types.map((t) => t.name));
+  const tableTypes = schema.types.filter(isTableType);
 
   const nodes: Node<TypeNodeData>[] = schema.types.map((t) =>
     localNodeFor(t, positions?.[t.name] ?? DEFAULT_POSITION),
@@ -124,21 +131,39 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
     if (type.kind !== 'object') continue;
     for (const field of type.fields) {
       const target = unwrapRefTarget(field.type);
-      if (!target) continue;
+      if (target) {
+        const crossBoundary = ensureExternalNode(target);
 
-      const crossBoundary = ensureExternalNode(target);
+        edges.push({
+          id: `${type.name}.${field.name}->${target}`,
+          source: type.name,
+          target,
+          type: 'ref',
+          data: {
+            relation: 'fieldRef',
+            sourceType: type.name,
+            sourceField: field.name,
+            targetType: target,
+            crossBoundary,
+          },
+        });
+        continue;
+      }
+
+      const inferredTarget = inferTableIdTarget(type, field, tableTypes);
+      if (!inferredTarget) continue;
 
       edges.push({
-        id: `${type.name}.${field.name}->${target}`,
+        id: `${type.name}.${field.name}~>${inferredTarget.name}`,
         source: type.name,
-        target,
+        target: inferredTarget.name,
         type: 'ref',
         data: {
-          relation: 'fieldRef',
+          relation: 'tableId',
           sourceType: type.name,
           sourceField: field.name,
-          targetType: target,
-          crossBoundary,
+          targetType: inferredTarget.name,
+          crossBoundary: false,
         },
       });
     }
@@ -186,6 +211,33 @@ function unwrapRefTarget(t: FieldType): string | undefined {
   let cur: FieldType = t;
   while (cur.kind === 'array') cur = cur.element;
   return cur.kind === 'ref' ? cur.typeName : undefined;
+}
+
+function inferTableIdTarget(
+  sourceType: TypeDef,
+  field: FieldDef,
+  tableTypes: ReadonlyArray<TableTypeDef>,
+): TableTypeDef | undefined {
+  if (sourceType.kind !== 'object' || sourceType.table !== true) return undefined;
+  if (!field.name.endsWith('Id') || !field.description) return undefined;
+  if (unwrapRefTarget(field.type)) return undefined;
+
+  const description = field.description.toLowerCase();
+  return tableTypes.find((candidate) => {
+    if (candidate.name === sourceType.name) return false;
+    return [candidate.name, candidate.tableName]
+      .filter((name): name is string => name !== undefined)
+      .some((name) => mentionsName(description, name));
+  });
+}
+
+function isTableType(type: TypeDef): type is TableTypeDef {
+  return type.kind === 'object' && type.table === true;
+}
+
+function mentionsName(description: string, name: string): boolean {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').toLowerCase();
+  return new RegExp(`(^|[^a-z0-9])${escapedName}([^a-z0-9]|$)`).test(description);
 }
 
 function enumValueRow(value: { value: string; description?: string }): EnumValueRow {
