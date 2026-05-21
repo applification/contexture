@@ -15,6 +15,7 @@ export * from './ir';
 export * from './layout';
 export * from './load';
 export * from './migrations';
+export * from './modeling-hints';
 export * from './op-tools';
 export * from './ops';
 export * from './pipeline';

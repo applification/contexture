@@ -15,7 +15,8 @@
  * concern. Splitting them like this keeps the panel test-only on the
  * selection prop surface.
  */
-import { useSyncExternalStore } from 'react';
+import { analyzeModelingHints } from '@contexture/core/modeling-hints';
+import { useMemo, useSyncExternalStore } from 'react';
 import type { Op } from '../../store/ops';
 import { useUndoStore } from '../../store/undo';
 import type { RefEdgeData } from '../graph/schema-to-graph';
@@ -35,6 +36,7 @@ export interface DetailPanelProps {
 
 export function DetailPanel({ selection }: DetailPanelProps) {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
+  const modelingHints = useMemo(() => analyzeModelingHints(schema), [schema]);
   const dispatch = (op: Op) => {
     useUndoStore.getState().apply(op);
   };
@@ -60,10 +62,25 @@ export function DetailPanel({ selection }: DetailPanelProps) {
     if (!field) {
       return <EmptyState message={`No field named "${selection.fieldName}".`} />;
     }
-    return <FieldDetail typeName={type.name} field={field} dispatch={dispatch} />;
+    return (
+      <FieldDetail
+        typeName={type.name}
+        field={field}
+        dispatch={dispatch}
+        modelingHints={modelingHints.filter(
+          (hint) => hint.typeName === type.name && hint.fieldName === field.name,
+        )}
+      />
+    );
   }
 
-  return <TypeDetail type={type} dispatch={dispatch} />;
+  return (
+    <TypeDetail
+      type={type}
+      dispatch={dispatch}
+      modelingHints={modelingHints.filter((hint) => hint.typeName === type.name)}
+    />
+  );
 }
 
 function EmptyState({ message }: { message: string }) {

@@ -11,18 +11,21 @@
  * nothing here mutates the store directly.
  */
 import type { FieldDef, FieldType } from '@contexture/core/ir';
+import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { Op } from '../../store/ops';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { ModelShapeHints } from './ModelShapeHints';
 
 export interface FieldDetailProps {
   typeName: string;
   field: FieldDef;
   dispatch: (op: Op) => void;
+  modelingHints?: readonly ModelingHint[];
 }
 
-export function FieldDetail({ typeName, field, dispatch }: FieldDetailProps) {
+export function FieldDetail({ typeName, field, dispatch, modelingHints = [] }: FieldDetailProps) {
   const update = (patch: Partial<FieldDef>) =>
     dispatch({ kind: 'update_field', typeName, fieldName: field.name, patch });
 
@@ -53,6 +56,7 @@ export function FieldDetail({ typeName, field, dispatch }: FieldDetailProps) {
       </div>
 
       <FieldTypeBody fieldType={field.type} onChange={(nextType) => update({ type: nextType })} />
+      <ModelShapeHints hints={modelingHints} />
     </div>
   );
 }

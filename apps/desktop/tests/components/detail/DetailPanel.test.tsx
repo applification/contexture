@@ -30,6 +30,36 @@ const plotSchema: Schema = {
   ],
 };
 
+const artworkSchema: Schema = {
+  version: '1',
+  types: [
+    {
+      kind: 'object',
+      name: 'Artwork',
+      table: true,
+      fields: [
+        {
+          name: 'sourceSearchText',
+          description: 'Denormalized lowercase search text.',
+          type: { kind: 'string' },
+        },
+        {
+          name: 'media',
+          type: { kind: 'array', element: { kind: 'ref', typeName: 'ArtworkMedia' } },
+        },
+      ],
+    },
+    {
+      kind: 'object',
+      name: 'ArtworkMedia',
+      fields: [
+        { name: 'storageId', type: { kind: 'string' } },
+        { name: 'alt', type: { kind: 'string' } },
+      ],
+    },
+  ],
+};
+
 describe('DetailPanel', () => {
   beforeEach(() => seed({ version: '1', types: [] }));
   afterEach(cleanup);
@@ -50,6 +80,22 @@ describe('DetailPanel', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot', fieldName: 'name' }} />);
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
+  });
+
+  it('derives model shape guidance for the selected type from the schema', () => {
+    seed(artworkSchema);
+    render(<DetailPanel selection={{ typeName: 'ArtworkMedia' }} />);
+    expect(screen.getByText('Model shape')).toBeInTheDocument();
+    expect(screen.getByText('Possible entity')).toBeInTheDocument();
+    expect(screen.getByText(/Keep it embedded/i)).toBeInTheDocument();
+  });
+
+  it('derives field-level query handle guidance for the selected field', () => {
+    seed(artworkSchema);
+    render(<DetailPanel selection={{ typeName: 'Artwork', fieldName: 'sourceSearchText' }} />);
+    expect(screen.getByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByText('Query handle')).toBeInTheDocument();
+    expect(screen.getByText(/denormalized/i)).toBeInTheDocument();
   });
 
   it('renders EdgeDetail when an edge is selected', () => {
