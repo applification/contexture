@@ -14,6 +14,14 @@ beforeEach(() => {
   s.clearImportWarnings();
   s.clearUnknownFormat();
   s.clearSaveWithErrors();
+  s.clearFileAccessError();
+  (window as unknown as { contexture: unknown }).contexture = {
+    shell: {
+      reveal: vi.fn(async () => undefined),
+      openInEditor: vi.fn(async () => undefined),
+      openFileAccessSettings: vi.fn(async () => undefined),
+    },
+  };
 });
 
 afterEach(() => {
@@ -52,6 +60,20 @@ describe('DocumentDialogs', () => {
     });
     expect(screen.getByText(/Not a Contexture file/i)).toBeInTheDocument();
     expect(screen.getByText('/tmp/weird.jsonld')).toBeInTheDocument();
+  });
+
+  it('shows file-access errors and opens privacy settings', () => {
+    render(<DocumentDialogs />);
+    act(() => {
+      useDocumentStore.getState().showFileAccessError({
+        message: 'macOS denied access to part of this Contexture bundle.',
+        path: '/Users/rufus/Downloads/.contexture/layout.json',
+      });
+    });
+    expect(screen.getByText(/Folder access needed/i)).toBeInTheDocument();
+    expect(screen.getByText('/Users/rufus/Downloads/.contexture/layout.json')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /open privacy settings/i }));
+    expect(window.contexture.shell.openFileAccessSettings).toHaveBeenCalled();
   });
 
   it('shows the save-with-errors dialog and fires onForceSave on "Save anyway"', () => {

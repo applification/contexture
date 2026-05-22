@@ -109,6 +109,8 @@ export interface ContextureShellAPI {
   reveal: (path: string) => Promise<void>;
   /** Open a folder or file in VS Code via the `vscode://` URL scheme. */
   openInEditor: (path: string) => Promise<void>;
+  /** Open the OS privacy settings page for file/folder access. */
+  openFileAccessSettings: () => Promise<void>;
 }
 
 export interface ContextureDriftAPI {

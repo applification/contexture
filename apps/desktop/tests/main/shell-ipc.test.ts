@@ -103,4 +103,21 @@ describe('registerShellIpc', () => {
 
     expect(shell.showItemInFolder).toHaveBeenCalledWith('/projects/my-app');
   });
+
+  it('opens macOS file access settings from the privacy shortcut', async () => {
+    registerShellIpc();
+    const settingsHandler = vi.mocked(ipcMain.handle).mock.calls.find(([channel]) => {
+      return channel === 'shell:open-file-access-settings';
+    })?.[1];
+
+    await settingsHandler?.({});
+
+    if (process.platform === 'darwin') {
+      expect(shell.openExternal).toHaveBeenCalledWith(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+      );
+    } else {
+      expect(shell.openExternal).not.toHaveBeenCalled();
+    }
+  });
 });

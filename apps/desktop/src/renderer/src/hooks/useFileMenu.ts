@@ -113,17 +113,25 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
 
   const handleOpen = useCallback(async (): Promise<void> => {
     if (!fileApi) return;
-    const opened = await fileApi.openDialog();
-    if (!opened) return;
-    applyLoaded(opened);
+    try {
+      const opened = await fileApi.openDialog();
+      if (!opened) return;
+      applyLoaded(opened);
+    } catch (err) {
+      useDocumentStore.getState().showFileAccessError(fileAccessErrorFrom(err));
+    }
   }, [fileApi, applyLoaded]);
 
   const handleOpenPath = useCallback(
     async (path: string): Promise<void> => {
       if (!fileApi) return;
-      const opened = await fileApi.openRecent(path);
-      if (!opened) return;
-      applyLoaded(opened);
+      try {
+        const opened = await fileApi.openRecent(path);
+        if (!opened) return;
+        applyLoaded(opened);
+      } catch (err) {
+        useDocumentStore.getState().showFileAccessError(fileAccessErrorFrom(err, path));
+      }
     },
     [fileApi, applyLoaded],
   );
@@ -233,4 +241,26 @@ async function writeBundle(
   const chat = options.getChat?.() ?? DEFAULT_CHAT;
   await fileApi.save({ irPath, schema, layout: doc.layout, chat });
   doc.markBundleSaved(irPath);
+}
+
+function fileAccessErrorFrom(
+  err: unknown,
+  fallbackPath?: string,
+): { message: string; path?: string } {
+  const rawMessage = err instanceof Error ? err.message : String(err);
+  const pathMatch = rawMessage.match(/(?:path: '([^']+)'|open '([^']+)'|access '([^']+)')/);
+  const path = pathMatch?.[1] ?? pathMatch?.[2] ?? pathMatch?.[3] ?? fallbackPath;
+
+  if (rawMessage.includes('EPERM') || rawMessage.includes('operation not permitted')) {
+    return {
+      message:
+        'macOS denied access to part of this Contexture bundle. Grant Contexture access to the folder, or move the file and its .contexture folder to a location the app can read.',
+      ...(path ? { path } : {}),
+    };
+  }
+
+  return {
+    message: rawMessage || 'The file could not be opened.',
+    ...(path ? { path } : {}),
+  };
 }
