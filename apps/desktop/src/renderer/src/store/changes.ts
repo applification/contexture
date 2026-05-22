@@ -20,6 +20,7 @@ interface ChangesState {
   selectedId: string | null;
 
   load: (input: { irPath: string; api: NonNullable<Window['contexture']['modelSync']> }) => void;
+  recordEntry: (entry: ModelChangeLogEntry) => void;
   resetForNoDocument: () => void;
   setQuery: (query: string) => void;
   setSourceFilter: (sourceFilter: ChangeSourceFilter) => void;
@@ -61,6 +62,13 @@ export const useChangesStore = create<ChangesState>((set, get) => ({
         });
       });
   },
+  recordEntry: (entry) =>
+    set((state) => ({
+      status: state.status === 'idle' ? 'ready' : state.status,
+      entries: [entry, ...state.entries.filter((existing) => existing.id !== entry.id)],
+      error: null,
+      selectedId: state.selectedId ?? entry.id,
+    })),
   resetForNoDocument: () =>
     set({
       status: 'ready',
@@ -92,4 +100,10 @@ function parseChangeLogLoadResult(value: unknown): ChangeLogLoadResult {
 
 function isChangeLogEntry(value: unknown): value is ModelChangeLogEntry {
   return !!value && typeof value === 'object' && 'id' in value && typeof value.id === 'string';
+}
+
+export function changeLogEntryFromAppendResult(value: unknown): ModelChangeLogEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const entry = (value as { entry?: unknown }).entry;
+  return isChangeLogEntry(entry) ? entry : null;
 }
