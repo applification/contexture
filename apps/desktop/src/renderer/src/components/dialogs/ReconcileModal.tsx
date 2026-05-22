@@ -180,7 +180,7 @@ export function ReconcileModal(): React.JSX.Element {
     undo.begin();
     for (let i = 0; i < proposedOps.length; i += 1) {
       if (!selectedIndices.has(i)) continue;
-      const r = undo.apply(proposedOps[i].op);
+      const r = undo.apply(proposedOps[i].op, { source: 'reconcile' });
       if ('error' in r) {
         undo.rollback();
         setError(r.error);

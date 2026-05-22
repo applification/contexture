@@ -15,7 +15,7 @@
 
 import { join } from 'node:path';
 import type { ChatHistory, Layout } from '@contexture/core';
-import { IRSchema, type Schema } from '@contexture/core';
+import { hashContent, IRSchema, type Schema, save as saveIR } from '@contexture/core';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import { z } from 'zod';
 import {
@@ -25,6 +25,7 @@ import {
 } from '../documents/document-store';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
 import { assertSafeContextureIrPath } from '../security';
+import { acknowledgeModelSyncSelfWrite } from './model-sync';
 import { IpcString, parseIpcPayload } from './validation';
 
 // Electron's FileFilter.extensions is a list of bare extensions (no dot,
@@ -93,6 +94,7 @@ export function setDocumentStoreForTesting(s: DocumentStore | null): void {
 
 /** Build the five-file bundle for `input` and write it atomically. */
 export async function handleSave(input: HandleSaveInput): Promise<void> {
+  acknowledgeModelSyncSelfWrite(input.irPath, hashContent(`${saveIR(input.schema)}\n`));
   await getStore().save(input);
 }
 

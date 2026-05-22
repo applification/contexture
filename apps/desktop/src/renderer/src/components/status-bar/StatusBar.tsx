@@ -11,6 +11,7 @@ import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics'
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { useDocumentStore } from '@renderer/store/document';
+import { sourceLabel, useModelSyncStore } from '@renderer/store/model-sync';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
@@ -24,6 +25,8 @@ export function StatusBar(): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const filePath = useDocumentStore((s) => s.filePath);
   const isDirty = useDocumentStore((s) => s.isDirty);
+  const syncStatus = useModelSyncStore((s) => s.status);
+  const syncNotice = useModelSyncStore((s) => s.notice);
   const click = useGraphSelectionStore((s) => s.click);
 
   const typeCount = schema.types.length;
@@ -98,7 +101,7 @@ export function StatusBar(): React.JSX.Element {
                   isDirty ? 'fill-warning text-warning' : 'fill-success/70 text-success/70',
                 )}
               />
-              <span>{isDirty ? 'Unsaved changes' : 'Saved'}</span>
+              <span>{saveStateLabel(isDirty, syncStatus, syncNotice)}</span>
             </span>
           </TooltipTrigger>
           <TooltipContent side="top">
@@ -122,6 +125,19 @@ export function StatusBar(): React.JSX.Element {
         </span>
 
         <span>{tokenDisplay}</span>
+
+        {syncNotice && syncStatus === 'synced' && (
+          <span className="text-sky-700 dark:text-sky-300">
+            Synced from {sourceLabel(syncNotice.source)} · {syncNotice.changeCount}{' '}
+            {syncNotice.changeCount === 1 ? 'change' : 'changes'}
+          </span>
+        )}
+
+        {syncStatus === 'external_changes' && (
+          <span className="text-sky-700 dark:text-sky-300">External changes pending</span>
+        )}
+
+        {syncStatus === 'invalid_model' && <span className="text-destructive">Invalid model</span>}
 
         <div className="flex-1" />
 
@@ -185,4 +201,16 @@ export function StatusBar(): React.JSX.Element {
       </TooltipProvider>
     </div>
   );
+}
+
+function saveStateLabel(
+  isDirty: boolean,
+  syncStatus: ReturnType<typeof useModelSyncStore.getState>['status'],
+  syncNotice: ReturnType<typeof useModelSyncStore.getState>['notice'],
+): string {
+  if (syncStatus === 'syncing') return 'Syncing...';
+  if (syncStatus === 'synced' && syncNotice) return 'Synced';
+  if (syncStatus === 'external_changes') return 'External changes';
+  if (syncStatus === 'invalid_model') return 'Invalid model';
+  return isDirty ? 'Unsaved changes' : 'Saved';
 }

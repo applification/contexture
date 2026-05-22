@@ -616,7 +616,7 @@ async function run(argv: string[]): Promise<void> {
       else process.stderr.write(`${error.error.message}\n`);
       return;
     }
-    const forward = createFileBackedForward(writableIrPath);
+    const forward = createFileBackedForward(writableIrPath, { changeSource: 'cli' });
     type ForwardResult = Awaited<ReturnType<typeof forward>>;
     let result: ForwardResult;
     try {
@@ -640,7 +640,7 @@ async function run(argv: string[]): Promise<void> {
   }
 
   const writableIrPath = assertContextureIrPath(irPath);
-  const forward = createFileBackedForward(writableIrPath);
+  const forward = createFileBackedForward(writableIrPath, { changeSource: 'cli' });
   const tools = new Map(createOpTools(forward).map((tool) => [tool.name, tool]));
   const { tool: toolName, input } = commandToToolInput(command, args);
   const tool = tools.get(toolName);

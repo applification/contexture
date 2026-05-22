@@ -14,6 +14,7 @@ export {
   assertContextureIrPath,
   baseNameFor,
   bundlePathsFor,
+  CHANGE_LOG_FILE,
   CHAT_FILE,
   CONVEX_VALIDATORS_FILE,
   contextureDirFor,

@@ -129,6 +129,38 @@ export interface DriftDetectedPayload {
   files?: Array<{ path: string; status: 'drifted' | 'unreadable' }>;
 }
 
+export type ModelSyncStatus = 'changed' | 'invalid_json' | 'invalid_ir' | 'unreadable' | 'deleted';
+
+export interface ModelSyncEventPayload {
+  irPath: string;
+  status: ModelSyncStatus;
+  source: 'desktop' | 'mcp' | 'cli' | 'schema_agent' | 'reconcile' | 'external' | 'unknown';
+  observedAt: number;
+  revision: string;
+  content?: string;
+  schema?: unknown;
+  error?: string;
+  change?: unknown;
+}
+
+export interface ContextureModelSyncAPI {
+  watch: (payload: { irPath: string }) => Promise<{ ok: boolean }>;
+  unwatch: () => Promise<{ ok: boolean }>;
+  check: () => Promise<{ ok: boolean }>;
+  acknowledgeSelfWrite: (payload: { irPath: string; revision: string }) => Promise<{ ok: boolean }>;
+  getChangeLog: (payload: { irPath: string }) => Promise<unknown>;
+  appendChange: (payload: {
+    irPath: string;
+    source: 'desktop' | 'schema_agent' | 'reconcile' | 'external';
+    reason: 'op_applied' | 'replace_schema' | 'external_sync_accepted';
+    before: unknown;
+    after: unknown;
+    opKind?: string;
+    actor?: string;
+  }) => Promise<unknown>;
+  onEvent: (listener: (payload: ModelSyncEventPayload) => void) => Unsubscribe;
+}
+
 export interface ContextureReconcileAPI {
   readGeneratedTarget: (payload: { irPath: string; targetPath: string }) => Promise<string | null>;
   writeGeneratedTarget: (payload: {
@@ -163,6 +195,7 @@ export interface ContextureAPI {
   file: ContextureFileAPI;
   shell: ContextureShellAPI;
   drift: ContextureDriftAPI;
+  modelSync: ContextureModelSyncAPI;
   reconcile: ContextureReconcileAPI;
   update: ContextureUpdateAPI;
 }

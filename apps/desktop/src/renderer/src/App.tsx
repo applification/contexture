@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
 import { ActivityBar } from './components/activity-bar/ActivityBar';
+import { ChangesPanel } from './components/changes/ChangesPanel';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
@@ -38,6 +39,7 @@ import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { DriftBanner } from './components/hud/DriftBanner';
+import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
@@ -55,10 +57,13 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { useDrift } from './hooks/useDrift';
 import { useFileMenu } from './hooks/useFileMenu';
+import { useModelChangeLogRecorder } from './hooks/useModelChangeLogRecorder';
+import { useModelSync } from './hooks/useModelSync';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { useDocumentStore } from './store/document';
+import { useModelSyncStore } from './store/model-sync';
 import { useGraphSelectionStore } from './store/selection';
 import { useUIChromeStore } from './store/ui-chrome';
 import { useUndoStore } from './store/undo';
@@ -79,6 +84,7 @@ export default function App(): React.JSX.Element {
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const highlightedNodeIds = useModelSyncStore((s) => s.highlightedNodeIds);
   const activeTab = useUIChromeStore((s) => s.sidebarTab);
   const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
@@ -150,6 +156,8 @@ export default function App(): React.JSX.Element {
   const chat = useSchemaAgentChat({ api: schemaAgentApi });
 
   useDrift();
+  useModelSync();
+  useModelChangeLogRecorder();
 
   const fileMenu = useFileMenu({
     getChat: chat.toHistory,
@@ -279,6 +287,7 @@ export default function App(): React.JSX.Element {
         <ResizablePanel id="graph-panel" defaultSize="70%" minSize="30%">
           <div className="flex flex-col w-full h-full">
             <DriftBanner />
+            <ModelSyncBanner />
             <div className="relative flex-1 min-h-0">
               {hasSchema && (
                 <div className="absolute top-2 left-2 z-10">
@@ -300,7 +309,11 @@ export default function App(): React.JSX.Element {
                 </div>
               )}
               {hasSchema ? (
-                <GraphCanvas positions={positions} onPositionsChange={setPositions} />
+                <GraphCanvas
+                  positions={positions}
+                  onPositionsChange={setPositions}
+                  highlightedNodeIds={highlightedNodeIds}
+                />
               ) : (
                 <EmptyState
                   onLoadSample={loadSample}
@@ -360,6 +373,9 @@ export default function App(): React.JSX.Element {
                   onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                 />
+              </div>
+              <div className={activeTab !== 'changes' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <ChangesPanel />
               </div>
             </div>
             <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />

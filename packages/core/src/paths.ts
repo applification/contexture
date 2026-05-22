@@ -4,6 +4,7 @@ export const SCHEMA_JSON_SUFFIX = '.schema.json';
 export const LAYOUT_FILE = 'layout.json';
 export const CHAT_FILE = 'chat.json';
 export const EMITTED_FILE = 'emitted.json';
+export const CHANGE_LOG_FILE = 'change-log.json';
 export const AI_TOOL_SCHEMAS_FILE = 'ai-tool-schemas.json';
 export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
 export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
@@ -16,6 +17,7 @@ export interface BundlePaths {
   layout: string;
   chat: string;
   emitted: string;
+  changeLog: string;
   schemaTs: string;
   schemaJson: string;
   schemaIndex: string;
@@ -75,6 +77,7 @@ export function bundlePathsFor(irPath: string): BundlePaths {
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
     emitted: `${ctxDir}/${EMITTED_FILE}`,
+    changeLog: `${ctxDir}/${CHANGE_LOG_FILE}`,
     schemaTs: `${schemaBase}${SCHEMA_TS_SUFFIX}`,
     schemaJson: `${schemaBase}${SCHEMA_JSON_SUFFIX}`,
     schemaIndex: `${layout.schemaDir}/index.ts`,
