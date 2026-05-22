@@ -30,7 +30,7 @@ Zod + JSON Schema outputs that downstream LLM pipelines can import.
 
 | Layer | Technology |
 |-------|-----------|
-| Desktop | Electron 35 |
+| Desktop | Electron 42 |
 | UI | React 19, TypeScript 5.8 |
 | Build | Vite 7 via electron-vite 5 |
 | Graph | @xyflow/react 12, elkjs |
