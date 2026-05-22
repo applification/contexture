@@ -2,7 +2,13 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFileBackedForward, type FileBackedFs, type Schema } from '../src';
+import {
+  changeLogPathFor,
+  createFileBackedForward,
+  type FileBackedFs,
+  type ModelChangeLog,
+  type Schema,
+} from '../src';
 
 const initialSchema: Schema = {
   version: '1',
@@ -36,6 +42,34 @@ describe('createFileBackedForward', () => {
     await expect(
       readFile(join(dir, 'packages/contexture/.contexture/emitted.json'), 'utf8'),
     ).resolves.toContain('app.schema.ts');
+  });
+
+  it('appends change-log entries when a change source is provided', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-core-'));
+    const irPath = join(dir, 'packages/contexture/app.contexture.json');
+    await mkdir(join(dir, 'packages/contexture/.contexture'), { recursive: true });
+    await writeFile(irPath, `${JSON.stringify(initialSchema, null, 2)}\n`, 'utf8');
+
+    const forward = createFileBackedForward(irPath, { changeSource: 'mcp' });
+    await forward({
+      kind: 'add_field',
+      typeName: 'Post',
+      field: { name: 'title', type: { kind: 'string' } },
+    });
+
+    const log = JSON.parse(await readFile(changeLogPathFor(irPath), 'utf8')) as ModelChangeLog;
+    expect(log.entries).toHaveLength(1);
+    expect(log.entries[0]).toMatchObject({
+      source: 'mcp',
+      reason: 'op_applied',
+      opKind: 'add_field',
+      changedTypes: ['Post'],
+      addedTypes: [],
+      removedTypes: [],
+      changeCount: 1,
+      summary: 'Updated Post',
+    });
+    expect(log.entries[0]?.afterHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('rolls back the IR if a later generated-file write fails', async () => {

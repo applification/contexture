@@ -1,3 +1,4 @@
+export * from './change-log';
 export * from './chat-history';
 export * from './document-bundle';
 export { emitAiToolSchemas } from './emit-ai-tool-schemas';

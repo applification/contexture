@@ -1,5 +1,10 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import {
+  appendModelChangeLogEntry,
+  buildModelChangeLogEntry,
+  type ModelChangeSource,
+} from './change-log';
 import { type GeneratedBundleFs, writeGeneratedBundle } from './generated-bundle-writer';
 import { load } from './load';
 import { type ApplyResult, apply, type Op } from './ops';
@@ -41,6 +46,8 @@ export const nodeFileBackedFs: FileBackedFs = {
 export interface FileBackedForwardOptions {
   fs?: FileBackedFs;
   stdlib?: StdlibCatalog;
+  changeSource?: ModelChangeSource;
+  actor?: string;
 }
 
 export function createFileBackedForward(
@@ -58,6 +65,21 @@ export function createFileBackedForward(
     if ('error' in result) return result;
 
     await writeGeneratedBundle({ irPath: resolvedIrPath, schema: result.schema, fs });
+    if (options.changeSource) {
+      await appendModelChangeLogEntry({
+        irPath: resolvedIrPath,
+        fs,
+        entry: buildModelChangeLogEntry({
+          irPath: resolvedIrPath,
+          source: options.changeSource,
+          reason: op.kind === 'replace_schema' ? 'replace_schema' : 'op_applied',
+          before: schema,
+          after: result.schema,
+          opKind: op.kind,
+          ...(options.actor ? { actor: options.actor } : {}),
+        }),
+      });
+    }
     return result;
   };
 }

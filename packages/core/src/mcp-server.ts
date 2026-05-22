@@ -264,7 +264,9 @@ async function applyContextureOp(
 
   let result: Awaited<ReturnType<ReturnType<typeof createFileBackedForward>>>;
   try {
-    result = await createFileBackedForward(path, { stdlib: catalog })(parsed.data);
+    result = await createFileBackedForward(path, { stdlib: catalog, changeSource: 'mcp' })(
+      parsed.data,
+    );
   } catch (err) {
     return {
       path,

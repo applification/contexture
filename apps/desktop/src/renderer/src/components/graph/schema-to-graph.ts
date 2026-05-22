@@ -40,6 +40,7 @@ export interface TypeNodeData extends Record<string, unknown> {
   enumValues?: ReadonlyArray<EnumValueRow>;
   fields: ReadonlyArray<FieldRow>;
   imported: boolean;
+  syncHighlighted?: boolean;
   /** True when the source `ObjectTypeDef` carries `table: true`. */
   table?: boolean;
 }

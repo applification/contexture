@@ -68,6 +68,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const isSelected = primaryNodeId === id;
   const isAdjacent = !isSelected && adjacentNodeIds.has(id);
   const isDimmed = primaryNodeId !== null && !isSelected && !isAdjacent;
+  const isSyncHighlighted = data.syncHighlighted === true && !isSelected && !isAdjacent;
 
   const onFieldClick = useCallback(
     (fieldName: string, ev: React.MouseEvent<HTMLElement>) => {
@@ -108,6 +109,10 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         borderColor,
         boxShadow: '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)',
         background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent',
+        outline: isSyncHighlighted
+          ? '2px solid color-mix(in oklch, var(--chart-2) 78%, var(--background))'
+          : undefined,
+        outlineOffset: isSyncHighlighted ? 3 : undefined,
         opacity: isDimmed ? 0.22 : data.imported ? 0.75 : 1,
         transition: 'opacity 0.15s ease, border-color 0.1s ease',
       }}

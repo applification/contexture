@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
+import { registerModelSyncIpc } from './ipc/model-sync';
 import { registerReconcileIpc } from './ipc/reconcile';
 import { registerSchemaAgentIpc } from './ipc/schema-agent';
 import { registerShellIpc } from './ipc/shell';
@@ -92,6 +93,7 @@ app.whenReady().then(() => {
   registerReconcileIpc();
   registerSchemaAgentIpc(mainWindow);
   registerDriftIpc(mainWindow);
+  registerModelSyncIpc(mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

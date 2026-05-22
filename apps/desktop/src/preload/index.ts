@@ -144,6 +144,29 @@ const drift = {
     subscribe('drift:resolved', (() => listener()) as (p: unknown) => void),
 };
 
+const modelSync = {
+  watch: (payload: { irPath: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('model-sync:watch', payload) as Promise<{ ok: boolean }>,
+  unwatch: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('model-sync:unwatch') as Promise<{ ok: boolean }>,
+  check: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('model-sync:check') as Promise<{ ok: boolean }>,
+  acknowledgeSelfWrite: (payload: { irPath: string; revision: string }): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('model-sync:acknowledge-self-write', payload) as Promise<{ ok: boolean }>,
+  getChangeLog: (payload: { irPath: string }): Promise<unknown> =>
+    ipcRenderer.invoke('model-sync:change-log', payload),
+  appendChange: (payload: {
+    irPath: string;
+    source: 'desktop' | 'schema_agent' | 'reconcile' | 'external';
+    reason: 'op_applied' | 'replace_schema' | 'external_sync_accepted';
+    before: unknown;
+    after: unknown;
+    opKind?: string;
+    actor?: string;
+  }): Promise<unknown> => ipcRenderer.invoke('model-sync:append-change', payload),
+  onEvent: (listener: (payload: unknown) => void) => subscribe('model-sync:event', listener),
+};
+
 const reconcile = {
   readGeneratedTarget: (payload: { irPath: string; targetPath: string }): Promise<string | null> =>
     ipcRenderer.invoke('reconcile:read-generated-target', payload) as Promise<string | null>,
@@ -182,7 +205,7 @@ const update = {
   },
 };
 
-const contexture = { schemaAgent, file, shell, drift, reconcile, update };
+const contexture = { schemaAgent, file, shell, drift, modelSync, reconcile, update };
 
 if (process.contextIsolated) {
   try {

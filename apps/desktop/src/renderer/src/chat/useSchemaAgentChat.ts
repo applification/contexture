@@ -302,7 +302,9 @@ export function useSchemaAgentChat({
 
   useEffect(() => {
     return api.onToolRequest(({ id, op }) => {
-      const result: ApplyResult = useUndoStore.getState().apply(op as Op);
+      const result: ApplyResult = useUndoStore
+        .getState()
+        .apply(op as Op, { source: 'schema_agent' });
       api.replyTool(id, result);
     });
   }, [api]);

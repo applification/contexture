@@ -63,6 +63,7 @@ export interface CanvasPosition {
 export interface GraphCanvasProps {
   positions?: Record<string, CanvasPosition>;
   onPositionsChange?: (next: Record<string, CanvasPosition>) => void;
+  highlightedNodeIds?: string[];
 }
 
 const NODE_TYPES = { type: TypeNode, group: GroupNode } as const;
@@ -76,7 +77,11 @@ export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
   );
 }
 
-function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): React.JSX.Element {
+function GraphCanvasInner({
+  positions,
+  onPositionsChange,
+  highlightedNodeIds = [],
+}: GraphCanvasProps): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
   const dispatch = useCallback((op: Op) => {
     useUndoStore.getState().apply(op);
@@ -93,10 +98,18 @@ function GraphCanvasInner({ positions, onPositionsChange }: GraphCanvasProps): R
   const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
   const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
-  const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(
-    () => buildGraph({ schema, positions }),
-    [schema, positions],
-  );
+  const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(() => {
+    const highlighted = new Set(highlightedNodeIds);
+    const graph = buildGraph({ schema, positions });
+    return {
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.type === 'type'
+          ? { ...node, data: { ...node.data, syncHighlighted: highlighted.has(node.id) } }
+          : node,
+      ),
+    };
+  }, [schema, positions, highlightedNodeIds]);
 
   const [nodes, setNodes] = useState<Node[]>(builtNodes);
   const [edges, setEdges] = useState<Edge[]>(builtEdges);

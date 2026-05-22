@@ -71,7 +71,9 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
 
   const handleNew = useCallback((): void => {
     optionsRef.current.onNew?.();
-    useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
+    useUndoStore
+      .getState()
+      .apply({ kind: 'replace_schema', schema: { version: '1', types: [] } }, { log: false });
     useDocumentStore.getState().resetForNewBundle();
   }, []);
 
@@ -87,7 +89,7 @@ export function useFileMenu(options: UseFileMenuOptions = {}): UseFileMenuReturn
       const doc = useDocumentStore.getState();
       try {
         const { schema, warnings: irWarnings } = load(opened.content);
-        useUndoStore.getState().apply({ kind: 'replace_schema', schema });
+        useUndoStore.getState().apply({ kind: 'replace_schema', schema }, { log: false });
         doc.acceptOpenedBundle({ filePath: opened.irPath, layout: opened.layout });
 
         optionsRef.current.onBundleLoaded?.({

@@ -29,6 +29,23 @@ import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { create } from 'zustand';
 import { type ApplyResult, apply as applyOp, type Op } from './ops';
 
+export interface UndoMutationMeta {
+  source?: 'desktop' | 'schema_agent' | 'reconcile' | 'external';
+  actor?: string;
+  log?: boolean;
+}
+
+export interface UndoMutationEvent {
+  op: Op;
+  before: Schema;
+  after: Schema;
+  meta: UndoMutationMeta;
+}
+
+export type UndoMutationListener = (event: UndoMutationEvent) => void;
+
+const mutationListeners = new Set<UndoMutationListener>();
+
 export interface UndoableState {
   schema: Schema;
   /** Past snapshots, oldest first. `past[past.length-1]` is the most recent pre-step schema. */
@@ -40,7 +57,7 @@ export interface UndoableState {
   /** Snapshot captured at the outermost `begin()`. null when no tx is open. */
   txStart: Schema | null;
 
-  apply: (op: Op) => ApplyResult;
+  apply: (op: Op, meta?: UndoMutationMeta) => ApplyResult;
   undo: () => void;
   redo: () => void;
   begin: () => void;
@@ -69,7 +86,7 @@ export function createUndoableContextureStore(initial: Schema) {
       canUndo: false,
       canRedo: false,
 
-      apply: (op) => {
+      apply: (op, meta = {}) => {
         const state = get();
         const res = applyOp(state.schema, op, STDLIB_REGISTRY);
         if ('error' in res) return res;
@@ -78,12 +95,14 @@ export function createUndoableContextureStore(initial: Schema) {
           // Inside a transaction: mutate the live schema but defer the
           // history push until `commit()`.
           set({ schema: res.schema });
+          notifyMutation(mutationListeners, { op, before: state.schema, after: res.schema, meta });
           return res;
         }
 
         const past = [...state.past, state.schema];
         const future: Schema[] = [];
         set({ schema: res.schema, past, future, ...recompute(past, future) });
+        notifyMutation(mutationListeners, { op, before: state.schema, after: res.schema, meta });
         return res;
       },
 
@@ -148,6 +167,17 @@ export function createUndoableContextureStore(initial: Schema) {
  * in one transaction.
  */
 export const useUndoStore = createUndoableContextureStore({ version: '1', types: [] });
+
+export function subscribeUndoMutations(listener: UndoMutationListener): () => void {
+  mutationListeners.add(listener);
+  return () => {
+    mutationListeners.delete(listener);
+  };
+}
+
+function notifyMutation(listeners: Set<UndoMutationListener>, event: UndoMutationEvent): void {
+  for (const listener of listeners) listener(event);
+}
 
 // Expose the store on `window` only in test/dev/e2e so Playwright specs can
 // dispatch ops directly without relying on XYFlow pointer events.
