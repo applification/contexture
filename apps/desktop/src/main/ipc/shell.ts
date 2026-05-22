@@ -6,6 +6,9 @@ import { IpcString, parseIpcPayload } from './validation';
 
 export type CliRunner = (args: readonly string[]) => Promise<void>;
 
+const MACOS_FILE_ACCESS_SETTINGS_URL =
+  'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
+
 export async function openInEditor(path: string, runCli: CliRunner): Promise<void> {
   const safePath = assertSafeShellPath(path);
   try {
@@ -47,5 +50,10 @@ export function registerShellIpc(): void {
   });
   ipcMain.handle('shell:open-in-editor', async (_evt, path: unknown) => {
     await openInEditor(parseIpcPayload('shell:open-in-editor', IpcString, path), spawnCode);
+  });
+  ipcMain.handle('shell:open-file-access-settings', async () => {
+    if (process.platform === 'darwin') {
+      await shell.openExternal(MACOS_FILE_ACCESS_SETTINGS_URL);
+    }
   });
 }

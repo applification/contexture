@@ -44,6 +44,8 @@ export function DocumentDialogs({ onForceSave }: DocumentDialogsProps): React.JS
   const clearUnknownFormat = useDocumentStore((s) => s.clearUnknownFormat);
   const saveWithErrorsPrompt = useDocumentStore((s) => s.saveWithErrorsPrompt);
   const clearSaveWithErrors = useDocumentStore((s) => s.clearSaveWithErrors);
+  const fileAccessError = useDocumentStore((s) => s.fileAccessError);
+  const clearFileAccessError = useDocumentStore((s) => s.clearFileAccessError);
 
   return (
     <>
@@ -97,6 +99,37 @@ export function DocumentDialogs({ onForceSave }: DocumentDialogsProps): React.JS
           )}
           <DialogFooter>
             <Button onClick={clearUnknownFormat}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={fileAccessError !== null}
+        onOpenChange={(open) => {
+          if (!open) clearFileAccessError();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Folder access needed</DialogTitle>
+            <DialogDescription>{fileAccessError?.message}</DialogDescription>
+          </DialogHeader>
+          {fileAccessError?.path && (
+            <p className="text-xs font-mono text-muted-foreground break-all">
+              {fileAccessError.path}
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={clearFileAccessError}>
+              OK
+            </Button>
+            <Button
+              onClick={() => {
+                void window.contexture?.shell.openFileAccessSettings();
+              }}
+            >
+              Open Privacy Settings
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

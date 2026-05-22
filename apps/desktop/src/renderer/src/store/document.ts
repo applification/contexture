@@ -33,6 +33,11 @@ export interface SaveWithErrorsPrompt {
   messages: string[];
 }
 
+export interface FileAccessError {
+  message: string;
+  path?: string;
+}
+
 export const DEFAULT_LAYOUT: Layout = { version: '1', positions: {} };
 
 interface DocumentState {
@@ -51,6 +56,8 @@ interface DocumentState {
   unknownFormatPath: string | null;
   /** Non-null while the save-with-errors dialog is visible. */
   saveWithErrorsPrompt: SaveWithErrorsPrompt | null;
+  /** Non-null while a filesystem permission/open error dialog is visible. */
+  fileAccessError: FileAccessError | null;
 
   setFilePath: (path: string | null) => void;
   setMode: (mode: DocumentMode) => void;
@@ -73,6 +80,9 @@ interface DocumentState {
 
   showSaveWithErrors: (prompt: SaveWithErrorsPrompt) => void;
   clearSaveWithErrors: () => void;
+
+  showFileAccessError: (error: FileAccessError) => void;
+  clearFileAccessError: () => void;
 }
 
 export const useDocumentStore = create<DocumentState>((set) => ({
@@ -83,6 +93,7 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   importWarnings: [],
   unknownFormatPath: null,
   saveWithErrorsPrompt: null,
+  fileAccessError: null,
 
   setFilePath: (filePath) => set({ filePath }),
   setMode: (mode) => set({ mode }),
@@ -127,4 +138,7 @@ export const useDocumentStore = create<DocumentState>((set) => ({
 
   showSaveWithErrors: (saveWithErrorsPrompt) => set({ saveWithErrorsPrompt }),
   clearSaveWithErrors: () => set({ saveWithErrorsPrompt: null }),
+
+  showFileAccessError: (fileAccessError) => set({ fileAccessError }),
+  clearFileAccessError: () => set({ fileAccessError: null }),
 }));

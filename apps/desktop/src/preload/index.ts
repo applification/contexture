@@ -123,6 +123,9 @@ const shell = {
   /** Open a folder (or file) in VS Code via the `vscode://` URL scheme. */
   openInEditor: (path: string): Promise<void> =>
     ipcRenderer.invoke('shell:open-in-editor', path) as Promise<void>,
+  /** Open the OS privacy settings page for file/folder access. */
+  openFileAccessSettings: (): Promise<void> =>
+    ipcRenderer.invoke('shell:open-file-access-settings') as Promise<void>,
 };
 
 const drift = {

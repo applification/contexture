@@ -34,6 +34,11 @@ function mockFileBridge(): {
       onMenuSaveAs: () => () => undefined,
       pickDirectory: vi.fn(async () => null),
     },
+    shell: {
+      reveal: vi.fn(async () => undefined),
+      openInEditor: vi.fn(async () => undefined),
+      openFileAccessSettings: vi.fn(async () => undefined),
+    },
   };
   return { openDialog, saveAsDialog, save, openRecent, getRecentFiles };
 }
@@ -48,6 +53,7 @@ beforeEach(() => {
   d.clearImportWarnings();
   d.clearUnknownFormat();
   d.clearSaveWithErrors();
+  d.clearFileAccessError();
 });
 
 afterEach(() => {
@@ -103,6 +109,23 @@ describe('useFileMenu', () => {
     expect(useDocumentStore.getState().unknownFormatPath).toBe('/tmp/broken.json');
     // File path shouldn't have been set.
     expect(useDocumentStore.getState().filePath).toBeNull();
+  });
+
+  it('handleOpen surfaces macOS folder permission failures', async () => {
+    const bridge = mockFileBridge();
+    bridge.openDialog.mockRejectedValueOnce(
+      new Error(
+        "EPERM: operation not permitted, open '/Users/rufus/Downloads/.contexture/layout.json'",
+      ),
+    );
+    const { result } = renderHook(() => useFileMenu());
+    await act(async () => {
+      await result.current.handleOpen();
+    });
+    expect(useDocumentStore.getState().fileAccessError).toMatchObject({
+      message: expect.stringMatching(/macOS denied access/i),
+      path: '/Users/rufus/Downloads/.contexture/layout.json',
+    });
   });
 
   it('handleSave writes the bundle when there are no validation errors', async () => {
@@ -300,5 +323,18 @@ describe('useFileMenu', () => {
     });
     expect(bridge.openRecent).toHaveBeenCalledWith('/tmp/recent.contexture.json');
     expect(useDocumentStore.getState().filePath).toBe('/tmp/recent.contexture.json');
+  });
+
+  it('handleOpenPath surfaces recent-file permission failures', async () => {
+    const bridge = mockFileBridge();
+    bridge.openRecent.mockRejectedValueOnce(new Error('EPERM: operation not permitted'));
+    const { result } = renderHook(() => useFileMenu());
+    await act(async () => {
+      await result.current.handleOpenPath('/tmp/recent.contexture.json');
+    });
+    expect(useDocumentStore.getState().fileAccessError).toMatchObject({
+      message: expect.stringMatching(/macOS denied access/i),
+      path: '/tmp/recent.contexture.json',
+    });
   });
 });
