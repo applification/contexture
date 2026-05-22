@@ -1,7 +1,6 @@
 import type { Schema, TypeDef } from './ir';
 import { save } from './load';
 import { bundlePathsFor } from './paths';
-import { hashContent } from './pipeline';
 
 export type ModelChangeSource =
   | 'desktop'
@@ -92,7 +91,7 @@ export function changeLogPathFor(irPath: string): string {
 }
 
 export function schemaHash(schema: Schema): string {
-  return hashContent(save(schema));
+  return hashText(save(schema));
 }
 
 export function summarizeModelChange(
@@ -342,6 +341,22 @@ function makeChangeLogId(createdAt?: string): string {
 
 function stableStringify(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function hashText(text: string): string {
+  const chunks = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b];
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      const chunk = chunks[chunkIndex];
+      if (chunk === undefined) continue;
+      chunks[chunkIndex] = Math.imul(chunk ^ (code + chunkIndex), 0x01000193);
+    }
+  }
+  return chunks
+    .map((chunk) => (chunk >>> 0).toString(16).padStart(8, '0'))
+    .join('')
+    .repeat(2);
 }
 
 function isSource(value: unknown): value is ModelChangeSource {

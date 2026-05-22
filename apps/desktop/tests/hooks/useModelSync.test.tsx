@@ -1,4 +1,5 @@
-import { type Schema, save } from '@contexture/core';
+import type { Schema } from '@contexture/core/ir';
+import { save } from '@contexture/core/load';
 import { useModelSync } from '@renderer/hooks/useModelSync';
 import { useDocumentStore } from '@renderer/store/document';
 import { useModelSyncStore } from '@renderer/store/model-sync';

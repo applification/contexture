@@ -5,7 +5,8 @@
  * valid clean source changes update the canvas; unsafe changes become a
  * model-sync attention state.
  */
-import { IRSchema, summarizeModelChange } from '@contexture/core';
+import { summarizeModelChange } from '@contexture/core/change-log';
+import { IRSchema } from '@contexture/core/ir';
 import { useEffect } from 'react';
 import { useDocumentStore } from '../store/document';
 import {
