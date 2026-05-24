@@ -1,18 +1,22 @@
 /**
  * Graph layout configuration store.
  *
- * Holds ELK tuning knobs exposed by the GraphControls panel. Persisted
- * to the layout sidecar alongside node positions — loading a document
- * hydrates this store, and subsequent mutations are written back.
+ * Holds graph view/layout controls exposed by the GraphControls panel.
+ * Persisted to the layout sidecar alongside node positions — loading a
+ * document hydrates this store, and subsequent mutations are written back.
  */
 import { create } from 'zustand';
 
 export interface GraphLayout {
   nodeSpacing: number;
+  showEnums: boolean;
+  showEdgeLabels: boolean;
 }
 
 export const DEFAULT_LAYOUT: GraphLayout = {
   nodeSpacing: 180,
+  showEnums: true,
+  showEdgeLabels: true,
 };
 
 interface GraphLayoutStoreShape {

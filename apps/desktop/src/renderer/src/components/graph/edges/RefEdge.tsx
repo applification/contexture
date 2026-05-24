@@ -21,6 +21,7 @@ import {
   useInternalNode,
 } from '@xyflow/react';
 import { memo } from 'react';
+import { useGraphLayoutStore } from '../../../store/layout-config';
 import { useGraphSelectionStore } from '../../../store/selection';
 import type { RefEdgeData } from '../schema-to-graph';
 import { getFloatingEdgeParams } from './floating-edge-utils';
@@ -33,6 +34,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const targetNode = useInternalNode(target);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const adjacentEdgeIds = useGraphSelectionStore((s) => s.state.adjacency.edgeIds);
+  const showEdgeLabels = useGraphLayoutStore((s) => s.graphLayout.showEdgeLabels);
 
   if (!sourceNode || !targetNode) return null;
 
@@ -87,7 +89,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
           fill: 'none',
         }}
       />
-      {label && (
+      {showEdgeLabels && label && (
         <EdgeLabelRenderer>
           <div
             style={{

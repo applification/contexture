@@ -115,6 +115,15 @@ describe('TypeNode', () => {
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
     const node = container.querySelector('[data-testid="type-node"]') as HTMLElement;
     expect(node.dataset.table).toBe('true');
+    expect(screen.getByTestId('type-node-header')).toHaveStyle({
+      background: 'var(--graph-node-table-header-bg)',
+    });
+    expect(screen.getByTestId('type-node-table-rail')).toHaveStyle({
+      width: '4px',
+      background: 'var(--graph-node-table-accent)',
+    });
+    expect(screen.getByTestId('type-node-table-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('type-node-table-badge')).toHaveTextContent('table');
   });
 
   it('does not mark non-table nodes with data-table', () => {
