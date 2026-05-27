@@ -65,9 +65,11 @@ All colors use OKLCH for perceptual uniformity. The palette is built around deep
 | `--graph-bg`                | `oklch(0.95 0.01 270)`           | `oklch(0.18 0.02 270)`           | Canvas background            |
 | `--graph-node-class`        | `oklch(0.45 0.15 270)`           | `oklch(0.65 0.12 280)`           | Class node color             |
 | `--graph-node-header-bg`    | `oklch(0.45 0.15 270 / 0.9)`     | `oklch(0.45 0.15 270 / 0.9)`     | Node header background       |
+| `--graph-node-table-header-bg` | `oklch(0.42 0.12 205 / 0.92)` | `oklch(0.42 0.12 205 / 0.92)` | Convex table node header     |
 | `--graph-node-header-text`  | `oklch(1 0 0)`                   | `oklch(1 0 0)`                   | Node header text             |
 | `--graph-node-body-bg`      | `oklch(0.95 0.01 270 / 0.85)`    | `oklch(0.18 0.02 270 / 0.92)`    | Node body background         |
 | `--graph-node-border`       | `oklch(0.45 0.15 270 / 0.25)`    | `oklch(0.25 0.02 270)`           | Node default border          |
+| `--graph-node-table-accent` | `oklch(0.66 0.13 195)`           | `oklch(0.68 0.11 195)`           | Convex table node rail       |
 | `--graph-node-selected`     | `oklch(0.75 0.15 195)`           | `oklch(0.75 0.15 195)`           | Selected node border (cyan)  |
 | `--graph-node-selected-bg`  | `oklch(0.75 0.15 195 / 0.1)`     | `oklch(0.75 0.15 195 / 0.1)`     | Selected node fill           |
 | `--graph-node-adjacent`     | `oklch(0.75 0.15 195 / 0.45)`    | `oklch(0.75 0.15 195 / 0.45)`    | Adjacent node border         |

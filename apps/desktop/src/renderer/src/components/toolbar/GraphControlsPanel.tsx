@@ -1,11 +1,9 @@
 /**
- * Graph controls popover — node-spacing slider + re-layout / fit / reset.
+ * Graph controls popover — view filters + node-spacing slider +
+ * re-layout / fit / reset.
  *
- * Pre-pivot had a stack of visibility filters (subClassOf, disjointWith,
- * object properties, individuals, restrictions, …). None of those map
- * to Contexture's two-kind edge model (`ref` + future `crossBoundary`),
- * so the filter block is deliberately omitted. If Contexture grows
- * more edge kinds the filter UI can come back alongside them.
+ * Keeps the first graph filters deliberately narrow: enums and edge
+ * labels are useful, but can add noise in structure-first reading.
  *
  * The panel talks to the canvas over two custom DOM events:
  *
@@ -19,6 +17,7 @@
 import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { Maximize2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 
 interface Props {
@@ -73,6 +72,34 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
             {graphLayout.nodeSpacing}
           </span>
         </div>
+      </div>
+
+      <div className="px-3 py-2 space-y-2 border-b border-border">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+          View
+        </p>
+        <label
+          className="flex items-center gap-2 text-xs text-foreground"
+          htmlFor="graph-control-show-enums"
+        >
+          <Checkbox
+            id="graph-control-show-enums"
+            checked={graphLayout.showEnums}
+            onCheckedChange={(checked) => setGraphLayout({ showEnums: checked === true })}
+          />
+          Enums
+        </label>
+        <label
+          className="flex items-center gap-2 text-xs text-foreground"
+          htmlFor="graph-control-show-edge-labels"
+        >
+          <Checkbox
+            id="graph-control-show-edge-labels"
+            checked={graphLayout.showEdgeLabels}
+            onCheckedChange={(checked) => setGraphLayout({ showEdgeLabels: checked === true })}
+          />
+          Edge labels
+        </label>
       </div>
 
       <div className="flex gap-2 px-3 py-2">

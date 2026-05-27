@@ -6,11 +6,11 @@
  * the canvas uses so new users can decode the diagram at a glance.
  *
  * Matches the four `TypeDef` kinds (object / enum / discriminatedUnion
- * / raw) and the edge modes (field ref, inferred table id, union variant,
- * cross-boundary import). Colours are pulled from `globals.css` so theme
- * changes flow through without edits here.
+ * / raw), table subtype marker, and the edge modes (field ref, inferred
+ * table id, union variant, cross-boundary import). Colours are pulled
+ * from `globals.css` so theme changes flow through without edits here.
  */
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Table2 } from 'lucide-react';
 import { memo, useState } from 'react';
 
 interface EdgeItem {
@@ -45,12 +45,14 @@ interface NodeItem {
   label: string;
   /** Header swatch colour — matches `headerColorFor` in `TypeNode`. */
   header: string;
+  table?: boolean;
   /** Border style. Imported refs render dashed; everything else solid. */
   style?: 'solid' | 'dashed';
 }
 
 const NODE_ITEMS: readonly NodeItem[] = [
   { label: 'Object', header: 'var(--graph-node-header-bg)' },
+  { label: 'Table', header: 'var(--graph-node-table-header-bg)', table: true },
   {
     label: 'Enum',
     header: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
@@ -122,7 +124,7 @@ export const GraphLegend = memo(function GraphLegend() {
               <div key={item.label} className="flex items-center gap-2">
                 <div
                   aria-hidden="true"
-                  className="shrink-0 rounded"
+                  className="relative shrink-0 overflow-hidden rounded"
                   style={{
                     width: 18,
                     height: 12,
@@ -130,7 +132,24 @@ export const GraphLegend = memo(function GraphLegend() {
                     border: `1px ${item.style ?? 'solid'} var(--graph-node-border)`,
                     boxShadow: `inset 0 3px 0 ${item.header}`,
                   }}
-                />
+                >
+                  {item.table ? (
+                    <>
+                      <span
+                        className="absolute inset-y-0 left-0"
+                        style={{
+                          width: 3,
+                          background: 'var(--graph-node-table-accent)',
+                        }}
+                      />
+                      <Table2
+                        size={8}
+                        strokeWidth={2.2}
+                        className="absolute right-0.5 top-0.5 text-white"
+                      />
+                    </>
+                  ) : null}
+                </div>
                 <span className="text-foreground">{item.label}</span>
               </div>
             ))}

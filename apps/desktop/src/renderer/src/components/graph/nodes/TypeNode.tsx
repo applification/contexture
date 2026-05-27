@@ -8,6 +8,8 @@
  *     glance without a badge.
  *   - Field rows under the header as a flat list, right-aligned type
  *     summary (ref fields use the edge-property colour for the summary).
+ *   - Table objects add a persistent left rail and header icon so they
+ *     remain distinguishable from value objects without relying on colour.
  *   - Selection, adjacency dimming, and imported-boundary styling all
  *     driven from the UI store.
  *
@@ -17,6 +19,7 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
+import { Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +90,10 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       : 'var(--graph-node-border)';
   const borderWidth = isSelected || isAdjacent ? 2 : 1;
   const borderStyle = data.imported ? 'dashed' : 'solid';
-  const headerColor = useMemo(() => headerColorFor(data.kind), [data.kind]);
+  const headerColor = useMemo(
+    () => (data.table ? 'var(--graph-node-table-header-bg)' : headerColorFor(data.kind)),
+    [data.kind, data.table],
+  );
   const node = (
     <div
       data-testid="type-node"
@@ -100,6 +106,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       style={{
         minWidth: 180,
         maxWidth: 260,
+        position: 'relative',
         borderRadius: 8,
         overflow: 'hidden',
         backdropFilter: 'blur(8px)',
@@ -117,6 +124,21 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         transition: 'opacity 0.15s ease, border-color 0.1s ease',
       }}
     >
+      {data.table ? (
+        <div
+          aria-hidden="true"
+          data-testid="type-node-table-rail"
+          style={{
+            position: 'absolute',
+            insetBlock: 0,
+            insetInlineStart: 0,
+            width: 4,
+            background: 'var(--graph-node-table-accent)',
+            zIndex: 1,
+          }}
+        />
+      ) : null}
+
       {/* Invisible handles — floating edges use intersection math to find
          the edge crossing point, so actual anchor position doesn't matter. */}
       <Handle
@@ -131,6 +153,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       />
 
       <div
+        data-testid="type-node-header"
         style={{
           padding: '6px 10px',
           fontSize: 12,
@@ -141,8 +164,18 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           display: 'flex',
           alignItems: 'center',
           gap: 6,
+          paddingLeft: data.table ? 12 : 10,
         }}
       >
+        {data.table ? (
+          <Table2
+            aria-hidden="true"
+            data-testid="type-node-table-icon"
+            size={14}
+            strokeWidth={2.2}
+            style={{ flex: '0 0 auto', opacity: 0.92 }}
+          />
+        ) : null}
         <span
           style={{
             flex: 1,
@@ -160,13 +193,14 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             style={{
               fontSize: 9,
               fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
+              letterSpacing: '0.04em',
               padding: '1px 5px',
               borderRadius: 3,
-              background: 'var(--graph-edge-property)',
+              border:
+                '1px solid color-mix(in oklch, var(--graph-node-header-text) 28%, transparent)',
+              background: 'color-mix(in oklch, var(--graph-node-header-text) 14%, transparent)',
               color: 'var(--graph-node-header-text)',
-              opacity: 0.9,
+              opacity: 0.86,
             }}
           >
             table

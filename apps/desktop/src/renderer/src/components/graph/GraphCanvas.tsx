@@ -44,6 +44,7 @@ import { useUIChromeStore } from '../../store/ui-chrome';
 import { useUndoStore } from '../../store/undo';
 import { RefEdge } from './edges/RefEdge';
 import { GraphLegend } from './GraphLegend';
+import { filterGraphView } from './graph-view';
 import {
   type ConnectPayload,
   handleConnect,
@@ -111,12 +112,21 @@ function GraphCanvasInner({
     };
   }, [schema, positions, highlightedNodeIds]);
 
-  const [nodes, setNodes] = useState<Node[]>(builtNodes);
-  const [edges, setEdges] = useState<Edge[]>(builtEdges);
+  const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
+  const showEnums = graphLayout.showEnums;
+  const { nodes: visibleBuiltNodes, edges: visibleBuiltEdges } = useMemo(
+    () => filterGraphView({ nodes: builtNodes, edges: builtEdges }, { showEnums }),
+    [builtNodes, builtEdges, showEnums],
+  );
+
+  const [nodes, setNodes] = useState<Node[]>(visibleBuiltNodes);
+  const [edges, setEdges] = useState<Edge[]>(visibleBuiltEdges);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const builtNodesRef = useRef(builtNodes);
   nodesRef.current = nodes;
   edgesRef.current = edges;
+  builtNodesRef.current = builtNodes;
 
   // When the IR changes, merge new structure onto the current local
   // positions so node drag state isn't blown away on every keystroke.
@@ -135,21 +145,26 @@ function GraphCanvasInner({
     // Merge: keep existing in-memory positions (user drags) + data
     // updates from the rebuilt nodes.
     const liveById = new Map(nodesRef.current.map((n) => [n.id, n]));
-    const merged = builtNodes.map((n) => {
+    const merged = visibleBuiltNodes.map((n) => {
       const live = liveById.get(n.id);
       return live ? { ...n, position: live.position } : n;
     });
     setNodes(merged);
-    setEdges(builtEdges);
+    setEdges(visibleBuiltEdges);
 
     if (structureChanged) layoutPendingRef.current = true;
-  }, [builtNodes, builtEdges]);
+  }, [builtNodes, visibleBuiltNodes, visibleBuiltEdges]);
+
+  useEffect(() => {
+    if (showEnums || !selectedNodeId) return;
+    const selectedNode = builtNodes.find((node) => node.id === selectedNodeId);
+    if (selectedNode?.data.kind === 'enum' && !selectedNode.data.imported) clearNodes();
+  }, [builtNodes, clearNodes, selectedNodeId, showEnums]);
 
   // ELK once the nodes have measured DOM dimensions.
   const { runLayout } = useELKLayout();
   const { fitView, setCenter } = useReactFlow();
   const nodesInitialized = useNodesInitialized({ includeHiddenNodes: false });
-  const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const graphLayoutRef = useRef(graphLayout);
   graphLayoutRef.current = graphLayout;
   // Keep refs for callbacks triggered outside React (custom events).
@@ -179,9 +194,14 @@ function GraphCanvasInner({
           return p ? { ...n, position: p } : n;
         }),
       );
+      const visibleNodeIds = new Set(nodesRef.current.map((n) => n.id));
       const next: Record<string, CanvasPosition> = respectSidecar
         ? { ...(positionsRef.current ?? {}) }
-        : {};
+        : Object.fromEntries(
+            builtNodesRef.current
+              .filter((n) => !visibleNodeIds.has(n.id))
+              .map((n) => [n.id, positionsRef.current?.[n.id] ?? n.position]),
+          );
       positionById.forEach((p, id) => {
         next[id] = p;
       });

@@ -10,6 +10,7 @@
  * Escape clears.
  */
 
+import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { Search, X } from 'lucide-react';
@@ -27,6 +28,7 @@ export function GraphSearchBar(): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const focus = useGraphSelectionStore((s) => s.focus);
+  const showEnums = useGraphLayoutStore((s) => s.graphLayout.showEnums);
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
 
   // Cmd/Ctrl+F focuses the input.
@@ -47,6 +49,7 @@ export function GraphSearchBar(): React.JSX.Element {
     if (!q) return [];
     const matches: Result[] = [];
     for (const t of schema.types) {
+      if (!showEnums && t.kind === 'enum') continue;
       if (t.name.toLowerCase().includes(q)) {
         matches.push({ name: t.name, matchType: 'name' });
       } else if (t.description?.toLowerCase().includes(q)) {
@@ -54,7 +57,7 @@ export function GraphSearchBar(): React.JSX.Element {
       }
     }
     return matches.slice(0, 10);
-  }, [query, schema]);
+  }, [query, schema, showEnums]);
 
   useEffect(() => {
     setActiveIndex(0);
