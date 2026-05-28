@@ -5,7 +5,7 @@
 
 ## Context
 
-Contexture's codebase has converged on a stronger product shape than "visual Zod schema editor":
+Contexture's codebase has converged on a stronger product shape than the older Zod-first editor category or a generic TypeScript schema tool:
 
 - `@contexture/core` owns a canonical IR, closed-world op vocabulary, validation, emitters, path conventions, and file-backed mutation helpers.
 - The desktop app provides local-first visual and chat-assisted authoring over that IR.
@@ -19,13 +19,13 @@ The product direction should preserve the narrow leverage point: Contexture owns
 
 ## Decision
 
-Contexture is the **domain-model control plane for AI-native TypeScript apps**.
+Contexture is the **domain-model control plane for Convex apps built with agents**.
 
 The product owns:
 
 - Authoring and validating a canonical `.contexture.json` IR.
 - Applying all human, CLI, and agent edits through the closed-world op vocabulary.
-- Emitting typed surfaces from that IR, including Zod, JSON Schema, Convex schema, schema indexes, and future AI-pipeline artefacts such as tool schemas, extractor scaffolds, MCP definitions, and form validators.
+- Emitting typed surfaces from that IR, led by Convex schema and validators, with supporting Zod, JSON Schema, schema indexes, and future AI-pipeline artefacts such as tool schemas, extractor scaffolds, MCP definitions, and form validators.
 - Detecting and reconciling drift in generated artefacts using the emitted hash manifest.
 - Exposing the same model mutation surface to agents through CLI/MCP-style adapters.
 
@@ -55,7 +55,7 @@ The desktop app remains the human visual authoring surface. The CLI and future M
 
 ## Alternatives considered
 
-- **Keep positioning as a visual Zod editor.** Too small: it undersells the existing Convex, JSON Schema, drift, CLI, and agent-safe op architecture.
+- **Keep positioning as a visual Zod editor.** Too small: it undersells the Convex-first model loop, JSON Schema, drift, CLI, and agent-safe op architecture.
 - **Become a full app builder.** Too broad: it would compete with scaffolding, Sandcastle, and coding agents, while weakening Contexture's source-of-truth story.
 - **Become a general agent orchestration product.** Rejected because Sandcastle/missions already cover that adjacent space; Contexture's leverage is a safe domain-model interface those agents can call.
-- **Reopen the JSON-LD/frame pivot.** Rejected for now because the current implementation and product plan have converged on TypeScript/Zod/Convex/AI-pipeline schema design.
+- **Reopen the JSON-LD/frame pivot.** Rejected for now because the current implementation and product plan have converged on Convex-first model design with supporting TypeScript, Zod, JSON Schema, and AI-pipeline outputs.

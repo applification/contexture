@@ -45,6 +45,32 @@ test.describe('Home page', () => {
     await expect(aiSection).toBeVisible();
     await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);
     await expect(aiSection.locator('text=MCP-native by design')).toBeVisible();
+    await expect(
+      aiSection.locator('text=Add Memberships table with user and team refs'),
+    ).toBeVisible();
+    await expect(aiSection.locator('text=discogsReleaseId')).toHaveCount(0);
+  });
+
+  test('generated-output proof leads with Convex files', async ({ page }) => {
+    await page.goto('/');
+    const proof = page.locator('section', {
+      has: page.locator('h3:has-text("See generated Convex files before they land in git")'),
+    });
+    await expect(proof.locator('div').filter({ hasText: /^convex\/schema\.ts$/ })).toBeVisible();
+    await expect(
+      proof.locator('div').filter({ hasText: /^convex\/validators\.ts$/ }),
+    ).toBeVisible();
+    await expect(proof.locator('text=memberships: defineTable')).toBeVisible();
+    await expect(proof.locator('text=.index("by_user", ["userId"])')).toBeVisible();
+  });
+
+  test('use cases lead with Convex app schemas', async ({ page }) => {
+    await page.goto('/');
+    const useCases = page.locator('section', {
+      has: page.locator('h2:has-text("One Convex model, many consumers")'),
+    });
+    const headings = useCases.locator('.uppercase');
+    await expect(headings.first()).toContainText('Convex app schemas');
   });
 
   test('footer contains expected links', async ({ page }) => {

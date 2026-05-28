@@ -113,12 +113,12 @@ const features = [
 const agentSteps = [
   {
     tool: 'inspect_contexture',
-    label: 'Read Release and generated targets',
+    label: 'Read Users and Teams tables',
     status: 'complete',
   },
   {
     tool: 'apply_contexture_op',
-    label: 'Add optional discogsReleaseId field',
+    label: 'Add Memberships table with user and team refs',
     status: 'complete',
   },
   { tool: 'emit_contexture', label: 'Regenerate Convex schema and validators', status: 'complete' },
@@ -128,6 +128,63 @@ const agentSteps = [
     status: 'clean',
   },
 ];
+
+const convexPreviewLines = [
+  { id: 'server-import', text: 'import { defineSchema, defineTable } from "convex/server";' },
+  { id: 'values-import', text: 'import { v } from "convex/values";' },
+  { id: 'spacer-imports', text: '' },
+  { id: 'schema-open', text: 'export default defineSchema({' },
+  { id: 'users-open', text: '  users: defineTable({' },
+  { id: 'users-name', text: '    name: v.string(),' },
+  { id: 'users-email', text: '    email: v.string(),' },
+  { id: 'users-index', text: '  }).index("by_email", ["email"]),' },
+  { id: 'teams-open', text: '  teams: defineTable({' },
+  { id: 'teams-slug', text: '    slug: v.string(),' },
+  { id: 'teams-name', text: '    name: v.string(),' },
+  { id: 'teams-index', text: '  }).index("by_slug", ["slug"]),' },
+  { id: 'memberships-open', text: '  memberships: defineTable({' },
+  { id: 'memberships-user', text: '    userId: v.id("users"),' },
+  { id: 'memberships-team', text: '    teamId: v.id("teams"),' },
+  { id: 'memberships-role', text: '    role: v.union(v.literal("owner"), v.literal("member")),' },
+  { id: 'memberships-close', text: '  })' },
+  { id: 'memberships-user-index', text: '    .index("by_user", ["userId"])' },
+  { id: 'memberships-team-index', text: '    .index("by_team", ["teamId"]),' },
+  { id: 'schema-close', text: '});' },
+];
+
+function ConvexGeneratedPreview() {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-card/70 text-left screenshot-glow">
+      <div className="flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3">
+        <div>
+          <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
+          <div className="text-[11px] text-muted-foreground">Read-only generated output</div>
+        </div>
+        <div className="rounded border border-success/20 bg-success/10 px-2 py-1 text-[10px] uppercase tracking-wide text-success">
+          Drift clean
+        </div>
+      </div>
+      <pre className="overflow-x-auto p-4 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+        <code>
+          {convexPreviewLines.map((line, index) => (
+            <span key={line.id} className="block">
+              <span className="mr-4 select-none text-muted-foreground/40">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <span>{line.text || ' '}</span>
+            </span>
+          ))}
+        </code>
+      </pre>
+      <div className="border-t border-border/60 bg-background/50 px-4 py-3">
+        <div className="font-mono text-xs text-primary dark:text-accent">convex/validators.ts</div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Reusable validators emit beside the schema for functions, forms, and app boundaries.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function AgentConversationDemo() {
   return (
@@ -416,15 +473,8 @@ export default function Home() {
 
           {/* Two-column: generated surface preview + description */}
           <div className="grid sm:grid-cols-5 gap-8 sm:gap-12 items-center">
-            <div className="sm:col-span-2 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <ThemeImage
-                srcDark="/images/misprint-generated-zod.png"
-                srcLight="/images/misprint-generated-zod-light.png"
-                alt="Contexture generated-output panel previewing code from the selected Convex domain model"
-                width={1600}
-                height={1200}
-                className="w-full h-auto"
-              />
+            <div className="sm:col-span-2">
+              <ConvexGeneratedPreview />
             </div>
             <div className="sm:col-span-3 space-y-6">
               <h3 className="text-2xl font-bold tracking-tight">
@@ -482,21 +532,21 @@ export default function Home() {
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-8">
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                Structured output
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Generate JSON Schema and structured-output definitions from the same Convex model
-                your app imports. Prompt surfaces and app surfaces stay aligned.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
                 Convex app schemas
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Emit `convex/schema.ts`, `convex/validators.ts`, and supporting schema files for the
                 product repo. Generated markers and the manifest make review and drift detection
                 part of normal git flow.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
+              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
+                Structured output
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Generate JSON Schema and structured-output definitions from the same Convex model
+                your app imports. Prompt surfaces and app surfaces stay aligned.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
