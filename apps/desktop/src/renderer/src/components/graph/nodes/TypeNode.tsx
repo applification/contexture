@@ -19,7 +19,7 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { Table2 } from 'lucide-react';
+import { CircleAlert, Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -158,6 +158,13 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       data-selected={isSelected ? 'true' : 'false'}
       data-adjacent={isAdjacent ? 'true' : 'false'}
       data-validation-issues={hasValidationIssues ? 'true' : undefined}
+      title={
+        hasValidationIssues
+          ? `${data.validationIssueCount} validation ${
+              data.validationIssueCount === 1 ? 'issue' : 'issues'
+            }`
+          : undefined
+      }
       {...(data.table ? { 'data-table': 'true' } : {})}
       className="contexture-type-node"
       style={{
@@ -170,7 +177,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         WebkitBackdropFilter: 'blur(8px)',
         borderWidth,
         borderStyle,
-        borderColor: hasValidationIssues && !isSelected ? 'var(--destructive)' : borderColor,
+        borderColor,
         boxShadow: '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)',
         background:
           isSelected || isPreviewPrimary ? 'var(--graph-node-selected-bg)' : 'transparent',
@@ -193,6 +200,20 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             width: 4,
             background: 'var(--graph-node-table-accent)',
             zIndex: 1,
+          }}
+        />
+      ) : null}
+      {hasValidationIssues ? (
+        <div
+          aria-hidden="true"
+          data-testid="type-node-validation-rail"
+          style={{
+            position: 'absolute',
+            insetBlock: 0,
+            insetInlineEnd: 0,
+            width: 3,
+            background: 'var(--destructive)',
+            zIndex: 2,
           }}
         />
       ) : null}
@@ -245,12 +266,36 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           {data.typeName}
         </span>
         {hasValidationIssues && (
-          <NodeKindLabel
+          <span
             data-testid="type-node-validation-label"
-            style={{ color: 'var(--destructive)', opacity: 0.95 }}
+            role="img"
+            aria-label={`${data.validationIssueCount} validation ${
+              data.validationIssueCount === 1 ? 'issue' : 'issues'
+            }`}
+            title={`${data.validationIssueCount} validation ${
+              data.validationIssueCount === 1 ? 'issue' : 'issues'
+            }`}
+            style={{
+              flex: '0 0 auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 999,
+              background: 'color-mix(in oklch, var(--destructive) 24%, var(--background))',
+              color: 'var(--destructive-foreground)',
+              border: '1px solid color-mix(in oklch, var(--destructive) 60%, transparent)',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
           >
-            issue
-          </NodeKindLabel>
+            <CircleAlert aria-hidden="true" size={11} strokeWidth={2.4} />
+            {data.validationIssueCount && data.validationIssueCount > 1
+              ? data.validationIssueCount
+              : null}
+          </span>
         )}
         {data.table ? (
           <NodeKindLabel data-testid="type-node-table-label">table</NodeKindLabel>
@@ -295,8 +340,9 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             background: 'var(--graph-node-body-bg)',
             color: 'var(--muted-foreground)',
             cursor: 'pointer',
-            fontSize: 10,
-            padding: '4px 10px',
+            fontSize: 11,
+            minHeight: 28,
+            padding: '6px 10px',
           }}
         >
           + field

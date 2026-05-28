@@ -15,7 +15,7 @@
 import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { ValidationError } from '@renderer/services/validation';
-import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
@@ -251,7 +251,7 @@ function ObjectBody({
             <TableHead className="h-7 px-2">Name</TableHead>
             <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
             <TableHead className="h-7 px-2 text-right">Type</TableHead>
-            <TableHead className="h-7 w-32 px-1 text-right">
+            <TableHead className="h-7 w-28 px-1 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
@@ -305,7 +305,7 @@ function ObjectBody({
                 <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
                   {summariseKind(f.type.kind)}
                 </TableCell>
-                <TableCell className="w-32 px-1 py-1.5 text-right">
+                <TableCell className="w-28 px-1 py-1.5 text-right">
                   <div className="inline-flex items-center gap-0.5">
                     <Button
                       type="button"
@@ -332,7 +332,7 @@ function ObjectBody({
                       onClick={() => moveField(fieldIndex, fieldIndex - 1)}
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                     >
-                      <ChevronLeft aria-hidden="true" />
+                      <ChevronUp aria-hidden="true" />
                     </Button>
                     <Button
                       type="button"
@@ -343,7 +343,7 @@ function ObjectBody({
                       onClick={() => moveField(fieldIndex, fieldIndex + 1)}
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                     >
-                      <ChevronRight aria-hidden="true" />
+                      <ChevronDown aria-hidden="true" />
                     </Button>
                     <Button
                       type="button"
@@ -676,9 +676,9 @@ function IndexFieldChip({
           aria-label={`Move ${fieldName} earlier in index ${indexName}`}
           disabled={position === 0}
           onClick={onMoveEarlier}
-          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
         >
-          <ChevronLeft aria-hidden="true" />
+          <ChevronUp aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -687,9 +687,9 @@ function IndexFieldChip({
           aria-label={`Move ${fieldName} later in index ${indexName}`}
           disabled={position === total - 1}
           onClick={onMoveLater}
-          className="h-5 w-5 text-muted-foreground hover:text-foreground"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
         >
-          <ChevronRight aria-hidden="true" />
+          <ChevronDown aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -699,7 +699,7 @@ function IndexFieldChip({
           disabled={onlyField}
           title={onlyField ? 'Indexes need at least one field.' : undefined}
           onClick={onRemove}
-          className="h-5 w-5 text-muted-foreground hover:text-destructive"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
         >
           <X aria-hidden="true" />
         </Button>
@@ -1071,9 +1071,9 @@ function DiscriminatedUnionBody({
         />
       </div>
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Label>Variants</Label>
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
             <Input
               aria-label="New variant"
               value={newVariant}
@@ -1085,7 +1085,7 @@ function DiscriminatedUnionBody({
                 }
               }}
               placeholder="Object type"
-              className="h-7 w-32 px-2 text-xs"
+              className="h-8 w-36 px-2 text-xs"
             />
             <Button
               type="button"
@@ -1099,7 +1099,7 @@ function DiscriminatedUnionBody({
                 variantObjectExists,
               )}
               onClick={addTypedVariant}
-              className="h-7 px-2 text-xs"
+              className="h-8 px-2 text-xs"
             >
               <Plus aria-hidden="true" />
               Add variant
@@ -1116,7 +1116,7 @@ function DiscriminatedUnionBody({
                 variantObjectExists,
               )}
               onClick={createObjectVariant}
-              className="h-7 px-2 text-xs"
+              className="h-8 px-2 text-xs"
             >
               <Plus aria-hidden="true" />
               Create object

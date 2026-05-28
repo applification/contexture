@@ -437,6 +437,7 @@ export default function App(): React.JSX.Element {
                       <Button
                         variant="secondary"
                         className="h-8 px-2 gap-1.5 shadow-sm"
+                        aria-label="Graph controls"
                         title="Graph controls"
                       >
                         <SlidersHorizontal className="size-4" />
@@ -474,7 +475,7 @@ export default function App(): React.JSX.Element {
         <ResizablePanel
           id="sidebar-panel"
           defaultSize="30%"
-          minSize="15%"
+          minSize="25%"
           maxSize="60%"
           collapsible
           collapsedSize={0}

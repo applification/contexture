@@ -1,5 +1,6 @@
 import type { ValidationError } from '@renderer/services/validation';
 import { CircleAlert } from 'lucide-react';
+import { Button } from '../ui/button';
 
 export interface ValidationIssueRepair {
   label: string;
@@ -32,14 +33,17 @@ export function ValidationIssues({
           return (
             <li key={`${error.code}:${error.path}`} className="flex items-start gap-2">
               {onIssueClick ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => onIssueClick(error)}
-                  className="min-w-0 flex-1 text-left hover:underline"
+                  className="h-auto min-h-8 min-w-0 flex-1 justify-start px-1.5 py-1 text-left text-xs hover:bg-destructive/10"
                 >
-                  <span>{error.message}</span>
-                  <span className="ml-1 text-muted-foreground/70">{error.path}</span>
-                </button>
+                  <span className="whitespace-normal">
+                    <span>{error.message}</span>
+                    <span className="ml-1 text-muted-foreground/70">{error.path}</span>
+                  </span>
+                </Button>
               ) : (
                 <span className="min-w-0 flex-1">
                   <span>{error.message}</span>
@@ -47,13 +51,15 @@ export function ValidationIssues({
                 </span>
               )}
               {repair && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={repair.onApply}
-                  className="shrink-0 rounded border border-border bg-background px-2 py-0.5 text-[11px] text-foreground hover:bg-muted"
+                  className="h-8 shrink-0 px-2 text-[11px]"
                 >
                   {repair.label}
-                </button>
+                </Button>
               )}
             </li>
           );

@@ -111,7 +111,10 @@ describe('TypeNode', () => {
     const field = screen.getByTestId('type-node-field');
 
     expect(node.dataset.validationIssues).toBe('true');
-    expect(screen.getByTestId('type-node-validation-label')).toHaveTextContent('issue');
+    expect(screen.getByTestId('type-node-validation-label')).toHaveAccessibleName(
+      '1 validation issue',
+    );
+    expect(screen.getByTestId('type-node-validation-rail')).toBeInTheDocument();
     expect(field.dataset.validationIssues).toBe('true');
     expect(field).toHaveStyle({ boxShadow: 'inset 3px 0 0 var(--destructive)' });
   });

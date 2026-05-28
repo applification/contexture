@@ -142,6 +142,7 @@ export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
             <Button
               variant="ghost"
               className="h-8 px-2 gap-1.5"
+              aria-label="Create type"
               title="Create type"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
