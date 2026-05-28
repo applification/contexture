@@ -48,11 +48,16 @@ export const AnimatedThemeToggler = ({
     const applyTheme = () => {
       const newTheme = !isDark;
       setIsDark(newTheme);
-      document.documentElement.classList.toggle('dark');
+      document.documentElement.classList.toggle('dark', newTheme);
       localStorage.setItem('theme', newTheme ? 'dark' : 'light');
     };
 
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (typeof document.startViewTransition !== 'function') {
+      applyTheme();
+      return;
+    }
+    if (reducedMotion) {
       applyTheme();
       return;
     }

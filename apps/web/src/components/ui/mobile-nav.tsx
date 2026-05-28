@@ -12,6 +12,13 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
+function scrollToId(id: string) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
+}
+
 export function MobileNav() {
   const [open, setOpen] = useState(false);
 
@@ -33,7 +40,7 @@ export function MobileNav() {
               type="button"
               onClick={() => {
                 setOpen(false);
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                scrollToId('features');
               }}
               className="py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
             >
@@ -61,7 +68,7 @@ export function MobileNav() {
               type="button"
               onClick={() => {
                 setOpen(false);
-                document.getElementById('download')?.scrollIntoView({ behavior: 'smooth' });
+                scrollToId('download');
               }}
               className="mt-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium text-center hover:opacity-90 transition-opacity w-full"
             >

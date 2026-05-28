@@ -23,6 +23,20 @@ test.describe('Page navigation', () => {
     await expect(page).toHaveTitle(/Contexture/i);
   });
 
+  test('theme preference persists across route navigation', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+
+    await page.getByRole('button', { name: 'Toggle theme' }).first().click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('theme'))).toBe('light');
+
+    await page.locator('nav a[href="/brand"]').click();
+    await expect(page).toHaveURL(/\/brand$/);
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('theme'))).toBe('light');
+  });
+
   test('404 page shows for invalid routes', async ({ page }) => {
     const response = await page.goto('/nonexistent-page');
     expect(response?.status()).toBe(404);
