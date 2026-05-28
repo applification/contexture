@@ -1,7 +1,7 @@
 {
   "name": "@contexture/desktop",
   "version": "0.15.20",
-  "description": "Visual Zod schema editor with LLM support",
+  "description": "Convex model editor with generated schema, validators, and agent-safe ops",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/applification/contexture",
   "author": "Applification Ltd",

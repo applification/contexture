@@ -5,7 +5,7 @@
 
 ## Context
 
-Contexture now has a clear product shape: it is the domain-model control plane for AI-native TypeScript apps, with `@contexture/core` as the shared kernel and desktop, CLI, MCP, and provider runtimes as surfaces over that kernel.
+Contexture now has a clear product shape: it is the domain-model control plane for Convex apps built with agents, with `@contexture/core` as the shared kernel and desktop, CLI, MCP, and provider runtimes as surfaces over that kernel.
 
 Recent architecture and security work tightened the trust envelope:
 

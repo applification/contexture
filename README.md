@@ -15,7 +15,7 @@ This is a Turborepo monorepo:
 
 | App / Package | Path | Description | Deployment |
 |---|---|---|---|
-| **Desktop** | [`apps/desktop/`](apps/desktop/) | Electron schema editor | GitHub Releases (tagged) |
+| **Desktop** | [`apps/desktop/`](apps/desktop/) | Electron Convex model editor | GitHub Releases (tagged) |
 | **Web** | [`apps/web/`](apps/web/) | Marketing website (Next.js) | Vercel (auto-deploy on merge to main) |
 | **stdlib** | [`packages/stdlib/`](packages/stdlib/) | Curated types library | — |
 | **runtime** | [`packages/runtime/`](packages/runtime/) | Published as `@contexture/runtime` | npm |
