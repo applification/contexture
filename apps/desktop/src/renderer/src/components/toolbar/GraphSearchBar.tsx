@@ -1,5 +1,5 @@
 /**
- * Canvas search bar — focuses a type by name.
+ * Canvas search bar — focuses a type or inline enum usage by name.
  *
  * Contexture IRs only have `TypeDef`s (objects / enums / discriminated
  * unions / raw), so we match against `TypeDef.name` and
@@ -10,16 +10,30 @@
  * Escape clears.
  */
 
+import type { FieldType } from '@contexture/core/ir';
 import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { Search, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 interface Result {
   name: string;
-  matchType: 'name' | 'description';
+  focusName: string;
+  matchType: 'name' | 'description' | 'enum';
+  kindLabel: 'object' | 'table' | 'enum' | 'union' | 'raw';
+  focusFieldName?: string;
+  detail?: string;
 }
+
+const KIND_BADGE_STYLES: Record<Result['kindLabel'], CSSProperties> = {
+  object: badgeStyle('var(--graph-node-header-bg)'),
+  table: badgeStyle('var(--graph-node-table-accent)'),
+  enum: badgeStyle('var(--chart-3)'),
+  union: badgeStyle('var(--graph-edge-union)'),
+  raw: badgeStyle('var(--muted-foreground)'),
+};
 
 export function GraphSearchBar(): React.JSX.Element {
   const [query, setQuery] = useState('');
@@ -48,12 +62,45 @@ export function GraphSearchBar(): React.JSX.Element {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const matches: Result[] = [];
+    const hiddenLocalEnums = new Set<string>();
     for (const t of schema.types) {
-      if (!showEnums && t.kind === 'enum') continue;
+      if (!showEnums && t.kind === 'enum') {
+        hiddenLocalEnums.add(t.name);
+        continue;
+      }
       if (t.name.toLowerCase().includes(q)) {
-        matches.push({ name: t.name, matchType: 'name' });
+        matches.push({
+          name: t.name,
+          focusName: t.name,
+          matchType: 'name',
+          kindLabel: kindLabel(t),
+        });
       } else if (t.description?.toLowerCase().includes(q)) {
-        matches.push({ name: t.name, matchType: 'description' });
+        matches.push({
+          name: t.name,
+          focusName: t.name,
+          matchType: 'description',
+          kindLabel: kindLabel(t),
+        });
+      }
+    }
+    if (!showEnums && hiddenLocalEnums.size > 0) {
+      for (const type of schema.types) {
+        if (type.kind !== 'object') continue;
+        for (const field of type.fields) {
+          const target = unwrapRefTarget(field.type);
+          if (!target || !hiddenLocalEnums.has(target)) continue;
+          if (target.toLowerCase().includes(q)) {
+            matches.push({
+              name: target,
+              focusName: type.name,
+              matchType: 'enum',
+              kindLabel: 'enum',
+              focusFieldName: field.name,
+              detail: `${type.name}.${field.name}`,
+            });
+          }
+        }
       }
     }
     return matches.slice(0, 10);
@@ -76,8 +123,8 @@ export function GraphSearchBar(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  function pick(name: string): void {
-    focus(name);
+  function pick(result: Result): void {
+    focus({ nodeId: result.focusName, fieldName: result.focusFieldName });
     setQuery('');
     setOpen(false);
   }
@@ -96,7 +143,7 @@ export function GraphSearchBar(): React.JSX.Element {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      pick(results[activeIndex].name);
+      pick(results[activeIndex]);
     }
   }
 
@@ -113,9 +160,9 @@ export function GraphSearchBar(): React.JSX.Element {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Search types…"
+          placeholder="Search types and enums…"
           className="flex-1 min-w-0 bg-transparent text-xs outline-none text-foreground placeholder:text-muted-foreground/50"
-          aria-label="Search types"
+          aria-label="Search types and enums"
         />
         {query && (
           <button
@@ -137,18 +184,27 @@ export function GraphSearchBar(): React.JSX.Element {
           {results.map((r, i) => (
             <button
               type="button"
-              key={r.name}
+              key={`${r.name}-${r.focusName}-${r.detail ?? r.matchType}`}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(r.name)}
-              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+              onClick={() => pick(r)}
+              className={`flex w-full min-w-0 items-baseline gap-1.5 px-3 py-1.5 text-left text-xs transition-colors ${
                 i === activeIndex
                   ? 'bg-secondary text-foreground'
                   : 'text-foreground hover:bg-secondary/60'
               }`}
             >
-              {r.name}
+              <span className="min-w-0 flex-1 truncate">{r.name}</span>
+              <span
+                className="shrink-0 rounded border px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide"
+                style={KIND_BADGE_STYLES[r.kindLabel]}
+                title={r.detail}
+              >
+                {r.kindLabel}
+              </span>
               {r.matchType === 'description' && (
-                <span className="text-muted-foreground/60 ml-1.5">(in description)</span>
+                <span className="shrink min-w-0 truncate text-muted-foreground/60">
+                  (in description)
+                </span>
               )}
             </button>
           ))}
@@ -156,4 +212,27 @@ export function GraphSearchBar(): React.JSX.Element {
       )}
     </div>
   );
+}
+
+function unwrapRefTarget(t: FieldType): string | undefined {
+  let cur: FieldType = t;
+  while (cur.kind === 'array' && cur.element) cur = cur.element as typeof cur;
+  return cur.kind === 'ref' ? cur.typeName : undefined;
+}
+
+function kindLabel(type: {
+  kind: 'object' | 'enum' | 'discriminatedUnion' | 'raw';
+  table?: boolean;
+}): Result['kindLabel'] {
+  if (type.kind === 'object') return type.table ? 'table' : 'object';
+  if (type.kind === 'discriminatedUnion') return 'union';
+  return type.kind;
+}
+
+function badgeStyle(color: string): CSSProperties {
+  return {
+    background: `color-mix(in oklch, ${color} 12%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} 42%, var(--border))`,
+    color: `color-mix(in oklch, ${color} 70%, var(--foreground))`,
+  };
 }

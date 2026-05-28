@@ -29,7 +29,12 @@ export interface GraphSelectionState {
   edgeId: string | null;
   adjacency: AdjacencySet;
   /** Target for "reveal in graph" from search — consumed by the canvas. */
-  focusNodeId: string | null;
+  focusTarget: GraphFocusTarget | null;
+}
+
+export interface GraphFocusTarget {
+  nodeId: string;
+  fieldName?: string;
 }
 
 export type AdjacencyResolver = (nodeId: string) => {
@@ -47,7 +52,7 @@ const INITIAL_STATE: GraphSelectionState = {
   primaryNodeId: null,
   edgeId: null,
   adjacency: EMPTY_ADJACENCY,
-  focusNodeId: null,
+  focusTarget: null,
 };
 
 const DEFAULT_RESOLVER: AdjacencyResolver = () => ({ nodeIds: [], edgeIds: [] });
@@ -70,7 +75,7 @@ interface GraphSelectionStoreShape {
   state: GraphSelectionState;
   click(nodeId: string, mode: ClickMode): void;
   selectEdge(edgeId: string | null): void;
-  focus(nodeId: string): void;
+  focus(target: string | GraphFocusTarget): void;
   /** Called by the canvas once it has centred on the focus target. */
   consumeFocus(): void;
   clear(): void;
@@ -136,12 +141,17 @@ export const useGraphSelectionStore = create<GraphSelectionStoreShape>((set, get
       set((s) => ({ state: { ...s.state, edgeId } }));
     },
 
-    focus(nodeId) {
-      set((s) => ({ state: { ...s.state, focusNodeId: nodeId } }));
+    focus(target) {
+      set((s) => ({
+        state: {
+          ...s.state,
+          focusTarget: typeof target === 'string' ? { nodeId: target } : target,
+        },
+      }));
     },
 
     consumeFocus() {
-      set((s) => ({ state: { ...s.state, focusNodeId: null } }));
+      set((s) => ({ state: { ...s.state, focusTarget: null } }));
     },
 
     clear() {

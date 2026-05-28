@@ -8,7 +8,11 @@
  * paths that matter: field rows, optional markers, imported styling,
  * and the bubbling `contexture:field-select` CustomEvent.
  */
-import { TYPE_NODE_EVENT, TypeNode } from '@renderer/components/graph/nodes/TypeNode';
+import {
+  TYPE_NODE_EVENT,
+  TYPE_NODE_REF_PREVIEW_EVENT,
+  TypeNode,
+} from '@renderer/components/graph/nodes/TypeNode';
 import type { TypeNodeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -104,6 +108,31 @@ describe('TypeNode', () => {
     expect(event.detail).toEqual({ typeName: 'Plot', fieldName: 'name' });
   });
 
+  it('selects referenced object targets when a ref field is clicked', () => {
+    const data: TypeNodeData = {
+      typeName: 'Artwork',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'dimensions',
+          summary: '→ ArtworkDimensions',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkDimensions',
+        },
+      ],
+    };
+    const handler = vi.fn();
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    container.addEventListener(TYPE_NODE_EVENT, handler as EventListener);
+
+    fireEvent.click(screen.getByTestId('type-node-field'));
+
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('ArtworkDimensions');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it('marks table-flagged nodes with data-table="true"', () => {
     const data: TypeNodeData = {
       typeName: 'Post',
@@ -123,7 +152,11 @@ describe('TypeNode', () => {
       background: 'var(--graph-node-table-accent)',
     });
     expect(screen.getByTestId('type-node-table-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('type-node-table-badge')).toHaveTextContent('table');
+    expect(screen.getByTestId('type-node-table-label')).toHaveTextContent('table');
+    expect(screen.getByTestId('type-node-table-label')).toHaveStyle({
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+    });
   });
 
   it('does not mark non-table nodes with data-table', () => {
@@ -174,6 +207,166 @@ describe('TypeNode', () => {
     });
   });
 
+  it('renders local enum refs as inline enum affordances with hover details', () => {
+    vi.useFakeTimers();
+    const data: TypeNodeData = {
+      typeName: 'Recipe',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'season',
+          summary: '→ Season',
+          optional: false,
+          nullable: false,
+          refTarget: 'Season',
+          enumTarget: {
+            name: 'Season',
+            description: 'The growing season.',
+            values: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+          },
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field-enum-affordance')).toHaveTextContent('Season enum');
+    expect(screen.getByTestId('type-node-field')).toHaveAccessibleName(
+      'season, Season enum, 2 values',
+    );
+    expect(screen.getByTestId('type-node-field-enum-summary')).toHaveStyle({
+      color: 'var(--muted-foreground)',
+      fontWeight: '400',
+      fontFamily: 'var(--font-mono)',
+    });
+    fireEvent.pointerEnter(screen.getByTestId('type-node-field'));
+    act(() => vi.advanceTimersByTime(120));
+
+    expect(screen.getByText('The growing season.')).toBeInTheDocument();
+    expect(screen.getByText('spring')).toBeInTheDocument();
+    expect(screen.getByText('spring').closest('[title]')).toHaveAttribute(
+      'title',
+      'Planting time.',
+    );
+  });
+
+  it('renders discriminated union refs as relationship refs with a muted suffix', () => {
+    const data: TypeNodeData = {
+      typeName: 'Artwork',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'sourceReference',
+          summary: '→ ArtworkSourceReference',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkSourceReference',
+          refTargetKind: 'discriminatedUnion',
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field-union-affordance')).toHaveTextContent(
+      '→ ArtworkSourceReference· union',
+    );
+    expect(screen.getByTestId('type-node-field-ref-summary')).toHaveStyle({
+      color: 'var(--graph-edge-property)',
+    });
+    expect(screen.getByText('· union')).toHaveStyle({
+      color: 'var(--muted-foreground)',
+      fontWeight: '400',
+    });
+  });
+
+  it('opens inline enum details on keyboard focus', () => {
+    const data: TypeNodeData = {
+      typeName: 'Recipe',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'season',
+          summary: '→ Season',
+          optional: false,
+          nullable: false,
+          refTarget: 'Season',
+          enumTarget: {
+            name: 'Season',
+            description: 'The growing season.',
+            values: [{ value: 'spring' }],
+          },
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.focus(screen.getByTestId('type-node-field'));
+
+    expect(screen.getByText('The growing season.')).toBeInTheDocument();
+    expect(screen.getByText('spring')).toBeInTheDocument();
+  });
+
+  it('previews object ref targets on hover and focus without previewing enum refs', () => {
+    const data: TypeNodeData = {
+      typeName: 'Artwork',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'dimensions',
+          summary: '→ ArtworkDimensions',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkDimensions',
+        },
+        {
+          name: 'medium',
+          summary: '→ ArtworkMedium',
+          optional: false,
+          nullable: false,
+          refTarget: 'ArtworkMedium',
+          enumTarget: {
+            name: 'ArtworkMedium',
+            values: [{ value: 'paint' }],
+          },
+        },
+      ],
+    };
+    const handler = vi.fn();
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    container.addEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler as EventListener);
+    const rows = screen.getAllByTestId('type-node-field');
+
+    fireEvent.mouseEnter(rows[0]);
+    fireEvent.mouseLeave(rows[0]);
+    fireEvent.focus(rows[0]);
+    fireEvent.mouseEnter(rows[1]);
+
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(handler.mock.calls.map(([event]) => (event as CustomEvent).detail)).toEqual([
+      {
+        sourceType: 'Artwork',
+        sourceField: 'dimensions',
+        targetType: 'ArtworkDimensions',
+        active: true,
+      },
+      {
+        sourceType: 'Artwork',
+        sourceField: 'dimensions',
+        targetType: 'ArtworkDimensions',
+        active: false,
+      },
+      {
+        sourceType: 'Artwork',
+        sourceField: 'dimensions',
+        targetType: 'ArtworkDimensions',
+        active: true,
+      },
+    ]);
+  });
+
   it('shows enum description and values in a hover card', () => {
     vi.useFakeTimers();
     const data: TypeNodeData = {
@@ -191,6 +384,9 @@ describe('TypeNode', () => {
 
     expect(screen.getByText('The growing season.')).toBeInTheDocument();
     expect(screen.getByText('Values')).toBeInTheDocument();
+    expect(screen.getByText('Enum')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+    });
     expect(screen.getByText('spring')).toBeInTheDocument();
     expect(screen.getByText('summer')).toBeInTheDocument();
     expect(screen.getByText('spring').closest('[title]')).toHaveAttribute(
@@ -199,12 +395,18 @@ describe('TypeNode', () => {
     );
     const badges = screen.getAllByTestId('enum-value-badge');
     expect(badges[0]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
-      color: 'var(--primary-foreground)',
+      background: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+      color: 'var(--graph-node-header-text)',
     });
+    expect(badges[0].getAttribute('style')).toContain(
+      'border-color: color-mix(in oklch, var(--chart-3) 85%, transparent)',
+    );
     expect(badges[1]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
-      color: 'var(--primary-foreground)',
+      background: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+      color: 'var(--graph-node-header-text)',
     });
+    expect(badges[1].getAttribute('style')).toContain(
+      'border-color: color-mix(in oklch, var(--chart-3) 85%, transparent)',
+    );
   });
 });

@@ -13,17 +13,17 @@ describe('GraphControlsPanel', () => {
     vi.useRealTimers();
   });
 
-  it('toggles enum and edge-label visibility', () => {
+  it('toggles expanded enum nodes and edge-label visibility', () => {
     render(<GraphControlsPanel onClose={vi.fn()} />);
 
-    expect(screen.getByRole('checkbox', { name: 'Enums' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show enum nodes' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Edge labels' })).toBeChecked();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Enums' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show enum nodes' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Edge labels' }));
 
     expect(useGraphLayoutStore.getState().graphLayout).toMatchObject({
-      showEnums: false,
+      showEnums: true,
       showEdgeLabels: false,
     });
   });
