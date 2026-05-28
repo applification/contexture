@@ -52,7 +52,12 @@ export const AnimatedThemeToggler = ({
       localStorage.setItem('theme', newTheme ? 'dark' : 'light');
     };
 
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (typeof document.startViewTransition !== 'function') {
+      applyTheme();
+      return;
+    }
+    if (reducedMotion) {
       applyTheme();
       return;
     }

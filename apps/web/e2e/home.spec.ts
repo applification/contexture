@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test';
 test.describe('Home page', () => {
   test('loads and displays hero section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Design your domain once. Ship it everywhere.');
+    await expect(page.locator('h1')).toContainText(
+      'A source-of-truth model your app and agents can share.',
+    );
     await expect(page.locator('nav')).toBeVisible();
   });
 
@@ -18,7 +20,7 @@ test.describe('Home page', () => {
     const features = page.locator('#features');
     await expect(features).toBeVisible();
     await expect(features.locator('h2')).toContainText(
-      'control plane for AI-native TypeScript apps',
+      'model boundary for AI-native TypeScript apps',
     );
   });
 
@@ -31,18 +33,18 @@ test.describe('Home page', () => {
 
   test('feature cards render all six features', async ({ page }) => {
     await page.goto('/');
-    const cards = page.locator('#features .grid > div');
+    const cards = page.locator('[data-testid="feature-card"]');
     await expect(cards).toHaveCount(6);
   });
 
-  test('AI section promotes agent-safe model changes', async ({ page }) => {
+  test('AI section promotes MCP-native model changes', async ({ page }) => {
     await page.goto('/');
     const aiSection = page.locator('section', {
-      has: page.locator('h2:has-text("Let agents change the model")'),
+      has: page.locator('h2:has-text("Let agents edit the model through typed operations")'),
     });
     await expect(aiSection).toBeVisible();
     await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);
-    await expect(aiSection.locator('text=Agent-safe by design')).toBeVisible();
+    await expect(aiSection.locator('text=MCP-native by design')).toBeVisible();
   });
 
   test('footer contains expected links', async ({ page }) => {

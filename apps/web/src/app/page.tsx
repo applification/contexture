@@ -2,11 +2,15 @@ import {
   ArrowRight,
   Bot,
   Brain,
+  Check,
+  CircleDot,
   Database,
   Download,
+  FileCode2,
   GitGraph,
-  Network,
+  PlugZap,
   Shield,
+  Sparkles,
   Zap,
 } from 'lucide-react';
 import { DownloadButton } from '@/components/download-button';
@@ -64,41 +68,148 @@ function GithubIcon({ className }: { className?: string }) {
 const features = [
   {
     icon: GitGraph,
-    title: 'Source-of-truth IR',
+    title: 'Desktop model editor',
     description:
-      'Keep `*.contexture.json` as the canonical domain model. The graph is an editor for the truth, not another drawing to keep in sync.',
+      'Map object types, enums, refs, stdlib types, and constraints in a real desktop workspace backed by source-of-truth `.contexture.json`.',
   },
   {
-    icon: Brain,
-    title: 'Closed-world agent ops',
+    icon: PlugZap,
+    title: 'Built-in MCP server',
     description:
-      'Codex and Claude change schemas through explicit Contexture operations, so every AI edit is reviewable, undoable, and constrained.',
+      'Give Codex, Claude, and other MCP clients tools to inspect models, apply constrained ops, emit targets, validate, and check drift.',
   },
   {
-    icon: Network,
-    title: 'App-ready emit targets',
+    icon: FileCode2,
+    title: 'Generated app contracts',
     description:
-      'Emit Zod, JSON Schema, schema indexes, and Convex schemas from the same model, then commit the generated surface your app imports.',
+      'Preview and emit Zod, JSON Schema, Convex schemas, schema indexes, structured-output schemas, MCP definitions, and form validators.',
   },
   {
     icon: Bot,
-    title: 'Agent-ready surfaces',
+    title: 'Agent-safe model changes',
     description:
-      'Opt into provider-neutral AI tool schemas and expose the same model over MCP so coding agents can inspect, mutate, emit, and check drift.',
+      'AI changes go through a closed operation vocabulary, so a model edit stays reviewable, undoable, and tied to the IR.',
   },
   {
     icon: Shield,
-    title: 'Drift you can trust',
+    title: 'Manifest-backed drift checks',
     description:
-      'Generated files carry a manifest. Contexture tells you when Zod, JSON Schema, Convex, or agent outputs no longer match the IR.',
+      'Generated files carry a manifest so you can prove the repo still matches the model before a change ships.',
   },
   {
     icon: Database,
-    title: 'Dogfooded on real apps',
+    title: 'Stdlib for real domains',
     description:
-      'The workflow is already being used on Applification products: start from the IR, regenerate artifacts, and let drift checks prove it.',
+      'Reach for curated primitives like Email, ISODate, LatLng, Handle, money, contact, identity, and place types instead of rebuilding basics.',
   },
 ];
+
+const agentSteps = [
+  {
+    tool: 'inspect_contexture',
+    label: 'Read Release and generated targets',
+    status: 'complete',
+  },
+  {
+    tool: 'apply_contexture_op',
+    label: 'Add optional discogsReleaseId field',
+    status: 'complete',
+  },
+  {
+    tool: 'emit_contexture',
+    label: 'Regenerate Zod, JSON Schema, and MCP definitions',
+    status: 'complete',
+  },
+  {
+    tool: 'check_contexture_drift',
+    label: 'Manifest clean',
+    status: 'clean',
+  },
+];
+
+function AgentConversationDemo() {
+  return (
+    <div className="max-w-4xl mx-auto rounded-xl border border-border/60 bg-card/40 overflow-hidden text-left screenshot-glow">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="size-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
+            <Bot className="size-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold">Contexture agent</div>
+            <div className="text-xs text-muted-foreground">MCP tools connected</div>
+          </div>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2.5 py-1 text-xs text-success">
+          <CircleDot className="size-3" />
+          Drift clean
+        </div>
+      </div>
+
+      <div className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="flex justify-end">
+          <div className="max-w-[88%] rounded-lg bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm sm:max-w-[72%]">
+            Add a Discogs release ID to my Release model, emit the app contracts, and check drift.
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="mt-1 size-7 rounded-md bg-accent/10 text-accent flex items-center justify-center shrink-0">
+            <Sparkles className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="rounded-lg border border-border/60 bg-background/60 px-4 py-3">
+              <p className="text-sm leading-relaxed text-foreground">
+                I’ll update the source model first, regenerate the selected outputs, then verify the
+                manifest so generated files stay disposable.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border/60 bg-background/60 p-2">
+              {agentSteps.map((step) => (
+                <div
+                  key={step.tool}
+                  className="flex items-start gap-3 rounded-md px-2.5 py-2 text-sm"
+                >
+                  <div className="mt-0.5 size-5 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
+                    <Check className="size-3" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs text-primary dark:text-accent">
+                      {step.tool}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{step.label}</div>
+                  </div>
+                  <span className="rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {step.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-success/25 bg-success/10 px-4 py-3 text-sm text-foreground">
+              Done. The IR changed, generated targets were emitted, and drift is clean.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-border/60 bg-background/50 p-3">
+        <div className="flex items-end gap-2 rounded-lg border border-border/70 bg-background px-3 py-2">
+          <div className="min-h-9 flex-1 text-sm text-muted-foreground flex items-center">
+            Ask the agent to change your model...
+          </div>
+          <div
+            aria-hidden="true"
+            className="size-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center"
+          >
+            <ArrowRight className="size-4" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -148,19 +259,19 @@ export default function Home() {
         </div>
 
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
-          <p className="animate-fade-in-up text-sm text-accent font-medium mb-6 tracking-widest uppercase">
-            Domain-model control plane
+          <p className="animate-fade-in-up text-sm text-primary dark:text-accent font-medium mb-6 tracking-widest uppercase">
+            Desktop app + MCP server
           </p>
           <h1 className="animate-fade-in-up-delay-1 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
-            Design your domain once. Ship it everywhere.
+            A source-of-truth model your app and agents can share.
           </h1>
-          <p className="animate-fade-in-up-delay-2 text-lg text-accent font-medium mb-3">
-            One model for your app, database, and agents.
+          <p className="animate-fade-in-up-delay-2 text-lg text-primary dark:text-accent font-medium mb-3">
+            Visual editing, generated TypeScript contracts, and MCP tools from one IR.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Contexture turns a source-of-truth IR into Zod, JSON Schema, Convex schemas, MCP tools,
-            and AI tool definitions. Humans and agents edit the same domain model; drift checks keep
-            the emitted code honest.
+            Contexture is a desktop control plane for TypeScript domain models. Design the model on
+            a graph, emit the contracts your app imports, and let coding agents work through a
+            constrained MCP server instead of hand-editing generated files.
           </p>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <TrackedLink
@@ -191,9 +302,9 @@ export default function Home() {
           >
             <div style={{ transform: 'rotateX(2deg)', transformOrigin: 'bottom center' }}>
               <ThemeImage
-                srcLight="/images/hero-graph-light.png"
-                srcDark="/images/hero-graph.png"
-                alt="Contexture visual schema editor showing connected types on a graph canvas with field-level ref edges"
+                srcLight="/images/misprint-graph-overview-light.png"
+                srcDark="/images/misprint-graph-overview.png"
+                alt="Contexture desktop app showing a graph of connected domain types with the Codex chat panel open"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -214,12 +325,12 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-12 sm:mb-20">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              The control plane for AI-native TypeScript apps
+              The model boundary for AI-native TypeScript apps
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Model the domain once, then emit the contracts every runtime needs. Contexture keeps
-              visual editing, agent mutation, generated code, and drift detection tied to one
-              explicit source of truth.
+              Contexture gives humans a clear desktop surface and gives agents a narrow protocol.
+              Both paths update the same IR, regenerate the same outputs, and leave drift checks as
+              evidence.
             </p>
           </div>
 
@@ -227,6 +338,7 @@ export default function Home() {
             {features.map((feature) => (
               <div
                 key={feature.title}
+                data-testid="feature-card"
                 className="group rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-primary/30 hover:bg-card/80 transition-all duration-200"
               >
                 <div className="size-11 rounded-lg bg-primary/10 group-hover:bg-primary/15 flex items-center justify-center mb-5 transition-colors">
@@ -240,16 +352,28 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Full-width app screenshot showing graph + properties panel */}
-          <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-            <ThemeImage
-              srcLight="/images/graph-detail-light.png"
-              srcDark="/images/graph-detail.png"
-              alt="Contexture showing the graph editor with a selected type and its detail panel editing field constraints"
-              width={1600}
-              height={1200}
-              className="w-full h-auto"
-            />
+          {/* Current desktop states: selected object properties + enum hover affordance */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <ThemeImage
+                srcLight="/images/misprint-properties-light.png"
+                srcDark="/images/misprint-properties.png"
+                alt="Contexture desktop app with a selected Misprint object and the properties panel showing fields, optional flags, and model-shape hints"
+                width={1600}
+                height={1200}
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
+              <ThemeImage
+                srcLight="/images/misprint-enum-hover-light.png"
+                srcDark="/images/misprint-enum-hover.png"
+                alt="Contexture graph editor showing an enum hover card for ArtworkState with values and description"
+                width={1600}
+                height={1200}
+                className="w-full h-auto"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -258,40 +382,44 @@ export default function Home() {
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
-            <div className="inline-flex items-center gap-2 text-sm text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+            <div className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
               <Brain className="size-4" />
-              Agent-safe by design
+              MCP-native by design
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-5">
-              Let agents change the model, not the contract.
+              Let agents edit the model through typed operations.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Contexture exposes a narrow mutation vocabulary through chat, CLI, and MCP. Codex or
-              Claude can inspect a schema, apply one closed-world op, regenerate artifacts, and
-              prove the repo is still clean.
+              The MCP server exposes model inspection, validation, constrained mutation, emit, and
+              drift checks. Agents can make useful schema changes while the generated files remain
+              outputs, not the source of truth.
             </p>
           </div>
 
-          {/* Two-column: AI validation panel + description */}
-          <div className="grid sm:grid-cols-5 gap-8 sm:gap-12 items-center mb-12 sm:mb-16">
+          <div className="mb-12 sm:mb-16">
+            <AgentConversationDemo />
+          </div>
+
+          {/* Two-column: generated surface preview + description */}
+          <div className="grid sm:grid-cols-5 gap-8 sm:gap-12 items-center">
             <div className="sm:col-span-2 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
               <ThemeImage
-                srcLight="/images/ai-validation-light.png"
-                srcDark="/images/ai-validation.png"
-                alt="Eval panel generating sample data against a selected root type with Zod validation passing"
-                width={478}
-                height={1145}
+                srcDark="/images/misprint-generated-zod.png"
+                srcLight="/images/misprint-generated-zod-light.png"
+                alt="Contexture schema panel previewing generated Zod source from the selected domain model"
+                width={1600}
+                height={1200}
                 className="w-full h-auto"
               />
             </div>
             <div className="sm:col-span-3 space-y-6">
               <h3 className="text-2xl font-bold tracking-tight">
-                Emit contracts your pipeline can actually use
+                See the generated surface before it lands in git
               </h3>
               <p className="text-muted-foreground leading-relaxed">
-                The same IR can serve product code, database definitions, structured output, and
-                agent tools. Opt-in AI pipeline targets generate provider-neutral tool schemas
-                without forcing a runtime choice.
+                The desktop app previews each target beside the model graph, so schema changes are
+                concrete before they become commits. Optional outputs let each project choose only
+                the contracts it needs.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -299,7 +427,7 @@ export default function Home() {
                     <Zap className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Zod, JSON Schema, schema indexes, and Convex schema from one IR
+                    Zod, JSON Schema, Convex, indexes, structured output, MCP, and forms
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -315,25 +443,10 @@ export default function Home() {
                     <Brain className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    MCP access for agents that need to inspect, mutate, emit, and validate
+                    MCP tools for agents that need to inspect, mutate, emit, and validate
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Chat example */}
-          <div className="max-w-3xl mx-auto rounded-xl border border-border/60 bg-card/30 p-5 sm:p-8 text-left font-mono text-sm leading-relaxed">
-            <div className="text-muted-foreground/70 text-xs uppercase tracking-wide mb-2">
-              You:
-            </div>
-            <div className="text-foreground mb-6">
-              Add a Discogs release ID to my Release model and make it queryable.
-            </div>
-            <div className="text-accent/80 text-xs uppercase tracking-wide mb-2">AI:</div>
-            <div className="text-muted-foreground">
-              add_field Release.discogsReleaseId (string, optional) · add_index Release
-              by_discogs_release_id · emit · check_generated clean
             </div>
           </div>
         </div>
@@ -344,40 +457,40 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              Ship every surface from the same domain model
+              One model, many consumers
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Contexture is deliberately narrow: it owns the model boundary, then gets out of the
-              way. Your app, agent, and database code consume generated artifacts.
+              Contexture is deliberately narrow: it owns the domain model boundary, then gets out of
+              the way. Product code, agents, and databases consume generated artifacts.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-8">
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Generate JSON Schema and AI tool definitions from the same type graph your app
-                imports. The prompt surface and TypeScript surface stop drifting apart.
+                Generate JSON Schema and structured-output definitions from the same type graph your
+                app imports. Prompt surfaces and TypeScript surfaces stay aligned.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
                 App schemas
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Emit Zod and Convex schema files for the product repo. Generated markers and the
-                manifest make review and drift detection part of normal git flow.
+                Emit Zod, Convex, and schema-index files for the product repo. Generated markers and
+                the manifest make review and drift detection part of normal git flow.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-accent text-sm font-medium uppercase tracking-wider mb-4">
+              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
                 Agent workflows
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Let Codex or Claude work through CLI and MCP instead of hand-editing generated
-                files. Agents update the IR, regenerate artifacts, and report whether drift remains.
+                Let Codex or Claude work through the Contexture MCP server instead of hand-editing
+                generated files. Agents update the IR and report whether drift remains.
               </p>
             </div>
           </div>
@@ -390,15 +503,15 @@ export default function Home() {
         className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
       >
         <div className="relative max-w-3xl mx-auto text-center">
-          <p className="text-sm text-accent font-medium mb-4 tracking-widest uppercase">
+          <p className="text-sm text-primary dark:text-accent font-medium mb-4 tracking-widest uppercase">
             Open source & free
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-            Start with your source-of-truth model
+            Put your domain model under control
           </h2>
           <p className="text-muted-foreground mb-10">
-            Free and open source. Build visually, collaborate with agents, and ship generated
-            contracts from the desktop app for macOS, Windows, and Linux.
+            Free and open source. Build visually, wire the MCP server into your coding tools, and
+            ship generated contracts from the desktop app for macOS, Windows, and Linux.
           </p>
           <DownloadButton
             location="footer_cta"
