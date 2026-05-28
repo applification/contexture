@@ -144,6 +144,9 @@ function GraphCanvasInner({
         }
       : visible;
     if (!refPreview) return visibleWithFocusedField;
+    if (!visibleWithFocusedField.nodes.some((node) => node.id === refPreview.targetType)) {
+      return visibleWithFocusedField;
+    }
     const previewNodeIds = new Set<string>([refPreview.targetType]);
     const previewEdgeIds = new Set<string>();
     for (const edge of visible.edges) {
