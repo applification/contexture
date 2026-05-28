@@ -39,7 +39,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useELKLayout } from '../../hooks/useELKLayout';
 import { useGraphLayoutStore } from '../../store/layout-config';
 import type { Op } from '../../store/ops';
-import { clickModeFromEvent, useGraphSelectionStore } from '../../store/selection';
+import {
+  clickModeFromEvent,
+  type GraphFocusTarget,
+  useGraphSelectionStore,
+} from '../../store/selection';
 import { useUIChromeStore } from '../../store/ui-chrome';
 import { useUndoStore } from '../../store/undo';
 import { RefEdge } from './edges/RefEdge';
@@ -71,6 +75,11 @@ const NODE_TYPES = { type: TypeNode, group: GroupNode } as const;
 const EDGE_TYPES = { ref: RefEdge } as const;
 
 type RefPreview = Omit<FieldRefPreview, 'active'>;
+type FocusedField = { nodeId: string; fieldName: string };
+
+export function focusedFieldFromTarget(target: GraphFocusTarget): FocusedField | null {
+  return target.fieldName ? { nodeId: target.nodeId, fieldName: target.fieldName } : null;
+}
 
 export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
   return (
@@ -297,9 +306,13 @@ function GraphCanvasInner({
     const cy = node.position.y + height / 2;
     setCenter(cx, cy, { zoom: 1.1, duration: 400 });
     click(focusTarget.nodeId, 'replace');
-    if (focusTarget.fieldName) {
-      if (focusedFieldClearTimer.current) clearTimeout(focusedFieldClearTimer.current);
-      setFocusedField({ nodeId: focusTarget.nodeId, fieldName: focusTarget.fieldName });
+    const nextFocusedField = focusedFieldFromTarget(focusTarget);
+    if (focusedFieldClearTimer.current) {
+      clearTimeout(focusedFieldClearTimer.current);
+      focusedFieldClearTimer.current = null;
+    }
+    setFocusedField(nextFocusedField);
+    if (nextFocusedField) {
       focusedFieldClearTimer.current = setTimeout(() => setFocusedField(null), 1600);
     }
     consumeFocus();
