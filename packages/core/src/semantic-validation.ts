@@ -39,7 +39,10 @@ export type SemanticIssueCode =
   | 'discriminator_missing_on_variant'
   | 'enum_empty'
   | 'enum_duplicate_value'
-  | 'duplicate_convex_table_name';
+  | 'duplicate_convex_table_name'
+  | 'convex_reserved_table_name'
+  | 'convex_reserved_field_name'
+  | 'convex_index_unknown_field';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
@@ -56,6 +59,7 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
     ...checkDuplicateConvexTableNames(schema),
+    ...checkConvexTableShapes(schema),
     ...checkDiscriminatedUnions(schema),
     ...checkEnums(schema),
   ];
@@ -87,6 +91,46 @@ function checkDuplicateConvexTableNames(schema: Schema): SemanticIssue[] {
 
 function convexTableName(type: ObjectType): string {
   return type.tableName ?? `${type.name.charAt(0).toLowerCase()}${type.name.slice(1)}`;
+}
+
+function checkConvexTableShapes(schema: Schema): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object' || type.table !== true) return;
+    const tableName = convexTableName(type);
+    if (tableName.startsWith('_')) {
+      issues.push({
+        code: 'convex_reserved_table_name',
+        path: `types.${typeIndex}.tableName`,
+        message: `Convex reserves table names starting with "_".`,
+        hint: 'Rename the type or set tableName to a public Convex table name.',
+      });
+    }
+
+    const fieldNames = new Set(type.fields.map((field) => field.name));
+    type.fields.forEach((field, fieldIndex) => {
+      if (!field.name.startsWith('_')) return;
+      issues.push({
+        code: 'convex_reserved_field_name',
+        path: `types.${typeIndex}.fields.${fieldIndex}.name`,
+        message: `Convex reserves field names starting with "_".`,
+        hint: 'Rename the field before emitting convex/schema.ts.',
+      });
+    });
+
+    (type.indexes ?? []).forEach((index, indexIndex) => {
+      index.fields.forEach((fieldName, fieldIndex) => {
+        if (fieldNames.has(fieldName)) return;
+        issues.push({
+          code: 'convex_index_unknown_field',
+          path: `types.${typeIndex}.indexes.${indexIndex}.fields.${fieldIndex}`,
+          message: `Convex index "${index.name}" references unknown field "${fieldName}".`,
+          hint: 'Use an existing table field or remove it from the index.',
+        });
+      });
+    });
+  });
+  return issues;
 }
 
 function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {

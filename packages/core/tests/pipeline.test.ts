@@ -14,11 +14,11 @@ describe('runEmitPipeline output config', () => {
     );
 
     expect(emitted.map((file) => file.path)).toEqual([
+      '/repo/packages/contexture/convex/schema.ts',
+      '/repo/packages/contexture/convex/validators.ts',
       '/repo/packages/contexture/app.schema.ts',
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',
-      '/repo/packages/contexture/convex/schema.ts',
-      '/repo/packages/contexture/convex/validators.ts',
     ]);
   });
 
@@ -26,11 +26,11 @@ describe('runEmitPipeline output config', () => {
     const { emitted } = runEmitPipeline(baseSchema, '/repo/apps/misprint/misprint.contexture.json');
 
     expect(emitted.map((file) => file.path)).toEqual([
+      '/repo/apps/misprint/convex/schema.ts',
+      '/repo/apps/misprint/convex/validators.ts',
       '/repo/apps/misprint/schema/misprint.schema.ts',
       '/repo/apps/misprint/schema/misprint.schema.json',
       '/repo/apps/misprint/schema/index.ts',
-      '/repo/apps/misprint/convex/schema.ts',
-      '/repo/apps/misprint/convex/validators.ts',
     ]);
   });
 
@@ -73,11 +73,11 @@ describe('runEmitPipeline output config', () => {
 
     const { emitted } = runEmitPipeline(parsed, '/repo/packages/contexture/app.contexture.json');
     expect(emitted.map((file) => file.path)).toEqual([
+      '/repo/packages/contexture/convex/schema.ts',
+      '/repo/packages/contexture/convex/validators.ts',
       '/repo/packages/contexture/app.schema.ts',
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',
-      '/repo/packages/contexture/convex/schema.ts',
-      '/repo/packages/contexture/convex/validators.ts',
     ]);
   });
 

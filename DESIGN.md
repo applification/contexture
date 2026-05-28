@@ -1,11 +1,11 @@
 # Contexture Design System
 
-> AI-readable design system specification for Contexture — the visual Zod schema editor with LLM support.
+> AI-readable design system specification for Contexture — the Convex model control plane with agent-safe editing.
 > Derived from existing Figma design system, shadcn/ui components, and production code.
 
 ## Brand
 
-- **Product:** Contexture — visual Zod schema editor that pairs a graph canvas with LLM-driven edits
+- **Product:** Contexture — visual Convex model editor that pairs a graph canvas with agent-safe model changes
 - **Tagline:** "Where schemas take shape."
 - **Voice:** Precise, confident, approachable, builder-oriented. Never academic, never dismissive.
 - **Logo:** Three connected nodes in a triangle. Always title-case: "Contexture".
@@ -146,9 +146,9 @@ Built on **shadcn/ui** with **Tailwind CSS v4**. Prefer existing shadcn componen
 
 **Desktop app (Electron):**
 - **UI primitives:** Badge, Button, Checkbox, Command, ContextMenu, Dialog, DropdownMenu, Empty, Input, Label, Popover, Resizable, Select, Separator, Slider, Tabs, Textarea, Tooltip
-- **Graph:** ReactFlowCanvas, ClassNode, GroupNode, GraphBackground, GraphLegend, ContextMenu
-- **Graph edges:** ObjectPropertyEdge, SubClassOfEdge, DisjointWithEdge
-- **Detail panels:** ClassDetail, EdgeDetail, DetailPanel
+- **Graph:** GraphCanvas, TypeNode, GroupNode, GraphBackground, GraphLegend, ContextMenu
+- **Graph edges:** RefEdge
+- **Detail panels:** TypeDetail, FieldDetail, EdgeDetail, DetailPanel
 - **Chat:** ChatPanel, ChatThreadList
 - **Toolbar:** Toolbar, GraphSearchBar, GraphControlsPanel
 - **App:** UpdateBanner

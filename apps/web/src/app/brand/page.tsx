@@ -9,7 +9,7 @@ const TokenBlock = dynamic(() => import('./token-block').then((m) => ({ default:
 export const metadata: Metadata = {
   title: 'Brand — Contexture',
   description:
-    'Contexture brand identity guidelines: logo, colors, typography, voice, and components.',
+    'Contexture brand identity guidelines for Convex model workflows: logo, colors, typography, voice, and components.',
 };
 
 /* ------------------------------------------------------------------ */
@@ -308,7 +308,7 @@ export default function BrandPage() {
         <Section id="typography" title="Typography">
           <p className="text-muted-foreground mb-8 max-w-2xl leading-relaxed">
             Geist provides a geometric, modern character with excellent readability at all sizes.
-            The monospace variant handles schema identifiers and generated Zod code snippets.
+            The monospace variant handles schema identifiers and generated Convex code snippets.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-6 mb-10">
@@ -409,29 +409,29 @@ export default function BrandPage() {
             </h3>
             <div className="grid sm:grid-cols-3 gap-x-8 gap-y-2 text-sm">
               <p className="text-foreground">
-                &ldquo;Design your domain once. Ship it everywhere.&rdquo;
+                &ldquo;Design your Convex model once. Ship it everywhere.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;The domain-model control plane for AI-native TypeScript apps.&rdquo;
+                &ldquo;The domain-model control plane for Convex apps built with agents.&rdquo;
               </p>
               <p className="text-foreground">
                 &ldquo;One source-of-truth IR for apps, databases, and agents.&rdquo;
               </p>
               <p className="text-foreground">&ldquo;Change the model, not the contract.&rdquo;</p>
               <p className="text-foreground">
-                &ldquo;Emit Zod, JSON Schema, Convex, MCP, and AI tool schemas.&rdquo;
+                &ldquo;Emit Convex schema, validators, and supporting contracts.&rdquo;
               </p>
               <p className="text-foreground">
                 &ldquo;Manifest-backed drift checks for every generated surface.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;Closed-world ops agents can use safely.&rdquo;
+                &ldquo;Reviewable model changes agents can propose safely.&rdquo;
               </p>
               <p className="text-foreground">
                 &ldquo;Inspect, mutate, emit, and validate through CLI or MCP.&rdquo;
               </p>
               <p className="text-foreground">
-                &ldquo;One model, many products — import the generated contracts directly.&rdquo;
+                &ldquo;One Convex model, many consumers — import generated files directly.&rdquo;
               </p>
             </div>
           </div>

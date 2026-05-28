@@ -98,15 +98,15 @@ describe('SchemaPanel', () => {
 
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
     expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask Codex: "List the contexture MCP tools, then inspect /repo/garden.contexture.json."',
+      'Ask Codex: "List the contexture MCP tools, then inspect /repo/garden.contexture.json and summarize the Convex tables."',
     );
 
     fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
     expect(onCopy).toHaveBeenCalledWith(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
   });
 
@@ -159,7 +159,7 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('agent-setup')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, then validate, emit, and check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
   });
 
@@ -213,14 +213,13 @@ describe('SchemaPanel', () => {
       await user.click(await screen.findByTestId(testId));
     }
 
-    it('shows Zod active by default without rendering a tab strip', () => {
-      const zodSrc = "import { z } from 'zod';\n";
-      render(<SchemaPanel {...DEFAULT_PROPS} zodSource={zodSrc} />);
+    it('shows Convex active by default when Convex source is available without rendering a tab strip', () => {
+      const convexSrc = 'import { defineSchema } from "convex/server";\n';
+      render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" convexSource={convexSrc} />);
       expect(screen.getByTestId('schema-output-selector')).toBeInTheDocument();
       expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-      expect(screen.getByTestId('schema-output-selector')).toHaveTextContent('Zod schema');
-      expect(screen.queryByTestId('schema-group-ai')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('schema-group-forms')).not.toBeInTheDocument();
+      expect(screen.getByTestId('schema-output-selector')).toHaveTextContent('Convex schema');
+      expect(screen.queryByTestId('schema-group-agent')).not.toBeInTheDocument();
     });
 
     it('switches to JSON Schema source when the JSON output is selected', async () => {
@@ -240,7 +239,7 @@ describe('SchemaPanel', () => {
       expect(screen.getByTestId('schema-code').textContent).toContain('defineSchema');
     });
 
-    it('shows non-empty AI and Forms outputs grouped away from Core in the selector', async () => {
+    it('shows non-empty agent and form targets grouped away from Convex and supporting contracts in the selector', async () => {
       const user = userEvent.setup();
       render(
         <SchemaPanel
@@ -255,9 +254,9 @@ describe('SchemaPanel', () => {
       );
 
       await user.click(screen.getByTestId('schema-output-selector'));
-      expect(screen.getByTestId('schema-group-core')).toHaveTextContent('Zod schema');
-      expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
-      expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
+      expect(screen.getByTestId('schema-group-supporting')).toHaveTextContent('Zod schema');
+      expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Tool schemas');
+      expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Form validators');
       expect(
         screen.queryByTestId('schema-output-structured-output-schemas'),
       ).not.toBeInTheDocument();
@@ -278,8 +277,8 @@ describe('SchemaPanel', () => {
       );
 
       fireEvent.click(screen.getByTestId('schema-output-config'));
-      expect(screen.getByTestId('schema-group-ai')).toHaveTextContent('Tool schemas');
-      expect(screen.getByTestId('schema-group-forms')).toHaveTextContent('Form validators');
+      expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Tool schemas');
+      expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Form validators');
       fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
       expect(onEnableOutput).toHaveBeenCalledWith('ai-tool-schemas');
     });
@@ -301,7 +300,7 @@ describe('SchemaPanel', () => {
         /JSON Schema tool definitions/i,
       );
       expect(screen.getByTestId('schema-output-form-validators')).toHaveTextContent(
-        /Type-safe validation helpers backed by generated Zod schemas/i,
+        /Type-safe validation helpers backed by generated model contracts/i,
       );
     });
 

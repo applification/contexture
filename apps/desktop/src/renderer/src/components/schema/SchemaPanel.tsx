@@ -2,9 +2,9 @@
  * SchemaPanel — read-only preview of the emitted schema source.
  *
  * Supports grouped output previews:
- *   - Core: Zod, JSON Schema, Convex
- *   - AI: tool schemas, structured outputs, MCP definitions when enabled
- *   - Forms: form validators when enabled
+ *   - Convex: schema and validators for the app database boundary
+ *   - Supporting contracts: Zod, JSON Schema, schema index
+ *   - Agent and form targets: tool schemas, structured outputs, MCP, forms
  *
  * Three visual states:
  *   - Empty (schema has no types): an `Empty` nudge telling the
@@ -86,7 +86,7 @@ export interface SchemaPanelProps {
   convexSource?: string;
   /** True when the IR has zero types; drives the empty state. */
   isEmpty: boolean;
-  /** Non-null when the primary (Zod) emit threw. Rendered as-is. */
+  /** Non-null when the primary emit threw. Rendered as-is. */
   error: string | null;
   /** Copy full source to clipboard — host wires `navigator.clipboard`. */
   onCopy?: (text: string) => void;
@@ -123,9 +123,9 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 13px
 const COPY_FEEDBACK_MS = 2000;
 
 const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
-  { group: 'core', label: 'Core' },
-  { group: 'ai', label: 'AI' },
-  { group: 'forms', label: 'Forms' },
+  { group: 'convex', label: 'Convex' },
+  { group: 'supporting', label: 'Supporting contracts' },
+  { group: 'agent', label: 'Agent and form targets' },
 ];
 
 const CODEX_MCP_INSTALL_COMMAND =
@@ -173,7 +173,7 @@ export function SchemaPanel({
   onOpenGeneratedFile,
   onRequestSave,
 }: SchemaPanelProps): React.JSX.Element {
-  const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('zod');
+  const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('convex');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
@@ -242,8 +242,10 @@ export function SchemaPanel({
   );
 
   useEffect(() => {
-    if (!enabledOutputOptions.some((output) => output.type === activeOutput)) {
-      setActiveOutput(enabledOutputOptions[0]?.type ?? 'zod');
+    const active = enabledOutputOptions.find((output) => output.type === activeOutput);
+    const firstWithSource = enabledOutputOptions.find((output) => output.source.trim().length > 0);
+    if (!active || (active.source.trim().length === 0 && firstWithSource)) {
+      setActiveOutput(firstWithSource?.type ?? enabledOutputOptions[0]?.type ?? 'convex');
     }
   }, [activeOutput, enabledOutputOptions]);
 
@@ -332,7 +334,7 @@ export function SchemaPanel({
             </EmptyMedia>
             <EmptyTitle className="text-sm font-medium">No schema yet</EmptyTitle>
             <EmptyDescription className="text-xs">
-              Add a type to the canvas to see the generated schemas.
+              Add a type to the canvas to see generated Convex schema and validators.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -565,7 +567,7 @@ function OutputConfigPopover({
         <div className="mb-2 px-1">
           <div className="text-xs font-semibold text-foreground">Generated outputs</div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Enable optional targets for this Contexture bundle.
+            Convex files are primary generated outputs. Enable supporting targets as needed.
           </p>
         </div>
         <div className="space-y-1">
@@ -621,11 +623,11 @@ function AgentSetupPopover({
   const savedPrompt =
     documentFilePath === null
       ? null
-      : `Use the Contexture MCP server to inspect ${documentFilePath}, then validate, emit, and check drift before finishing.`;
+      : `Use the Contexture MCP server to inspect ${documentFilePath}, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
   const smokeTest =
     documentFilePath === null
       ? 'Ask Codex: "List the contexture MCP tools."'
-      : `Ask Codex: "List the contexture MCP tools, then inspect ${documentFilePath}."`;
+      : `Ask Codex: "List the contexture MCP tools, then inspect ${documentFilePath} and summarize the Convex tables."`;
   const copiedLabel =
     copied === 'install'
       ? 'Copied install command'
@@ -665,7 +667,7 @@ function AgentSetupPopover({
             Agent setup
           </h3>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Use this Contexture document from Codex or another MCP-capable agent.
+            Let Codex or another MCP-capable agent review and evolve this Convex model.
           </p>
         </div>
 

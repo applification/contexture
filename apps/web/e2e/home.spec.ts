@@ -4,7 +4,7 @@ test.describe('Home page', () => {
   test('loads and displays hero section', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText(
-      'A source-of-truth model your app and agents can share.',
+      'A source-of-truth Convex model your app and agents can share.',
     );
     await expect(page.locator('nav')).toBeVisible();
   });
@@ -20,7 +20,7 @@ test.describe('Home page', () => {
     const features = page.locator('#features');
     await expect(features).toBeVisible();
     await expect(features.locator('h2')).toContainText(
-      'model boundary for AI-native TypeScript apps',
+      'model boundary for Convex apps built with agents',
     );
   });
 
@@ -31,16 +31,16 @@ test.describe('Home page', () => {
     await expect(download.locator('a[href="/download"]')).toBeVisible();
   });
 
-  test('feature cards render all six features', async ({ page }) => {
+  test('feature cards render the Convex-first feature set', async ({ page }) => {
     await page.goto('/');
     const cards = page.locator('[data-testid="feature-card"]');
-    await expect(cards).toHaveCount(6);
+    await expect(cards).toHaveCount(7);
   });
 
   test('AI section promotes MCP-native model changes', async ({ page }) => {
     await page.goto('/');
     const aiSection = page.locator('section', {
-      has: page.locator('h2:has-text("Let agents edit the model through typed operations")'),
+      has: page.locator('h2:has-text("Let agents propose reviewable Convex model changes")'),
     });
     await expect(aiSection).toBeVisible();
     await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);

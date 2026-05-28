@@ -1,19 +1,20 @@
 # Contexture
 
-A modern desktop Zod schema editor with provider-backed AI integration. Chat
-about a domain, build a closed-world schema visually, and generate
-Zod + JSON Schema outputs that downstream LLM pipelines can import.
+A modern desktop Convex model editor with provider-backed AI integration. Chat
+about a domain, build a closed-world model visually, and generate
+`convex/schema.ts`, `convex/validators.ts`, and supporting contracts that your
+app and agents can import.
 
 ## Features
 
-- **Visual schema editor** — types and fields on a React Flow canvas; edges
+- **Visual Convex model editor** — types and fields on a React Flow canvas; edges
   follow field-level refs.
 - **Schema agent** — chat-driven schema authoring via a small op
   vocabulary (add type, add field, rename, set discriminator, …) exposed as
   an in-process MCP server.
 - **IR source of truth** — `.contexture.json` is the canonical project
-  file; `.schema.ts` (Zod) and `.schema.json` are generated alongside and
-  git-checked so products can import them directly.
+  file; `convex/schema.ts`, `convex/validators.ts`, Zod, and JSON Schema files
+  are generated alongside and git-checked so products can import them directly.
 - **Curated stdlib** — common types (Email, URL, UUID, Address, Money,
   PhoneE164, …) referenced by qualified name (`common.Email`) and emitted
   as `import` statements from `@contexture/runtime/<namespace>`.

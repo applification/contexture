@@ -7,6 +7,7 @@
  */
 
 import { emit as emitZod } from '@contexture/core/emit-zod';
+import type { FieldType } from '@contexture/core/ir';
 import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
@@ -36,6 +37,20 @@ export function StatusBar(): React.JSX.Element {
       if (t.kind === 'object') n += t.fields.length;
     }
     return n;
+  }, [schema]);
+  const convexSummary = useMemo(() => {
+    let tables = 0;
+    let refs = 0;
+    let indexes = 0;
+    for (const type of schema.types) {
+      if (type.kind !== 'object') continue;
+      if (type.table === true) {
+        tables += 1;
+        indexes += type.indexes?.length ?? 0;
+      }
+      for (const field of type.fields) refs += countRefs(field.type);
+    }
+    return { tables, refs, indexes };
   }, [schema]);
 
   const tokenCount = useMemo(() => {
@@ -124,6 +139,20 @@ export function StatusBar(): React.JSX.Element {
           {typeCount} types · {fieldCount} fields
         </span>
 
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="whitespace-nowrap">
+              {convexSummary.tables} Convex tables · {convexSummary.refs} refs ·{' '}
+              {convexSummary.indexes} indexes
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="text-xs">
+              Object types marked as Convex tables, ref fields, and configured table indexes.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+
         <span>{tokenDisplay}</span>
 
         {syncNotice && syncStatus === 'synced' && (
@@ -201,6 +230,12 @@ export function StatusBar(): React.JSX.Element {
       </TooltipProvider>
     </div>
   );
+}
+
+function countRefs(type: FieldType): number {
+  if (type.kind === 'ref') return 1;
+  if (type.kind === 'array') return countRefs(type.element);
+  return 0;
 }
 
 function saveStateLabel(

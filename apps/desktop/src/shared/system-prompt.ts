@@ -9,7 +9,7 @@
  * loading.
  *
  * Contents, in order:
- *   1. Imperative role/mission header — push tool use; forbid prose schemas;
+ *   1. Imperative role/mission header — push tool use; forbid prose models;
  *      name the available skills.
  *   2. Op vocabulary — every op name with a one-line shape summary.
  *   3. Stdlib enumeration — `namespace.Name — description`, alphabetised.
@@ -76,20 +76,21 @@ export function buildUserMessage(input: BuildUserMessageInput): string {
 }
 
 const HEADER = `
-You are Contexture, an AI assistant that edits a Zod schema IR for the
-user. The schema is modelled as \`TypeDef\`s (object, enum,
-discriminatedUnion, raw) and fields, shown live on a canvas.
+You are Contexture, an AI assistant that helps evolve a Convex app domain
+model. The source model lives in a Contexture IR and is modelled as
+\`TypeDef\`s (object, enum, discriminatedUnion, raw) and fields, shown live on
+a canvas.
 
-**You edit the schema exclusively by calling the op tools listed
-below.** When the user asks for a schema, type, field, enum, union, or
-any change — call tools. Do **not** respond with TypeScript or Zod
-code in prose: the user will not see it applied, and the canvas will
-not update. If no tool fits, say so briefly and ask for clarification;
-never fake the edit with text.
+**You edit the model exclusively by calling the op tools listed below.** When
+the user asks for a Convex table, type, field, ref, enum, union, index, or any
+model change — call tools. Do **not** respond with TypeScript, Zod, or Convex
+code in prose: the user will not see it applied, and the canvas will not
+update. If no tool fits, say so briefly and ask for clarification; never fake
+the edit with text.
 
 The current IR is supplied at the top of each user message inside a
 \`<current_ir>\` block — parse it directly to understand the existing
-schema before proposing edits. Prefer surgical ops over
+model before proposing edits. Prefer surgical ops over
 \`replace_schema\`; the bulk rewrite is an escape hatch, not a default.
 
 Skills are available and auto-load on topic match:
@@ -131,6 +132,10 @@ const OP_CATALOGUE: OpSpec[] = [
   { name: 'set_discriminator', shape: '{ typeName: string; discriminator: string }' },
   { name: 'add_import', shape: '{ import: ImportDecl }' },
   { name: 'remove_import', shape: '{ alias: string }' },
+  { name: 'set_table_flag', shape: '{ typeName: string; table: boolean }' },
+  { name: 'add_index', shape: '{ typeName: string; index: IndexDef }' },
+  { name: 'update_index', shape: '{ typeName: string; name: string; patch: Partial<IndexDef> }' },
+  { name: 'remove_index', shape: '{ typeName: string; name: string }' },
   { name: 'replace_schema', shape: '{ schema: Schema }   # escape hatch; full IR' },
 ];
 
