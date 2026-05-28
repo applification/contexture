@@ -11,16 +11,32 @@ import {
   useSchemaAgentSettingsStore,
 } from '@renderer/store/schema-agent-settings';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
-import { Bot, ChevronDown, Moon, PanelRight, Sun } from 'lucide-react';
+import {
+  Bot,
+  Box,
+  ChevronDown,
+  GitBranch,
+  ListChecks,
+  Moon,
+  PanelRight,
+  Plus,
+  Sun,
+  Table2,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import type { CreateTypeKind } from '../graph/interactions';
 import { GraphSearchBar } from './GraphSearchBar';
 
-export function Toolbar(): React.JSX.Element {
+interface ToolbarProps {
+  onCreateType?: (kind: CreateTypeKind) => void;
+}
+
+export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
   useState(() => {
     useSchemaAgentSettingsStore.getState().reloadFromStorage();
     return null;
@@ -119,6 +135,44 @@ export function Toolbar(): React.JSX.Element {
       <div className="flex-1 flex justify-center">
         <GraphSearchBar />
       </div>
+
+      {onCreateType && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-8 px-2 gap-1.5"
+              title="Create type"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              <Plus className="size-4" />
+              <ChevronDown className="size-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-1" align="end">
+            <CreateTypeButton
+              icon={<Table2 className="size-4" />}
+              label="Table"
+              onClick={() => onCreateType('table')}
+            />
+            <CreateTypeButton
+              icon={<Box className="size-4" />}
+              label="Object"
+              onClick={() => onCreateType('object')}
+            />
+            <CreateTypeButton
+              icon={<ListChecks className="size-4" />}
+              label="Enum"
+              onClick={() => onCreateType('enum')}
+            />
+            <CreateTypeButton
+              icon={<GitBranch className="size-4" />}
+              label="Union"
+              onClick={() => onCreateType('union')}
+            />
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Button
         variant="ghost"
@@ -237,6 +291,28 @@ export function Toolbar(): React.JSX.Element {
         <PanelRight />
       </Button>
     </div>
+  );
+}
+
+function CreateTypeButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className="h-8 w-full justify-start gap-2 px-2 text-xs"
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </Button>
   );
 }
 

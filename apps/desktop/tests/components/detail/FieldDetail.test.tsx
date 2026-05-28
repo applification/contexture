@@ -3,17 +3,32 @@
  * render and the right `update_field` op flows.
  */
 
-import type { FieldDef } from '@contexture/core/ir';
+import type { FieldDef, IndexDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { FieldDetail } from '@renderer/components/detail/FieldDetail';
+import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-function setup(field: FieldDef, modelingHints: ModelingHint[] = []) {
+function setup(
+  field: FieldDef,
+  modelingHints: ModelingHint[] = [],
+  availableTypeNames: readonly string[] = [],
+  onCreateRefTarget?: () => string | undefined,
+  tableIndexes?: readonly IndexDef[],
+) {
   const dispatch = vi.fn<(op: Op) => void>();
   render(
-    <FieldDetail typeName="Plot" field={field} dispatch={dispatch} modelingHints={modelingHints} />,
+    <FieldDetail
+      typeName="Plot"
+      field={field}
+      dispatch={dispatch}
+      modelingHints={modelingHints}
+      availableTypeNames={availableTypeNames}
+      onCreateRefTarget={onCreateRefTarget}
+      tableIndexes={tableIndexes}
+    />,
   );
   return { dispatch };
 }
@@ -43,6 +58,172 @@ describe('FieldDetail', () => {
       typeName: 'Plot',
       fieldName: 'email',
       patch: { type: { kind: 'string', format: 'email' } },
+    });
+  });
+
+  it('type picker changes a field from string to number', () => {
+    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
+    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'number' } });
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'name',
+      patch: { type: { kind: 'number' } },
+    });
+  });
+
+  it('dispatches update_field when the description changes', () => {
+    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
+    const textarea = screen.getByLabelText('Description');
+    fireEvent.change(textarea, { target: { value: 'Display name for the plot.' } });
+    fireEvent.blur(textarea);
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'name',
+      patch: { description: 'Display name for the plot.' },
+    });
+  });
+
+  it('dispatches update_field when the field name changes', () => {
+    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
+    const input = screen.getByLabelText('Name');
+    fireEvent.change(input, { target: { value: 'title' } });
+    fireEvent.blur(input);
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'name',
+      patch: { name: 'title' },
+    });
+  });
+
+  it('dispatches remove_field when the field delete action is clicked', () => {
+    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete field name' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'remove_field',
+      typeName: 'Plot',
+      fieldName: 'name',
+    });
+  });
+
+  it('dispatches update_field when a string default changes', () => {
+    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
+    const input = screen.getByLabelText('Default value');
+    fireEvent.change(input, { target: { value: 'Untitled' } });
+    fireEvent.blur(input);
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'name',
+      patch: { default: 'Untitled' },
+    });
+  });
+
+  it('parses numeric and boolean defaults by field type', () => {
+    const number = setup({ name: 'count', type: { kind: 'number' } });
+    fireEvent.change(screen.getByLabelText('Default value'), { target: { value: '42' } });
+    fireEvent.blur(screen.getByLabelText('Default value'));
+    expect(number.dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'count',
+      patch: { default: 42 },
+    });
+
+    cleanup();
+    const boolean = setup({ name: 'published', type: { kind: 'boolean' } });
+    fireEvent.change(screen.getByLabelText('Default value'), { target: { value: 'false' } });
+    fireEvent.blur(screen.getByLabelText('Default value'));
+    expect(boolean.dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'published',
+      patch: { default: false },
+    });
+  });
+
+  it('clears a default when the input is emptied', () => {
+    const { dispatch } = setup({
+      name: 'published',
+      type: { kind: 'boolean' },
+      default: false,
+    });
+    const input = screen.getByLabelText('Default value');
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'published',
+      patch: { default: undefined },
+    });
+  });
+
+  it('adds a single-field index for a table field', () => {
+    const { dispatch } = setup(
+      { name: 'author', type: { kind: 'ref', typeName: 'User' } },
+      [],
+      [],
+      undefined,
+      [],
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add index' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'add_index',
+      typeName: 'Plot',
+      index: { name: 'by_author', fields: ['author'] },
+    });
+  });
+
+  it('increments the generated index name when needed', () => {
+    const { dispatch } = setup(
+      { name: 'author', type: { kind: 'ref', typeName: 'User' } },
+      [],
+      [],
+      undefined,
+      [{ name: 'by_author', fields: ['name'] }],
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add index' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'add_index',
+      typeName: 'Plot',
+      index: { name: 'by_author2', fields: ['author'] },
+    });
+  });
+
+  it('shows existing single-field index state instead of adding a duplicate', () => {
+    setup({ name: 'author', type: { kind: 'ref', typeName: 'User' } }, [], [], undefined, [
+      { name: 'by_author', fields: ['author'] },
+    ]);
+    expect(screen.getByText('Indexed')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add index' })).not.toBeInTheDocument();
+  });
+
+  it('type picker creates a ref to the first available type', () => {
+    const { dispatch } = setup(
+      { name: 'harvest', type: { kind: 'string' } },
+      [],
+      ['Harvest', 'Season'],
+    );
+    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'ref' } });
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'harvest',
+      patch: { type: { kind: 'ref', typeName: 'Harvest' } },
+    });
+  });
+
+  it('type picker creates a stdlib ref when no local type is available', () => {
+    const { dispatch } = setup({ name: 'email', type: { kind: 'string' } });
+    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'ref' } });
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'email',
+      patch: { type: { kind: 'ref', typeName: 'common.Email' } },
     });
   });
 
@@ -82,16 +263,141 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('ref: target input dispatches with new typeName', () => {
+  it('ref: target picker preserves an unknown current target', () => {
     const { dispatch } = setup({ name: 'harvest', type: { kind: 'ref', typeName: 'Harvest' } });
-    const input = screen.getByLabelText('target');
-    fireEvent.change(input, { target: { value: 'HarvestLog' } });
-    fireEvent.blur(input);
+    fireEvent.click(screen.getByLabelText('target'));
+    expect(screen.getByRole('option', { name: 'Harvest' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /^Email - Email address\./ }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'harvest',
+      patch: { type: { kind: 'ref', typeName: 'common.Email' } },
+    });
+  });
+
+  it('ref: target picker dispatches from available type names', () => {
+    const { dispatch } = setup(
+      { name: 'harvest', type: { kind: 'ref', typeName: 'Harvest' } },
+      [],
+      ['Harvest', 'HarvestLog'],
+    );
+    fireEvent.click(screen.getByLabelText('target'));
+    fireEvent.click(screen.getByRole('option', { name: 'HarvestLog' }));
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
       fieldName: 'harvest',
       patch: { type: { kind: 'ref', typeName: 'HarvestLog' } },
+    });
+  });
+
+  it('ref: target picker previews local targets on hover and focus', () => {
+    const handler = vi.fn();
+    document.addEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler as EventListener);
+    setup({ name: 'harvest', type: { kind: 'ref', typeName: 'Harvest' } }, [], ['HarvestLog']);
+
+    fireEvent.click(screen.getByLabelText('target'));
+    const option = screen.getByRole('option', { name: 'HarvestLog' });
+    fireEvent.mouseEnter(option);
+    fireEvent.mouseLeave(option);
+    fireEvent.focus(option);
+    fireEvent.blur(option);
+
+    document.removeEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler as EventListener);
+    expect(handler.mock.calls.map(([event]) => (event as CustomEvent).detail)).toEqual([
+      { sourceType: 'Plot', sourceField: 'harvest', targetType: 'HarvestLog', active: true },
+      { sourceType: 'Plot', sourceField: 'harvest', targetType: 'HarvestLog', active: false },
+      { sourceType: 'Plot', sourceField: 'harvest', targetType: 'HarvestLog', active: true },
+      { sourceType: 'Plot', sourceField: 'harvest', targetType: 'HarvestLog', active: false },
+    ]);
+  });
+
+  it('ref: target picker includes searchable grouped stdlib types', () => {
+    const { dispatch } = setup({
+      name: 'country',
+      type: { kind: 'ref', typeName: 'common.Email' },
+    });
+    fireEvent.click(screen.getByLabelText('target'));
+    expect(screen.getByRole('option', { name: /^Email - Email address\./ })).toBeInTheDocument();
+    expect(screen.getByText('user@example.com')).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', {
+        name: /^CountryCode - ISO 3166-1 alpha-2 officially-assigned country code\./,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('GB')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Find a type...'), {
+      target: { value: 'country' },
+    });
+    fireEvent.click(
+      screen.getByRole('option', {
+        name: /^CountryCode - ISO 3166-1 alpha-2 officially-assigned country code\./,
+      }),
+    );
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'country',
+      patch: { type: { kind: 'ref', typeName: 'place.CountryCode' } },
+    });
+  });
+
+  it('ref: target picker can create and select a referenced object type', () => {
+    const createRefTarget = vi.fn(() => 'Harvest');
+    const { dispatch } = setup(
+      { name: 'harvest', type: { kind: 'ref', typeName: 'common.Email' } },
+      [],
+      [],
+      createRefTarget,
+    );
+
+    fireEvent.click(screen.getByLabelText('target'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create object target' }));
+
+    expect(createRefTarget).toHaveBeenCalledOnce();
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'harvest',
+      patch: { type: { kind: 'ref', typeName: 'Harvest' } },
+    });
+  });
+
+  it('type picker wraps the current field as a string array', () => {
+    const { dispatch } = setup({ name: 'tags', type: { kind: 'string' } });
+    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'array' } });
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'tags',
+      patch: { type: { kind: 'array', element: { kind: 'string' } } },
+    });
+  });
+
+  it('list toggle wraps the current type without resetting constraints', () => {
+    const { dispatch } = setup({ name: 'tags', type: { kind: 'string', min: 2 } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'list' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'tags',
+      patch: { type: { kind: 'array', element: { kind: 'string', min: 2 } } },
+    });
+  });
+
+  it('list toggle unwraps an array back to its element type', () => {
+    const { dispatch } = setup({
+      name: 'scores',
+      type: { kind: 'array', element: { kind: 'number', int: true } },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'list' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'scores',
+      patch: { type: { kind: 'number', int: true } },
     });
   });
 
@@ -123,6 +429,32 @@ describe('FieldDetail', () => {
       typeName: 'Plot',
       fieldName: 'n',
       patch: { optional: true },
+    });
+  });
+
+  it('server-derived checkbox dispatches update_field', () => {
+    const { dispatch } = setup({ name: 'createdAt', type: { kind: 'date' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'server derived' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'createdAt',
+      patch: { serverDerived: true },
+    });
+  });
+
+  it('server-derived checkbox clears the marker when unchecked', () => {
+    const { dispatch } = setup({
+      name: 'createdAt',
+      type: { kind: 'date' },
+      serverDerived: true,
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'server derived' }));
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'createdAt',
+      patch: { serverDerived: undefined },
     });
   });
 

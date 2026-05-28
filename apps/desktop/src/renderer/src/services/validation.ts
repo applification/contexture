@@ -8,6 +8,7 @@ export interface ValidationError {
   code: string;
   path: string;
   message: string;
+  hint?: string;
 }
 
 export interface ValidateOptions {
@@ -30,5 +31,6 @@ function toValidationError(issue: SemanticIssue): ValidationError {
     code: issue.code,
     path: issue.path,
     message: issue.hint ? `${issue.message} ${issue.hint}` : issue.message,
+    hint: issue.hint,
   };
 }

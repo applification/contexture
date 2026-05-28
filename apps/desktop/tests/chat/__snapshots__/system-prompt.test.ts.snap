@@ -40,9 +40,11 @@ Skills are available and auto-load on topic match:
 - \`update_value\` { typeName: string; value: string; patch: { value?: string; description?: string } }
 - \`remove_value\` { typeName: string; value: string }
 - \`add_variant\` { typeName: string; variant: string }
+- \`remove_variant\` { typeName: string; variant: string }
 - \`set_discriminator\` { typeName: string; discriminator: string }
 - \`add_import\` { import: ImportDecl }
 - \`remove_import\` { alias: string }
+- \`remove_import_at\` { index: number }
 - \`set_table_flag\` { typeName: string; table: boolean }
 - \`add_index\` { typeName: string; index: IndexDef }
 - \`update_index\` { typeName: string; name: string; patch: Partial<IndexDef> }

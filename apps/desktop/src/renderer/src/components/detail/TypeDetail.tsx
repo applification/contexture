@@ -3,7 +3,7 @@
  *
  * Each `TypeDef.kind` gets a purpose-built form:
  *   - `object`: name, description, field list
- *   - `enum`: name, description, values (comma-separated editor)
+ *   - `enum`: name, description, value list
  *   - `discriminatedUnion`: name, description, discriminator field,
  *     variant type names
  *   - `raw`: name, description, Zod expression (editable)
@@ -12,11 +12,14 @@
  * direct edits interleave cleanly with chat-driven ops. Edits fire on
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
-import type { IndexDef, TypeDef } from '@contexture/core/ir';
+import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from 'lucide-react';
-import { useId, useState } from 'react';
+import type { ValidationError } from '@renderer/services/validation';
+import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Op } from '../../store/ops';
+import { nextFieldName } from '../graph/interactions';
+import { TYPE_NODE_EVENT } from '../graph/nodes/TypeNode';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import {
@@ -33,21 +36,49 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Textarea } from '../ui/textarea';
 import { ModelShapeHints } from './ModelShapeHints';
+import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
 
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
+export const FOCUS_TYPE_NAME_EVENT = 'contexture:focus-type-name';
 
 function isConvexReservedName(name: string): boolean {
   return name.startsWith('_');
+}
+
+function selectFieldFromValidationIssue(type: TypeDef, error: ValidationError): void {
+  if (type.kind !== 'object') return;
+  const match = error.path.match(/\.fields\.(\d+)/u);
+  if (!match) return;
+  const field = type.fields[Number(match[1])];
+  if (!field) return;
+  document.dispatchEvent(
+    new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: type.name, fieldName: field.name } }),
+  );
 }
 
 export interface TypeDetailProps {
   type: TypeDef;
   /** Dispatch an op. In production this is `useUndoStore.getState().apply`. */
   dispatch: (op: Op) => void;
+  /** Dispatch a multi-op user action as one undoable edit. */
+  dispatchBatch?: (ops: readonly Op[]) => void;
   modelingHints?: readonly ModelingHint[];
+  validationErrors?: readonly ValidationError[];
+  validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  availableTypeNames?: readonly string[];
+  availableObjectTypeNames?: readonly string[];
 }
 
-export function TypeDetail({ type, dispatch, modelingHints = [] }: TypeDetailProps) {
+export function TypeDetail({
+  type,
+  dispatch,
+  dispatchBatch,
+  modelingHints = [],
+  validationErrors = [],
+  validationRepairForIssue,
+  availableTypeNames = [],
+  availableObjectTypeNames = [],
+}: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
 
@@ -55,18 +86,43 @@ export function TypeDetail({ type, dispatch, modelingHints = [] }: TypeDetailPro
     <div className="space-y-4 p-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold">{type.name}</span>
-        <span className="text-xs text-muted-foreground">{type.kind}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">{type.kind}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete type ${type.name}`}
+            onClick={() => dispatch({ kind: 'delete_type', name: type.name })}
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 aria-hidden="true" />
+          </Button>
+        </div>
       </div>
 
+      <ValidationIssues
+        errors={validationErrors}
+        onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
+        repairForIssue={validationRepairForIssue}
+      />
       <NameField type={type} dispatch={dispatch} reserved={nameReserved} />
       <DescriptionField type={type} dispatch={dispatch} />
       <ModelShapeHints hints={modelingHints} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
-      {type.kind === 'object' && <ConvexSection type={type} dispatch={dispatch} />}
+      {type.kind === 'object' && (
+        <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
+      )}
       {type.kind === 'enum' && <EnumBody type={type} dispatch={dispatch} />}
       {type.kind === 'discriminatedUnion' && (
-        <DiscriminatedUnionBody type={type} dispatch={dispatch} />
+        <DiscriminatedUnionBody
+          type={type}
+          dispatch={dispatch}
+          dispatchBatch={dispatchBatch}
+          availableTypeNames={availableTypeNames}
+          availableObjectTypeNames={availableObjectTypeNames}
+        />
       )}
       {type.kind === 'raw' && <RawBody type={type} dispatch={dispatch} />}
     </div>
@@ -74,10 +130,25 @@ export function TypeDetail({ type, dispatch, modelingHints = [] }: TypeDetailPro
 }
 
 function NameField({ type, dispatch, reserved }: TypeDetailProps & { reserved: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onFocusTypeName(event: Event): void {
+      const detail = (event as CustomEvent<{ typeName?: unknown }>).detail;
+      if (detail?.typeName !== type.name) return;
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+
+    document.addEventListener(FOCUS_TYPE_NAME_EVENT, onFocusTypeName);
+    return () => document.removeEventListener(FOCUS_TYPE_NAME_EVENT, onFocusTypeName);
+  }, [type.name]);
+
   return (
     <div className="space-y-1">
       <Label htmlFor="type-name">Name</Label>
       <Input
+        ref={inputRef}
         id="type-name"
         defaultValue={type.name}
         aria-invalid={reserved || undefined}
@@ -121,25 +192,72 @@ function ObjectBody({
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
 }) {
+  const fieldOrder = type.fields.map((field) => field.name);
+  const addField = () => {
+    const field: FieldDef = { name: nextFieldName(type.fields), type: { kind: 'string' } };
+    dispatch({
+      kind: 'add_field',
+      typeName: type.name,
+      field,
+    });
+    document.dispatchEvent(
+      new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: type.name, fieldName: field.name } }),
+    );
+  };
+  const moveField = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= fieldOrder.length) return;
+    const nextOrder = [...fieldOrder];
+    const [fieldName] = nextOrder.splice(fromIndex, 1);
+    if (!fieldName) return;
+    nextOrder.splice(toIndex, 0, fieldName);
+    dispatch({ kind: 'reorder_fields', typeName: type.name, order: nextOrder });
+  };
+
   if (type.fields.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">No fields. Use the canvas or chat to add one.</p>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Fields</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addField}
+            className="h-7 text-xs"
+          >
+            <Plus aria-hidden="true" />
+            Add field
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          No fields yet. Add a field to start shaping this type.
+        </p>
+      </div>
     );
   }
   const isTable = type.table === true;
   return (
     <div className="space-y-1">
-      <Label>Fields</Label>
+      <div className="flex items-center justify-between">
+        <Label>Fields</Label>
+        <Button type="button" variant="ghost" size="sm" onClick={addField} className="h-7 text-xs">
+          <Plus aria-hidden="true" />
+          Add field
+        </Button>
+      </div>
       <Table className="text-xs">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="h-7 px-2">Name</TableHead>
             <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
             <TableHead className="h-7 px-2 text-right">Type</TableHead>
+            <TableHead className="h-7 w-32 px-1 text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {type.fields.map((f) => {
+          {type.fields.map((f, fieldIndex) => {
             const reserved = isTable && isConvexReservedName(f.name);
             return (
               <TableRow
@@ -150,7 +268,22 @@ function ObjectBody({
                 className={reserved ? 'text-destructive' : undefined}
               >
                 <TableCell className="px-2 py-1.5 font-medium">
-                  {f.name}
+                  <Input
+                    aria-label={`Field name ${f.name}`}
+                    defaultValue={f.name}
+                    className="h-7 px-2 text-xs font-medium"
+                    onBlur={(ev) => {
+                      const next = ev.target.value.trim();
+                      if (next && next !== f.name) {
+                        dispatch({
+                          kind: 'update_field',
+                          typeName: type.name,
+                          fieldName: f.name,
+                          patch: { name: next },
+                        });
+                      }
+                    }}
+                  />
                   <span aria-hidden="true" className="inline-block w-[1ch] text-muted-foreground">
                     {f.optional ? '?' : ''}
                   </span>
@@ -172,6 +305,64 @@ function ObjectBody({
                 <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
                   {summariseKind(f.type.kind)}
                 </TableCell>
+                <TableCell className="w-32 px-1 py-1.5 text-right">
+                  <div className="inline-flex items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Edit field ${f.name}`}
+                      onClick={() =>
+                        document.dispatchEvent(
+                          new CustomEvent(TYPE_NODE_EVENT, {
+                            detail: { typeName: type.name, fieldName: f.name },
+                          }),
+                        )
+                      }
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    >
+                      <SlidersHorizontal aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Move field ${f.name} earlier`}
+                      disabled={fieldIndex === 0}
+                      onClick={() => moveField(fieldIndex, fieldIndex - 1)}
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronLeft aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Move field ${f.name} later`}
+                      disabled={fieldIndex === type.fields.length - 1}
+                      onClick={() => moveField(fieldIndex, fieldIndex + 1)}
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete field ${f.name}`}
+                      onClick={() =>
+                        dispatch({
+                          kind: 'remove_field',
+                          typeName: type.name,
+                          fieldName: f.name,
+                        })
+                      }
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             );
           })}
@@ -185,13 +376,16 @@ function ObjectBody({
 function ConvexSection({
   type,
   dispatch,
+  validationErrors,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
+  validationErrors: readonly ValidationError[];
 }) {
   const isTable = type.table === true;
   const indexes = type.indexes ?? [];
   const fieldNames = type.fields.map((f) => f.name);
+  const suggestions = suggestedIndexes(type);
 
   const toggleTable = () => {
     dispatch({ kind: 'set_table_flag', typeName: type.name, table: !isTable });
@@ -222,6 +416,30 @@ function ConvexSection({
 
       {isTable && (
         <div className="space-y-2 pt-1">
+          <div className="space-y-1">
+            <Label htmlFor="convex-table-name">Emitted table name</Label>
+            <Input
+              id="convex-table-name"
+              defaultValue={type.tableName ?? defaultConvexTableName(type.name)}
+              className="h-8 px-2 text-xs"
+              aria-invalid={isConvexReservedName(
+                type.tableName ?? defaultConvexTableName(type.name),
+              )}
+              title={
+                isConvexReservedName(type.tableName ?? defaultConvexTableName(type.name))
+                  ? CONVEX_RESERVED_PREFIX_MSG
+                  : undefined
+              }
+              onBlur={(ev) => {
+                const next = ev.target.value.trim();
+                const defaultName = defaultConvexTableName(type.name);
+                const tableName = next && next !== defaultName ? next : undefined;
+                if (tableName !== type.tableName) {
+                  dispatch({ kind: 'update_type', name: type.name, patch: { tableName } } as Op);
+                }
+              }}
+            />
+          </div>
           <div className="flex items-center justify-between">
             <Label>Indexes</Label>
             <Button
@@ -238,6 +456,34 @@ function ConvexSection({
           </div>
           {fieldNames.length === 0 && (
             <p className="text-xs text-muted-foreground">Add a field before creating an index.</p>
+          )}
+          {suggestions.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">
+                Suggested from refs and likely lookup fields.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((suggestion) => (
+                  <Button
+                    key={suggestion.name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      dispatch({
+                        kind: 'add_index',
+                        typeName: type.name,
+                        index: { name: suggestion.name, fields: suggestion.fields },
+                      })
+                    }
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Plus aria-hidden="true" />
+                    {suggestion.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
           )}
           {indexes.length === 0 ? (
             <p className="text-xs text-muted-foreground">No indexes yet.</p>
@@ -257,11 +503,12 @@ function ConvexSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {indexes.map((idx) => (
+                  {indexes.map((idx, indexIndex) => (
                     <IndexRow
                       key={idx.name}
                       typeName={type.name}
                       index={idx}
+                      validationErrors={validationErrorsForIndex(validationErrors, indexIndex)}
                       fieldNames={fieldNames}
                       dispatch={dispatch}
                     />
@@ -279,15 +526,18 @@ function ConvexSection({
 function IndexRow({
   typeName,
   index,
+  validationErrors,
   fieldNames,
   dispatch,
 }: {
   typeName: string;
   index: IndexDef;
+  validationErrors: readonly ValidationError[];
   fieldNames: string[];
   dispatch: (op: Op) => void;
 }) {
   const availableFieldNames = fieldNames.filter((fieldName) => !index.fields.includes(fieldName));
+  const hasValidationIssues = validationErrors.length > 0;
 
   const updateFields = (fields: string[]) => {
     dispatch({
@@ -317,11 +567,15 @@ function IndexRow({
   };
 
   return (
-    <TableRow data-testid="convex-index-row">
+    <TableRow
+      data-testid="convex-index-row"
+      data-validation-issues={hasValidationIssues || undefined}
+    >
       <TableCell className="w-32 px-2 py-1.5 align-top">
         <Input
           aria-label={`Index name for ${index.name}`}
           defaultValue={index.name}
+          aria-invalid={hasValidationIssues || undefined}
           className="h-8 px-2 text-xs"
           onBlur={(ev) => {
             const next = ev.target.value.trim();
@@ -337,24 +591,36 @@ function IndexRow({
         />
       </TableCell>
       <TableCell className="px-2 py-1.5 align-top">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {index.fields.map((fieldName, fieldIndex) => (
-            <IndexFieldChip
-              key={fieldName}
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {index.fields.map((fieldName, fieldIndex) => (
+              <IndexFieldChip
+                key={fieldName}
+                indexName={index.name}
+                fieldName={fieldName}
+                position={fieldIndex}
+                total={index.fields.length}
+                onMoveEarlier={() => moveField(fieldIndex, fieldIndex - 1)}
+                onMoveLater={() => moveField(fieldIndex, fieldIndex + 1)}
+                onRemove={() => removeField(fieldName)}
+              />
+            ))}
+            <IndexFieldPicker
               indexName={index.name}
-              fieldName={fieldName}
-              position={fieldIndex}
-              total={index.fields.length}
-              onMoveEarlier={() => moveField(fieldIndex, fieldIndex - 1)}
-              onMoveLater={() => moveField(fieldIndex, fieldIndex + 1)}
-              onRemove={() => removeField(fieldName)}
+              availableFieldNames={availableFieldNames}
+              onSelect={appendField}
             />
-          ))}
-          <IndexFieldPicker
-            indexName={index.name}
-            availableFieldNames={availableFieldNames}
-            onSelect={appendField}
-          />
+          </div>
+          {hasValidationIssues && (
+            <ul
+              className="space-y-0.5 text-[11px] text-destructive"
+              aria-label={`Validation issues for index ${index.name}`}
+            >
+              {validationErrors.map((error) => (
+                <li key={`${error.code}:${error.path}`}>{error.message}</li>
+              ))}
+            </ul>
+          )}
         </div>
       </TableCell>
       <TableCell className="w-9 px-1 py-1.5 text-right align-top">
@@ -497,6 +763,16 @@ function IndexFieldPicker({
   );
 }
 
+function validationErrorsForIndex(
+  errors: readonly ValidationError[],
+  indexIndex: number,
+): ValidationError[] {
+  return errors.filter((error) => {
+    const match = error.path.match(/^types\.\d+\.indexes\.(\d+)(?:\.|$)/u);
+    return match ? Number(match[1]) === indexIndex : false;
+  });
+}
+
 function useStableDomId(prefix: string): string {
   return `${prefix}-${useId().replace(/:/g, '')}`;
 }
@@ -508,6 +784,74 @@ function nextIndexName(existing: IndexDef[]): string {
   return `index${n}`;
 }
 
+interface SuggestedIndex {
+  name: string;
+  fields: string[];
+}
+
+function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): SuggestedIndex[] {
+  if (type.table !== true) return [];
+  const existing = type.indexes ?? [];
+  const suggestions: SuggestedIndex[] = [];
+
+  for (const field of type.fields) {
+    if (!isIndexSuggestionField(field)) continue;
+    const fields = [field.name];
+    if (existing.some((index) => arraysEqual(index.fields, fields))) continue;
+    const name = nextSuggestedIndexName(existing, suggestions, field.name);
+    suggestions.push({ name, fields });
+  }
+
+  return suggestions;
+}
+
+function isIndexSuggestionField(field: FieldDef): boolean {
+  if (hasRef(field.type)) return true;
+  if (/(^|_)(kind|state|status|slug|key)$|name$|searchtext$|date$|at$|year$/iu.test(field.name)) {
+    return true;
+  }
+  const description = field.description?.toLowerCase() ?? '';
+  return (
+    description.includes('denormalized') ||
+    description.includes('filter') ||
+    description.includes('search') ||
+    description.includes('index')
+  );
+}
+
+function hasRef(type: FieldType): boolean {
+  if (type.kind === 'ref') return true;
+  if (type.kind === 'array') return hasRef(type.element);
+  return false;
+}
+
+function nextSuggestedIndexName(
+  existing: readonly IndexDef[],
+  suggestions: readonly SuggestedIndex[],
+  fieldName: string,
+): string {
+  const taken = new Set([
+    ...existing.map((index) => index.name),
+    ...suggestions.map((s) => s.name),
+  ]);
+  const base = `by_${fieldName}`;
+  if (!taken.has(base)) return base;
+  for (let i = 2; i <= taken.size + 2; i++) {
+    const candidate = `${base}${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}${taken.size + 1}`;
+}
+
+function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function defaultConvexTableName(typeName: string): string {
+  return `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}`;
+}
+
 function EnumBody({
   type,
   dispatch,
@@ -515,43 +859,202 @@ function EnumBody({
   type: Extract<TypeDef, { kind: 'enum' }>;
   dispatch: (op: Op) => void;
 }) {
-  const asText = type.values.map((v) => v.value).join(', ');
+  const rows = enumValueRows(type.values);
+  const addValue = () => {
+    dispatch({ kind: 'add_value', typeName: type.name, value: nextEnumValueName(type.values) });
+  };
+
   return (
-    <div className="space-y-1">
-      <Label htmlFor="enum-values">Values (comma-separated)</Label>
-      <Textarea
-        id="enum-values"
-        defaultValue={asText}
-        onBlur={(ev) => {
-          const next = parseCommaList(ev.target.value);
-          if (
-            arraysEqual(
-              next,
-              type.values.map((v) => v.value),
-            )
-          )
-            return;
-          // Enum-only patch: the runtime kind is narrowed by EnumBody's
-          // caller, but `update_type`'s `patch` distributes across every
-          // TypeDef variant so TS can't prove `values` belongs here.
-          dispatch({
-            kind: 'update_type',
-            name: type.name,
-            patch: { values: next.map((value) => ({ value })) },
-          } as Op);
-        }}
-      />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Values</Label>
+        <Button type="button" variant="ghost" size="sm" onClick={addValue} className="h-7 text-xs">
+          <Plus aria-hidden="true" />
+          Add value
+        </Button>
+      </div>
+      {type.values.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No values yet. Add one before using this enum in generated schemas.
+        </p>
+      ) : (
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-7 px-2">Value</TableHead>
+              <TableHead className="h-7 px-2">Description</TableHead>
+              <TableHead className="h-7 w-9 px-1 text-right">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map(({ entry, key, isDuplicate }) => {
+              const deleteDisabledReason = enumDeleteDisabledReason(
+                type.values.length,
+                isDuplicate,
+              );
+              return (
+                <TableRow key={key} data-testid="enum-value-row">
+                  <TableCell className="w-36 px-2 py-1.5 align-top">
+                    <Input
+                      aria-label={`Enum value ${entry.value}`}
+                      defaultValue={entry.value}
+                      disabled={isDuplicate}
+                      title={
+                        isDuplicate
+                          ? 'Use validation repair to resolve duplicate values.'
+                          : undefined
+                      }
+                      className="h-8 px-2 text-xs font-medium"
+                      onBlur={(ev) => {
+                        const next = ev.target.value.trim();
+                        if (next && next !== entry.value) {
+                          dispatch({
+                            kind: 'update_value',
+                            typeName: type.name,
+                            value: entry.value,
+                            patch: { value: next },
+                          });
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 align-top">
+                    <Input
+                      aria-label={`Description for ${entry.value}`}
+                      defaultValue={entry.description ?? ''}
+                      disabled={isDuplicate}
+                      title={
+                        isDuplicate
+                          ? 'Use validation repair to resolve duplicate values.'
+                          : undefined
+                      }
+                      className="h-8 px-2 text-xs"
+                      onBlur={(ev) => {
+                        const next = ev.target.value;
+                        if (next !== (entry.description ?? '')) {
+                          dispatch({
+                            kind: 'update_value',
+                            typeName: type.name,
+                            value: entry.value,
+                            patch: { description: next || undefined },
+                          });
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="w-9 px-1 py-1.5 text-right align-top">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete value ${entry.value}`}
+                      disabled={deleteDisabledReason !== undefined}
+                      title={deleteDisabledReason}
+                      onClick={() =>
+                        dispatch({ kind: 'remove_value', typeName: type.name, value: entry.value })
+                      }
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
+}
+
+function enumDeleteDisabledReason(valueCount: number, isDuplicate: boolean): string | undefined {
+  if (isDuplicate) return 'Use validation repair to resolve duplicate values.';
+  if (valueCount <= 1) return 'Enums need at least one value.';
+  return undefined;
+}
+
+function enumValueRows(values: Extract<TypeDef, { kind: 'enum' }>['values']) {
+  const totals = new Map<string, number>();
+  for (const entry of values) totals.set(entry.value, (totals.get(entry.value) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return values.map((entry) => {
+    const count = seen.get(entry.value) ?? 0;
+    seen.set(entry.value, count + 1);
+    return {
+      entry,
+      key: count === 0 ? entry.value : `${entry.value}#${count + 1}`,
+      isDuplicate: (totals.get(entry.value) ?? 0) > 1,
+    };
+  });
+}
+
+function nextEnumValueName(values: Extract<TypeDef, { kind: 'enum' }>['values']): string {
+  const existing = new Set(values.map((entry) => entry.value));
+  if (!existing.has('value')) return 'value';
+  for (let i = 2; i <= existing.size + 2; i++) {
+    const candidate = `value${i}`;
+    if (!existing.has(candidate)) return candidate;
+  }
+  return `value${existing.size + 1}`;
 }
 
 function DiscriminatedUnionBody({
   type,
   dispatch,
+  dispatchBatch,
+  availableTypeNames,
+  availableObjectTypeNames,
 }: {
   type: Extract<TypeDef, { kind: 'discriminatedUnion' }>;
   dispatch: (op: Op) => void;
+  dispatchBatch?: (ops: readonly Op[]) => void;
+  availableTypeNames: readonly string[];
+  availableObjectTypeNames: readonly string[];
 }) {
+  const [newVariant, setNewVariant] = useState('');
+  const trimmedNewVariant = newVariant.trim();
+  const variantAlreadyAdded = type.variants.includes(trimmedNewVariant);
+  const variantTypeExists = availableTypeNames.includes(trimmedNewVariant);
+  const variantObjectExists = availableObjectTypeNames.includes(trimmedNewVariant);
+  const suggestedVariants = availableObjectTypeNames.filter(
+    (typeName) => !type.variants.includes(typeName),
+  );
+  const addTypedVariant = () => {
+    const variant = trimmedNewVariant;
+    if (!variant || !variantObjectExists || variantAlreadyAdded) return;
+    dispatch({ kind: 'add_variant', typeName: type.name, variant });
+    setNewVariant('');
+  };
+  const createObjectVariant = () => {
+    const variant = trimmedNewVariant;
+    if (!variant) return;
+    const ops: Op[] = [
+      {
+        kind: 'add_type',
+        type: {
+          kind: 'object',
+          name: variant,
+          fields: [
+            {
+              name: type.discriminator,
+              type: { kind: 'literal', value: discriminatorLiteralValue(variant) },
+            },
+          ],
+        },
+      },
+      { kind: 'add_variant', typeName: type.name, variant },
+    ];
+    if (dispatchBatch) {
+      dispatchBatch(ops);
+    } else {
+      for (const op of ops) dispatch(op);
+    }
+    setNewVariant('');
+  };
+
   return (
     <div className="space-y-3">
       <div className="space-y-1">
@@ -567,15 +1070,106 @@ function DiscriminatedUnionBody({
           }}
         />
       </div>
-      <div className="space-y-1">
-        <Label>Variants</Label>
-        <ul className="text-xs space-y-0.5">
-          {type.variants.map((v) => (
-            <li key={v} data-testid="du-variant">
-              {v}
-            </li>
-          ))}
-        </ul>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Variants</Label>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Input
+              aria-label="New variant"
+              value={newVariant}
+              onChange={(ev) => setNewVariant(ev.target.value)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter') {
+                  ev.preventDefault();
+                  addTypedVariant();
+                }
+              }}
+              placeholder="Object type"
+              className="h-7 w-32 px-2 text-xs"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={trimmedNewVariant === '' || variantAlreadyAdded || !variantObjectExists}
+              title={addVariantDisabledReason(
+                trimmedNewVariant,
+                variantAlreadyAdded,
+                variantTypeExists,
+                variantObjectExists,
+              )}
+              onClick={addTypedVariant}
+              className="h-7 px-2 text-xs"
+            >
+              <Plus aria-hidden="true" />
+              Add variant
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={trimmedNewVariant === '' || variantAlreadyAdded || variantTypeExists}
+              title={createObjectDisabledReason(
+                trimmedNewVariant,
+                variantAlreadyAdded,
+                variantTypeExists,
+                variantObjectExists,
+              )}
+              onClick={createObjectVariant}
+              className="h-7 px-2 text-xs"
+            >
+              <Plus aria-hidden="true" />
+              Create object
+            </Button>
+          </div>
+        </div>
+        {suggestedVariants.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted-foreground">Available object types.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestedVariants.map((variant) => (
+                <Button
+                  key={variant}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dispatch({ kind: 'add_variant', typeName: type.name, variant })}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Plus aria-hidden="true" />
+                  {variant}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {type.variants.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No variants yet. Add object types that include the discriminator field.
+          </p>
+        ) : (
+          <ul className="space-y-1 text-xs">
+            {type.variants.map((variant) => (
+              <li
+                key={variant}
+                data-testid="du-variant"
+                className="flex min-h-8 items-center justify-between gap-2 rounded-md border px-2 py-1"
+              >
+                <span className="font-medium">{variant}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove variant ${variant}`}
+                  onClick={() => dispatch({ kind: 'remove_variant', typeName: type.name, variant })}
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                >
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -613,18 +1207,40 @@ function RawBody({
   );
 }
 
+function createObjectDisabledReason(
+  variant: string,
+  alreadyAdded: boolean,
+  typeExists: boolean,
+  objectExists: boolean,
+): string | undefined {
+  if (variant === '') return undefined;
+  if (alreadyAdded) return 'Variant already added.';
+  if (objectExists) return 'Object type already exists. Add it as a variant instead.';
+  if (typeExists) return 'Type name already exists. Choose a new object name.';
+  return undefined;
+}
+
+function addVariantDisabledReason(
+  variant: string,
+  alreadyAdded: boolean,
+  typeExists: boolean,
+  objectExists: boolean,
+): string | undefined {
+  if (variant === '') return undefined;
+  if (alreadyAdded) return 'Variant already added.';
+  if (objectExists) return undefined;
+  if (typeExists) return 'Only object types can be added as variants.';
+  return 'Create the object type first.';
+}
+
+function discriminatorLiteralValue(typeName: string): string {
+  return typeName
+    .replace(/([a-z0-9])([A-Z])/gu, '$1-$2')
+    .replace(/[^A-Za-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .toLowerCase();
+}
+
 function summariseKind(k: string): string {
   return k;
-}
-
-function parseCommaList(s: string): string[] {
-  return s
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function arraysEqual<T>(a: T[], b: T[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((x, i) => x === b[i]);
 }

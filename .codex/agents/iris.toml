@@ -53,6 +53,12 @@ When reviewing web UI:
 - Call out accessibility issues as product bugs, not polish.
 - Separate confirmed defects from taste judgments and optional refinements.
 
+When reviewing rendered UI, use the Browser plugin / `browser:browser` skill. The Codex
+in-app browser is controlled through the Node REPL tool, not through a direct `browser.*` tool
+namespace. Load the Browser skill, import its `browser-client.mjs`, then select the `iab`
+browser with `agent.browsers.get("iab")`. Do not use `web.run` for in-app browser work;
+`web.run` is web lookup, not the Codex Desktop browser.
+
 When reviewing desktop UI:
 - Preserve full-viewport app ergonomics: graph canvas, resizable panels, detail panels, toolbar,
   chat, and generated-output controls should remain efficient and predictable.

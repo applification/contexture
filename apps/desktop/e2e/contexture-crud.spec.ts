@@ -79,4 +79,68 @@ test.describe('Contexture CRUD', () => {
 
     await expect(page.locator('[data-type-name="E2EType"]')).toBeVisible();
   });
+
+  test('models a Convex app surface with tables, refs, enums, and indexes', async () => {
+    await page.evaluate(() => {
+      const store = (
+        window as unknown as {
+          __contextureUndoStore?: { getState: () => { apply: (op: unknown) => unknown } };
+        }
+      ).__contextureUndoStore;
+      if (!store) throw new Error('undo store not exposed');
+      const apply = store.getState().apply;
+
+      apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
+      apply({
+        kind: 'add_type',
+        type: {
+          kind: 'object',
+          name: 'User',
+          table: true,
+          fields: [
+            { name: 'email', type: { kind: 'ref', typeName: 'common.Email' } },
+            { name: 'name', type: { kind: 'string' } },
+          ],
+          indexes: [{ name: 'by_email', fields: ['email'] }],
+        },
+      });
+      apply({
+        kind: 'add_type',
+        type: { kind: 'enum', name: 'PostStatus', values: [{ value: 'draft' }, { value: 'live' }] },
+      });
+      apply({
+        kind: 'add_type',
+        type: {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [
+            { name: 'author', type: { kind: 'ref', typeName: 'User' } },
+            { name: 'status', type: { kind: 'ref', typeName: 'PostStatus' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+          indexes: [
+            { name: 'by_author', fields: ['author'] },
+            { name: 'by_status', fields: ['status'] },
+          ],
+        },
+      });
+    });
+
+    await expect(page.locator('[data-type-name="User"]')).toBeVisible();
+    await expect(page.locator('[data-type-name="Post"]')).toBeVisible();
+    await expect(page.getByText('3 types · 5 fields')).toBeVisible();
+    await expect(page.getByText('2 Convex tables · 3 refs · 3 indexes')).toBeVisible();
+    await expect(page.getByText('no errors')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Schema' }).click();
+    const source = page.getByTestId('schema-code');
+    await expect(source).toContainText('user: defineTable');
+    await expect(source).toContainText('.index("by_email", ["email"])');
+    await expect(source).toContainText('post: defineTable');
+    await expect(source).toContainText('.index("by_author", ["author"])');
+    await expect(page.getByTestId('schema-output-boundary')).toContainText(
+      'Read-only generated output',
+    );
+  });
 });

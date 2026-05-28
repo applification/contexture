@@ -273,6 +273,13 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       forward,
     ),
     strictTool(
+      'remove_variant',
+      'Remove a variant (type name) from a discriminatedUnion.',
+      { typeName: z.string().min(1), variant: z.string().min(1) },
+      ({ typeName, variant }) => ({ kind: 'remove_variant', typeName, variant }),
+      forward,
+    ),
+    strictTool(
       'set_discriminator',
       "Set a discriminatedUnion's discriminator field name.",
       { typeName: z.string().min(1), discriminator: z.string().min(1) },
@@ -284,6 +291,13 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       'Remove an import by alias.',
       { alias: z.string().min(1) },
       ({ alias }) => ({ kind: 'remove_import', alias }),
+      forward,
+    ),
+    strictTool(
+      'remove_import_at',
+      'Remove an import by schema.imports[] index. Use for duplicate aliases where alias removal would remove too much.',
+      { index: z.number().int().nonnegative() },
+      ({ index }) => ({ kind: 'remove_import_at', index }),
       forward,
     ),
     strictTool(

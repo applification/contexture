@@ -410,6 +410,12 @@ export function SchemaPanel({
               <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
                 {selectedOutput?.fileName ?? 'schema.ts'}
               </div>
+              <div
+                className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80"
+                data-testid="schema-output-boundary"
+              >
+                Read-only generated output
+              </div>
             </div>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">

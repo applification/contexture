@@ -35,6 +35,8 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { validate } from '@renderer/services/validation';
+import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useELKLayout } from '../../hooks/useELKLayout';
 import { useGraphLayoutStore } from '../../store/layout-config';
@@ -46,19 +48,29 @@ import {
 } from '../../store/selection';
 import { useUIChromeStore } from '../../store/ui-chrome';
 import { useUndoStore } from '../../store/undo';
+import { FOCUS_TYPE_NAME_EVENT } from '../detail/TypeDetail';
+import { TYPE_EDGE_SELECT_EVENT } from './edge-select-event';
 import { RefEdge } from './edges/RefEdge';
 import { GraphLegend } from './GraphLegend';
 import { filterGraphView } from './graph-view';
 import {
   type ConnectPayload,
+  createFieldOp,
   handleConnect,
   handleDoubleClick,
   handleKeyDown,
   type KeyEvent as InteractionKeyEvent,
 } from './interactions';
 import { GroupNode } from './nodes/GroupNode';
-import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT, TypeNode } from './nodes/TypeNode';
-import { type BuildGraphResult, buildGraph, type RefEdgeData } from './schema-to-graph';
+import { TYPE_NODE_ADD_FIELD_EVENT, TypeNode } from './nodes/TypeNode';
+import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from './ref-preview-event';
+import {
+  type BuildGraphResult,
+  buildGraph,
+  type FieldRow,
+  type RefEdgeData,
+  type TypeNodeData,
+} from './schema-to-graph';
 
 export interface CanvasPosition {
   x: number;
@@ -79,6 +91,51 @@ type FocusedField = { nodeId: string; fieldName: string };
 
 export function focusedFieldFromTarget(target: GraphFocusTarget): FocusedField | null {
   return target.fieldName ? { nodeId: target.nodeId, fieldName: target.fieldName } : null;
+}
+
+export function applyValidationHighlights(
+  graph: BuildGraphResult,
+  errors: readonly { path: string }[],
+): BuildGraphResult {
+  if (errors.length === 0) return graph;
+
+  const typeIssueCounts = new Map<number, number>();
+  const fieldIssueCounts = new Map<string, number>();
+
+  for (const error of errors) {
+    const typeMatch = error.path.match(/^types\.(\d+)/u);
+    if (!typeMatch) continue;
+    const typeIndex = Number(typeMatch[1]);
+    typeIssueCounts.set(typeIndex, (typeIssueCounts.get(typeIndex) ?? 0) + 1);
+
+    const fieldMatch = error.path.match(/^types\.\d+\.fields\.(\d+)/u);
+    if (fieldMatch) {
+      const key = `${typeIndex}:${Number(fieldMatch[1])}`;
+      fieldIssueCounts.set(key, (fieldIssueCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) => {
+      if (node.type !== 'type') return node;
+      const typeIndex = node.data.schemaIndex;
+      if (typeIndex === undefined) return node;
+      const validationIssueCount = typeIssueCounts.get(typeIndex) ?? 0;
+      if (validationIssueCount === 0) return node;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          validationIssueCount,
+          fields: node.data.fields.map((field: FieldRow, fieldIndex: number) => ({
+            ...field,
+            validationIssueCount: fieldIssueCounts.get(`${typeIndex}:${fieldIndex}`) ?? undefined,
+          })),
+        } satisfies TypeNodeData,
+      };
+    }),
+  };
 }
 
 export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
@@ -102,6 +159,7 @@ function GraphCanvasInner({
   const redo = useCallback(() => useUndoStore.getState().redo(), []);
 
   const click = useGraphSelectionStore((s) => s.click);
+  const selectEdge = useGraphSelectionStore((s) => s.selectEdge);
   const clearNodes = useGraphSelectionStore((s) => s.clearNodes);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
@@ -110,9 +168,11 @@ function GraphCanvasInner({
   const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
   const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
+  const validationErrors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
+
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(() => {
     const highlighted = new Set(highlightedNodeIds);
-    const graph = buildGraph({ schema, positions });
+    const graph = applyValidationHighlights(buildGraph({ schema, positions }), validationErrors);
     return {
       ...graph,
       nodes: graph.nodes.map((node) =>
@@ -121,7 +181,7 @@ function GraphCanvasInner({
           : node,
       ),
     };
-  }, [schema, positions, highlightedNodeIds]);
+  }, [schema, positions, highlightedNodeIds, validationErrors]);
 
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const showEnums = graphLayout.showEnums;
@@ -388,6 +448,31 @@ function GraphCanvasInner({
     [dispatch],
   );
 
+  const addFieldFromNode = useCallback(
+    (typeName: string): void => {
+      const op = createFieldOp(useUndoStore.getState().schema, typeName);
+      if (!op || op.kind !== 'add_field') return;
+      const result = useUndoStore.getState().apply(op);
+      if ('error' in result) return;
+      click(typeName, 'replace');
+      useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
+      setSidebarVisible(true);
+      setSidebarTab('properties');
+    },
+    [click, setSidebarTab, setSidebarVisible],
+  );
+
+  const focusSelectedTypeName = useCallback((): void => {
+    if (!selectedNodeId) return;
+    setSidebarVisible(true);
+    setSidebarTab('properties');
+    setTimeout(() => {
+      document.dispatchEvent(
+        new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName: selectedNodeId } }),
+      );
+    }, 0);
+  }, [selectedNodeId, setSidebarTab, setSidebarVisible]);
+
   // Double-click a node → focus its properties in the sidebar.
   const onNodeDoubleClick: ReactFlowProps['onNodeDoubleClick'] = useCallback(
     (_event, node) => {
@@ -417,10 +502,23 @@ function GraphCanvasInner({
       if (action.kind === 'op') dispatch(action.op);
       else if (action.command === 'undo') undo();
       else if (action.command === 'redo') redo();
+      else if (action.command === 'rename') focusSelectedTypeName();
     };
     el.addEventListener('keydown', handler);
     return () => el.removeEventListener('keydown', handler);
-  }, [dispatch, undo, redo, selectedNodeId]);
+  }, [dispatch, undo, redo, selectedNodeId, focusSelectedTypeName]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (ev: Event): void => {
+      const detail = (ev as CustomEvent<{ typeName?: unknown }>).detail;
+      if (typeof detail?.typeName !== 'string') return;
+      addFieldFromNode(detail.typeName);
+    };
+    el.addEventListener(TYPE_NODE_ADD_FIELD_EVENT, handler);
+    return () => el.removeEventListener(TYPE_NODE_ADD_FIELD_EVENT, handler);
+  }, [addFieldFromNode]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -458,11 +556,11 @@ function GraphCanvasInner({
         );
       }, 80);
     };
-    el.addEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
+    document.addEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
     return () => {
       if (refPreviewClearTimer.current) clearTimeout(refPreviewClearTimer.current);
       if (focusedFieldClearTimer.current) clearTimeout(focusedFieldClearTimer.current);
-      el.removeEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
+      document.removeEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
     };
   }, []);
 
@@ -488,7 +586,12 @@ function GraphCanvasInner({
         onPaneClick={() => clearNodes()}
         onEdgeClick={(_, edge) => {
           const data = edge.data as RefEdgeData | undefined;
-          if (data) click(data.sourceType, 'replace');
+          if (!data) return;
+          click(data.sourceType, 'replace');
+          selectEdge(edge.id);
+          document.dispatchEvent(
+            new CustomEvent(TYPE_EDGE_SELECT_EVENT, { detail: { edgeId: edge.id, data } }),
+          );
         }}
         minZoom={0.1}
         maxZoom={2.5}

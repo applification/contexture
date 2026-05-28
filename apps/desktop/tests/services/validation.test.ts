@@ -261,6 +261,29 @@ describe('validate', () => {
     expect(validate(schema).some((e) => e.code.startsWith('enum_'))).toBe(false);
   });
 
+  it('flags duplicate fields inside a Convex index', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'author', type: { kind: 'string' } }],
+          indexes: [{ name: 'by_author', fields: ['author', 'author'] }],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'convex_index_duplicate_field');
+    expect(err).toEqual({
+      code: 'convex_index_duplicate_field',
+      path: 'types.0.indexes.0.fields.1',
+      message:
+        'Convex index "by_author" includes field "author" more than once. Remove the duplicate field from the index.',
+      hint: 'Remove the duplicate field from the index.',
+    });
+  });
+
   // Rule 6: unique import aliases
   it('rule 6: flags duplicate import aliases', () => {
     const schema: Schema = {
@@ -315,5 +338,29 @@ describe('validate', () => {
       ],
     };
     expect(validate(schema).some((e) => e.code === 'duplicate_type_name')).toBe(false);
+  });
+
+  it('flags duplicate field names on an object type', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [
+            { name: 'title', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+        },
+      ],
+    };
+    const err = validate(schema).find((e) => e.code === 'duplicate_field_name');
+    expect(err).toEqual({
+      code: 'duplicate_field_name',
+      path: 'types.0.fields.1.name',
+      message:
+        'Duplicate field name "title" in "Post". Rename one of the fields before editing indexes or generated outputs.',
+      hint: 'Rename one of the fields before editing indexes or generated outputs.',
+    });
   });
 });

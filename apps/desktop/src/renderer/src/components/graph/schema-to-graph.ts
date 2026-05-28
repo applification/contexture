@@ -35,6 +35,8 @@ type TableTypeDef = Extract<TypeDef, { kind: 'object' }> & { table: true };
 export interface TypeNodeData extends Record<string, unknown> {
   /** Fully-qualified type name (local or `<alias>.<Name>`). */
   typeName: string;
+  /** Source `schema.types` index for local nodes; absent for shadow/imported nodes. */
+  schemaIndex?: number;
   kind: TypeDef['kind'];
   description?: string;
   enumValues?: ReadonlyArray<EnumValueRow>;
@@ -44,8 +46,11 @@ export interface TypeNodeData extends Record<string, unknown> {
   focusedFieldName?: string;
   previewRole?: 'primary' | 'adjacent';
   previewDimmed?: boolean;
+  validationIssueCount?: number;
   /** True when the source `ObjectTypeDef` carries `table: true`. */
   table?: boolean;
+  /** Local object nodes can create fields directly from the canvas. */
+  canAddFields?: boolean;
 }
 
 export interface EnumValueRow {
@@ -66,6 +71,7 @@ export interface FieldRow {
   refTargetKind?: TypeDef['kind'];
   /** Local enum metadata when this field references an enum TypeDef. */
   enumTarget?: EnumTargetRow;
+  validationIssueCount?: number;
 }
 
 export interface EnumTargetRow {
@@ -103,8 +109,8 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
   const localTypes = new Map(schema.types.map((type) => [type.name, type]));
   const tableTypes = schema.types.filter(isTableType);
 
-  const nodes: Node<TypeNodeData>[] = schema.types.map((t) =>
-    localNodeFor(t, positions?.[t.name] ?? DEFAULT_POSITION, localTypes),
+  const nodes: Node<TypeNodeData>[] = schema.types.map((t, schemaIndex) =>
+    localNodeFor(t, schemaIndex, positions?.[t.name] ?? DEFAULT_POSITION, localTypes),
   );
 
   // Collect edges + shadow nodes for targets that point outside the local
@@ -190,6 +196,7 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
 
 function localNodeFor(
   type: TypeDef,
+  schemaIndex: number,
   position: { x: number; y: number },
   localTypes: ReadonlyMap<string, TypeDef>,
 ): Node<TypeNodeData> {
@@ -199,12 +206,14 @@ function localNodeFor(
     position,
     data: {
       typeName: type.name,
+      schemaIndex,
       kind: type.kind,
       description: type.description,
       enumValues: type.kind === 'enum' ? type.values.map(enumValueRow) : undefined,
       fields: type.kind === 'object' ? type.fields.map((field) => fieldRow(field, localTypes)) : [],
       imported: false,
       table: type.kind === 'object' && type.table === true ? true : undefined,
+      canAddFields: type.kind === 'object' ? true : undefined,
     },
   };
 }

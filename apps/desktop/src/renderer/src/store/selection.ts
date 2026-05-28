@@ -164,6 +164,7 @@ export const useGraphSelectionStore = create<GraphSelectionStoreShape>((set, get
           ...s.state,
           nodeIds: new Set<string>(),
           primaryNodeId: null,
+          edgeId: null,
           adjacency: EMPTY_ADJACENCY,
         },
       }));

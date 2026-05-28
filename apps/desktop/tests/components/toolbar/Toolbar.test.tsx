@@ -112,4 +112,20 @@ describe('Toolbar Codex settings', () => {
       });
     });
   });
+
+  it('offers quick creation for tables, objects, enums, and unions', () => {
+    const onCreateType = vi.fn();
+    render(<Toolbar onCreateType={onCreateType} />);
+
+    fireEvent.click(screen.getByTitle('Create type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Object' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enum' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Union' }));
+
+    expect(onCreateType).toHaveBeenNthCalledWith(1, 'table');
+    expect(onCreateType).toHaveBeenNthCalledWith(2, 'object');
+    expect(onCreateType).toHaveBeenNthCalledWith(3, 'enum');
+    expect(onCreateType).toHaveBeenNthCalledWith(4, 'union');
+  });
 });

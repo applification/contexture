@@ -34,6 +34,7 @@ export type SemanticIssueCode =
   | 'stdlib_alias_mismatch'
   | 'duplicate_alias'
   | 'duplicate_type_name'
+  | 'duplicate_field_name'
   | 'discriminator_variant_not_found'
   | 'discriminator_variant_not_object'
   | 'discriminator_missing_on_variant'
@@ -42,6 +43,7 @@ export type SemanticIssueCode =
   | 'duplicate_convex_table_name'
   | 'convex_reserved_table_name'
   | 'convex_reserved_field_name'
+  | 'convex_index_duplicate_field'
   | 'convex_index_unknown_field';
 
 export interface SemanticIssue {
@@ -58,6 +60,7 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkImports(schema, catalog),
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
+    ...checkDuplicateFieldNames(schema),
     ...checkDuplicateConvexTableNames(schema),
     ...checkConvexTableShapes(schema),
     ...checkDiscriminatedUnions(schema),
@@ -119,7 +122,18 @@ function checkConvexTableShapes(schema: Schema): SemanticIssue[] {
     });
 
     (type.indexes ?? []).forEach((index, indexIndex) => {
+      const seenIndexFields = new Set<string>();
       index.fields.forEach((fieldName, fieldIndex) => {
+        if (seenIndexFields.has(fieldName)) {
+          issues.push({
+            code: 'convex_index_duplicate_field',
+            path: `types.${typeIndex}.indexes.${indexIndex}.fields.${fieldIndex}`,
+            message: `Convex index "${index.name}" includes field "${fieldName}" more than once.`,
+            hint: 'Remove the duplicate field from the index.',
+          });
+        } else {
+          seenIndexFields.add(fieldName);
+        }
         if (fieldNames.has(fieldName)) return;
         issues.push({
           code: 'convex_index_unknown_field',
@@ -237,6 +251,27 @@ function checkDuplicateTypeNames(schema: Schema): SemanticIssue[] {
     } else {
       seen.add(type.name);
     }
+  });
+  return issues;
+}
+
+function checkDuplicateFieldNames(schema: Schema): SemanticIssue[] {
+  const issues: SemanticIssue[] = [];
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object') return;
+    const seen = new Set<string>();
+    type.fields.forEach((field, fieldIndex) => {
+      if (seen.has(field.name)) {
+        issues.push({
+          code: 'duplicate_field_name',
+          path: `types.${typeIndex}.fields.${fieldIndex}.name`,
+          message: `Duplicate field name "${field.name}" in "${type.name}".`,
+          hint: 'Rename one of the fields before editing indexes or generated outputs.',
+        });
+      } else {
+        seen.add(field.name);
+      }
+    });
   });
   return issues;
 }

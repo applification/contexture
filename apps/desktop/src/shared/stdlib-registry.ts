@@ -18,6 +18,14 @@ export type StdlibRegistry = StdlibCatalog;
 
 export const STDLIB_NAMESPACES = NAMESPACES;
 
+export interface StdlibTypeOption {
+  namespace: Namespace;
+  name: string;
+  qualifiedName: string;
+  description: string;
+  example: string;
+}
+
 export function buildStdlibRegistry(): StdlibRegistry {
   const typeNamesByNamespace: Record<string, ReadonlySet<string>> = Object.fromEntries(
     NAMESPACES.map((ns) => [ns, new Set(IR_BY_NAMESPACE[ns].types.map((t) => t.name))]),
@@ -53,4 +61,85 @@ export function buildSystemPromptStdlibRegistry(): SystemPromptStdlibRegistry {
 /** System-prompt registry singleton — same data as STDLIB_REGISTRY, flat shape. */
 export const SYSTEM_PROMPT_STDLIB: SystemPromptStdlibRegistry = buildSystemPromptStdlibRegistry();
 
+export function buildStdlibTypeOptions(): StdlibTypeOption[] {
+  return NAMESPACES.flatMap((ns) =>
+    IR_BY_NAMESPACE[ns].types.map((type) => ({
+      namespace: ns,
+      name: type.name,
+      qualifiedName: `${ns}.${type.name}`,
+      description:
+        (typeof type.description === 'string' && type.description) ||
+        IR_BY_NAMESPACE[ns].metadata?.description ||
+        '',
+      example: stdlibExample(type),
+    })),
+  );
+}
+
+export const STDLIB_TYPE_OPTIONS = buildStdlibTypeOptions();
+
 export type { Namespace };
+
+interface StdlibExampleType {
+  kind: string;
+  name: string;
+  fields?: readonly {
+    name: string;
+    optional?: boolean;
+    type: { kind: string };
+  }[];
+  values?: readonly { value: string }[];
+  jsonSchema?: { type?: unknown };
+}
+
+function stdlibExample(type: StdlibExampleType): string {
+  const namedExample = stdlibNamedExample(type.name);
+  if (namedExample) return namedExample;
+
+  if (type.kind === 'object' && type.fields) {
+    const fields = type.fields
+      .filter((field) => field.optional !== true)
+      .slice(0, 3)
+      .map((field) => `${field.name}: ${exampleForFieldType(field.type.kind)}`);
+    return `{ ${fields.join(', ')} }`;
+  }
+  if (type.kind === 'enum') return type.values?.[0]?.value ?? 'value';
+  if (type.kind !== 'raw') return type.name;
+
+  return type.jsonSchema?.type === 'number' || type.jsonSchema?.type === 'integer' ? '1' : 'value';
+}
+
+function stdlibNamedExample(typeName: string): string | undefined {
+  switch (typeName) {
+    case 'Email':
+      return 'user@example.com';
+    case 'URL':
+      return 'https://example.com';
+    case 'UUID':
+      return '550e8400-e29b-41d4-a716-446655440000';
+    case 'ISODate':
+      return '2026-05-28';
+    case 'ISODateTime':
+      return '2026-05-28T12:00:00Z';
+    case 'Slug':
+      return 'my-record';
+    case 'CountryCode':
+      return 'GB';
+    case 'CurrencyCode':
+      return 'GBP';
+    case 'PhoneNumber':
+      return '+447700900123';
+    case 'PositiveInt':
+      return '1';
+    case 'PositiveNumber':
+      return '1.5';
+    default:
+      return undefined;
+  }
+}
+
+function exampleForFieldType(kind: string): string {
+  if (kind === 'number') return '1';
+  if (kind === 'boolean') return 'true';
+  return '"value"';
+}

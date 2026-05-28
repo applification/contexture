@@ -6,6 +6,7 @@
  */
 
 import type { Schema } from '@contexture/core/ir';
+import { applyValidationHighlights } from '@renderer/components/graph/GraphCanvas';
 import { buildGraph, summariseFieldType } from '@renderer/components/graph/schema-to-graph';
 import { describe, expect, it } from 'vitest';
 
@@ -21,6 +22,7 @@ describe('buildGraph', () => {
     const { nodes } = buildGraph({ schema });
     expect(nodes).toHaveLength(2);
     expect(nodes[0]).toMatchObject({ id: 'Plot', type: 'type', data: { kind: 'object' } });
+    expect(nodes[0].data.canAddFields).toBe(true);
     expect(nodes[1]).toMatchObject({
       id: 'Season',
       type: 'type',
@@ -140,6 +142,64 @@ describe('buildGraph', () => {
       'area?=number',
       'tags=string[]',
     ]);
+  });
+
+  it('can apply validation highlights to affected nodes and fields', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [{ name: 'author', type: { kind: 'ref', typeName: 'Author' } }],
+        },
+      ],
+    };
+
+    const graph = applyValidationHighlights(buildGraph({ schema }), [
+      { path: 'types.0.fields.0.type' },
+    ]);
+
+    expect(graph.nodes[0].data).toMatchObject({
+      validationIssueCount: 1,
+      fields: [expect.objectContaining({ name: 'author', validationIssueCount: 1 })],
+    });
+  });
+
+  it('applies validation highlights by schema index when type names are duplicated', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [{ name: 'author', type: { kind: 'ref', typeName: 'Author' } }],
+        },
+      ],
+    };
+
+    const graph = applyValidationHighlights(buildGraph({ schema }), [
+      { path: 'types.1.fields.0.type' },
+    ]);
+
+    expect(graph.nodes[0].data).toMatchObject({
+      typeName: 'Post',
+      schemaIndex: 0,
+      fields: [expect.objectContaining({ name: 'title' })],
+    });
+    expect(graph.nodes[0].data.validationIssueCount).toBeUndefined();
+    expect(graph.nodes[0].data.fields[0]?.validationIssueCount).toBeUndefined();
+    expect(graph.nodes[1].data).toMatchObject({
+      typeName: 'Post',
+      schemaIndex: 1,
+      validationIssueCount: 1,
+      fields: [expect.objectContaining({ name: 'author', validationIssueCount: 1 })],
+    });
   });
 
   it('emits a ref edge for a ref field and leaves no shadow node when target is local', () => {

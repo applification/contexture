@@ -25,6 +25,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useGraphSelectionStore } from '../../../store/selection';
+import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from '../ref-preview-event';
 import type { EnumTargetRow, TypeNodeData } from '../schema-to-graph';
 
 export interface FieldSelection {
@@ -33,14 +34,7 @@ export interface FieldSelection {
 }
 
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
-export const TYPE_NODE_REF_PREVIEW_EVENT = 'contexture:field-ref-preview' as const;
-
-export interface FieldRefPreview {
-  sourceType: string;
-  sourceField: string;
-  targetType: string;
-  active: boolean;
-}
+export const TYPE_NODE_ADD_FIELD_EVENT = 'contexture:type-node-add-field' as const;
 
 type TypeNodeKind = Node<TypeNodeData, 'type'>;
 
@@ -92,6 +86,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       !isPreviewAdjacent) ||
     (data.previewDimmed === true && !isSelected && !isPreviewPrimary && !isPreviewAdjacent);
   const isSyncHighlighted = data.syncHighlighted === true && !isSelected && !isAdjacent;
+  const hasValidationIssues = (data.validationIssueCount ?? 0) > 0;
 
   const onFieldClick = useCallback(
     (field: TypeNodeData['fields'][number], ev: React.MouseEvent<HTMLElement>) => {
@@ -127,6 +122,19 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     [data.typeName],
   );
 
+  const onAddField = useCallback(
+    (ev: React.MouseEvent<HTMLButtonElement>) => {
+      ev.stopPropagation();
+      ev.currentTarget.dispatchEvent(
+        new CustomEvent(TYPE_NODE_ADD_FIELD_EVENT, {
+          bubbles: true,
+          detail: { typeName: data.typeName },
+        }),
+      );
+    },
+    [data.typeName],
+  );
+
   const borderColor = isSelected
     ? 'var(--graph-node-selected)'
     : isAdjacent
@@ -149,6 +157,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       data-imported={data.imported ? 'true' : 'false'}
       data-selected={isSelected ? 'true' : 'false'}
       data-adjacent={isAdjacent ? 'true' : 'false'}
+      data-validation-issues={hasValidationIssues ? 'true' : undefined}
       {...(data.table ? { 'data-table': 'true' } : {})}
       className="contexture-type-node"
       style={{
@@ -161,7 +170,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         WebkitBackdropFilter: 'blur(8px)',
         borderWidth,
         borderStyle,
-        borderColor,
+        borderColor: hasValidationIssues && !isSelected ? 'var(--destructive)' : borderColor,
         boxShadow: '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)',
         background:
           isSelected || isPreviewPrimary ? 'var(--graph-node-selected-bg)' : 'transparent',
@@ -235,6 +244,14 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         >
           {data.typeName}
         </span>
+        {hasValidationIssues && (
+          <NodeKindLabel
+            data-testid="type-node-validation-label"
+            style={{ color: 'var(--destructive)', opacity: 0.95 }}
+          >
+            issue
+          </NodeKindLabel>
+        )}
         {data.table ? (
           <NodeKindLabel data-testid="type-node-table-label">table</NodeKindLabel>
         ) : (
@@ -260,6 +277,30 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             />
           ))}
         </div>
+      )}
+      {data.canAddFields && !data.imported && (
+        <button
+          type="button"
+          data-testid="type-node-add-field"
+          onClick={onAddField}
+          className="contexture-type-node-add-field hover:bg-accent/35 focus-visible:bg-accent/45 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
+          style={{
+            display: 'flex',
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            border: 'none',
+            borderTop: '1px solid color-mix(in oklch, var(--border) 70%, transparent)',
+            background: 'var(--graph-node-body-bg)',
+            color: 'var(--muted-foreground)',
+            cursor: 'pointer',
+            fontSize: 10,
+            padding: '4px 10px',
+          }}
+        >
+          + field
+        </button>
       )}
     </div>
   );
@@ -364,6 +405,7 @@ function FieldRowButton({
   ) => void;
 }) {
   const refTargetSelected = field.refTarget !== undefined && field.refTarget === selectedTarget;
+  const hasValidationIssues = (field.validationIssueCount ?? 0) > 0;
   const [enumCardOpen, setEnumCardOpen] = useState(false);
   const enumSummary = field.enumTarget ? `${field.summary.replace(/^→\s*/, '')} enum` : undefined;
   const isUnionRef = field.refTargetKind === 'discriminatedUnion';
@@ -372,6 +414,7 @@ function FieldRowButton({
       type="button"
       data-testid="type-node-field"
       data-field-name={field.name}
+      data-validation-issues={hasValidationIssues ? 'true' : undefined}
       onClick={(ev) => onFieldClick(field, ev)}
       onFocus={field.enumTarget ? () => setEnumCardOpen(true) : undefined}
       onBlur={field.enumTarget ? () => setEnumCardOpen(false) : undefined}
@@ -397,13 +440,24 @@ function FieldRowButton({
         border: 'none',
         cursor: 'pointer',
         textAlign: 'left',
-        background: searchFocused ? 'var(--graph-node-selected-bg)' : undefined,
+        background: searchFocused
+          ? 'var(--graph-node-selected-bg)'
+          : hasValidationIssues
+            ? 'color-mix(in oklch, var(--destructive) 10%, transparent)'
+            : undefined,
         boxShadow: searchFocused
           ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 0 0 1px color-mix(in oklch, var(--graph-node-selected) 34%, transparent)'
-          : undefined,
+          : hasValidationIssues
+            ? 'inset 3px 0 0 var(--destructive)'
+            : undefined,
       }}
     >
-      <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
+      <span
+        style={{
+          color: hasValidationIssues ? 'var(--destructive)' : 'var(--muted-foreground)',
+          fontWeight: 400,
+        }}
+      >
         {field.name}
         {field.optional ? '?' : ''}
         {field.nullable ? ' | null' : ''}

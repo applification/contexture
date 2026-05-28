@@ -5,14 +5,31 @@
 
 import type { TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
-import { TypeDetail } from '@renderer/components/detail/TypeDetail';
+import { FOCUS_TYPE_NAME_EVENT, TypeDetail } from '@renderer/components/detail/TypeDetail';
+import { TYPE_NODE_EVENT } from '@renderer/components/graph/nodes/TypeNode';
+import type { ValidationError } from '@renderer/services/validation';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-function setup(type: TypeDef, modelingHints: ModelingHint[] = []) {
+function setup(
+  type: TypeDef,
+  modelingHints: ModelingHint[] = [],
+  availableObjectTypeNames: readonly string[] = [],
+  validationErrors: ValidationError[] = [],
+  availableTypeNames: readonly string[] = availableObjectTypeNames,
+) {
   const dispatch = vi.fn<(op: Op) => void>();
-  render(<TypeDetail type={type} dispatch={dispatch} modelingHints={modelingHints} />);
+  render(
+    <TypeDetail
+      type={type}
+      dispatch={dispatch}
+      modelingHints={modelingHints}
+      availableTypeNames={availableTypeNames}
+      availableObjectTypeNames={availableObjectTypeNames}
+      validationErrors={validationErrors}
+    />,
+  );
   return { dispatch };
 }
 
@@ -35,13 +52,72 @@ describe('TypeDetail', () => {
       expect(screen.getByText('object')).toBeInTheDocument();
       const rows = screen.getAllByTestId('object-field-summary');
       expect(rows).toHaveLength(2);
-      expect(rows[1]).toHaveTextContent('area?');
+      expect(screen.getByDisplayValue('area')).toBeInTheDocument();
+      expect(rows[1]).toHaveTextContent('?');
     });
 
     it('renders field optionality as editable checkboxes', () => {
       setup(type);
       expect(screen.getByLabelText('name optional')).not.toBeChecked();
       expect(screen.getByLabelText('area optional')).toBeChecked();
+    });
+
+    it('dispatches delete_type when the type delete action is clicked', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete type Plot' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'delete_type',
+        name: 'Plot',
+      });
+    });
+
+    it('dispatches add_field when Add field is clicked', () => {
+      const onFieldSelect = vi.fn();
+      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_field',
+        typeName: 'Plot',
+        field: { name: 'field1', type: { kind: 'string' } },
+      });
+      expect(onFieldSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { typeName: 'Plot', fieldName: 'field1' },
+        }),
+      );
+      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    });
+
+    it('dispatches add_field for an empty object', () => {
+      const onFieldSelect = vi.fn();
+      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      const { dispatch } = setup({ kind: 'object', name: 'Plot', fields: [] });
+      fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_field',
+        typeName: 'Plot',
+        field: { name: 'field1', type: { kind: 'string' } },
+      });
+      expect(onFieldSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { typeName: 'Plot', fieldName: 'field1' },
+        }),
+      );
+      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    });
+
+    it('dispatches update_field when a field name is edited', () => {
+      const { dispatch } = setup(type);
+      const input = screen.getByLabelText('Field name name');
+      fireEvent.change(input, { target: { value: 'title' } });
+      fireEvent.blur(input);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_field',
+        typeName: 'Plot',
+        fieldName: 'name',
+        patch: { name: 'title' },
+      });
     });
 
     it('dispatches update_field when field optionality toggles', () => {
@@ -55,6 +131,73 @@ describe('TypeDetail', () => {
       });
     });
 
+    it('dispatches remove_field when a field is deleted from the field list', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete field area' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_field',
+        typeName: 'Plot',
+        fieldName: 'area',
+      });
+    });
+
+    it('raises field-select when a field is opened from the field list', () => {
+      const onFieldSelect = vi.fn();
+      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      setup(type);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit field area' }));
+
+      expect(onFieldSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { typeName: 'Plot', fieldName: 'area' },
+        }),
+      );
+      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    });
+
+    it('raises field-select when a field validation issue is clicked', () => {
+      const onFieldSelect = vi.fn();
+      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      setup(
+        type,
+        [],
+        [],
+        [
+          {
+            code: 'unresolved_ref',
+            path: 'types.0.fields.1.type',
+            message: 'Unresolved ref "Area".',
+          },
+        ],
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Unresolved ref "Area"/i }));
+
+      expect(onFieldSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { typeName: 'Plot', fieldName: 'area' },
+        }),
+      );
+      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    });
+
+    it('dispatches reorder_fields when a field is moved later', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Move field name later' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'reorder_fields',
+        typeName: 'Plot',
+        order: ['area', 'name'],
+      });
+    });
+
+    it('disables field move buttons at the list boundaries', () => {
+      setup(type);
+      expect(screen.getByRole('button', { name: 'Move field name earlier' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Move field area later' })).toBeDisabled();
+    });
+
     it('dispatches rename_type when the name input blurs with a new value', () => {
       const { dispatch } = setup(type);
       const input = screen.getByLabelText('Name') as HTMLInputElement;
@@ -65,6 +208,18 @@ describe('TypeDetail', () => {
         from: 'Plot',
         to: 'Allotment',
       });
+    });
+
+    it('focuses and selects the name input when requested for the current type', () => {
+      setup(type);
+      const input = screen.getByLabelText('Name') as HTMLInputElement;
+      document.dispatchEvent(
+        new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName: 'Plot' } }),
+      );
+
+      expect(document.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(input.value.length);
     });
 
     it('dispatches update_type when the description changes', () => {
@@ -146,6 +301,35 @@ describe('TypeDetail', () => {
       setup({ ...base, table: true });
       expect(screen.getByText('Indexes')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /add index/i })).toBeInTheDocument();
+    });
+
+    it('shows and edits the emitted Convex table name when table:true', () => {
+      const { dispatch } = setup({ ...base, table: true, tableName: 'posts' });
+      const input = screen.getByLabelText('Emitted table name') as HTMLInputElement;
+      expect(input.value).toBe('posts');
+
+      fireEvent.change(input, { target: { value: 'blogPosts' } });
+      fireEvent.blur(input);
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_type',
+        name: 'Post',
+        patch: { tableName: 'blogPosts' },
+      });
+    });
+
+    it('clears explicit tableName when it matches the default emitted name', () => {
+      const { dispatch } = setup({ ...base, table: true, tableName: 'posts' });
+      const input = screen.getByLabelText('Emitted table name');
+
+      fireEvent.change(input, { target: { value: 'post' } });
+      fireEvent.blur(input);
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_type',
+        name: 'Post',
+        patch: { tableName: undefined },
+      });
     });
 
     it('does not render the Convex section for non-object kinds', () => {
@@ -281,6 +465,76 @@ describe('TypeDetail', () => {
       expect(row).not.toHaveTextContent('author');
     });
 
+    it('shows validation issues inline on the affected index row', () => {
+      const typeWithIndex: TypeDef = {
+        ...base,
+        table: true,
+        indexes: [{ name: 'by_missing', fields: ['missing'] }],
+      };
+      setup(
+        typeWithIndex,
+        [],
+        [],
+        [
+          {
+            code: 'convex_index_unknown_field',
+            path: 'types.0.indexes.0.fields.0',
+            message: 'Convex index "by_missing" references unknown field "missing".',
+          },
+        ],
+      );
+
+      const row = screen.getByTestId('convex-index-row');
+      expect(row.getAttribute('data-validation-issues')).toBe('true');
+      expect(screen.getByLabelText('Index name for by_missing')).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+      expect(
+        screen.getByRole('list', { name: 'Validation issues for index by_missing' }),
+      ).toHaveTextContent('unknown field "missing"');
+    });
+
+    it('suggests indexes for refs and likely lookup fields', () => {
+      const { dispatch } = setup({
+        kind: 'object',
+        name: 'Post',
+        table: true,
+        fields: [
+          { name: 'author', type: { kind: 'ref', typeName: 'User' } },
+          { name: 'status', type: { kind: 'string' } },
+          { name: 'body', type: { kind: 'string' } },
+        ],
+      });
+
+      expect(screen.getByText('Suggested from refs and likely lookup fields.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'by_author' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'by_status' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'by_body' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'by_author' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_index',
+        typeName: 'Post',
+        index: { name: 'by_author', fields: ['author'] },
+      });
+    });
+
+    it('hides index suggestions that already exist', () => {
+      setup({
+        kind: 'object',
+        name: 'Post',
+        table: true,
+        fields: [{ name: 'author', type: { kind: 'ref', typeName: 'User' } }],
+        indexes: [{ name: 'by_author', fields: ['author'] }],
+      });
+
+      expect(
+        screen.queryByText('Suggested from refs and likely lookup fields.'),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'by_author' })).not.toBeInTheDocument();
+    });
+
     it('flags type name starting with "_" as reserved when table:true', () => {
       setup({ ...base, name: '_Post', table: true });
       const nameInput = screen.getByLabelText('Name') as HTMLInputElement;
@@ -314,25 +568,105 @@ describe('TypeDetail', () => {
     const type: TypeDef = {
       kind: 'enum',
       name: 'Season',
-      values: [{ value: 'spring' }, { value: 'summer' }],
+      values: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
     };
 
-    it('renders comma-separated values in a textarea', () => {
+    it('renders enum values as editable rows', () => {
       setup(type);
-      const textarea = screen.getByLabelText(/values/i) as HTMLTextAreaElement;
-      expect(textarea.value).toBe('spring, summer');
+      expect(screen.getAllByTestId('enum-value-row')).toHaveLength(2);
+      expect(screen.getByDisplayValue('spring')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Planting time.')).toBeInTheDocument();
     });
 
-    it('dispatches update_type with new values when the textarea blurs', () => {
+    it('dispatches add_value when Add value is clicked', () => {
       const { dispatch } = setup(type);
-      const textarea = screen.getByLabelText(/values/i);
-      fireEvent.change(textarea, { target: { value: 'spring, summer, autumn' } });
-      fireEvent.blur(textarea);
+      fireEvent.click(screen.getByRole('button', { name: 'Add value' }));
       expect(dispatch).toHaveBeenCalledWith({
-        kind: 'update_type',
-        name: 'Season',
-        patch: { values: [{ value: 'spring' }, { value: 'summer' }, { value: 'autumn' }] },
+        kind: 'add_value',
+        typeName: 'Season',
+        value: 'value',
       });
+    });
+
+    it('dispatches add_value with an incremented placeholder when value already exists', () => {
+      const { dispatch } = setup({
+        kind: 'enum',
+        name: 'Status',
+        values: [{ value: 'value' }, { value: 'value2' }],
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Add value' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_value',
+        typeName: 'Status',
+        value: 'value3',
+      });
+    });
+
+    it('dispatches update_value when a value is renamed', () => {
+      const { dispatch } = setup(type);
+      const input = screen.getByLabelText('Enum value spring');
+      fireEvent.change(input, { target: { value: 'autumn' } });
+      fireEvent.blur(input);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_value',
+        typeName: 'Season',
+        value: 'spring',
+        patch: { value: 'autumn' },
+      });
+    });
+
+    it('dispatches update_value when a value description changes', () => {
+      const { dispatch } = setup(type);
+      const input = screen.getByLabelText('Description for summer');
+      fireEvent.change(input, { target: { value: 'Harvest time.' } });
+      fireEvent.blur(input);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_value',
+        typeName: 'Season',
+        value: 'summer',
+        patch: { description: 'Harvest time.' },
+      });
+    });
+
+    it('dispatches remove_value when a value is deleted', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete value spring' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_value',
+        typeName: 'Season',
+        value: 'spring',
+      });
+    });
+
+    it('disables deleting the last enum value', () => {
+      setup({
+        kind: 'enum',
+        name: 'Role',
+        values: [{ value: 'admin' }],
+      });
+
+      const button = screen.getByRole('button', { name: 'Delete value admin' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', 'Enums need at least one value.');
+    });
+
+    it('disables duplicate enum row edits until validation repair resolves them', () => {
+      setup({
+        kind: 'enum',
+        name: 'Role',
+        values: [{ value: 'admin' }, { value: 'admin' }],
+      });
+
+      for (const input of screen.getAllByLabelText('Enum value admin')) {
+        expect(input).toBeDisabled();
+        expect(input).toHaveAttribute(
+          'title',
+          'Use validation repair to resolve duplicate values.',
+        );
+      }
+      for (const button of screen.getAllByRole('button', { name: 'Delete value admin' })) {
+        expect(button).toBeDisabled();
+      }
     });
   });
 
@@ -362,6 +696,114 @@ describe('TypeDetail', () => {
         kind: 'set_discriminator',
         typeName: 'Event',
         discriminator: 'type',
+      });
+    });
+
+    it('dispatches add_variant from the typed variant control for an existing object type', () => {
+      const { dispatch } = setup(type, [], ['Login', 'Signup']);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'Signup' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_variant',
+        typeName: 'Event',
+        variant: 'Signup',
+      });
+    });
+
+    it('disables adding a typed variant before its object type exists', () => {
+      const { dispatch } = setup(type, [], ['Login']);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'Signup' } });
+
+      const addVariant = screen.getByRole('button', { name: 'Add variant' });
+      expect(addVariant).toBeDisabled();
+      expect(addVariant).toHaveAttribute('title', 'Create the object type first.');
+      fireEvent.click(addVariant);
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    it('creates an object variant with the discriminator field', () => {
+      const { dispatch } = setup(type);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'PasswordReset' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Create object' }));
+      expect(dispatch).toHaveBeenNthCalledWith(1, {
+        kind: 'add_type',
+        type: {
+          kind: 'object',
+          name: 'PasswordReset',
+          fields: [{ name: 'kind', type: { kind: 'literal', value: 'password-reset' } }],
+        },
+      });
+      expect(dispatch).toHaveBeenNthCalledWith(2, {
+        kind: 'add_variant',
+        typeName: 'Event',
+        variant: 'PasswordReset',
+      });
+    });
+
+    it('disables creating an object when the typed variant object already exists', () => {
+      setup(type, [], ['Login', 'Signup']);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'Signup' } });
+
+      expect(screen.getByRole('button', { name: 'Add variant' })).toBeEnabled();
+      const createObject = screen.getByRole('button', { name: 'Create object' });
+      expect(createObject).toBeDisabled();
+      expect(createObject).toHaveAttribute(
+        'title',
+        'Object type already exists. Add it as a variant instead.',
+      );
+    });
+
+    it('disables creating an object when the typed variant name is used by a non-object type', () => {
+      setup(type, [], ['Login'], [], ['Login', 'Status']);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'Status' } });
+
+      const addVariant = screen.getByRole('button', { name: 'Add variant' });
+      expect(addVariant).toBeDisabled();
+      expect(addVariant).toHaveAttribute('title', 'Only object types can be added as variants.');
+      const createObject = screen.getByRole('button', { name: 'Create object' });
+      expect(createObject).toBeDisabled();
+      expect(createObject).toHaveAttribute(
+        'title',
+        'Type name already exists. Choose a new object name.',
+      );
+    });
+
+    it('disables adding or creating a variant that is already attached', () => {
+      setup(type, [], ['Login', 'Signup']);
+      const input = screen.getByLabelText('New variant');
+      fireEvent.change(input, { target: { value: 'Login' } });
+
+      for (const buttonName of ['Add variant', 'Create object']) {
+        const button = screen.getByRole('button', { name: buttonName });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('title', 'Variant already added.');
+      }
+    });
+
+    it('dispatches add_variant from available object suggestions', () => {
+      const { dispatch } = setup(type, [], ['Login', 'Signup']);
+      expect(screen.getByText('Available object types.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Login' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Signup' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_variant',
+        typeName: 'Event',
+        variant: 'Signup',
+      });
+    });
+
+    it('dispatches remove_variant when a variant is deleted', () => {
+      const { dispatch } = setup(type);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove variant Login' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_variant',
+        typeName: 'Event',
+        variant: 'Login',
       });
     });
   });
