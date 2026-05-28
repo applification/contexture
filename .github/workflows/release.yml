@@ -52,11 +52,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          - os: blacksmith-6vcpu-macos-15
             platform: mac
           - os: blacksmith-4vcpu-windows-2025
             platform: win
-          - os: ubuntu-24.04
+          - os: blacksmith-4vcpu-ubuntu-2404
             platform: linux
 
     runs-on: ${{ matrix.os }}
