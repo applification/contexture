@@ -9,7 +9,7 @@ import { emit as emitZod } from './emit-zod';
 import type { Schema } from './ir';
 import { type BundlePaths, baseNameFor, bundlePathsFor, type GeneratedTargetKind } from './paths';
 
-export type GeneratedTargetGroup = 'core' | 'ai' | 'forms';
+export type GeneratedTargetGroup = 'convex' | 'supporting' | 'agent';
 export type GeneratedTargetLanguage = 'typescript' | 'json';
 
 export interface GeneratedTargetMetadata {
@@ -104,10 +104,37 @@ function enableAiOutput(schema: Schema, key: AiOutputConfigKey): Schema {
 
 export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   {
+    kind: 'convex',
+    group: 'convex',
+    label: 'Convex schema',
+    help: 'Primary Convex database schema generated from Contexture table types.',
+    language: 'typescript',
+    previewable: true,
+    displayPath: () => 'convex/schema.ts',
+    path: (paths) => paths.convex,
+    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
+    enable: (schema) => enableCoreOutput(schema, 'convex'),
+    emit: (schema, irPath, deps) => (deps.emitConvex ?? emitConvexSchema)(schema, irPath),
+  },
+  {
+    kind: 'convex-validators',
+    group: 'convex',
+    label: 'Convex validators',
+    help: 'Reusable Convex validators for functions, forms, and app boundaries.',
+    language: 'typescript',
+    previewable: true,
+    displayPath: () => 'convex/validators.ts',
+    path: (paths) => paths.convexValidators,
+    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
+    enable: (schema) => enableCoreOutput(schema, 'convex'),
+    emit: (schema, irPath, deps) =>
+      (deps.emitConvexValidators ?? emitConvexValidators)(schema, irPath),
+  },
+  {
     kind: 'zod',
-    group: 'core',
+    group: 'supporting',
     label: 'Zod schema',
-    help: 'TypeScript Zod schemas for app/runtime validation.',
+    help: 'Supporting TypeScript Zod schemas for app/runtime validation.',
     language: 'typescript',
     previewable: true,
     displayPath: (baseName) => `${baseName}.schema.ts`,
@@ -118,9 +145,9 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   },
   {
     kind: 'json-schema',
-    group: 'core',
+    group: 'supporting',
     label: 'JSON Schema',
-    help: 'Draft 2020-12 JSON Schema for interoperable validation and tooling.',
+    help: 'Supporting Draft 2020-12 JSON Schema for interoperable validation and tooling.',
     language: 'json',
     previewable: true,
     displayPath: (baseName) => `${baseName}.schema.json`,
@@ -132,9 +159,9 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   },
   {
     kind: 'schema-index',
-    group: 'core',
+    group: 'supporting',
     label: 'Schema index',
-    help: 'Barrel module that re-exports generated TypeScript schemas.',
+    help: 'Supporting barrel module that re-exports generated TypeScript schemas.',
     language: 'typescript',
     previewable: false,
     displayPath: () => 'index.ts',
@@ -145,35 +172,8 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
       (deps.emitSchemaIndex ?? emitSchemaIndex)(baseNameFor(irPath), irPath),
   },
   {
-    kind: 'convex',
-    group: 'core',
-    label: 'Convex schema',
-    help: 'Convex database schema generated from Contexture table types.',
-    language: 'typescript',
-    previewable: true,
-    displayPath: () => 'convex/schema.ts',
-    path: (paths) => paths.convex,
-    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
-    enable: (schema) => enableCoreOutput(schema, 'convex'),
-    emit: (schema, irPath, deps) => (deps.emitConvex ?? emitConvexSchema)(schema, irPath),
-  },
-  {
-    kind: 'convex-validators',
-    group: 'core',
-    label: 'Convex validators',
-    help: 'Reusable Convex validators for schema fields and function args.',
-    language: 'typescript',
-    previewable: true,
-    displayPath: () => 'convex/validators.ts',
-    path: (paths) => paths.convexValidators,
-    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
-    enable: (schema) => enableCoreOutput(schema, 'convex'),
-    emit: (schema, irPath, deps) =>
-      (deps.emitConvexValidators ?? emitConvexValidators)(schema, irPath),
-  },
-  {
     kind: 'ai-tool-schemas',
-    group: 'ai',
+    group: 'agent',
     label: 'Tool schemas',
     help: 'JSON Schema tool definitions for AI function/tool calling.',
     language: 'json',
@@ -187,7 +187,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   },
   {
     kind: 'structured-output-schemas',
-    group: 'ai',
+    group: 'agent',
     label: 'Structured outputs',
     help: 'Provider-neutral response schemas for model outputs.',
     language: 'json',
@@ -201,7 +201,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   },
   {
     kind: 'mcp-definitions',
-    group: 'ai',
+    group: 'agent',
     label: 'MCP definitions',
     help: 'Machine-readable tool/server definitions for MCP integrations.',
     language: 'json',
@@ -215,9 +215,9 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
   },
   {
     kind: 'form-validators',
-    group: 'forms',
+    group: 'agent',
     label: 'Form validators',
-    help: 'Type-safe validation helpers backed by generated Zod schemas.',
+    help: 'Type-safe validation helpers backed by generated model contracts.',
     language: 'typescript',
     previewable: true,
     displayPath: () => 'form-validators.ts',

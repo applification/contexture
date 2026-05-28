@@ -14,9 +14,10 @@ describe('buildSystemPromptAppend', () => {
     expect(prompt).toMatch(/Contexture/);
     expect(prompt).toMatch(/schema/i);
     // Tool-use imperative — "calling the op tools", "do not respond
-    // with TypeScript/Zod … in prose".
+    // with TypeScript/Zod/Convex … in prose".
     expect(prompt).toMatch(/calling the op tools/i);
     expect(prompt).toMatch(/do \*\*not\*\* respond with TypeScript/i);
+    expect(prompt).toMatch(/Convex app domain\s+model/i);
   });
 
   it('names the bundled skills so Claude knows to reach for them', () => {
@@ -53,6 +54,10 @@ describe('buildSystemPromptAppend', () => {
       'set_discriminator',
       'add_import',
       'remove_import',
+      'set_table_flag',
+      'add_index',
+      'update_index',
+      'remove_index',
       'replace_schema',
     ]) {
       expect(prompt).toContain(op);

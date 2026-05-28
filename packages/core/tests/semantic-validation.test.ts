@@ -202,6 +202,52 @@ describe('checkSemantic — duplicates', () => {
 
     expect(issues.some((i) => i.code === 'duplicate_convex_table_name')).toBe(true);
   });
+
+  it('rejects Convex table and field names reserved by Convex', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: '_Private',
+          table: true,
+          fields: [{ name: '_secret', type: { kind: 'string' } }],
+        },
+      ],
+    };
+
+    const issues = checkSemantic(schema, STDLIB);
+
+    expect(issues.map((i) => i.code)).toEqual(
+      expect.arrayContaining(['convex_reserved_table_name', 'convex_reserved_field_name']),
+    );
+  });
+
+  it('rejects Convex indexes that reference missing fields', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'slug', type: { kind: 'string' } }],
+          indexes: [{ name: 'by_author', fields: ['authorId'] }],
+        },
+      ],
+    };
+
+    const issues = checkSemantic(schema, STDLIB);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'convex_index_unknown_field',
+          path: 'types.0.indexes.0.fields.0',
+        }),
+      ]),
+    );
+  });
 });
 
 describe('checkSemantic — discriminated unions', () => {

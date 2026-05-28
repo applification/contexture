@@ -215,6 +215,10 @@ function ConvexSection({
         <Checkbox id="convex-table" checked={isTable} onCheckedChange={toggleTable} />
         Use as Convex table
       </Label>
+      <p className="text-xs text-muted-foreground">
+        Convex tables emit into <code className="font-mono">convex/schema.ts</code> and can own
+        query indexes.
+      </p>
 
       {isTable && (
         <div className="space-y-2 pt-1">

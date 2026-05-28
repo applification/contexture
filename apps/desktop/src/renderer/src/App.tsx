@@ -417,8 +417,8 @@ function EmptyState({
             {projectName ?? 'Contexture bundle'}
           </h1>
           <p className="text-sm">
-            This bundle is ready for generated outputs. Start chatting with {providerLabel} or add
-            types directly.
+            This bundle is ready for generated Convex schema and validators. Start chatting with{' '}
+            {providerLabel} or add types directly.
           </p>
           <p className="text-xs text-muted-foreground/60">
             You can iterate on the schema by continuing the conversation, or edit types directly
@@ -428,7 +428,7 @@ function EmptyState({
       ) : (
         <div className="relative z-10 text-center text-muted-foreground max-w-sm">
           <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
-          <p className="text-xs text-muted-foreground/70 mb-3">Visual Zod schema editor</p>
+          <p className="text-xs text-muted-foreground/70 mb-3">Convex model control plane</p>
           <p className="text-sm mb-4">
             Open a <code className="text-xs">.contexture.json</code> file or start chatting with
             {` ${providerLabel}`} to create one.

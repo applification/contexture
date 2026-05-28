@@ -1,9 +1,10 @@
 # Contexture
 
-Contexture is the domain-model control plane for AI-native TypeScript apps.
+Contexture is the domain-model control plane for Convex apps built with agents.
 Design your domain once in source-of-truth `.contexture.json`, then emit the
-typed surfaces your products and agents need: Zod, JSON Schema, Convex schemas,
-schema indexes, MCP tools, and opt-in AI tool definitions.
+Convex schema, validators, and supporting typed surfaces your products and
+agents need: Zod, JSON Schema, schema indexes, MCP tools, and opt-in AI tool
+definitions.
 
 Built for engineers who want humans and agents to change the model, regenerate
 artifacts, and prove drift is gone before the code ships.

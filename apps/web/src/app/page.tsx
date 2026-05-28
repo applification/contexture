@@ -68,9 +68,15 @@ function GithubIcon({ className }: { className?: string }) {
 const features = [
   {
     icon: GitGraph,
-    title: 'Desktop model editor',
+    title: 'Convex model editor',
     description:
-      'Map object types, enums, refs, stdlib types, and constraints in a real desktop workspace backed by source-of-truth `.contexture.json`.',
+      'Map Convex tables, object types, enums, refs, stdlib types, and constraints in a desktop workspace backed by source-of-truth `.contexture.json`.',
+  },
+  {
+    icon: Database,
+    title: 'Convex schema and validators',
+    description:
+      'Preview and emit `convex/schema.ts` and `convex/validators.ts` from table types, refs, and indexes before the files land in git.',
   },
   {
     icon: PlugZap,
@@ -80,9 +86,9 @@ const features = [
   },
   {
     icon: FileCode2,
-    title: 'Generated app contracts',
+    title: 'Supporting contracts',
     description:
-      'Preview and emit Zod, JSON Schema, Convex schemas, schema indexes, structured-output schemas, MCP definitions, and form validators.',
+      'Keep Zod, JSON Schema, schema indexes, structured-output schemas, MCP definitions, and form validators aligned with the Convex model.',
   },
   {
     icon: Bot,
@@ -115,11 +121,7 @@ const agentSteps = [
     label: 'Add optional discogsReleaseId field',
     status: 'complete',
   },
-  {
-    tool: 'emit_contexture',
-    label: 'Regenerate Zod, JSON Schema, and MCP definitions',
-    status: 'complete',
-  },
+  { tool: 'emit_contexture', label: 'Regenerate Convex schema and validators', status: 'complete' },
   {
     tool: 'check_contexture_drift',
     label: 'Manifest clean',
@@ -149,7 +151,8 @@ function AgentConversationDemo() {
       <div className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex justify-end">
           <div className="max-w-[88%] rounded-lg bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm sm:max-w-[72%]">
-            Add a Discogs release ID to my Release model, emit the app contracts, and check drift.
+            Add a memberships table with refs to users and teams, emit the Convex files, and check
+            drift.
           </div>
         </div>
 
@@ -160,8 +163,8 @@ function AgentConversationDemo() {
           <div className="min-w-0 flex-1 space-y-3">
             <div className="rounded-lg border border-border/60 bg-background/60 px-4 py-3">
               <p className="text-sm leading-relaxed text-foreground">
-                I’ll update the source model first, regenerate the selected outputs, then verify the
-                manifest so generated files stay disposable.
+                I’ll update the source model first, regenerate convex/schema.ts and
+                convex/validators.ts, then verify the manifest so generated files stay disposable.
               </p>
             </div>
 
@@ -260,19 +263,30 @@ export default function Home() {
 
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-primary dark:text-accent font-medium mb-6 tracking-widest uppercase">
-            Desktop app + MCP server
+            Convex model editor + MCP server
           </p>
           <h1 className="animate-fade-in-up-delay-1 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
-            A source-of-truth model your app and agents can share.
+            A source-of-truth Convex model your app and agents can share.
           </h1>
           <p className="animate-fade-in-up-delay-2 text-lg text-primary dark:text-accent font-medium mb-3">
-            Visual editing, generated TypeScript contracts, and MCP tools from one IR.
+            Visual editing, generated Convex schema and validators, and MCP tools from one IR.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
-            Contexture is a desktop control plane for TypeScript domain models. Design the model on
-            a graph, emit the contracts your app imports, and let coding agents work through a
-            constrained MCP server instead of hand-editing generated files.
+            Contexture is a desktop control plane for Convex app models. Design tables, refs, and
+            indexes on a graph, emit the files your app imports, and let coding agents propose
+            reviewable model changes instead of hand-editing generated files.
           </p>
+          <div className="animate-fade-in-up-delay-2 mb-8 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1 font-mono">
+              convex/schema.ts
+            </span>
+            <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1 font-mono">
+              convex/validators.ts
+            </span>
+            <span className="rounded-full border border-success/20 bg-success/10 px-3 py-1 text-success">
+              Drift clean
+            </span>
+          </div>
           <div className="animate-fade-in-up-delay-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <TrackedLink
               event="hero_cta_click"
@@ -325,12 +339,12 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-12 sm:mb-20">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              The model boundary for AI-native TypeScript apps
+              The model boundary for Convex apps built with agents
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
               Contexture gives humans a clear desktop surface and gives agents a narrow protocol.
-              Both paths update the same IR, regenerate the same outputs, and leave drift checks as
-              evidence.
+              Both paths update the same IR, regenerate Convex schema and validators, and leave
+              drift checks as evidence.
             </p>
           </div>
 
@@ -358,7 +372,7 @@ export default function Home() {
               <ThemeImage
                 srcLight="/images/misprint-properties-light.png"
                 srcDark="/images/misprint-properties.png"
-                alt="Contexture desktop app with a selected Misprint object and the properties panel showing fields, optional flags, and model-shape hints"
+                alt="Contexture desktop app with a selected Convex model object and the properties panel showing fields, optional flags, and model-shape hints"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -387,12 +401,12 @@ export default function Home() {
               MCP-native by design
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-5">
-              Let agents edit the model through typed operations.
+              Let agents propose reviewable Convex model changes.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               The MCP server exposes model inspection, validation, constrained mutation, emit, and
-              drift checks. Agents can make useful schema changes while the generated files remain
-              outputs, not the source of truth.
+              drift checks. Agents can update Convex tables, refs, and indexes while generated files
+              remain outputs, not the source of truth.
             </p>
           </div>
 
@@ -406,7 +420,7 @@ export default function Home() {
               <ThemeImage
                 srcDark="/images/misprint-generated-zod.png"
                 srcLight="/images/misprint-generated-zod-light.png"
-                alt="Contexture schema panel previewing generated Zod source from the selected domain model"
+                alt="Contexture generated-output panel previewing code from the selected Convex domain model"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -414,12 +428,12 @@ export default function Home() {
             </div>
             <div className="sm:col-span-3 space-y-6">
               <h3 className="text-2xl font-bold tracking-tight">
-                See the generated surface before it lands in git
+                See generated Convex files before they land in git
               </h3>
               <p className="text-muted-foreground leading-relaxed">
-                The desktop app previews each target beside the model graph, so schema changes are
-                concrete before they become commits. Optional outputs let each project choose only
-                the contracts it needs.
+                The desktop app previews generated outputs beside the model graph, so Convex table
+                and index changes are concrete before they become commits. Optional supporting
+                outputs let each project choose only the contracts it needs.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -427,7 +441,7 @@ export default function Home() {
                     <Zap className="size-4 text-accent" />
                   </div>
                   <span className="text-muted-foreground">
-                    Zod, JSON Schema, Convex, indexes, structured output, MCP, and forms
+                    Convex schema, validators, Zod, JSON Schema, structured output, MCP, and forms
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
@@ -457,11 +471,11 @@ export default function Home() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-              One model, many consumers
+              One Convex model, many consumers
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Contexture is deliberately narrow: it owns the domain model boundary, then gets out of
-              the way. Product code, agents, and databases consume generated artifacts.
+              Contexture is deliberately narrow: it owns the Convex model boundary, then gets out of
+              the way. Product code, agents, and supporting contracts consume generated artifacts.
             </p>
           </div>
 
@@ -471,17 +485,18 @@ export default function Home() {
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Generate JSON Schema and structured-output definitions from the same type graph your
-                app imports. Prompt surfaces and TypeScript surfaces stay aligned.
+                Generate JSON Schema and structured-output definitions from the same Convex model
+                your app imports. Prompt surfaces and app surfaces stay aligned.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
               <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
-                App schemas
+                Convex app schemas
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Emit Zod, Convex, and schema-index files for the product repo. Generated markers and
-                the manifest make review and drift detection part of normal git flow.
+                Emit `convex/schema.ts`, `convex/validators.ts`, and supporting schema files for the
+                product repo. Generated markers and the manifest make review and drift detection
+                part of normal git flow.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
@@ -511,7 +526,8 @@ export default function Home() {
           </h2>
           <p className="text-muted-foreground mb-10">
             Free and open source. Build visually, wire the MCP server into your coding tools, and
-            ship generated contracts from the desktop app for macOS, Windows, and Linux.
+            ship generated Convex schema and validators from the desktop app for macOS, Windows, and
+            Linux.
           </p>
           <DownloadButton
             location="footer_cta"

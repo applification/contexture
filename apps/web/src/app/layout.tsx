@@ -19,15 +19,16 @@ const themeInitScript = `
 `;
 
 export const metadata: Metadata = {
-  title: 'Contexture — Desktop domain models for apps and agents.',
+  title: 'Contexture — Convex models for apps and agents.',
   description:
-    'Contexture is the desktop control plane for TypeScript domain models. Design one source-of-truth IR, then emit Zod, JSON Schema, Convex, MCP, and agent-ready contracts.',
+    'Contexture is the desktop control plane for Convex app models. Design one source-of-truth IR, then emit convex/schema.ts, validators, and agent-ready supporting contracts.',
   keywords: [
-    'domain model control plane',
-    'TypeScript domain model',
+    'Convex model control plane',
+    'Convex domain model',
     'Contexture',
-    'Zod schema generator',
     'Convex schema generator',
+    'Convex validators',
+    'Zod schema generator',
     'MCP server',
     'LLM structured output',
     'JSON Schema editor',
@@ -41,9 +42,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Contexture — Desktop domain models for apps and agents.',
+    title: 'Contexture — Convex models for apps and agents.',
     description:
-      'Design one source-of-truth domain model and emit the typed surfaces your apps, agents, and databases need.',
+      'Design one source-of-truth Convex model and emit the schema, validators, and supporting contracts your app and agents need.',
     type: 'website',
     siteName: 'Contexture',
     images: [
@@ -51,14 +52,14 @@ export const metadata: Metadata = {
         url: '/images/misprint-graph-overview.png',
         width: 1600,
         height: 1200,
-        alt: 'Contexture desktop app showing a graph of connected domain types',
+        alt: 'Contexture desktop app showing a graph of connected Convex domain types',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Contexture — Desktop domain models for apps and agents.',
-    description: 'A source-of-truth model your app and agents can share.',
+    title: 'Contexture — Convex models for apps and agents.',
+    description: 'A source-of-truth Convex model your app and agents can share.',
     images: ['/images/misprint-graph-overview.png'],
   },
 };
