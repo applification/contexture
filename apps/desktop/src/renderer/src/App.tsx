@@ -38,11 +38,11 @@ import { DetailPanel } from './components/detail/DetailPanel';
 import { FOCUS_TYPE_NAME_EVENT } from './components/detail/TypeDetail';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
-import { type EdgeSelection, TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
+import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/graph/interactions';
-import { type FieldSelection, TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
+import { TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
@@ -70,7 +70,7 @@ import allotment from './samples/allotment.contexture.json' with { type: 'json' 
 import { useDocumentStore } from './store/document';
 import { useGraphLayoutStore } from './store/layout-config';
 import { useModelSyncStore } from './store/model-sync';
-import { useGraphSelectionStore } from './store/selection';
+import { type EdgeSelection, type FieldSelection, useGraphSelectionStore } from './store/selection';
 import { useUIChromeStore } from './store/ui-chrome';
 import { useUndoStore } from './store/undo';
 
@@ -90,9 +90,8 @@ export default function App(): React.JSX.Element {
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
-  const selectedEdgeId = useGraphSelectionStore((s) => s.state.edgeId);
-  const [selectedField, setSelectedField] = useState<FieldSelection | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<EdgeSelection | null>(null);
+  const selectedField = useGraphSelectionStore((s) => s.state.selectedField);
+  const selectedEdge = useGraphSelectionStore((s) => s.state.selectedEdge);
   const highlightedNodeIds = useModelSyncStore((s) => s.highlightedNodeIds);
   const activeTab = useUIChromeStore((s) => s.sidebarTab);
   const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
@@ -108,18 +107,8 @@ export default function App(): React.JSX.Element {
   }, [sidebarVisible]);
 
   useEffect(() => {
-    if (!selectedField) return;
-    if (selectedField.typeName !== selectedNodeId) setSelectedField(null);
-  }, [selectedField, selectedNodeId]);
-
-  useEffect(() => {
-    if (selectedEdgeId === null) setSelectedEdge(null);
-  }, [selectedEdgeId]);
-
-  useEffect(() => {
     if (!selectedEdge) return;
     if (edgeSelectionExists(schema, selectedEdge.data)) return;
-    setSelectedEdge(null);
     useGraphSelectionStore.getState().selectEdge(null);
   }, [schema, selectedEdge]);
 
@@ -127,9 +116,9 @@ export default function App(): React.JSX.Element {
     function onFieldSelect(event: Event): void {
       const detail = (event as CustomEvent<Partial<FieldSelection>>).detail;
       if (typeof detail?.typeName !== 'string' || typeof detail.fieldName !== 'string') return;
-      setSelectedEdge(null);
-      setSelectedField({ typeName: detail.typeName, fieldName: detail.fieldName });
-      useGraphSelectionStore.getState().click(detail.typeName, 'replace');
+      useGraphSelectionStore
+        .getState()
+        .selectField({ typeName: detail.typeName, fieldName: detail.fieldName });
       useUIChromeStore.getState().setSidebarVisible(true);
       useUIChromeStore.getState().setSidebarTab('properties');
     }
@@ -141,8 +130,7 @@ export default function App(): React.JSX.Element {
     function onEdgeSelect(event: Event): void {
       const detail = (event as CustomEvent<EdgeSelection>).detail;
       if (typeof detail?.edgeId !== 'string' || !detail.data) return;
-      setSelectedField(null);
-      setSelectedEdge(detail);
+      useGraphSelectionStore.getState().selectEdge(detail);
       useUIChromeStore.getState().setSidebarVisible(true);
       useUIChromeStore.getState().setSidebarTab('properties');
     }
@@ -156,7 +144,6 @@ export default function App(): React.JSX.Element {
     if ('error' in result || op.kind !== 'add_type') return;
     const typeName = op.type.name;
     if (kind === 'enum') useGraphLayoutStore.getState().setGraphLayout({ showEnums: true });
-    setSelectedEdge(null);
     useGraphSelectionStore.getState().click(typeName, 'replace');
     useGraphSelectionStore.getState().focus(typeName);
     useUIChromeStore.getState().setSidebarVisible(true);
@@ -173,9 +160,7 @@ export default function App(): React.JSX.Element {
     if (!op || op.kind !== 'add_field') return;
     const result = useUndoStore.getState().apply(op);
     if ('error' in result) return;
-    setSelectedEdge(null);
-    setSelectedField({ typeName, fieldName: op.field.name });
-    useGraphSelectionStore.getState().click(typeName, 'replace');
+    useGraphSelectionStore.getState().selectField({ typeName, fieldName: op.field.name });
     useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
     useUIChromeStore.getState().setSidebarVisible(true);
     useUIChromeStore.getState().setSidebarTab('properties');
@@ -184,8 +169,6 @@ export default function App(): React.JSX.Element {
   const focusSelectedTypeName = useCallback((): void => {
     const typeName = useGraphSelectionStore.getState().state.primaryNodeId;
     if (!typeName) return;
-    setSelectedEdge(null);
-    setSelectedField(null);
     useGraphSelectionStore.getState().click(typeName, 'replace');
     useUIChromeStore.getState().setSidebarVisible(true);
     useUIChromeStore.getState().setSidebarTab('properties');
@@ -206,8 +189,6 @@ export default function App(): React.JSX.Element {
 
       if (ev.key === 'Escape') {
         useGraphSelectionStore.getState().clear();
-        setSelectedField(null);
-        setSelectedEdge(null);
         return;
       }
 
@@ -267,12 +248,11 @@ export default function App(): React.JSX.Element {
             typeName: selectedField.typeName,
             fieldName: selectedField.fieldName,
           });
-          if ('schema' in result) setSelectedField(null);
+          if ('schema' in result) useGraphSelectionStore.getState().selectField(null);
           return;
         }
         const result = useUndoStore.getState().apply({ kind: 'delete_type', name: selected });
         if ('schema' in result) {
-          setSelectedField(null);
           useGraphSelectionStore.getState().clearNodes();
         }
       }
@@ -337,7 +317,8 @@ export default function App(): React.JSX.Element {
     };
   }, []);
 
-  const hasSelection = selectedNodeId !== null;
+  const detailTypeName = selectedField?.typeName ?? selectedEdge?.data.sourceType ?? selectedNodeId;
+  const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
 
   // Emit generated sources for the SchemaPanel. Only runs while the
   // Schema tab is active so we don't burn cycles on every IR change
@@ -487,21 +468,20 @@ export default function App(): React.JSX.Element {
                 {hasSelection ? (
                   <DetailPanel
                     selection={{
-                      edge: selectedEdge?.edgeId === selectedEdgeId ? selectedEdge.data : undefined,
-                      typeName: selectedNodeId ?? undefined,
+                      edge: selectedEdge?.data,
+                      typeName: detailTypeName ?? undefined,
                       fieldName:
-                        selectedField?.typeName === selectedNodeId
+                        selectedField && selectedField.typeName === detailTypeName
                           ? selectedField.fieldName
                           : undefined,
                     }}
                     onClearSelection={() => {
-                      setSelectedField(null);
-                      setSelectedEdge(null);
+                      useGraphSelectionStore.getState().selectField(null);
+                      useGraphSelectionStore.getState().selectEdge(null);
                     }}
-                    onClearSelectedField={() => setSelectedField(null)}
+                    onClearSelectedField={() => useGraphSelectionStore.getState().selectField(null)}
                     onSelectField={(typeName, fieldName) => {
-                      setSelectedEdge(null);
-                      setSelectedField({ typeName, fieldName });
+                      useGraphSelectionStore.getState().selectField({ typeName, fieldName });
                     }}
                   />
                 ) : (

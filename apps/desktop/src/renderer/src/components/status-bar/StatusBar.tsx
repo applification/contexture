@@ -22,7 +22,6 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { TYPE_NODE_EVENT } from '../graph/nodes/TypeNode';
 
 export function StatusBar(): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
@@ -93,12 +92,10 @@ export function StatusBar(): React.JSX.Element {
         if (type.kind === 'object' && loc.fieldIndex !== undefined) {
           const field = type.fields[loc.fieldIndex];
           if (field) {
+            useGraphSelectionStore
+              .getState()
+              .selectField({ typeName: type.name, fieldName: field.name });
             useGraphSelectionStore.getState().focus({ nodeId: type.name, fieldName: field.name });
-            document.dispatchEvent(
-              new CustomEvent(TYPE_NODE_EVENT, {
-                detail: { typeName: type.name, fieldName: field.name },
-              }),
-            );
           }
         } else {
           useGraphSelectionStore.getState().focus(type.name);

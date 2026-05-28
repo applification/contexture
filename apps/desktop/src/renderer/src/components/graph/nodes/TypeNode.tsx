@@ -24,14 +24,9 @@ import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { useGraphSelectionStore } from '../../../store/selection';
+import { type FieldSelection, useGraphSelectionStore } from '../../../store/selection';
 import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from '../ref-preview-event';
 import type { EnumTargetRow, TypeNodeData } from '../schema-to-graph';
-
-export interface FieldSelection {
-  typeName: string;
-  fieldName: string;
-}
 
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
 export const TYPE_NODE_ADD_FIELD_EVENT = 'contexture:type-node-add-field' as const;

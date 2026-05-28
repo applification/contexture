@@ -206,20 +206,14 @@ describe('DetailPanel', () => {
     });
   });
 
-  it('offers duplicate enum value repair from selected type details', () => {
+  it('does not offer duplicate enum value repair without index-addressed ops', () => {
     seedUnchecked({
       version: '1',
       types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'admin' }] }],
     });
 
     render(<DetailPanel selection={{ typeName: 'Role' }} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Rename value' }));
-
-    expect(useUndoStore.getState().schema.types[0]).toMatchObject({
-      kind: 'enum',
-      name: 'Role',
-      values: [{ value: 'admin2' }, { value: 'admin' }],
-    });
+    expect(screen.queryByRole('button', { name: 'Rename value' })).not.toBeInTheDocument();
   });
 
   it('shows validation issues scoped to the selected field', () => {

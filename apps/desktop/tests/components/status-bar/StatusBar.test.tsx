@@ -1,10 +1,9 @@
 import type { Schema } from '@contexture/core/ir';
-import { TYPE_NODE_EVENT } from '@renderer/components/graph/nodes/TypeNode';
 import { StatusBar } from '@renderer/components/status-bar/StatusBar';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function seed(schema: Schema) {
   useUndoStore.setState({
@@ -40,7 +39,7 @@ describe('StatusBar validation repairs', () => {
     });
   });
 
-  it('renames a duplicate enum value from validation repair', () => {
+  it('does not offer duplicate enum value repair without index-addressed ops', () => {
     seed({
       version: '1',
       types: [{ kind: 'enum', name: 'Role', values: [{ value: 'admin' }, { value: 'admin' }] }],
@@ -48,13 +47,7 @@ describe('StatusBar validation repairs', () => {
     render(<StatusBar />);
 
     fireEvent.click(screen.getByRole('button', { name: '1 error' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Rename value' }));
-
-    expect(useUndoStore.getState().schema.types[0]).toMatchObject({
-      kind: 'enum',
-      name: 'Role',
-      values: [{ value: 'admin2' }, { value: 'admin' }],
-    });
+    expect(screen.queryByRole('button', { name: 'Rename value' })).not.toBeInTheDocument();
   });
 
   it('renames a duplicate Convex table name from validation repair', () => {
@@ -136,7 +129,7 @@ describe('StatusBar validation repairs', () => {
     expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Post' });
   });
 
-  it('renames a duplicate field from validation repair', () => {
+  it('does not offer duplicate field repair without index-addressed ops', () => {
     seed({
       version: '1',
       types: [
@@ -153,17 +146,7 @@ describe('StatusBar validation repairs', () => {
     render(<StatusBar />);
 
     fireEvent.click(screen.getByRole('button', { name: '1 error' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Rename field' }));
-
-    expect(useUndoStore.getState().schema.types[0]).toMatchObject({
-      kind: 'object',
-      name: 'Post',
-      fields: [
-        { name: 'slug2', type: { kind: 'string' } },
-        { name: 'slug', type: { kind: 'string' } },
-      ],
-    });
-    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Post' });
+    expect(screen.queryByRole('button', { name: 'Rename field' })).not.toBeInTheDocument();
   });
 
   it('creates a missing local ref target from an unresolved-ref error', () => {
@@ -199,8 +182,6 @@ describe('StatusBar validation repairs', () => {
         },
       ],
     });
-    const onFieldSelect = vi.fn();
-    document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
     render(<StatusBar />);
 
     fireEvent.click(screen.getByRole('button', { name: '1 error' }));
@@ -211,12 +192,10 @@ describe('StatusBar validation repairs', () => {
       nodeId: 'Post',
       fieldName: 'author',
     });
-    expect(onFieldSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        detail: { typeName: 'Post', fieldName: 'author' },
-      }),
-    );
-    document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+      typeName: 'Post',
+      fieldName: 'author',
+    });
   });
 
   it('creates a missing discriminated-union variant object with a discriminator field', () => {

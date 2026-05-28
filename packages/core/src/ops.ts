@@ -9,10 +9,12 @@
  * with the result.
  *
  * Design notes:
- *   - Every op mutates at most one well-defined region; `rename_type` is the
- *     sole exception because a rename must cascade atomically through all
- *     local refs and discriminated-union variants. Qualified refs
- *     (`alias.Name`) are left alone — they point at external modules.
+ *   - Every op mutates at most one well-defined region, except for atomic
+ *     relationship-preserving ops. `rename_type` cascades through all local
+ *     refs and discriminated-union variants; `set_discriminator` cascades the
+ *     discriminator field name across the union's local object variants.
+ *     Qualified refs (`alias.Name`) are left alone — they point at external
+ *     modules.
  *   - `replace_schema` runs the Zod meta-schema so obviously broken inputs
  *     are caught here. A delta semantic check gates *every* op — including
  *     `replace_schema` — so callers cannot land an IR that introduces new
@@ -30,9 +32,15 @@ import {
   type StdlibCatalog,
 } from './semantic-validation';
 
+export type TypeUpdatePatch = TypeDef extends infer T
+  ? T extends TypeDef
+    ? Partial<Omit<T, 'kind' | 'name'>>
+    : never
+  : never;
+
 export type Op =
   | { kind: 'add_type'; type: TypeDef }
-  | { kind: 'update_type'; name: string; patch: Partial<Omit<TypeDef, 'kind' | 'name'>> }
+  | { kind: 'update_type'; name: string; patch: TypeUpdatePatch }
   | { kind: 'rename_type'; from: string; to: string }
   | { kind: 'delete_type'; name: string }
   | { kind: 'add_field'; typeName: string; field: FieldDef; index?: number }

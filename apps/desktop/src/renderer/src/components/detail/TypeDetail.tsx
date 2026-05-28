@@ -14,12 +14,13 @@
  */
 import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
+import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
-import { TYPE_NODE_EVENT } from '../graph/nodes/TypeNode';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import {
@@ -51,9 +52,7 @@ function selectFieldFromValidationIssue(type: TypeDef, error: ValidationError): 
   if (!match) return;
   const field = type.fields[Number(match[1])];
   if (!field) return;
-  document.dispatchEvent(
-    new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: type.name, fieldName: field.name } }),
-  );
+  useGraphSelectionStore.getState().selectField({ typeName: type.name, fieldName: field.name });
 }
 
 export interface TypeDetailProps {
@@ -200,9 +199,7 @@ function ObjectBody({
       typeName: type.name,
       field,
     });
-    document.dispatchEvent(
-      new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: type.name, fieldName: field.name } }),
-    );
+    useGraphSelectionStore.getState().selectField({ typeName: type.name, fieldName: field.name });
   };
   const moveField = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= fieldOrder.length) return;
@@ -313,11 +310,9 @@ function ObjectBody({
                       size="icon"
                       aria-label={`Edit field ${f.name}`}
                       onClick={() =>
-                        document.dispatchEvent(
-                          new CustomEvent(TYPE_NODE_EVENT, {
-                            detail: { typeName: type.name, fieldName: f.name },
-                          }),
-                        )
+                        useGraphSelectionStore
+                          .getState()
+                          .selectField({ typeName: type.name, fieldName: f.name })
                       }
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                     >
@@ -435,7 +430,11 @@ function ConvexSection({
                 const defaultName = defaultConvexTableName(type.name);
                 const tableName = next && next !== defaultName ? next : undefined;
                 if (tableName !== type.tableName) {
-                  dispatch({ kind: 'update_type', name: type.name, patch: { tableName } } as Op);
+                  dispatch({
+                    kind: 'update_type',
+                    name: type.name,
+                    patch: typePatch({ tableName }),
+                  });
                 }
               }}
             />
@@ -852,6 +851,10 @@ function defaultConvexTableName(typeName: string): string {
   return `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}`;
 }
 
+function typePatch(patch: TypeUpdatePatch): TypeUpdatePatch {
+  return patch;
+}
+
 function EnumBody({
   type,
   dispatch,
@@ -1192,9 +1195,7 @@ function RawBody({
         onBlur={(ev) => {
           const next = ev.target.value;
           if (next !== type.zod) {
-            // Raw-only patch; see the enum note above — cast narrows the
-            // distributed union.
-            dispatch({ kind: 'update_type', name: type.name, patch: { zod: next } } as Op);
+            dispatch({ kind: 'update_type', name: type.name, patch: typePatch({ zod: next }) });
           }
         }}
       />

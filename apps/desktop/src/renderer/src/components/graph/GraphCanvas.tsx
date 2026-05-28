@@ -160,6 +160,7 @@ function GraphCanvasInner({
 
   const click = useGraphSelectionStore((s) => s.click);
   const selectEdge = useGraphSelectionStore((s) => s.selectEdge);
+  const selectFocusedNode = useGraphSelectionStore((s) => s.selectFocusedNode);
   const clearNodes = useGraphSelectionStore((s) => s.clearNodes);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
@@ -368,7 +369,7 @@ function GraphCanvasInner({
     const cx = node.position.x + width / 2;
     const cy = node.position.y + height / 2;
     setCenter(cx, cy, { zoom: 1.1, duration: 400 });
-    click(focusTarget.nodeId, 'replace');
+    selectFocusedNode(focusTarget.nodeId);
     const nextFocusedField = focusedFieldFromTarget(focusTarget);
     if (focusedFieldClearTimer.current) {
       clearTimeout(focusedFieldClearTimer.current);
@@ -379,7 +380,7 @@ function GraphCanvasInner({
       focusedFieldClearTimer.current = setTimeout(() => setFocusedField(null), 1600);
     }
     consumeFocus();
-  }, [focusTarget, setCenter, click, consumeFocus]);
+  }, [focusTarget, setCenter, selectFocusedNode, consumeFocus]);
 
   // Register an adjacency resolver against the current edges so the
   // selection store's `click()` can compute dim-sets without reaching
@@ -587,11 +588,9 @@ function GraphCanvasInner({
         onEdgeClick={(_, edge) => {
           const data = edge.data as RefEdgeData | undefined;
           if (!data) return;
-          click(data.sourceType, 'replace');
-          selectEdge(edge.id);
-          document.dispatchEvent(
-            new CustomEvent(TYPE_EDGE_SELECT_EVENT, { detail: { edgeId: edge.id, data } }),
-          );
+          const selection = { edgeId: edge.id, data };
+          selectEdge(selection);
+          document.dispatchEvent(new CustomEvent(TYPE_EDGE_SELECT_EVENT, { detail: selection }));
         }}
         minZoom={0.1}
         maxZoom={2.5}

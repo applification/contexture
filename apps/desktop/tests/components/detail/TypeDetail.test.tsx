@@ -6,9 +6,9 @@
 import type { TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { FOCUS_TYPE_NAME_EVENT, TypeDetail } from '@renderer/components/detail/TypeDetail';
-import { TYPE_NODE_EVENT } from '@renderer/components/graph/nodes/TypeNode';
 import type { ValidationError } from '@renderer/services/validation';
 import type { Op } from '@renderer/store/ops';
+import { useGraphSelectionStore } from '@renderer/store/selection';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -34,7 +34,10 @@ function setup(
 }
 
 describe('TypeDetail', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    useGraphSelectionStore.getState().clear();
+    cleanup();
+  });
 
   describe('object kind', () => {
     const type: TypeDef = {
@@ -72,8 +75,6 @@ describe('TypeDetail', () => {
     });
 
     it('dispatches add_field when Add field is clicked', () => {
-      const onFieldSelect = vi.fn();
-      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
       const { dispatch } = setup(type);
       fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
       expect(dispatch).toHaveBeenCalledWith({
@@ -81,17 +82,13 @@ describe('TypeDetail', () => {
         typeName: 'Plot',
         field: { name: 'field1', type: { kind: 'string' } },
       });
-      expect(onFieldSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detail: { typeName: 'Plot', fieldName: 'field1' },
-        }),
-      );
-      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+        typeName: 'Plot',
+        fieldName: 'field1',
+      });
     });
 
     it('dispatches add_field for an empty object', () => {
-      const onFieldSelect = vi.fn();
-      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
       const { dispatch } = setup({ kind: 'object', name: 'Plot', fields: [] });
       fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
       expect(dispatch).toHaveBeenCalledWith({
@@ -99,12 +96,10 @@ describe('TypeDetail', () => {
         typeName: 'Plot',
         field: { name: 'field1', type: { kind: 'string' } },
       });
-      expect(onFieldSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detail: { typeName: 'Plot', fieldName: 'field1' },
-        }),
-      );
-      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+        typeName: 'Plot',
+        fieldName: 'field1',
+      });
     });
 
     it('dispatches update_field when a field name is edited', () => {
@@ -142,23 +137,17 @@ describe('TypeDetail', () => {
     });
 
     it('raises field-select when a field is opened from the field list', () => {
-      const onFieldSelect = vi.fn();
-      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
       setup(type);
 
       fireEvent.click(screen.getByRole('button', { name: 'Edit field area' }));
 
-      expect(onFieldSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detail: { typeName: 'Plot', fieldName: 'area' },
-        }),
-      );
-      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+        typeName: 'Plot',
+        fieldName: 'area',
+      });
     });
 
     it('raises field-select when a field validation issue is clicked', () => {
-      const onFieldSelect = vi.fn();
-      document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
       setup(
         type,
         [],
@@ -174,12 +163,10 @@ describe('TypeDetail', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /Unresolved ref "Area"/i }));
 
-      expect(onFieldSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          detail: { typeName: 'Plot', fieldName: 'area' },
-        }),
-      );
-      document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+      expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+        typeName: 'Plot',
+        fieldName: 'area',
+      });
     });
 
     it('dispatches reorder_fields when a field is moved later', () => {

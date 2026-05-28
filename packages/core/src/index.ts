@@ -21,3 +21,4 @@ export * from './op-tools';
 export * from './ops';
 export * from './pipeline';
 export * from './semantic-validation';
+export * from './validation-repairs';

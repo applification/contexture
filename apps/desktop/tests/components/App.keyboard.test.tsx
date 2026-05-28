@@ -242,7 +242,7 @@ describe('App global keyboard', () => {
       crossBoundary: false,
     };
     useGraphSelectionStore.getState().click('Plot', 'replace');
-    useGraphSelectionStore.getState().selectEdge('Plot:harvest->Harvest');
+    useGraphSelectionStore.getState().selectEdge({ edgeId: 'Plot:harvest->Harvest', data: edge });
     render(<App />);
 
     document.dispatchEvent(
@@ -282,7 +282,7 @@ describe('App global keyboard', () => {
       crossBoundary: false,
     };
     useGraphSelectionStore.getState().click('Plot', 'replace');
-    useGraphSelectionStore.getState().selectEdge('Plot.harvest->Harvest');
+    useGraphSelectionStore.getState().selectEdge({ edgeId: 'Plot.harvest->Harvest', data: edge });
     render(<App />);
 
     document.dispatchEvent(

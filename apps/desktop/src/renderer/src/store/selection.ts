@@ -14,6 +14,7 @@
  * the topology directly.
  */
 import { create } from 'zustand';
+import type { RefEdgeData } from '../components/graph/schema-to-graph';
 
 export type ClickMode = 'replace' | 'toggle' | 'extend';
 
@@ -27,6 +28,8 @@ export interface GraphSelectionState {
   /** Last-clicked node; the detail panel and adjacency follow this id. */
   primaryNodeId: string | null;
   edgeId: string | null;
+  selectedField: FieldSelection | null;
+  selectedEdge: EdgeSelection | null;
   adjacency: AdjacencySet;
   /** Target for "reveal in graph" from search — consumed by the canvas. */
   focusTarget: GraphFocusTarget | null;
@@ -35,6 +38,16 @@ export interface GraphSelectionState {
 export interface GraphFocusTarget {
   nodeId: string;
   fieldName?: string;
+}
+
+export interface FieldSelection {
+  typeName: string;
+  fieldName: string;
+}
+
+export interface EdgeSelection {
+  edgeId: string;
+  data: RefEdgeData;
 }
 
 export type AdjacencyResolver = (nodeId: string) => {
@@ -51,6 +64,8 @@ const INITIAL_STATE: GraphSelectionState = {
   nodeIds: new Set<string>(),
   primaryNodeId: null,
   edgeId: null,
+  selectedField: null,
+  selectedEdge: null,
   adjacency: EMPTY_ADJACENCY,
   focusTarget: null,
 };
@@ -74,8 +89,10 @@ export function clickModeFromEvent(event: {
 interface GraphSelectionStoreShape {
   state: GraphSelectionState;
   click(nodeId: string, mode: ClickMode): void;
-  selectEdge(edgeId: string | null): void;
+  selectField(field: FieldSelection | null): void;
+  selectEdge(edge: EdgeSelection | null): void;
   focus(target: string | GraphFocusTarget): void;
+  selectFocusedNode(nodeId: string): void;
   /** Called by the canvas once it has centred on the focus target. */
   consumeFocus(): void;
   clear(): void;
@@ -132,13 +149,39 @@ export const useGraphSelectionStore = create<GraphSelectionStoreShape>((set, get
           nodeIds: next,
           primaryNodeId: primary,
           edgeId: null,
+          selectedField: null,
+          selectedEdge: null,
           adjacency: adjacencyFor(primary),
         },
       });
     },
 
-    selectEdge(edgeId) {
-      set((s) => ({ state: { ...s.state, edgeId } }));
+    selectField(field) {
+      set((s) => ({
+        state: {
+          ...s.state,
+          nodeIds: field ? new Set([field.typeName]) : s.state.nodeIds,
+          primaryNodeId: field ? field.typeName : s.state.primaryNodeId,
+          edgeId: null,
+          selectedField: field,
+          selectedEdge: null,
+          adjacency: field ? adjacencyFor(field.typeName) : s.state.adjacency,
+        },
+      }));
+    },
+
+    selectEdge(edge) {
+      set((s) => ({
+        state: {
+          ...s.state,
+          nodeIds: edge ? new Set([edge.data.sourceType]) : s.state.nodeIds,
+          primaryNodeId: edge ? edge.data.sourceType : s.state.primaryNodeId,
+          edgeId: edge?.edgeId ?? null,
+          selectedEdge: edge,
+          selectedField: edge ? null : s.state.selectedField,
+          adjacency: edge ? adjacencyFor(edge.data.sourceType) : s.state.adjacency,
+        },
+      }));
     },
 
     focus(target) {
@@ -148,6 +191,23 @@ export const useGraphSelectionStore = create<GraphSelectionStoreShape>((set, get
           focusTarget: typeof target === 'string' ? { nodeId: target } : target,
         },
       }));
+    },
+
+    selectFocusedNode(nodeId) {
+      set((s) => {
+        const prev = s.state;
+        return {
+          state: {
+            ...prev,
+            nodeIds: new Set([nodeId]),
+            primaryNodeId: nodeId,
+            edgeId: null,
+            selectedEdge: null,
+            selectedField: prev.selectedField?.typeName === nodeId ? prev.selectedField : null,
+            adjacency: adjacencyFor(nodeId),
+          },
+        };
+      });
     },
 
     consumeFocus() {
@@ -165,6 +225,8 @@ export const useGraphSelectionStore = create<GraphSelectionStoreShape>((set, get
           nodeIds: new Set<string>(),
           primaryNodeId: null,
           edgeId: null,
+          selectedField: null,
+          selectedEdge: null,
           adjacency: EMPTY_ADJACENCY,
         },
       }));
