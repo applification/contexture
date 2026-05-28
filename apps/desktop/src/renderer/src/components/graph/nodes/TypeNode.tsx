@@ -113,7 +113,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
       active: boolean,
       ev: React.SyntheticEvent<HTMLElement>,
     ) => {
-      if (!field.refTarget || field.enumTarget) return;
+      if (!field.refTarget) return;
       const detail: FieldRefPreview = {
         sourceType: data.typeName,
         sourceField: field.name,

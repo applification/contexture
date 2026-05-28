@@ -16,16 +16,16 @@ export function ModelShapeHints({ hints }: ModelShapeHintsProps) {
   return (
     <section
       aria-label="Model shape"
-      className="space-y-2 rounded border border-border/70 bg-muted/20 p-3 text-xs"
+      className="space-y-2.5 rounded border border-border/70 bg-muted/20 p-3 text-[12px] leading-5"
     >
       <div className="flex items-start gap-2">
         <Lightbulb aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 text-primary" />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold text-foreground">Model shape</h3>
-            <span className="text-[10px] text-muted-foreground">Advisory</span>
+            <h3 className="text-sm font-semibold text-foreground">Model shape</h3>
+            <span className="text-[11px] text-muted-foreground">Advisory</span>
           </div>
-          <p className="text-[11px] leading-snug text-muted-foreground">
+          <p className="text-xs leading-5 text-muted-foreground">
             Embed for ownership. Extract for identity.
           </p>
         </div>
@@ -35,7 +35,7 @@ export function ModelShapeHints({ hints }: ModelShapeHintsProps) {
 
       {secondary.length > 0 && (
         <details className="group">
-          <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
             {secondary.length} more {secondary.length === 1 ? 'signal' : 'signals'}
           </summary>
           <div className="mt-2 space-y-2">
@@ -56,7 +56,7 @@ function HintBody({ hint, compact = false }: { hint: ModelingHint; compact?: boo
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge
           variant="outline"
-          className="rounded px-1.5 py-0 text-[10px] font-medium"
+          className="rounded px-1.5 py-0.5 text-[11px] font-medium leading-none"
           style={tone}
         >
           {hint.title}
@@ -65,17 +65,15 @@ function HintBody({ hint, compact = false }: { hint: ModelingHint; compact?: boo
           <Badge
             key={fieldName}
             variant="outline"
-            className="rounded px-1.5 py-0 text-[10px] font-medium"
+            className="rounded px-1.5 py-0.5 text-[11px] font-medium leading-none"
             style={fieldBadgeStyle}
           >
             {fieldName}
           </Badge>
         ))}
       </div>
-      <p className="leading-snug text-muted-foreground">{hint.message}</p>
-      {!compact && (
-        <p className="text-[11px] leading-snug text-muted-foreground">{hint.rationale}</p>
-      )}
+      <p className="text-foreground/85">{hint.message}</p>
+      {!compact && <p className="text-[12px] leading-5 text-muted-foreground">{hint.rationale}</p>}
     </div>
   );
 }

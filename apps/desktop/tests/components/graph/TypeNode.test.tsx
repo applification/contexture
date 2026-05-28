@@ -308,7 +308,7 @@ describe('TypeNode', () => {
     expect(screen.getByText('spring')).toBeInTheDocument();
   });
 
-  it('previews object ref targets on hover and focus without previewing enum refs', () => {
+  it('previews ref targets on hover and focus, including enum refs', () => {
     const data: TypeNodeData = {
       typeName: 'Artwork',
       kind: 'object',
@@ -344,7 +344,7 @@ describe('TypeNode', () => {
     fireEvent.focus(rows[0]);
     fireEvent.mouseEnter(rows[1]);
 
-    expect(handler).toHaveBeenCalledTimes(3);
+    expect(handler).toHaveBeenCalledTimes(4);
     expect(handler.mock.calls.map(([event]) => (event as CustomEvent).detail)).toEqual([
       {
         sourceType: 'Artwork',
@@ -362,6 +362,12 @@ describe('TypeNode', () => {
         sourceType: 'Artwork',
         sourceField: 'dimensions',
         targetType: 'ArtworkDimensions',
+        active: true,
+      },
+      {
+        sourceType: 'Artwork',
+        sourceField: 'medium',
+        targetType: 'ArtworkMedium',
         active: true,
       },
     ]);
