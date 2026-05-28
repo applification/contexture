@@ -9,10 +9,12 @@
  * with the result.
  *
  * Design notes:
- *   - Every op mutates at most one well-defined region; `rename_type` is the
- *     sole exception because a rename must cascade atomically through all
- *     local refs and discriminated-union variants. Qualified refs
- *     (`alias.Name`) are left alone — they point at external modules.
+ *   - Every op mutates at most one well-defined region, except for atomic
+ *     relationship-preserving ops. `rename_type` cascades through all local
+ *     refs and discriminated-union variants; `set_discriminator` cascades the
+ *     discriminator field name across the union's local object variants.
+ *     Qualified refs (`alias.Name`) are left alone — they point at external
+ *     modules.
  *   - `replace_schema` runs the Zod meta-schema so obviously broken inputs
  *     are caught here. A delta semantic check gates *every* op — including
  *     `replace_schema` — so callers cannot land an IR that introduces new
@@ -30,9 +32,15 @@ import {
   type StdlibCatalog,
 } from './semantic-validation';
 
+export type TypeUpdatePatch = TypeDef extends infer T
+  ? T extends TypeDef
+    ? Partial<Omit<T, 'kind' | 'name'>>
+    : never
+  : never;
+
 export type Op =
   | { kind: 'add_type'; type: TypeDef }
-  | { kind: 'update_type'; name: string; patch: Partial<Omit<TypeDef, 'kind' | 'name'>> }
+  | { kind: 'update_type'; name: string; patch: TypeUpdatePatch }
   | { kind: 'rename_type'; from: string; to: string }
   | { kind: 'delete_type'; name: string }
   | { kind: 'add_field'; typeName: string; field: FieldDef; index?: number }
@@ -48,9 +56,11 @@ export type Op =
   | { kind: 'remove_value'; typeName: string; value: string }
   | { kind: 'reorder_fields'; typeName: string; order: string[] }
   | { kind: 'add_variant'; typeName: string; variant: string }
+  | { kind: 'remove_variant'; typeName: string; variant: string }
   | { kind: 'set_discriminator'; typeName: string; discriminator: string }
   | { kind: 'add_import'; import: ImportDecl }
   | { kind: 'remove_import'; alias: string }
+  | { kind: 'remove_import_at'; index: number }
   | { kind: 'set_table_flag'; typeName: string; table: boolean }
   | { kind: 'add_index'; typeName: string; index: IndexDef }
   | { kind: 'remove_index'; typeName: string; name: string }
@@ -134,12 +144,18 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
     variant: z.string().min(1),
   }),
   z.object({
+    kind: z.literal('remove_variant'),
+    typeName: z.string().min(1),
+    variant: z.string().min(1),
+  }),
+  z.object({
     kind: z.literal('set_discriminator'),
     typeName: z.string().min(1),
     discriminator: z.string().min(1),
   }),
   z.object({ kind: z.literal('add_import'), import: ImportDeclItemSchema }),
   z.object({ kind: z.literal('remove_import'), alias: z.string().min(1) }),
+  z.object({ kind: z.literal('remove_import_at'), index: z.number().int().nonnegative() }),
   z.object({
     kind: z.literal('set_table_flag'),
     typeName: z.string().min(1),
@@ -260,12 +276,16 @@ function applyStructural(schema: Schema, op: Op): ApplyResult {
       return reorderFields(schema, op.typeName, op.order);
     case 'add_variant':
       return addVariant(schema, op.typeName, op.variant);
+    case 'remove_variant':
+      return removeVariant(schema, op.typeName, op.variant);
     case 'set_discriminator':
       return setDiscriminator(schema, op.typeName, op.discriminator);
     case 'add_import':
       return addImport(schema, op.import);
     case 'remove_import':
       return removeImport(schema, op.alias);
+    case 'remove_import_at':
+      return removeImportAt(schema, op.index);
     case 'set_table_flag':
       return setTableFlag(schema, op.typeName, op.table);
     case 'add_index':
@@ -394,9 +414,23 @@ function updateField(
     if (fi === -1) return { error: `field "${fieldName}" not found on "${typeName}"` };
     const field = t.fields[fi];
     if (!field) return { error: `field "${fieldName}" not found on "${typeName}"` };
+    if (
+      patch.name !== undefined &&
+      patch.name !== fieldName &&
+      t.fields.some((candidate) => candidate.name === patch.name)
+    ) {
+      return { error: `field "${patch.name}" already exists on "${typeName}"` };
+    }
     const fields = [...t.fields];
     fields[fi] = { ...field, ...patch };
-    return { ...t, fields };
+    const indexes =
+      patch.name && patch.name !== fieldName
+        ? t.indexes?.map((index) => ({
+            ...index,
+            fields: index.fields.map((name) => (name === fieldName ? (patch.name ?? name) : name)),
+          }))
+        : t.indexes;
+    return { ...t, fields, indexes };
   });
 }
 
@@ -405,7 +439,17 @@ function removeField(schema: Schema, typeName: string, fieldName: string): Apply
     if (!t.fields.some((f) => f.name === fieldName)) {
       return { error: `field "${fieldName}" not found on "${typeName}"` };
     }
-    return { ...t, fields: t.fields.filter((f) => f.name !== fieldName) };
+    const indexes = (t.indexes ?? [])
+      .map((index) => ({
+        ...index,
+        fields: index.fields.filter((field) => field !== fieldName),
+      }))
+      .filter((index) => index.fields.length > 0);
+    return {
+      ...t,
+      fields: t.fields.filter((f) => f.name !== fieldName),
+      indexes: indexes.length > 0 ? indexes : undefined,
+    };
   });
 }
 
@@ -505,6 +549,10 @@ function addIndex(schema: Schema, typeName: string, index: IndexDef): ApplyResul
     if (index.fields.length === 0) {
       return { error: `add_index: index "${index.name}" must have at least one field` };
     }
+    const duplicateField = firstDuplicate(index.fields);
+    if (duplicateField) {
+      return { error: `add_index: field "${duplicateField}" appears more than once` };
+    }
     const existing = t.indexes ?? [];
     if (existing.some((i) => i.name === index.name)) {
       return { error: `index "${index.name}" already exists on "${typeName}"` };
@@ -546,6 +594,10 @@ function updateIndex(
     if (nextFields.length === 0) {
       return { error: `update_index: index "${name}" must have at least one field` };
     }
+    const duplicateField = firstDuplicate(nextFields);
+    if (duplicateField) {
+      return { error: `update_index: field "${duplicateField}" appears more than once` };
+    }
     if (patch.name && patch.name !== name && existing.some((i) => i.name === patch.name)) {
       return { error: `index "${patch.name}" already exists on "${typeName}"` };
     }
@@ -559,6 +611,15 @@ function updateIndex(
     indexes[idx] = { name: nextName, fields: nextFields };
     return { ...t, indexes };
   });
+}
+
+function firstDuplicate(values: readonly string[]): string | null {
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) return value;
+    seen.add(value);
+  }
+  return null;
 }
 
 // ── discriminated unions ─────────────────────────────────────────────────
@@ -593,8 +654,50 @@ function addVariant(schema: Schema, typeName: string, variant: string): ApplyRes
   });
 }
 
+function removeVariant(schema: Schema, typeName: string, variant: string): ApplyResult {
+  return withUnion(schema, typeName, (t) => {
+    if (!t.variants.includes(variant)) {
+      return { error: `variant "${variant}" not found on "${typeName}"` };
+    }
+    return { ...t, variants: t.variants.filter((candidate) => candidate !== variant) };
+  });
+}
+
 function setDiscriminator(schema: Schema, typeName: string, discriminator: string): ApplyResult {
-  return withUnion(schema, typeName, (t) => ({ ...t, discriminator }));
+  const union = schema.types.find(
+    (type): type is UnionType => type.kind === 'discriminatedUnion' && type.name === typeName,
+  );
+  if (!union) {
+    const exists = schema.types.some((type) => type.name === typeName);
+    return {
+      error: exists
+        ? `type "${typeName}" is not a discriminatedUnion`
+        : `type "${typeName}" not found`,
+    };
+  }
+  if (union.discriminator === discriminator) return { schema };
+
+  const variantNames = new Set(union.variants);
+  const types = schema.types.map((type): TypeDef => {
+    if (type.name === typeName) return { ...union, discriminator };
+    if (type.kind !== 'object' || !variantNames.has(type.name)) return type;
+    if (type.fields.some((field) => field.name === discriminator)) return type;
+    if (!type.fields.some((field) => field.name === union.discriminator)) return type;
+    return {
+      ...type,
+      fields: type.fields.map((field) =>
+        field.name === union.discriminator ? { ...field, name: discriminator } : field,
+      ),
+      indexes: type.indexes?.map((index) => ({
+        ...index,
+        fields: index.fields.map((field) =>
+          field === union.discriminator ? discriminator : field,
+        ),
+      })),
+    };
+  });
+
+  return { schema: { ...schema, types } };
 }
 
 // ── imports ──────────────────────────────────────────────────────────────
@@ -613,6 +716,15 @@ function removeImport(schema: Schema, alias: string): ApplyResult {
     return { error: `import alias "${alias}" not found` };
   }
   return { schema: { ...schema, imports: existing.filter((i) => i.alias !== alias) } };
+}
+
+function removeImportAt(schema: Schema, index: number): ApplyResult {
+  const existing = schema.imports ?? [];
+  if (index < 0 || index >= existing.length) {
+    return { error: `import at index ${index} not found` };
+  }
+  const imports = existing.filter((_, candidateIndex) => candidateIndex !== index);
+  return { schema: { ...schema, imports: imports.length > 0 ? imports : undefined } };
 }
 
 // ── full replace ─────────────────────────────────────────────────────────

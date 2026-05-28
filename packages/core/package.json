@@ -29,7 +29,8 @@
     "./op-tools": "./src/op-tools.ts",
     "./paths": "./src/paths.ts",
     "./pipeline": "./src/pipeline.ts",
-    "./semantic-validation": "./src/semantic-validation.ts"
+    "./semantic-validation": "./src/semantic-validation.ts",
+    "./validation-repairs": "./src/validation-repairs.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

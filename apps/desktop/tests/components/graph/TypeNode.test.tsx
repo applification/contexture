@@ -9,10 +9,11 @@
  * and the bubbling `contexture:field-select` CustomEvent.
  */
 import {
+  TYPE_NODE_ADD_FIELD_EVENT,
   TYPE_NODE_EVENT,
-  TYPE_NODE_REF_PREVIEW_EVENT,
   TypeNode,
 } from '@renderer/components/graph/nodes/TypeNode';
+import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { TypeNodeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -87,6 +88,35 @@ describe('TypeNode', () => {
     const node = container.querySelector('[data-testid="type-node"]') as HTMLElement;
     expect(node.dataset.imported).toBe('true');
     expect(node.style.borderStyle).toBe('dashed');
+  });
+
+  it('marks nodes and fields with validation issues', () => {
+    const data: TypeNodeData = {
+      typeName: 'Post',
+      kind: 'object',
+      imported: false,
+      validationIssueCount: 1,
+      fields: [
+        {
+          name: 'author',
+          summary: '→ Author',
+          optional: false,
+          nullable: false,
+          validationIssueCount: 1,
+        },
+      ],
+    };
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    const node = container.querySelector('[data-testid="type-node"]') as HTMLElement;
+    const field = screen.getByTestId('type-node-field');
+
+    expect(node.dataset.validationIssues).toBe('true');
+    expect(screen.getByTestId('type-node-validation-label')).toHaveAccessibleName(
+      '1 validation issue',
+    );
+    expect(screen.getByTestId('type-node-validation-rail')).toBeInTheDocument();
+    expect(field.dataset.validationIssues).toBe('true');
+    expect(field).toHaveStyle({ boxShadow: 'inset 3px 0 0 var(--destructive)' });
   });
 
   it('raises a contexture:field-select event with typeName + fieldName when a field is clicked', () => {
@@ -180,6 +210,37 @@ describe('TypeNode', () => {
     };
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
     expect(container.querySelectorAll('[data-testid="type-node-field"]')).toHaveLength(0);
+  });
+
+  it('raises an add-field event from local object nodes', () => {
+    const data: TypeNodeData = {
+      typeName: 'Plot',
+      kind: 'object',
+      imported: false,
+      canAddFields: true,
+      fields: [],
+    };
+    const handler = vi.fn();
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    container.addEventListener(TYPE_NODE_ADD_FIELD_EVENT, handler as EventListener);
+
+    fireEvent.click(screen.getByTestId('type-node-add-field'));
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ typeName: 'Plot' });
+  });
+
+  it('does not show add-field controls for imported object nodes', () => {
+    const data: TypeNodeData = {
+      typeName: 'common.Email',
+      kind: 'object',
+      imported: true,
+      canAddFields: true,
+      fields: [],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.queryByTestId('type-node-add-field')).not.toBeInTheDocument();
   });
 
   it('highlights a ref summary when its target node is selected', () => {

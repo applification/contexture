@@ -19,24 +19,24 @@ describe('double-click → add_type integration', () => {
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
 
-  it('adds a fresh Type1 to the live schema', () => {
+  it('adds a fresh Object1 to the live schema', () => {
     const op = handleDoubleClick(useUndoStore.getState().schema);
     const result = useUndoStore.getState().apply(op);
     expect('schema' in result).toBe(true);
     const state = useUndoStore.getState().schema;
-    expect(state.types).toEqual([{ kind: 'object', name: 'Type1', fields: [] }]);
+    expect(state.types).toEqual([{ kind: 'object', name: 'Object1', fields: [] }]);
   });
 
-  it('adds Type2 on a second double-click without colliding with Type1', () => {
+  it('adds Object2 on a second double-click without colliding with Object1', () => {
     useUndoStore.getState().apply(handleDoubleClick(useUndoStore.getState().schema));
     useUndoStore.getState().apply(handleDoubleClick(useUndoStore.getState().schema));
-    expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['Type1', 'Type2']);
+    expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['Object1', 'Object2']);
   });
 
   it('each add_type lands as its own undo step so Cmd-Z reverses one', () => {
     useUndoStore.getState().apply(handleDoubleClick(useUndoStore.getState().schema));
     useUndoStore.getState().apply(handleDoubleClick(useUndoStore.getState().schema));
     useUndoStore.getState().undo();
-    expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['Type1']);
+    expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['Object1']);
   });
 });

@@ -4,6 +4,8 @@
 
 import type { Schema } from '@contexture/core/ir';
 import {
+  createFieldOp,
+  createTypeOp,
   handleConnect,
   handleDoubleClick,
   handleKeyDown,
@@ -37,8 +39,66 @@ describe('handleDoubleClick', () => {
     const op = handleDoubleClick(empty);
     expect(op).toEqual({
       kind: 'add_type',
-      type: { kind: 'object', name: 'Type1', fields: [] },
+      type: { kind: 'object', name: 'Object1', fields: [] },
     });
+  });
+});
+
+describe('createTypeOp', () => {
+  it('creates a Convex table with table defaults', () => {
+    expect(createTypeOp(empty, 'table')).toEqual({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Table1', fields: [], table: true },
+    });
+  });
+
+  it('creates an enum with a starter value', () => {
+    expect(createTypeOp(empty, 'enum')).toEqual({
+      kind: 'add_type',
+      type: { kind: 'enum', name: 'Enum1', values: [{ value: 'value' }] },
+    });
+  });
+
+  it('creates a discriminated union with a default discriminator', () => {
+    expect(createTypeOp(empty, 'union')).toEqual({
+      kind: 'add_type',
+      type: {
+        kind: 'discriminatedUnion',
+        name: 'Union1',
+        discriminator: 'kind',
+        variants: [],
+      },
+    });
+  });
+});
+
+describe('createFieldOp', () => {
+  it('creates a string field with a fresh placeholder name for object types', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          fields: [{ name: 'field1', type: { kind: 'string' } }],
+        },
+      ],
+    };
+
+    expect(createFieldOp(schema, 'Plot')).toEqual({
+      kind: 'add_field',
+      typeName: 'Plot',
+      field: { name: 'field2', type: { kind: 'string' } },
+    });
+  });
+
+  it('returns null for non-object types', () => {
+    expect(
+      createFieldOp(
+        { version: '1', types: [{ kind: 'enum', name: 'Season', values: [{ value: 'spring' }] }] },
+        'Season',
+      ),
+    ).toBeNull();
   });
 });
 

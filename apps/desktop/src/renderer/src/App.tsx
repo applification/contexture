@@ -25,6 +25,7 @@ import {
   isGeneratedTargetEnabled,
   previewableGeneratedTargets,
 } from '@contexture/core/generated-targets';
+import type { Schema } from '@contexture/core/ir';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -34,10 +35,14 @@ import { ActivityBar } from './components/activity-bar/ActivityBar';
 import { ChangesPanel } from './components/changes/ChangesPanel';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { DetailPanel } from './components/detail/DetailPanel';
+import { FOCUS_TYPE_NAME_EVENT } from './components/detail/TypeDetail';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
+import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
+import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/graph/interactions';
+import { TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
@@ -63,8 +68,9 @@ import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { useDocumentStore } from './store/document';
+import { useGraphLayoutStore } from './store/layout-config';
 import { useModelSyncStore } from './store/model-sync';
-import { useGraphSelectionStore } from './store/selection';
+import { type EdgeSelection, type FieldSelection, useGraphSelectionStore } from './store/selection';
 import { useUIChromeStore } from './store/ui-chrome';
 import { useUndoStore } from './store/undo';
 
@@ -84,6 +90,8 @@ export default function App(): React.JSX.Element {
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const selectedField = useGraphSelectionStore((s) => s.state.selectedField);
+  const selectedEdge = useGraphSelectionStore((s) => s.state.selectedEdge);
   const highlightedNodeIds = useModelSyncStore((s) => s.highlightedNodeIds);
   const activeTab = useUIChromeStore((s) => s.sidebarTab);
   const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
@@ -97,6 +105,77 @@ export default function App(): React.JSX.Element {
     if (sidebarVisible) sidebarRef.current?.expand();
     else sidebarRef.current?.collapse();
   }, [sidebarVisible]);
+
+  useEffect(() => {
+    if (!selectedEdge) return;
+    if (edgeSelectionExists(schema, selectedEdge.data)) return;
+    useGraphSelectionStore.getState().selectEdge(null);
+  }, [schema, selectedEdge]);
+
+  useEffect(() => {
+    function onFieldSelect(event: Event): void {
+      const detail = (event as CustomEvent<Partial<FieldSelection>>).detail;
+      if (typeof detail?.typeName !== 'string' || typeof detail.fieldName !== 'string') return;
+      useGraphSelectionStore
+        .getState()
+        .selectField({ typeName: detail.typeName, fieldName: detail.fieldName });
+      useUIChromeStore.getState().setSidebarVisible(true);
+      useUIChromeStore.getState().setSidebarTab('properties');
+    }
+    document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
+    return () => document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+  }, []);
+
+  useEffect(() => {
+    function onEdgeSelect(event: Event): void {
+      const detail = (event as CustomEvent<EdgeSelection>).detail;
+      if (typeof detail?.edgeId !== 'string' || !detail.data) return;
+      useGraphSelectionStore.getState().selectEdge(detail);
+      useUIChromeStore.getState().setSidebarVisible(true);
+      useUIChromeStore.getState().setSidebarTab('properties');
+    }
+    document.addEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
+    return () => document.removeEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
+  }, []);
+
+  const createType = useCallback((kind: CreateTypeKind): void => {
+    const op = createTypeOp(useUndoStore.getState().schema, kind);
+    const result = useUndoStore.getState().apply(op);
+    if ('error' in result || op.kind !== 'add_type') return;
+    const typeName = op.type.name;
+    if (kind === 'enum') useGraphLayoutStore.getState().setGraphLayout({ showEnums: true });
+    useGraphSelectionStore.getState().click(typeName, 'replace');
+    useGraphSelectionStore.getState().focus(typeName);
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('properties');
+    window.setTimeout(() => {
+      document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
+    }, 0);
+  }, []);
+
+  const createFieldForSelectedType = useCallback((): void => {
+    const typeName = useGraphSelectionStore.getState().state.primaryNodeId;
+    if (!typeName) return;
+    const op = createFieldOp(useUndoStore.getState().schema, typeName);
+    if (!op || op.kind !== 'add_field') return;
+    const result = useUndoStore.getState().apply(op);
+    if ('error' in result) return;
+    useGraphSelectionStore.getState().selectField({ typeName, fieldName: op.field.name });
+    useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('properties');
+  }, []);
+
+  const focusSelectedTypeName = useCallback((): void => {
+    const typeName = useGraphSelectionStore.getState().state.primaryNodeId;
+    if (!typeName) return;
+    useGraphSelectionStore.getState().click(typeName, 'replace');
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('properties');
+    window.setTimeout(() => {
+      document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
+    }, 0);
+  }, []);
 
   // Global keyboard shortcuts — forwarded from the document so they
   // work regardless of canvas focus. Inputs / textareas get a pass so
@@ -127,18 +206,60 @@ export default function App(): React.JSX.Element {
         useUndoStore.getState().redo();
         return;
       }
+      if (mod && ev.shiftKey && (ev.key === 't' || ev.key === 'T')) {
+        ev.preventDefault();
+        createType('table');
+        return;
+      }
+      if (mod && ev.shiftKey && (ev.key === 'o' || ev.key === 'O')) {
+        ev.preventDefault();
+        createType('object');
+        return;
+      }
+      if (mod && ev.shiftKey && (ev.key === 'e' || ev.key === 'E')) {
+        ev.preventDefault();
+        createType('enum');
+        return;
+      }
+      if (mod && ev.shiftKey && (ev.key === 'u' || ev.key === 'U')) {
+        ev.preventDefault();
+        createType('union');
+        return;
+      }
+      if (mod && ev.shiftKey && (ev.key === 'f' || ev.key === 'F')) {
+        ev.preventDefault();
+        createFieldForSelectedType();
+        return;
+      }
+
+      if (ev.key === 'F2') {
+        ev.preventDefault();
+        focusSelectedTypeName();
+        return;
+      }
 
       if (ev.key === 'Delete' || ev.key === 'Backspace') {
         const selected = useGraphSelectionStore.getState().state.primaryNodeId;
         if (!selected) return;
         ev.preventDefault();
+        if (selectedField?.typeName === selected) {
+          const result = useUndoStore.getState().apply({
+            kind: 'remove_field',
+            typeName: selectedField.typeName,
+            fieldName: selectedField.fieldName,
+          });
+          if ('schema' in result) useGraphSelectionStore.getState().selectField(null);
+          return;
+        }
         const result = useUndoStore.getState().apply({ kind: 'delete_type', name: selected });
-        if ('schema' in result) useGraphSelectionStore.getState().clearNodes();
+        if ('schema' in result) {
+          useGraphSelectionStore.getState().clearNodes();
+        }
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [createFieldForSelectedType, createType, focusSelectedTypeName, selectedField]);
 
   const loadSample = useCallback(() => {
     useUndoStore
@@ -196,7 +317,8 @@ export default function App(): React.JSX.Element {
     };
   }, []);
 
-  const hasSelection = selectedNodeId !== null;
+  const detailTypeName = selectedField?.typeName ?? selectedEdge?.data.sourceType ?? selectedNodeId;
+  const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
 
   // Emit generated sources for the SchemaPanel. Only runs while the
   // Schema tab is active so we don't burn cycles on every IR change
@@ -277,7 +399,7 @@ export default function App(): React.JSX.Element {
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <UpdateBanner />
-      <Toolbar />
+      <Toolbar onCreateType={createType} />
 
       <ResizablePanelGroup
         orientation="horizontal"
@@ -296,6 +418,7 @@ export default function App(): React.JSX.Element {
                       <Button
                         variant="secondary"
                         className="h-8 px-2 gap-1.5 shadow-sm"
+                        aria-label="Graph controls"
                         title="Graph controls"
                       >
                         <SlidersHorizontal className="size-4" />
@@ -333,7 +456,7 @@ export default function App(): React.JSX.Element {
         <ResizablePanel
           id="sidebar-panel"
           defaultSize="30%"
-          minSize="15%"
+          minSize="25%"
           maxSize="60%"
           collapsible
           collapsedSize={0}
@@ -343,7 +466,24 @@ export default function App(): React.JSX.Element {
             <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               <div className={activeTab !== 'properties' ? 'hidden' : 'flex-1 overflow-y-auto'}>
                 {hasSelection ? (
-                  <DetailPanel selection={{ typeName: selectedNodeId ?? undefined }} />
+                  <DetailPanel
+                    selection={{
+                      edge: selectedEdge?.data,
+                      typeName: detailTypeName ?? undefined,
+                      fieldName:
+                        selectedField && selectedField.typeName === detailTypeName
+                          ? selectedField.fieldName
+                          : undefined,
+                    }}
+                    onClearSelection={() => {
+                      useGraphSelectionStore.getState().selectField(null);
+                      useGraphSelectionStore.getState().selectEdge(null);
+                    }}
+                    onClearSelectedField={() => useGraphSelectionStore.getState().selectField(null)}
+                    onSelectField={(typeName, fieldName) => {
+                      useGraphSelectionStore.getState().selectField({ typeName, fieldName });
+                    }}
+                  />
                 ) : (
                   <Empty className="border-0 p-4">
                     <EmptyHeader>
@@ -388,6 +528,20 @@ export default function App(): React.JSX.Element {
       <ReconcileModal />
     </div>
   );
+}
+
+function edgeSelectionExists(schema: Schema, edge: EdgeSelection['data']): boolean {
+  const sourceType = schema.types.find((type) => type.name === edge.sourceType);
+  if (!sourceType) return false;
+
+  if (edge.relation === 'unionVariant') {
+    return (
+      sourceType.kind === 'discriminatedUnion' && sourceType.variants.includes(edge.targetType)
+    );
+  }
+
+  if (sourceType.kind !== 'object' || typeof edge.sourceField !== 'string') return false;
+  return sourceType.fields.some((field) => field.name === edge.sourceField);
 }
 
 function EmptyState({

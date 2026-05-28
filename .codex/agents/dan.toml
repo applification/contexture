@@ -26,6 +26,12 @@ When reviewing a branch, PR, plan, feature, or bug:
 - Use concrete file paths, commands, user flows, and test names when available.
 - Avoid style-only comments unless they hide real QA, release, or maintainability risk.
 
+When running browser-based verification, use the Browser plugin / `browser:browser` skill. The
+Codex in-app browser is controlled through the Node REPL tool, not through a direct `browser.*`
+tool namespace. Load the Browser skill, import its `browser-client.mjs`, then select the `iab`
+browser with `agent.browsers.get("iab")`. Do not use `web.run` for in-app browser work;
+`web.run` is web lookup, not the Codex Desktop browser.
+
 Default response shape:
 1. Findings, ordered by severity, with file or behaviour references.
 2. Missing or recommended tests.

@@ -11,6 +11,7 @@ import type { FieldType } from '@contexture/core/ir';
 import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics';
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
+import { parseTypePath, repairForValidationError } from '@renderer/services/validation-repairs';
 import { useDocumentStore } from '@renderer/store/document';
 import { sourceLabel, useModelSyncStore } from '@renderer/store/model-sync';
 import { useGraphSelectionStore } from '@renderer/store/selection';
@@ -83,11 +84,35 @@ export function StatusBar(): React.JSX.Element {
   function handleErrorClick(error: ValidationError): void {
     // Paths are dotted (`types.3.fields.0.type`); pick the enclosing
     // TypeDef by index so clicking an error selects the right node.
-    const match = error.path.match(/^types\.(\d+)/);
-    if (match) {
-      const idx = Number(match[1]);
-      const t = schema.types[idx];
-      if (t) click(t.name, 'replace');
+    const loc = parseTypePath(error.path);
+    if (loc) {
+      const type = schema.types[loc.typeIndex];
+      if (type) {
+        click(type.name, 'replace');
+        if (type.kind === 'object' && loc.fieldIndex !== undefined) {
+          const field = type.fields[loc.fieldIndex];
+          if (field) {
+            useGraphSelectionStore
+              .getState()
+              .selectField({ typeName: type.name, fieldName: field.name });
+            useGraphSelectionStore.getState().focus({ nodeId: type.name, fieldName: field.name });
+          }
+        } else {
+          useGraphSelectionStore.getState().focus(type.name);
+        }
+      }
+    }
+    setPopoverOpen(false);
+  }
+
+  function handleRepair(error: ValidationError): void {
+    const repair = repairForValidationError(schema, error);
+    if (!repair) return;
+    const result = useUndoStore.getState().apply(repair.op);
+    if ('error' in result) return;
+    if (repair.focusTypeName) {
+      click(repair.focusTypeName, 'replace');
+      useGraphSelectionStore.getState().focus(repair.focusTypeName);
     }
     setPopoverOpen(false);
   }
@@ -188,22 +213,38 @@ export function StatusBar(): React.JSX.Element {
             </PopoverTrigger>
             <PopoverContent className="w-96 p-0" align="end">
               <div className="max-h-64 overflow-y-auto">
-                {errors.map((err) => (
-                  <button
-                    type="button"
-                    key={`${err.code}:${err.path}`}
-                    onClick={() => handleErrorClick(err)}
-                    className="w-full text-left px-3 py-2 text-xs border-b border-border last:border-b-0 hover:bg-muted transition-colors"
-                  >
-                    <div className="flex items-start gap-2">
-                      <CircleAlert className="size-3 shrink-0 mt-0.5 text-destructive" />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{err.message}</div>
-                        <div className="text-muted-foreground/70 truncate">{err.path}</div>
-                      </div>
+                {errors.map((err) => {
+                  const repair = repairForValidationError(schema, err);
+                  return (
+                    <div
+                      key={`${err.code}:${err.path}`}
+                      className="flex gap-2 border-b border-border px-3 py-2 text-xs last:border-b-0 hover:bg-muted"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleErrorClick(err)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-start gap-2">
+                          <CircleAlert className="size-3 shrink-0 mt-0.5 text-destructive" />
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{err.message}</div>
+                            <div className="text-muted-foreground/70 truncate">{err.path}</div>
+                          </div>
+                        </div>
+                      </button>
+                      {repair && (
+                        <button
+                          type="button"
+                          onClick={() => handleRepair(err)}
+                          className="self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                        >
+                          {repair.label}
+                        </button>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </PopoverContent>
           </Popover>

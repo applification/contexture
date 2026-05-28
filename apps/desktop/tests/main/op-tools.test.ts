@@ -15,7 +15,7 @@ function toolNamed(tools: OpToolDescriptor[], name: string): OpToolDescriptor {
 }
 
 describe('createOpTools', () => {
-  it('registers one SDK tool per op (20 total)', () => {
+  it('registers one SDK tool per op (22 total)', () => {
     const { tools } = makeTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
@@ -29,8 +29,10 @@ describe('createOpTools', () => {
         'delete_type',
         'remove_field',
         'remove_import',
+        'remove_import_at',
         'remove_index',
         'remove_value',
+        'remove_variant',
         'rename_type',
         'reorder_fields',
         'replace_schema',
@@ -285,6 +287,30 @@ describe('createOpTools', () => {
       typeName: 'Role',
       value: 'admin',
     });
+  });
+
+  it('remove_variant forwards a strict Op', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'remove_variant');
+    await tool.handler({ typeName: 'Event', variant: 'Signup' });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'remove_variant',
+      typeName: 'Event',
+      variant: 'Signup',
+    });
+  });
+
+  it('remove_import_at forwards a strict Op', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'remove_import_at');
+    await tool.handler({ index: 1 });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'remove_import_at',
+      index: 1,
+    });
+    await expect(tool.handler({ index: -1 })).rejects.toThrow();
   });
 
   it('delete_type accepts top-level and payload-wrapped Claude shapes', async () => {

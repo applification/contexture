@@ -63,9 +63,11 @@ Schema mutations:
   remove-index <type> <name>
   update-index <type> <name> <patchJson>
   add-variant <union> <variant>
+  remove-variant <union> <variant>
   set-discriminator <union> <field>
   add-import <importDeclJson>
   remove-import <alias>
+  remove-import-at <index>
   replace-schema <schemaJson>
 
 Options:
@@ -196,6 +198,15 @@ function parseBoolean(raw: string | undefined, label: string): boolean {
   if (raw === 'true') return true;
   if (raw === 'false') return false;
   throw new Error(`${label} must be "true" or "false"`);
+}
+
+function parseNonNegativeInteger(raw: string | undefined, label: string): number {
+  if (!raw) throw new Error(`${label} is required`);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+  return value;
 }
 
 function requireArgs(args: string[], count: number, usage: string): void {
@@ -400,12 +411,21 @@ function commandToToolInput(command: string, args: string[]): { tool: string; in
     case 'add-variant':
       requireArgs(args, 2, 'add-variant <union> <variant>');
       return { tool: 'add_variant', input: { typeName: args[0], variant: args[1] } };
+    case 'remove-variant':
+      requireArgs(args, 2, 'remove-variant <union> <variant>');
+      return { tool: 'remove_variant', input: { typeName: args[0], variant: args[1] } };
     case 'set-discriminator':
       requireArgs(args, 2, 'set-discriminator <union> <field>');
       return { tool: 'set_discriminator', input: { typeName: args[0], discriminator: args[1] } };
     case 'remove-import':
       requireArgs(args, 1, 'remove-import <alias>');
       return { tool: 'remove_import', input: { alias: args[0] } };
+    case 'remove-import-at':
+      requireArgs(args, 1, 'remove-import-at <index>');
+      return {
+        tool: 'remove_import_at',
+        input: { index: parseNonNegativeInteger(args[0], 'index') },
+      };
     case 'set-table-flag':
       requireArgs(args, 2, 'set-table-flag <type> <true|false>');
       return {

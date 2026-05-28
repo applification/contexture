@@ -8,7 +8,7 @@
  */
 import type { Schema } from '@contexture/core/ir';
 import { validate } from '@renderer/services/validation';
-import { buildStdlibRegistry, STDLIB_REGISTRY } from '@shared/stdlib-registry';
+import { buildStdlibRegistry, STDLIB_REGISTRY, STDLIB_TYPE_OPTIONS } from '@shared/stdlib-registry';
 import { describe, expect, it } from 'vitest';
 
 describe('stdlib registry', () => {
@@ -33,6 +33,22 @@ describe('stdlib registry', () => {
     // Independent instances, same data.
     expect(a).not.toBe(b);
     expect(a.namespaces).toEqual(b.namespaces);
+  });
+
+  it('exposes picker examples for stdlib types', () => {
+    expect(STDLIB_TYPE_OPTIONS).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          qualifiedName: 'common.Email',
+          description: 'Email address.',
+          example: 'user@example.com',
+        }),
+        expect.objectContaining({
+          qualifiedName: 'place.CountryCode',
+          example: 'GB',
+        }),
+      ]),
+    );
   });
 });
 

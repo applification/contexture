@@ -14,7 +14,7 @@
  * the host can flip the node into rename mode — there's no "rename"
  * op until the text actually changes.
  */
-import type { Schema, TypeDef } from '@contexture/core/ir';
+import type { FieldDef, Schema, TypeDef } from '@contexture/core/ir';
 import type { Op } from '../../store/ops';
 
 /** Selection shape passed from the UI store. */
@@ -50,10 +50,51 @@ export function nextTypeName(schema: Schema, prefix = 'Type'): string {
   return `${prefix}${existing.size + 1}`;
 }
 
+export type CreateTypeKind = 'table' | 'object' | 'enum' | 'union';
+
+/** Build the op for a fresh type with Convex-oriented defaults. */
+export function createTypeOp(schema: Schema, kind: CreateTypeKind): Op {
+  const type: TypeDef =
+    kind === 'enum'
+      ? { kind: 'enum', name: nextTypeName(schema, 'Enum'), values: [{ value: 'value' }] }
+      : kind === 'union'
+        ? {
+            kind: 'discriminatedUnion',
+            name: nextTypeName(schema, 'Union'),
+            discriminator: 'kind',
+            variants: [],
+          }
+        : {
+            kind: 'object',
+            name: nextTypeName(schema, kind === 'table' ? 'Table' : 'Object'),
+            fields: [],
+            ...(kind === 'table' ? { table: true } : {}),
+          };
+  return { kind: 'add_type', type };
+}
+
+export function nextFieldName(fields: readonly Pick<FieldDef, 'name'>[]): string {
+  const existing = new Set(fields.map((field) => field.name));
+  for (let i = 1; i <= existing.size + 1; i++) {
+    const candidate = `field${i}`;
+    if (!existing.has(candidate)) return candidate;
+  }
+  return `field${existing.size + 1}`;
+}
+
+export function createFieldOp(schema: Schema, typeName: string): Op | null {
+  const type = schema.types.find((candidate) => candidate.name === typeName);
+  if (type?.kind !== 'object') return null;
+  return {
+    kind: 'add_field',
+    typeName,
+    field: { name: nextFieldName(type.fields), type: { kind: 'string' } },
+  };
+}
+
 /** Double-click on the empty canvas → `add_type` for a fresh object type. */
 export function handleDoubleClick(schema: Schema): Op {
-  const type: TypeDef = { kind: 'object', name: nextTypeName(schema), fields: [] };
-  return { kind: 'add_type', type };
+  return createTypeOp(schema, 'object');
 }
 
 /** Keyboard → op / command. */

@@ -193,6 +193,64 @@ describe('apply', () => {
     expect(f.type).toEqual({ kind: 'number' });
   });
 
+  it('update_field: renaming a table field cascades through indexes', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [
+            { name: 'author', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'date' } },
+          ],
+          indexes: [
+            { name: 'by_author', fields: ['author'] },
+            { name: 'by_author_created', fields: ['author', 'createdAt'] },
+          ],
+        },
+      ],
+    };
+    const s1 = ok(
+      apply(base, {
+        kind: 'update_field',
+        typeName: 'Post',
+        fieldName: 'author',
+        patch: { name: 'authorId' },
+      }),
+    );
+    const post = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(post.fields.map((field) => field.name)).toEqual(['authorId', 'createdAt']);
+    expect(post.indexes).toEqual([
+      { name: 'by_author', fields: ['authorId'] },
+      { name: 'by_author_created', fields: ['authorId', 'createdAt'] },
+    ]);
+  });
+
+  it('update_field: rejects renaming a field to an existing sibling field', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          fields: [
+            { name: 'title', type: { kind: 'string' } },
+            { name: 'slug', type: { kind: 'string' } },
+          ],
+        },
+      ],
+    };
+    const res = apply(base, {
+      kind: 'update_field',
+      typeName: 'Post',
+      fieldName: 'slug',
+      patch: { name: 'title' },
+    });
+    expect('error' in res && res.error).toContain('field "title" already exists on "Post"');
+  });
+
   // 7. remove_field (was delete_field)
   it('remove_field: removes a named field', () => {
     const base: Schema = {
@@ -211,6 +269,31 @@ describe('apply', () => {
     const s1 = ok(apply(base, { kind: 'remove_field', typeName: 'User', fieldName: 'a' }));
     const fields = (s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>).fields;
     expect(fields.map((f) => f.name)).toEqual(['b']);
+  });
+
+  it('remove_field: prunes table indexes that mention the removed field', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [
+            { name: 'author', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+          indexes: [
+            { name: 'by_author_title', fields: ['author', 'title'] },
+            { name: 'by_author', fields: ['author'] },
+          ],
+        },
+      ],
+    };
+    const s1 = ok(apply(base, { kind: 'remove_field', typeName: 'Post', fieldName: 'author' }));
+    const post = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(post.fields.map((field) => field.name)).toEqual(['title']);
+    expect(post.indexes).toEqual([{ name: 'by_author_title', fields: ['title'] }]);
   });
 
   // 8. reorder_fields
@@ -267,6 +350,36 @@ describe('apply', () => {
     expect(du.variants).toEqual(['Click', 'Hover']);
   });
 
+  it('remove_variant: removes a variant from a discriminatedUnion', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Click',
+          fields: [{ name: 'type', type: { kind: 'literal', value: 'click' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Hover',
+          fields: [{ name: 'type', type: { kind: 'literal', value: 'hover' } }],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'type',
+          variants: ['Click', 'Hover'],
+        },
+      ],
+    };
+    const s1 = ok(apply(base, { kind: 'remove_variant', typeName: 'Event', variant: 'Hover' }));
+    const du = s1.types[2] as Extract<(typeof s1.types)[number], { kind: 'discriminatedUnion' }>;
+    expect(du.variants).toEqual(['Click']);
+
+    const missing = apply(s1, { kind: 'remove_variant', typeName: 'Event', variant: 'Hover' });
+    expect('error' in missing).toBe(true);
+  });
+
   // 10. set_discriminator
   it('set_discriminator: updates the discriminator field of a dUnion', () => {
     const base: Schema = {
@@ -285,6 +398,48 @@ describe('apply', () => {
     );
     const du = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'discriminatedUnion' }>;
     expect(du.discriminator).toBe('tag');
+  });
+
+  it('set_discriminator: renames matching discriminator fields on object variants', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Login',
+          table: true,
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'login' } },
+            { name: 'userId', type: { kind: 'string' } },
+          ],
+          indexes: [{ name: 'by_kind', fields: ['kind', 'userId'] }],
+        },
+        {
+          kind: 'object',
+          name: 'Logout',
+          fields: [
+            { name: 'kind', type: { kind: 'literal', value: 'logout' } },
+            { name: 'userId', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'discriminatedUnion',
+          name: 'Event',
+          discriminator: 'kind',
+          variants: ['Login', 'Logout'],
+        },
+      ],
+    };
+    const s1 = ok(
+      apply(base, { kind: 'set_discriminator', typeName: 'Event', discriminator: 'type' }),
+    );
+    const login = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    const logout = s1.types[1] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    const event = s1.types[2] as Extract<(typeof s1.types)[number], { kind: 'discriminatedUnion' }>;
+    expect(event.discriminator).toBe('type');
+    expect(login.fields.map((field) => field.name)).toEqual(['type', 'userId']);
+    expect(login.indexes).toEqual([{ name: 'by_kind', fields: ['type', 'userId'] }]);
+    expect(logout.fields.map((field) => field.name)).toEqual(['type', 'userId']);
   });
 
   // 11. add_import
@@ -317,6 +472,20 @@ describe('apply', () => {
     expect(s1.imports).toEqual([
       { kind: 'stdlib', path: '@contexture/identity', alias: 'identity' },
     ]);
+  });
+
+  it('remove_import_at: drops only the import at the given index', () => {
+    const base: Schema = {
+      version: '1',
+      imports: [
+        { kind: 'stdlib', path: '@contexture/common', alias: 'common' },
+        { kind: 'relative', path: './legacy.contexture.json', alias: 'common' },
+      ],
+      types: [],
+    };
+    const s1 = ok(apply(base, { kind: 'remove_import_at', index: 1 }));
+    expect(s1.imports).toEqual([{ kind: 'stdlib', path: '@contexture/common', alias: 'common' }]);
+    expect('error' in apply(s1, { kind: 'remove_import_at', index: 1 })).toBe(true);
   });
 
   // set_table_flag
@@ -392,6 +561,15 @@ describe('apply', () => {
       index: { name: 'empty', fields: [] },
     });
     expect('error' in empty).toBe(true);
+
+    const duplicateField = apply(base, {
+      kind: 'add_index',
+      typeName: 'Post',
+      index: { name: 'by_author_twice', fields: ['author', 'author'] },
+    });
+    expect('error' in duplicateField && duplicateField.error).toContain(
+      'field "author" appears more than once',
+    );
   });
 
   // remove_index
@@ -486,6 +664,16 @@ describe('apply', () => {
       patch: { fields: ['author'] },
     });
     expect('error' in missing).toBe(true);
+
+    const duplicateField = apply(base, {
+      kind: 'update_index',
+      typeName: 'Post',
+      name: 'by_author',
+      patch: { fields: ['author', 'author'] },
+    });
+    expect('error' in duplicateField && duplicateField.error).toContain(
+      'field "author" appears more than once',
+    );
   });
 
   // 13. replace_schema — structural pre-flight

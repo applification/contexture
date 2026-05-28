@@ -92,6 +92,13 @@ When reviewing a plan, branch, feature, bug fix, or refactor:
 - If the plan relies on many new concepts, ask whether the domain language should be updated in
   `CONTEXT.md` or whether the design can use existing terms.
 
+When browser access is needed to inspect rendered behavior or validate a feedback loop, use the
+Browser plugin / `browser:browser` skill. The Codex in-app browser is controlled through the
+Node REPL tool, not through a direct `browser.*` tool namespace. Load the Browser skill, import
+its `browser-client.mjs`, then select the `iab` browser with `agent.browsers.get("iab")`. Do
+not use `web.run` for in-app browser work; `web.run` is web lookup, not the Codex Desktop
+browser.
+
 Default response shape:
 1. Architectural read: the key forces and current shape.
 2. Findings or risks, ordered by impact, with evidence.

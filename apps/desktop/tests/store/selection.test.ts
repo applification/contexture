@@ -124,21 +124,41 @@ describe('useGraphSelectionStore', () => {
     const { result } = renderHook(() => useGraphSelectionStore());
     act(() => {
       result.current.click('A', 'replace');
-      result.current.selectEdge('e2');
+      result.current.selectEdge({
+        edgeId: 'e2',
+        data: {
+          relation: 'fieldRef',
+          sourceType: 'A',
+          sourceField: 'ref',
+          targetType: 'B',
+          crossBoundary: false,
+        },
+      });
     });
     expect(result.current.state.edgeId).toBe('e2');
+    expect(result.current.state.selectedEdge?.edgeId).toBe('e2');
   });
 
   it('clear() wipes node + edge selection and adjacency', () => {
     const { result } = renderHook(() => useGraphSelectionStore());
     act(() => {
       result.current.click('A', 'replace');
-      result.current.selectEdge('e1');
+      result.current.selectEdge({
+        edgeId: 'e1',
+        data: {
+          relation: 'fieldRef',
+          sourceType: 'A',
+          sourceField: 'ref',
+          targetType: 'B',
+          crossBoundary: false,
+        },
+      });
       result.current.clear();
     });
     expect(result.current.state.nodeIds.size).toBe(0);
     expect(result.current.state.primaryNodeId).toBeNull();
     expect(result.current.state.edgeId).toBeNull();
+    expect(result.current.state.selectedEdge).toBeNull();
     expect(result.current.state.adjacency.nodeIds.size).toBe(0);
   });
 });

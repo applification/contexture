@@ -50,6 +50,13 @@ describe('SchemaPanel', () => {
     expect(code.textContent).toContain('export const Foo = z.object({})');
   });
 
+  it('labels generated previews as read-only output', () => {
+    render(<SchemaPanel {...DEFAULT_PROPS} convexSource="export default {};\n" />);
+    expect(screen.getByTestId('schema-output-boundary')).toHaveTextContent(
+      'Read-only generated output',
+    );
+  });
+
   it('invokes onCopy with the zod source when Copy is clicked on the Zod tab', () => {
     const source = '// code\nexport const A = 1;\n';
     const onCopy = vi.fn();
