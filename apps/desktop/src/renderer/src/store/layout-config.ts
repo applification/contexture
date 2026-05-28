@@ -15,7 +15,7 @@ export interface GraphLayout {
 
 export const DEFAULT_LAYOUT: GraphLayout = {
   nodeSpacing: 180,
-  showEnums: true,
+  showEnums: false,
   showEdgeLabels: true,
 };
 

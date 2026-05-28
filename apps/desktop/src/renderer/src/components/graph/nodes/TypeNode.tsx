@@ -21,11 +21,11 @@
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
 import { Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useGraphSelectionStore } from '../../../store/selection';
-import type { TypeNodeData } from '../schema-to-graph';
+import type { EnumTargetRow, TypeNodeData } from '../schema-to-graph';
 
 export interface FieldSelection {
   typeName: string;
@@ -33,6 +33,14 @@ export interface FieldSelection {
 }
 
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
+export const TYPE_NODE_REF_PREVIEW_EVENT = 'contexture:field-ref-preview' as const;
+
+export interface FieldRefPreview {
+  sourceType: string;
+  sourceField: string;
+  targetType: string;
+  active: boolean;
+}
 
 type TypeNodeKind = Node<TypeNodeData, 'type'>;
 
@@ -57,9 +65,13 @@ function headerColorFor(kind: TypeNodeData['kind']): string {
 }
 
 const enumValueBadgeStyle: CSSProperties = {
-  background: 'color-mix(in oklch, var(--chart-1) 78%, var(--background))',
-  borderColor: 'color-mix(in oklch, var(--chart-1) 88%, transparent)',
-  color: 'var(--primary-foreground)',
+  background: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+  borderColor: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+  color: 'var(--graph-node-header-text)',
+};
+
+const enumHoverCardStyle: CSSProperties = {
+  borderTop: '2px solid color-mix(in oklch, var(--chart-3) 85%, transparent)',
 };
 
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
@@ -70,24 +82,60 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
 
   const isSelected = primaryNodeId === id;
   const isAdjacent = !isSelected && adjacentNodeIds.has(id);
-  const isDimmed = primaryNodeId !== null && !isSelected && !isAdjacent;
+  const isPreviewPrimary = data.previewRole === 'primary' && !isSelected;
+  const isPreviewAdjacent = data.previewRole === 'adjacent' && !isSelected && !isAdjacent;
+  const isDimmed =
+    (primaryNodeId !== null &&
+      !isSelected &&
+      !isAdjacent &&
+      !isPreviewPrimary &&
+      !isPreviewAdjacent) ||
+    (data.previewDimmed === true && !isSelected && !isPreviewPrimary && !isPreviewAdjacent);
   const isSyncHighlighted = data.syncHighlighted === true && !isSelected && !isAdjacent;
 
   const onFieldClick = useCallback(
-    (fieldName: string, ev: React.MouseEvent<HTMLElement>) => {
+    (field: TypeNodeData['fields'][number], ev: React.MouseEvent<HTMLElement>) => {
       ev.stopPropagation();
+      if (field.refTarget && !field.enumTarget) {
+        click(field.refTarget, 'replace');
+        return;
+      }
       click(data.typeName, 'replace');
-      const detail: FieldSelection = { typeName: data.typeName, fieldName };
+      const detail: FieldSelection = { typeName: data.typeName, fieldName: field.name };
       ev.currentTarget.dispatchEvent(new CustomEvent(TYPE_NODE_EVENT, { bubbles: true, detail }));
     },
     [data.typeName, click],
+  );
+
+  const onRefPreview = useCallback(
+    (
+      field: TypeNodeData['fields'][number],
+      active: boolean,
+      ev: React.SyntheticEvent<HTMLElement>,
+    ) => {
+      if (!field.refTarget || field.enumTarget) return;
+      const detail: FieldRefPreview = {
+        sourceType: data.typeName,
+        sourceField: field.name,
+        targetType: field.refTarget,
+        active,
+      };
+      ev.currentTarget.dispatchEvent(
+        new CustomEvent(TYPE_NODE_REF_PREVIEW_EVENT, { bubbles: true, detail }),
+      );
+    },
+    [data.typeName],
   );
 
   const borderColor = isSelected
     ? 'var(--graph-node-selected)'
     : isAdjacent
       ? 'var(--graph-node-adjacent)'
-      : 'var(--graph-node-border)';
+      : isPreviewPrimary
+        ? 'var(--graph-node-selected)'
+        : isPreviewAdjacent
+          ? 'var(--graph-node-adjacent)'
+          : 'var(--graph-node-border)';
   const borderWidth = isSelected || isAdjacent ? 2 : 1;
   const borderStyle = data.imported ? 'dashed' : 'solid';
   const headerColor = useMemo(
@@ -115,7 +163,8 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         borderStyle,
         borderColor,
         boxShadow: '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)',
-        background: isSelected ? 'var(--graph-node-selected-bg)' : 'transparent',
+        background:
+          isSelected || isPreviewPrimary ? 'var(--graph-node-selected-bg)' : 'transparent',
         outline: isSyncHighlighted
           ? '2px solid color-mix(in oklch, var(--chart-2) 78%, var(--background))'
           : undefined,
@@ -187,36 +236,9 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           {data.typeName}
         </span>
         {data.table ? (
-          <span
-            data-testid="type-node-table-badge"
-            title="Convex table"
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              padding: '1px 5px',
-              borderRadius: 3,
-              border:
-                '1px solid color-mix(in oklch, var(--graph-node-header-text) 28%, transparent)',
-              background: 'color-mix(in oklch, var(--graph-node-header-text) 14%, transparent)',
-              color: 'var(--graph-node-header-text)',
-              opacity: 0.86,
-            }}
-          >
-            table
-          </span>
+          <NodeKindLabel data-testid="type-node-table-label">table</NodeKindLabel>
         ) : (
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              opacity: 0.75,
-            }}
-          >
-            {data.kind === 'discriminatedUnion' ? 'union' : data.kind}
-          </span>
+          <NodeKindLabel>{data.kind === 'discriminatedUnion' ? 'union' : data.kind}</NodeKindLabel>
         )}
       </div>
 
@@ -232,7 +254,9 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
               key={f.name}
               field={f}
               selectedTarget={primaryNodeId}
+              searchFocused={data.focusedFieldName === f.name}
               onFieldClick={onFieldClick}
+              onRefPreview={onRefPreview}
             />
           ))}
         </div>
@@ -245,59 +269,123 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   return (
     <HoverCard openDelay={120} closeDelay={80}>
       <HoverCardTrigger asChild>{node}</HoverCardTrigger>
-      <HoverCardContent side="right" align="start" className="w-72 p-3 text-xs">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <div className="text-sm font-semibold text-foreground">{data.typeName}</div>
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Enum
-            </div>
-            {data.description && (
-              <p className="text-xs leading-snug text-muted-foreground">{data.description}</p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Values
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(data.enumValues ?? []).map((value) => (
-                <Badge
-                  key={value.value}
-                  data-testid="enum-value-badge"
-                  variant="default"
-                  title={value.description}
-                  className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
-                  style={enumValueBadgeStyle}
-                >
-                  <span className="truncate">{value.value}</span>
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </div>
+      <HoverCardContent
+        side="right"
+        align="start"
+        className="w-72 p-3 text-xs"
+        style={enumHoverCardStyle}
+      >
+        <EnumHoverCardContent
+          enumTarget={{
+            name: data.typeName,
+            description: data.description,
+            values: data.enumValues ?? [],
+          }}
+        />
       </HoverCardContent>
     </HoverCard>
   );
 });
 
+function NodeKindLabel({
+  children,
+  ...props
+}: React.PropsWithChildren<React.HTMLAttributes<HTMLSpanElement>>) {
+  return (
+    <span
+      {...props}
+      style={{
+        fontSize: 9,
+        fontWeight: 500,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        opacity: 0.75,
+        ...props.style,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function EnumHoverCardContent({ enumTarget }: { enumTarget: EnumTargetRow }) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <div className="text-sm font-semibold text-foreground">{enumTarget.name}</div>
+        <div
+          className="text-[10px] font-medium uppercase tracking-wide"
+          style={{ color: 'color-mix(in oklch, var(--chart-3) 85%, transparent)' }}
+        >
+          Enum
+        </div>
+        {enumTarget.description && (
+          <p className="text-xs leading-snug text-muted-foreground">{enumTarget.description}</p>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Values
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {enumTarget.values.map((value) => (
+            <Badge
+              key={value.value}
+              data-testid="enum-value-badge"
+              variant="default"
+              title={value.description}
+              className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
+              style={enumValueBadgeStyle}
+            >
+              <span className="truncate">{value.value}</span>
+            </Badge>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FieldRowButton({
   field,
   selectedTarget,
+  searchFocused,
   onFieldClick,
+  onRefPreview,
 }: {
   field: TypeNodeData['fields'][number];
   selectedTarget: string | null;
-  onFieldClick: (fieldName: string, ev: React.MouseEvent<HTMLElement>) => void;
+  searchFocused: boolean;
+  onFieldClick: (field: TypeNodeData['fields'][number], ev: React.MouseEvent<HTMLElement>) => void;
+  onRefPreview: (
+    field: TypeNodeData['fields'][number],
+    active: boolean,
+    ev: React.SyntheticEvent<HTMLElement>,
+  ) => void;
 }) {
   const refTargetSelected = field.refTarget !== undefined && field.refTarget === selectedTarget;
-  return (
+  const [enumCardOpen, setEnumCardOpen] = useState(false);
+  const enumSummary = field.enumTarget ? `${field.summary.replace(/^→\s*/, '')} enum` : undefined;
+  const isUnionRef = field.refTargetKind === 'discriminatedUnion';
+  const button = (
     <button
       type="button"
       data-testid="type-node-field"
       data-field-name={field.name}
-      onClick={(ev) => onFieldClick(field.name, ev)}
-      className="contexture-type-node-field"
+      onClick={(ev) => onFieldClick(field, ev)}
+      onFocus={field.enumTarget ? () => setEnumCardOpen(true) : undefined}
+      onBlur={field.enumTarget ? () => setEnumCardOpen(false) : undefined}
+      onMouseEnter={(ev) => onRefPreview(field, true, ev)}
+      onMouseLeave={(ev) => onRefPreview(field, false, ev)}
+      onFocusCapture={(ev) => onRefPreview(field, true, ev)}
+      onBlurCapture={(ev) => onRefPreview(field, false, ev)}
+      aria-label={
+        field.enumTarget
+          ? `${field.name}, ${field.enumTarget.name} enum, ${field.enumTarget.values.length} values`
+          : undefined
+      }
+      data-search-focused={searchFocused ? 'true' : 'false'}
+      className="contexture-type-node-field hover:bg-accent/35 focus-visible:bg-accent/45 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -306,10 +394,13 @@ function FieldRowButton({
         fontSize: 10,
         gap: 8,
         width: '100%',
-        background: 'transparent',
         border: 'none',
         cursor: 'pointer',
         textAlign: 'left',
+        background: searchFocused ? 'var(--graph-node-selected-bg)' : undefined,
+        boxShadow: searchFocused
+          ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 0 0 1px color-mix(in oklch, var(--graph-node-selected) 34%, transparent)'
+          : undefined,
       }}
     >
       <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>
@@ -318,23 +409,77 @@ function FieldRowButton({
         {field.nullable ? ' | null' : ''}
       </span>
       <span
-        data-testid={field.refTarget ? 'type-node-field-ref-summary' : undefined}
+        data-testid={
+          field.enumTarget
+            ? 'type-node-field-enum-summary'
+            : field.refTarget
+              ? 'type-node-field-ref-summary'
+              : undefined
+        }
         style={{
           color: refTargetSelected
             ? 'var(--graph-node-selected)'
+            : field.enumTarget
+              ? 'var(--muted-foreground)'
+              : field.refTarget
+                ? 'var(--graph-edge-property)'
+                : 'var(--muted-foreground)',
+          fontFamily: field.enumTarget
+            ? 'var(--font-mono)'
             : field.refTarget
-              ? 'var(--graph-edge-property)'
-              : 'var(--muted-foreground)',
-          fontFamily: field.refTarget ? 'inherit' : 'var(--font-mono)',
+              ? 'inherit'
+              : 'var(--font-mono)',
           fontSize: 9,
           fontWeight: refTargetSelected ? 700 : 400,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
+          minWidth: 0,
         }}
       >
-        {field.summary}
+        {field.enumTarget ? (
+          <span
+            data-testid="type-node-field-enum-affordance"
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {enumSummary}
+          </span>
+        ) : isUnionRef ? (
+          <span
+            data-testid="type-node-field-union-affordance"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'baseline',
+              maxWidth: '100%',
+              minWidth: 0,
+              gap: 3,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {field.summary}
+            </span>
+            <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>· union</span>
+          </span>
+        ) : (
+          field.summary
+        )}
       </span>
     </button>
+  );
+
+  if (!field.enumTarget) return button;
+
+  return (
+    <HoverCard open={enumCardOpen} onOpenChange={setEnumCardOpen} openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{button}</HoverCardTrigger>
+      <HoverCardContent
+        side="right"
+        align="start"
+        className="w-72 p-3 text-xs"
+        style={enumHoverCardStyle}
+      >
+        <EnumHoverCardContent enumTarget={field.enumTarget} />
+      </HoverCardContent>
+    </HoverCard>
   );
 }

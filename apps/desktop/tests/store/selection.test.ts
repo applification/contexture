@@ -104,16 +104,20 @@ describe('useGraphSelectionStore', () => {
     expect(result.current.state.adjacency.edgeIds.size).toBe(0);
   });
 
-  it('focus(X) sets focusNodeId; focus(null-eq) is a no-op reset via setFocus', () => {
+  it('focus(X) sets focusTarget; consumeFocus resets it', () => {
     const { result } = renderHook(() => useGraphSelectionStore());
     act(() => {
       result.current.focus('A');
     });
-    expect(result.current.state.focusNodeId).toBe('A');
+    expect(result.current.state.focusTarget).toEqual({ nodeId: 'A' });
+    act(() => {
+      result.current.focus({ nodeId: 'B', fieldName: 'kind' });
+    });
+    expect(result.current.state.focusTarget).toEqual({ nodeId: 'B', fieldName: 'kind' });
     act(() => {
       result.current.consumeFocus();
     });
-    expect(result.current.state.focusNodeId).toBeNull();
+    expect(result.current.state.focusTarget).toBeNull();
   });
 
   it('selectEdge() clears node selection and sets edgeId', () => {

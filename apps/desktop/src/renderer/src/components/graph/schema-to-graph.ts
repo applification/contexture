@@ -41,6 +41,9 @@ export interface TypeNodeData extends Record<string, unknown> {
   fields: ReadonlyArray<FieldRow>;
   imported: boolean;
   syncHighlighted?: boolean;
+  focusedFieldName?: string;
+  previewRole?: 'primary' | 'adjacent';
+  previewDimmed?: boolean;
   /** True when the source `ObjectTypeDef` carries `table: true`. */
   table?: boolean;
 }
@@ -60,6 +63,15 @@ export interface FieldRow {
    * element, is a `ref`). Used to draw `RefEdge`s.
    */
   refTarget?: string;
+  refTargetKind?: TypeDef['kind'];
+  /** Local enum metadata when this field references an enum TypeDef. */
+  enumTarget?: EnumTargetRow;
+}
+
+export interface EnumTargetRow {
+  name: string;
+  description?: string;
+  values: ReadonlyArray<EnumValueRow>;
 }
 
 export interface RefEdgeData extends Record<string, unknown> {
@@ -70,6 +82,8 @@ export interface RefEdgeData extends Record<string, unknown> {
   discriminator?: string;
   /** True when the target is an imported (out-of-file) type. */
   crossBoundary: boolean;
+  previewHighlighted?: boolean;
+  previewDimmed?: boolean;
 }
 
 export interface BuildGraphInput {
@@ -86,10 +100,11 @@ const DEFAULT_POSITION = { x: 0, y: 0 };
 
 export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphResult {
   const localNames = new Set(schema.types.map((t) => t.name));
+  const localTypes = new Map(schema.types.map((type) => [type.name, type]));
   const tableTypes = schema.types.filter(isTableType);
 
   const nodes: Node<TypeNodeData>[] = schema.types.map((t) =>
-    localNodeFor(t, positions?.[t.name] ?? DEFAULT_POSITION),
+    localNodeFor(t, positions?.[t.name] ?? DEFAULT_POSITION, localTypes),
   );
 
   // Collect edges + shadow nodes for targets that point outside the local
@@ -173,7 +188,11 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
   return { nodes, edges };
 }
 
-function localNodeFor(type: TypeDef, position: { x: number; y: number }): Node<TypeNodeData> {
+function localNodeFor(
+  type: TypeDef,
+  position: { x: number; y: number },
+  localTypes: ReadonlyMap<string, TypeDef>,
+): Node<TypeNodeData> {
   return {
     id: type.name,
     type: 'type',
@@ -183,7 +202,7 @@ function localNodeFor(type: TypeDef, position: { x: number; y: number }): Node<T
       kind: type.kind,
       description: type.description,
       enumValues: type.kind === 'enum' ? type.values.map(enumValueRow) : undefined,
-      fields: type.kind === 'object' ? type.fields.map(fieldRow) : [],
+      fields: type.kind === 'object' ? type.fields.map((field) => fieldRow(field, localTypes)) : [],
       imported: false,
       table: type.kind === 'object' && type.table === true ? true : undefined,
     },
@@ -248,14 +267,24 @@ function enumValueRow(value: { value: string; description?: string }): EnumValue
   };
 }
 
-function fieldRow(field: FieldDef): FieldRow {
+function fieldRow(field: FieldDef, localTypes: ReadonlyMap<string, TypeDef>): FieldRow {
   const target = unwrapRefTarget(field.type);
+  const refTargetType = target ? localTypes.get(target) : undefined;
+  const enumTarget = refTargetType?.kind === 'enum' ? refTargetType : undefined;
   return {
     name: field.name,
     summary: summariseFieldType(field.type),
     optional: field.optional === true,
     nullable: field.nullable === true,
     refTarget: target,
+    refTargetKind: refTargetType?.kind,
+    enumTarget: enumTarget
+      ? {
+          name: enumTarget.name,
+          description: enumTarget.description,
+          values: enumTarget.values.map(enumValueRow),
+        }
+      : undefined,
   };
 }
 

@@ -53,6 +53,71 @@ describe('buildGraph', () => {
     });
   });
 
+  it('passes local enum metadata into referring object field rows', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          fields: [{ name: 'season', type: { kind: 'ref', typeName: 'Season' } }],
+        },
+        {
+          kind: 'enum',
+          name: 'Season',
+          description: 'The growing season.',
+          values: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+        },
+      ],
+    };
+
+    const { nodes } = buildGraph({ schema });
+    const recipe = nodes.find((node) => node.id === 'Recipe');
+
+    expect(recipe?.data.fields[0]).toMatchObject({
+      name: 'season',
+      summary: '→ Season',
+      refTarget: 'Season',
+      refTargetKind: 'enum',
+      enumTarget: {
+        name: 'Season',
+        description: 'The growing season.',
+        values: [{ value: 'spring', description: 'Planting time.' }, { value: 'summer' }],
+      },
+    });
+  });
+
+  it('passes local ref target kind into object field rows', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Artwork',
+          fields: [
+            { name: 'dimensions', type: { kind: 'ref', typeName: 'ArtworkDimensions' } },
+            { name: 'source', type: { kind: 'ref', typeName: 'ArtworkSourceReference' } },
+          ],
+        },
+        { kind: 'object', name: 'ArtworkDimensions', fields: [] },
+        {
+          kind: 'discriminatedUnion',
+          name: 'ArtworkSourceReference',
+          discriminator: 'kind',
+          variants: ['PosterReference'],
+        },
+      ],
+    };
+
+    const { nodes } = buildGraph({ schema });
+    const artwork = nodes.find((node) => node.id === 'Artwork');
+
+    expect(artwork?.data.fields).toEqual([
+      expect.objectContaining({ name: 'dimensions', refTargetKind: 'object' }),
+      expect.objectContaining({ name: 'source', refTargetKind: 'discriminatedUnion' }),
+    ]);
+  });
+
   it('renders object fields as field rows with summaries', () => {
     const schema: Schema = {
       version: '1',

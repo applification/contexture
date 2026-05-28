@@ -2,8 +2,8 @@
  * Graph controls popover — view filters + node-spacing slider +
  * re-layout / fit / reset.
  *
- * Keeps the first graph filters deliberately narrow: enums and edge
- * labels are useful, but can add noise in structure-first reading.
+ * Keeps the first graph filters deliberately narrow: expanded enum nodes
+ * and edge labels are useful, but can add noise in structure-first reading.
  *
  * The panel talks to the canvas over two custom DOM events:
  *
@@ -87,7 +87,7 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
             checked={graphLayout.showEnums}
             onCheckedChange={(checked) => setGraphLayout({ showEnums: checked === true })}
           />
-          Enums
+          Show enum nodes
         </label>
         <label
           className="flex items-center gap-2 text-xs text-foreground"

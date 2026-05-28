@@ -5,10 +5,10 @@
  * stays out of the way; expanded view names every visual affordance
  * the canvas uses so new users can decode the diagram at a glance.
  *
- * Matches the four `TypeDef` kinds (object / enum / discriminatedUnion
- * / raw), table subtype marker, and the edge modes (field ref, inferred
- * table id, union variant, cross-boundary import). Colours are pulled
- * from `globals.css` so theme changes flow through without edits here.
+ * Matches the `TypeDef` kinds, inline enum marker, table subtype marker,
+ * and the edge modes (field ref, inferred table id, union variant,
+ * cross-boundary import). Colours are pulled from `globals.css` so theme
+ * changes flow through without edits here.
  */
 import { ChevronDown, ChevronUp, Table2 } from 'lucide-react';
 import { memo, useState } from 'react';
@@ -54,10 +54,6 @@ const NODE_ITEMS: readonly NodeItem[] = [
   { label: 'Object', header: 'var(--graph-node-header-bg)' },
   { label: 'Table', header: 'var(--graph-node-table-header-bg)', table: true },
   {
-    label: 'Enum',
-    header: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
-  },
-  {
     label: 'Discriminated union',
     header: 'color-mix(in oklch, var(--chart-4) 85%, transparent)',
   },
@@ -76,8 +72,22 @@ const NODE_ITEMS: readonly NodeItem[] = [
   },
 ];
 
-export const GraphLegend = memo(function GraphLegend() {
+export const GraphLegend = memo(function GraphLegend({
+  showEnumNodes = false,
+}: {
+  showEnumNodes?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const nodeItems = showEnumNodes
+    ? [
+        ...NODE_ITEMS.slice(0, 2),
+        {
+          label: 'Enum',
+          header: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
+        },
+        ...NODE_ITEMS.slice(2),
+      ]
+    : NODE_ITEMS;
 
   return (
     <div
@@ -119,8 +129,41 @@ export const GraphLegend = memo(function GraphLegend() {
           </div>
 
           <div className="space-y-1">
+            <span className="text-[9px] text-muted-foreground font-medium uppercase">Fields</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px]" style={{ color: 'var(--graph-edge-property)' }}>
+                → Reference
+              </span>
+              <span className="text-foreground">Object ref</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex min-w-0 items-baseline gap-0.5 text-[9px]"
+                style={{ color: 'var(--graph-edge-property)' }}
+              >
+                <span>→ Source</span>
+                <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>· union</span>
+              </span>
+              <span className="text-foreground">Union ref</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="text-[9px]"
+                style={{
+                  color: 'var(--muted-foreground)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                Status enum
+              </span>
+              <span className="text-foreground">Inline enum</span>
+            </div>
+          </div>
+
+          <div className="space-y-1">
             <span className="text-[9px] text-muted-foreground font-medium uppercase">Nodes</span>
-            {NODE_ITEMS.map((item) => (
+            {nodeItems.map((item) => (
               <div key={item.label} className="flex items-center gap-2">
                 <div
                   aria-hidden="true"

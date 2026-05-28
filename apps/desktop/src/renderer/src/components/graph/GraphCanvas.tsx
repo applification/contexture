@@ -39,7 +39,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useELKLayout } from '../../hooks/useELKLayout';
 import { useGraphLayoutStore } from '../../store/layout-config';
 import type { Op } from '../../store/ops';
-import { clickModeFromEvent, useGraphSelectionStore } from '../../store/selection';
+import {
+  clickModeFromEvent,
+  type GraphFocusTarget,
+  useGraphSelectionStore,
+} from '../../store/selection';
 import { useUIChromeStore } from '../../store/ui-chrome';
 import { useUndoStore } from '../../store/undo';
 import { RefEdge } from './edges/RefEdge';
@@ -53,7 +57,7 @@ import {
   type KeyEvent as InteractionKeyEvent,
 } from './interactions';
 import { GroupNode } from './nodes/GroupNode';
-import { TypeNode } from './nodes/TypeNode';
+import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT, TypeNode } from './nodes/TypeNode';
 import { type BuildGraphResult, buildGraph, type RefEdgeData } from './schema-to-graph';
 
 export interface CanvasPosition {
@@ -69,6 +73,13 @@ export interface GraphCanvasProps {
 
 const NODE_TYPES = { type: TypeNode, group: GroupNode } as const;
 const EDGE_TYPES = { ref: RefEdge } as const;
+
+type RefPreview = Omit<FieldRefPreview, 'active'>;
+type FocusedField = { nodeId: string; fieldName: string };
+
+export function focusedFieldFromTarget(target: GraphFocusTarget): FocusedField | null {
+  return target.fieldName ? { nodeId: target.nodeId, fieldName: target.fieldName } : null;
+}
 
 export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
   return (
@@ -94,7 +105,7 @@ function GraphCanvasInner({
   const clearNodes = useGraphSelectionStore((s) => s.clearNodes);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
-  const focusNodeId = useGraphSelectionStore((s) => s.state.focusNodeId);
+  const focusTarget = useGraphSelectionStore((s) => s.state.focusTarget);
   const consumeFocus = useGraphSelectionStore((s) => s.consumeFocus);
   const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
   const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
@@ -114,10 +125,52 @@ function GraphCanvasInner({
 
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const showEnums = graphLayout.showEnums;
-  const { nodes: visibleBuiltNodes, edges: visibleBuiltEdges } = useMemo(
-    () => filterGraphView({ nodes: builtNodes, edges: builtEdges }, { showEnums }),
-    [builtNodes, builtEdges, showEnums],
+  const [refPreview, setRefPreview] = useState<RefPreview | null>(null);
+  const refPreviewClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [focusedField, setFocusedField] = useState<{ nodeId: string; fieldName: string } | null>(
+    null,
   );
+  const focusedFieldClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { nodes: visibleBuiltNodes, edges: visibleBuiltEdges } = useMemo(() => {
+    const visible = filterGraphView({ nodes: builtNodes, edges: builtEdges }, { showEnums });
+    const visibleWithFocusedField = focusedField
+      ? {
+          ...visible,
+          nodes: visible.nodes.map((node) =>
+            node.id === focusedField.nodeId
+              ? { ...node, data: { ...node.data, focusedFieldName: focusedField.fieldName } }
+              : node,
+          ),
+        }
+      : visible;
+    if (!refPreview) return visibleWithFocusedField;
+    const previewNodeIds = new Set<string>([refPreview.targetType]);
+    const previewEdgeIds = new Set<string>();
+    for (const edge of visible.edges) {
+      if (edge.source !== refPreview.targetType && edge.target !== refPreview.targetType) continue;
+      previewEdgeIds.add(edge.id);
+      previewNodeIds.add(edge.source);
+      previewNodeIds.add(edge.target);
+    }
+    return {
+      nodes: visibleWithFocusedField.nodes.map((node) =>
+        previewNodeIds.has(node.id)
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                previewRole: node.id === refPreview.targetType ? 'primary' : 'adjacent',
+              },
+            }
+          : { ...node, data: { ...node.data, previewDimmed: true } },
+      ),
+      edges: visibleWithFocusedField.edges.map((edge) => {
+        return previewEdgeIds.has(edge.id)
+          ? { ...edge, data: { ...edge.data, previewHighlighted: true } }
+          : { ...edge, data: { ...edge.data, previewDimmed: true } };
+      }),
+    };
+  }, [builtNodes, builtEdges, showEnums, refPreview, focusedField]);
 
   const [nodes, setNodes] = useState<Node[]>(visibleBuiltNodes);
   const [edges, setEdges] = useState<Edge[]>(visibleBuiltEdges);
@@ -237,12 +290,12 @@ function GraphCanvasInner({
     };
   }, [runLayoutNow, fitView]);
 
-  // Search → centre the matched node and select it. `focusNodeId` is
+  // Search → centre the matched node and select it. `focusTarget` is
   // the trigger; we consume the value so repeated picks of the same
   // name still re-centre.
   useEffect(() => {
-    if (!focusNodeId) return;
-    const node = nodesRef.current.find((n) => n.id === focusNodeId);
+    if (!focusTarget) return;
+    const node = nodesRef.current.find((n) => n.id === focusTarget.nodeId);
     if (!node) {
       consumeFocus();
       return;
@@ -252,9 +305,18 @@ function GraphCanvasInner({
     const cx = node.position.x + width / 2;
     const cy = node.position.y + height / 2;
     setCenter(cx, cy, { zoom: 1.1, duration: 400 });
-    click(focusNodeId, 'replace');
+    click(focusTarget.nodeId, 'replace');
+    const nextFocusedField = focusedFieldFromTarget(focusTarget);
+    if (focusedFieldClearTimer.current) {
+      clearTimeout(focusedFieldClearTimer.current);
+      focusedFieldClearTimer.current = null;
+    }
+    setFocusedField(nextFocusedField);
+    if (nextFocusedField) {
+      focusedFieldClearTimer.current = setTimeout(() => setFocusedField(null), 1600);
+    }
     consumeFocus();
-  }, [focusNodeId, setCenter, click, consumeFocus]);
+  }, [focusTarget, setCenter, click, consumeFocus]);
 
   // Register an adjacency resolver against the current edges so the
   // selection store's `click()` can compute dim-sets without reaching
@@ -357,6 +419,50 @@ function GraphCanvasInner({
     return () => el.removeEventListener('keydown', handler);
   }, [dispatch, undo, redo, selectedNodeId]);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (ev: Event): void => {
+      const detail = (ev as CustomEvent<FieldRefPreview>).detail;
+      if (refPreviewClearTimer.current) {
+        clearTimeout(refPreviewClearTimer.current);
+        refPreviewClearTimer.current = null;
+      }
+      if (detail.active) {
+        setRefPreview((prev) => {
+          if (
+            prev?.sourceType === detail.sourceType &&
+            prev.sourceField === detail.sourceField &&
+            prev.targetType === detail.targetType
+          ) {
+            return prev;
+          }
+          return {
+            sourceType: detail.sourceType,
+            sourceField: detail.sourceField,
+            targetType: detail.targetType,
+          };
+        });
+        return;
+      }
+      refPreviewClearTimer.current = setTimeout(() => {
+        setRefPreview((prev) =>
+          prev?.sourceType === detail.sourceType &&
+          prev.sourceField === detail.sourceField &&
+          prev.targetType === detail.targetType
+            ? null
+            : prev,
+        );
+      }, 80);
+    };
+    el.addEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
+    return () => {
+      if (refPreviewClearTimer.current) clearTimeout(refPreviewClearTimer.current);
+      if (focusedFieldClearTimer.current) clearTimeout(focusedFieldClearTimer.current);
+      el.removeEventListener(TYPE_NODE_REF_PREVIEW_EVENT, handler);
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -389,7 +495,7 @@ function GraphCanvasInner({
             pattern reads as texture not noise on both light and dark. */}
         <Background gap={28} size={0.8} color="var(--graph-dot)" />
         <Controls showInteractive={false} />
-        <GraphLegend />
+        <GraphLegend showEnumNodes={showEnums} />
       </ReactFlow>
     </div>
   );

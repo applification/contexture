@@ -56,22 +56,26 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const isUnionVariant = data?.relation === 'unionVariant';
   const isTableId = data?.relation === 'tableId';
   const isAdjacent = adjacentEdgeIds.has(id);
+  const isPreviewHighlighted = data?.previewHighlighted === true;
+  const isPreviewDimmed = data?.previewDimmed === true;
   // Dim edges that touch neither the selected node nor an adjacent one.
   const isDimmed =
-    selectedNodeId !== null &&
-    !isAdjacent &&
-    source !== selectedNodeId &&
-    target !== selectedNodeId;
+    (selectedNodeId !== null &&
+      !isAdjacent &&
+      !isPreviewHighlighted &&
+      source !== selectedNodeId &&
+      target !== selectedNodeId) ||
+    isPreviewDimmed;
 
   const stroke =
-    selected || isAdjacent
+    selected || isAdjacent || isPreviewHighlighted
       ? 'var(--graph-node-selected)'
       : isUnionVariant
         ? 'var(--graph-edge-union, var(--chart-4))'
         : crossBoundary
           ? 'var(--graph-edge-import, var(--muted-foreground))'
           : 'var(--graph-edge-ref, var(--graph-edge-property))';
-  const strokeWidth = selected || isAdjacent ? 2 : 1.25;
+  const strokeWidth = selected || isAdjacent || isPreviewHighlighted ? 2 : 1.25;
   const strokeDasharray = isUnionVariant ? '2 4' : isTableId || crossBoundary ? '6 4' : undefined;
   const label = isUnionVariant ? 'variant' : data?.sourceField;
 
@@ -84,7 +88,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
           stroke,
           strokeWidth,
           strokeDasharray,
-          opacity: isDimmed ? 0.2 : 1,
+          opacity: isDimmed ? 0.2 : isPreviewHighlighted ? 0.95 : 1,
           transition: 'opacity 0.15s ease, stroke 0.1s ease',
           fill: 'none',
         }}
@@ -103,7 +107,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
               fontSize: 9,
               fontFamily: 'var(--font-mono, monospace)',
               pointerEvents: 'none',
-              opacity: isDimmed ? 0.2 : 0.85,
+              opacity: isDimmed ? 0.2 : isPreviewHighlighted ? 1 : 0.85,
               whiteSpace: 'nowrap',
             }}
             data-testid="ref-edge"
