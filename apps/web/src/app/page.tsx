@@ -171,28 +171,254 @@ const trustedLoopSteps = [
   },
 ];
 
+type SyntaxKind =
+  | 'function'
+  | 'identifier'
+  | 'keyword'
+  | 'module'
+  | 'plain'
+  | 'property'
+  | 'punctuation'
+  | 'string';
+
+type SyntaxPart = {
+  kind?: SyntaxKind;
+  key: string;
+  text: string;
+};
+
+type ConvexPreviewLine = {
+  id: string;
+  parts: SyntaxPart[];
+};
+
+let syntaxPartId = 0;
+
+function token(text: string, kind: SyntaxKind = 'plain'): SyntaxPart {
+  syntaxPartId += 1;
+  return { key: `${kind}-${syntaxPartId}`, text, kind };
+}
+
 const convexPreviewLines = [
-  { id: 'server-import', text: 'import { defineSchema, defineTable } from "convex/server";' },
-  { id: 'values-import', text: 'import { v } from "convex/values";' },
-  { id: 'spacer-imports', text: '' },
-  { id: 'schema-open', text: 'export default defineSchema({' },
-  { id: 'users-open', text: '  users: defineTable({' },
-  { id: 'users-name', text: '    name: v.string(),' },
-  { id: 'users-email', text: '    email: v.string(),' },
-  { id: 'users-index', text: '  }).index("by_email", ["email"]),' },
-  { id: 'teams-open', text: '  teams: defineTable({' },
-  { id: 'teams-slug', text: '    slug: v.string(),' },
-  { id: 'teams-name', text: '    name: v.string(),' },
-  { id: 'teams-index', text: '  }).index("by_slug", ["slug"]),' },
-  { id: 'memberships-open', text: '  memberships: defineTable({' },
-  { id: 'memberships-user', text: '    userId: v.id("users"),' },
-  { id: 'memberships-team', text: '    teamId: v.id("teams"),' },
-  { id: 'memberships-role', text: '    role: v.union(v.literal("owner"), v.literal("member")),' },
-  { id: 'memberships-close', text: '  })' },
-  { id: 'memberships-user-index', text: '    .index("by_user", ["userId"])' },
-  { id: 'memberships-team-index', text: '    .index("by_team", ["teamId"]),' },
-  { id: 'schema-close', text: '});' },
-];
+  {
+    id: 'server-import',
+    parts: [
+      token('import', 'keyword'),
+      token(' { ', 'punctuation'),
+      token('defineSchema', 'function'),
+      token(', ', 'punctuation'),
+      token('defineTable', 'function'),
+      token(' } ', 'punctuation'),
+      token('from', 'keyword'),
+      token(' ', 'plain'),
+      token('"convex/server"', 'module'),
+      token(';', 'punctuation'),
+    ],
+  },
+  {
+    id: 'values-import',
+    parts: [
+      token('import', 'keyword'),
+      token(' { ', 'punctuation'),
+      token('v', 'identifier'),
+      token(' } ', 'punctuation'),
+      token('from', 'keyword'),
+      token(' ', 'plain'),
+      token('"convex/values"', 'module'),
+      token(';', 'punctuation'),
+    ],
+  },
+  { id: 'spacer-imports', parts: [token(' ')] },
+  {
+    id: 'schema-open',
+    parts: [
+      token('export default', 'keyword'),
+      token(' ', 'plain'),
+      token('defineSchema', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-open',
+    parts: [
+      token('  '),
+      token('users', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-name',
+    parts: [
+      token('    '),
+      token('name', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-email',
+    parts: [
+      token('    '),
+      token('email', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-index',
+    parts: [
+      token('  }).', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_email"', 'string'),
+      token(', ', 'punctuation'),
+      token('["email"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-open',
+    parts: [
+      token('  '),
+      token('teams', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-slug',
+    parts: [
+      token('    '),
+      token('slug', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-name',
+    parts: [
+      token('    '),
+      token('name', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-index',
+    parts: [
+      token('  }).', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_slug"', 'string'),
+      token(', ', 'punctuation'),
+      token('["slug"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-open',
+    parts: [
+      token('  '),
+      token('memberships', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-user',
+    parts: [
+      token('    '),
+      token('userId', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('id', 'function'),
+      token('(', 'punctuation'),
+      token('"users"', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-team',
+    parts: [
+      token('    '),
+      token('teamId', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('id', 'function'),
+      token('(', 'punctuation'),
+      token('"teams"', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-role',
+    parts: [
+      token('    '),
+      token('role', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('union', 'function'),
+      token('(', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('literal', 'function'),
+      token('(', 'punctuation'),
+      token('"owner"', 'string'),
+      token('), ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('literal', 'function'),
+      token('(', 'punctuation'),
+      token('"member"', 'string'),
+      token(')),', 'punctuation'),
+    ],
+  },
+  { id: 'memberships-close', parts: [token('  })', 'punctuation')] },
+  {
+    id: 'memberships-user-index',
+    parts: [
+      token('    .', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_user"', 'string'),
+      token(', ', 'punctuation'),
+      token('["userId"]', 'string'),
+      token(')', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-team-index',
+    parts: [
+      token('    .', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_team"', 'string'),
+      token(', ', 'punctuation'),
+      token('["teamId"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  { id: 'schema-close', parts: [token('});', 'punctuation')] },
+] satisfies ConvexPreviewLine[];
 
 const highlightedConvexLineIds = new Set([
   'memberships-open',
@@ -229,7 +455,13 @@ function ConvexGeneratedPreview() {
               <span className="mr-4 select-none text-muted-foreground/40">
                 {String(index + 1).padStart(2, '0')}
               </span>
-              <span>{line.text || ' '}</span>
+              <span>
+                {line.parts.map((part) => (
+                  <span key={part.key} className={`syntax-token syntax-${part.kind ?? 'plain'}`}>
+                    {part.text}
+                  </span>
+                ))}
+              </span>
             </span>
           ))}
         </code>
@@ -253,77 +485,88 @@ function AgentTurnReviewDemo() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto rounded-xl border border-border/60 bg-card/40 overflow-hidden text-left screenshot-glow">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-md border border-border/70 bg-card/70 text-left text-xs shadow-sm screenshot-glow">
+      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
-            <Bot className="size-4" />
+          <div className="size-7 rounded-md bg-accent/10 text-accent flex items-center justify-center">
+            <Bot className="size-3.5" />
           </div>
-          <div>
-            <div className="text-sm font-semibold">Agent turn review</div>
-            <div className="text-xs text-muted-foreground">Constrained model operations</div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">Agent turn review</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              Codex · GPT-5.5 · committed
+            </div>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2.5 py-1 text-xs text-success">
+        <div className="hidden shrink-0 items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2 py-1 text-[11px] text-success sm:flex">
           <CircleDot className="size-3" />
           Drift clean
         </div>
       </div>
 
-      <div className="grid gap-4 px-4 py-5 sm:grid-cols-[1fr_1.1fr] sm:px-6 sm:py-6">
-        <div className="space-y-3">
-          <div className="rounded-lg border border-border/60 bg-background/60 px-4 py-3">
-            <p className="text-sm leading-relaxed text-foreground">
+      <div className="grid gap-3 px-3 py-3 sm:grid-cols-[0.95fr_1.05fr]">
+        <div className="space-y-2">
+          <div className="rounded-md border border-border/70 bg-background/60 px-3 py-2.5">
+            <p className="text-xs leading-5 text-foreground">
               Add a memberships table with refs to users and teams, emit the Convex files, and check
               drift.
             </p>
           </div>
-          <MotionList className="rounded-lg border border-border/60 bg-background/60 p-3">
+          <MotionList className="overflow-hidden rounded-md border border-border/70 bg-background/60">
             {agentSteps.map((step) => (
               <MotionItem
                 key={step.tool}
-                className="flex items-start gap-3 rounded-md px-2 py-2 text-sm"
+                className="flex items-start gap-2.5 border-b border-border/50 px-2.5 py-2 text-xs last:border-b-0"
               >
-                <div className="mt-0.5 size-5 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
+                <div className="mt-0.5 size-4 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
                   <Check className="size-3" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-mono text-xs text-primary dark:text-accent">{step.tool}</div>
-                  <div className="text-xs text-muted-foreground">{step.label}</div>
+                  <div className="font-mono text-[11px] leading-4 text-primary dark:text-accent">
+                    {step.tool}
+                  </div>
+                  <div className="text-[11px] leading-4 text-muted-foreground">{step.label}</div>
                 </div>
               </MotionItem>
             ))}
           </MotionList>
         </div>
 
-        <div className="rounded-lg border border-border/60 bg-background/70 p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-md border border-border/70 bg-background/70 p-2.5">
+          <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
             <div>
-              <div className="text-sm font-semibold">5 proposed model changes</div>
-              <div className="text-xs text-muted-foreground">3 applied, 1 rejected, 1 no-op</div>
+              <div className="font-semibold text-foreground">5 proposed model changes</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                  committed
+                </span>
+                <span>3 applied</span>
+                <span className="text-warning">1 rejected</span>
+                <span>1 no-op</span>
+              </div>
             </div>
             <MotionStatusBadge delay={0.45}>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-2.5 py-1.5 text-xs text-muted-foreground"
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
               >
-                <Undo2 className="size-3.5" />
+                <Undo2 className="size-3" />
                 Undo turn
               </button>
             </MotionStatusBadge>
           </div>
-          <MotionList className="space-y-2">
+          <MotionList className="overflow-hidden rounded-md border border-border/70">
             {reviewRows.map((row) => (
               <MotionItem
                 key={row.label}
-                className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-card/40 px-3 py-2 text-xs"
+                className="flex items-center justify-between gap-2 border-b border-border/50 bg-card/40 px-2.5 py-2 text-[11px] last:border-b-0"
               >
-                <span className="text-foreground">{row.label}</span>
+                <span className="min-w-0 truncate text-foreground">{row.label}</span>
                 <span
                   className={
                     row.status === 'applied'
-                      ? 'rounded border border-success/20 bg-success/10 px-1.5 py-0.5 uppercase tracking-wide text-success'
-                      : 'rounded border border-warning/25 bg-warning/10 px-1.5 py-0.5 uppercase tracking-wide text-warning'
+                      ? 'shrink-0 rounded border border-success/20 bg-success/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-success'
+                      : 'shrink-0 rounded border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warning'
                   }
                 >
                   {row.status}
@@ -331,7 +574,7 @@ function AgentTurnReviewDemo() {
               </MotionItem>
             ))}
           </MotionList>
-          <div className="mt-4 rounded-md border border-accent/20 bg-accent/5 px-3 py-2 text-xs text-muted-foreground">
+          <div className="mt-2.5 rounded-md border border-primary/15 bg-primary/5 px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
             Validation blocks unsafe ops before generated files are emitted.
           </div>
         </div>
@@ -406,7 +649,7 @@ function ReconcileDemo() {
           </div>
         </div>
         <MotionStatusBadge
-          className="rounded border border-warning/25 bg-warning/10 px-2 py-1 text-[10px] uppercase tracking-wide text-warning"
+          className="whitespace-nowrap rounded border border-warning/25 bg-warning/10 px-2 py-1 text-[10px] uppercase tracking-wide text-warning"
           delay={0.15}
         >
           Needs review
@@ -425,17 +668,17 @@ function ReconcileDemo() {
           </MotionItem>
         ))}
       </MotionList>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="mt-4 grid gap-2">
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
         >
           <RefreshCw className="size-4" />
           Regenerate from IR
         </button>
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm font-medium text-muted-foreground"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm font-medium text-muted-foreground"
         >
           <ListChecks className="size-4" />
           Apply selected ops

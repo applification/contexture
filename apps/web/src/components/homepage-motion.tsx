@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useReducedMotion, type Variants } from 'motion/react';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
 
@@ -78,8 +78,7 @@ export function MotionList({ children, className }: { children: ReactNode; class
     <motion.div
       className={className}
       initial={reducedMotion ? false : 'hidden'}
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.25 }}
+      animate="visible"
       variants={reducedMotion ? undefined : listVariants}
     >
       {children}
