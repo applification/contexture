@@ -42,6 +42,7 @@ export interface ReconcileOp {
   label: string;
   /** True when the op is destructive (delete, rename, type change). Renders a ⚠ badge. */
   lossy: boolean;
+  provenance: 'deterministic' | 'provider';
 }
 
 interface ReconcileState {
@@ -54,11 +55,16 @@ interface ReconcileState {
   targetPath: string | null;
   /** On-disk contents of the target file captured when the modal opened. */
   onDiskSource: string | null;
+  deterministicFallbackReason: string | null;
 
   open: (targetPath: string) => void;
   close: () => void;
   setLoading: () => void;
-  setReady: (ops: ReconcileOp[], onDiskSource: string) => void;
+  setReady: (
+    ops: ReconcileOp[],
+    onDiskSource: string,
+    options?: { deterministicFallbackReason?: string },
+  ) => void;
   setError: (message: string) => void;
   setApplying: () => void;
   toggleOp: (index: number) => void;
@@ -87,6 +93,7 @@ const INITIAL: Omit<
   error: null,
   targetPath: null,
   onDiskSource: null,
+  deterministicFallbackReason: null,
 };
 
 export const useReconcileStore = create<ReconcileState>((set, get) => ({
@@ -101,18 +108,20 @@ export const useReconcileStore = create<ReconcileState>((set, get) => ({
       error: null,
       targetPath,
       onDiskSource: null,
+      deterministicFallbackReason: null,
     }),
 
   close: () => set({ ...INITIAL }),
 
   setLoading: () => set({ status: 'loading', error: null }),
 
-  setReady: (ops, onDiskSource) =>
+  setReady: (ops, onDiskSource, options) =>
     set({
       status: 'ready',
       proposedOps: ops,
       selectedIndices: new Set(ops.map((_, i) => i)),
       onDiskSource,
+      deterministicFallbackReason: options?.deterministicFallbackReason ?? null,
       error: null,
     }),
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkGeneratedBundle,
+  classifyGeneratedBundleDrift,
   GeneratedBundleDriftError,
   type GeneratedBundleFs,
   type Schema,
@@ -188,5 +189,81 @@ describe('generated bundle writer', () => {
       status: 'drifted',
     });
     expect(checks.find((check) => check.path.endsWith('app.schema.ts'))?.status).toBe('clean');
+  });
+
+  it('classifies files that still match the manifest but not the current IR as stale', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+
+    const checks = await classifyGeneratedBundleDrift(
+      {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Post',
+            table: true,
+            fields: [{ name: 'title', type: { kind: 'string' } }],
+          },
+        ],
+      },
+      irPath,
+      fs,
+    );
+
+    expect(checks.find((check) => check.path.endsWith('convex/schema.ts'))).toMatchObject({
+      status: 'stale',
+      matchesManifest: true,
+      matchesCurrentIr: false,
+    });
+  });
+
+  it('classifies files that match the current IR but not the manifest as externally regenerated', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+    const oldManifest = fs.files.get('/proj/packages/contexture/.contexture/emitted.json');
+    expect(oldManifest).toBeDefined();
+
+    const nextSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    await writeGeneratedBundle({ irPath, schema: nextSchema, fs, driftPreflight: false });
+    await fs.writeFile('/proj/packages/contexture/.contexture/emitted.json', oldManifest ?? '');
+
+    const checks = await classifyGeneratedBundleDrift(nextSchema, irPath, fs);
+
+    expect(checks.find((check) => check.path.endsWith('convex/schema.ts'))).toMatchObject({
+      status: 'externally_regenerated',
+      matchesManifest: false,
+      matchesCurrentIr: true,
+    });
+  });
+
+  it('classifies missing and hand-modified generated files separately', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+    await fs.remove('/proj/packages/contexture/convex/validators.ts');
+    await fs.writeFile('/proj/packages/contexture/convex/schema.ts', '// hand edit\n');
+
+    const checks = await classifyGeneratedBundleDrift(schema, irPath, fs);
+
+    expect(checks.find((check) => check.path.endsWith('convex/validators.ts'))).toMatchObject({
+      status: 'missing',
+      matchesManifest: false,
+      matchesCurrentIr: false,
+    });
+    expect(checks.find((check) => check.path.endsWith('convex/schema.ts'))).toMatchObject({
+      status: 'modified',
+      matchesManifest: false,
+      matchesCurrentIr: false,
+    });
   });
 });

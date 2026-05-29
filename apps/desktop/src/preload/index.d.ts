@@ -128,7 +128,10 @@ export interface ContextureDriftAPI {
 
 export interface DriftDetectedPayload {
   paths: string[];
-  files?: Array<{ path: string; status: 'drifted' | 'unreadable' }>;
+  files?: Array<{
+    path: string;
+    status: 'drifted' | 'missing' | 'unreadable' | 'modified' | 'stale' | 'externally_regenerated';
+  }>;
 }
 
 export type ModelSyncStatus = 'changed' | 'invalid_json' | 'invalid_ir' | 'unreadable' | 'deleted';
@@ -169,18 +172,34 @@ export interface ContextureReconcileAPI {
     irPath: string;
     targetPath: string;
     contents: string;
-  }) => Promise<void>;
+  }) => Promise<ReconcileWriteResult>;
+  acceptGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+    contents: string;
+    schema: unknown;
+  }) => Promise<ReconcileWriteResult>;
   /**
    * Fire a one-shot schema-agent query that proposes IR ops to align
    * the current schema with the user's hand-edited on-disk source. The
    * returned `ops` array is raw — the renderer validates each entry
    * via the op-applier before showing it in the modal.
    */
-  query: (payload: {
-    irJson: string;
-    onDiskSource: string;
-    targetKind: string;
-  }) => Promise<{ ok: boolean; ops?: unknown[]; error?: string }>;
+  query: (payload: { irJson: string; onDiskSource: string; targetKind: string }) => Promise<{
+    ok: boolean;
+    ops?: unknown[];
+    error?: string;
+    deterministicFallbackReason?: string;
+  }>;
+}
+
+export type ConvexCliValidationResult =
+  | { status: 'skipped'; reason: string }
+  | { status: 'passed'; command: string; output?: string }
+  | { status: 'failed'; command: string; error: string; output?: string };
+
+export interface ReconcileWriteResult {
+  convexValidation: ConvexCliValidationResult;
 }
 
 export interface ContextureUpdateAPI {

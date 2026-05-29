@@ -17,6 +17,7 @@ vi.mock('@renderer/hooks/useSchemaAgentReconcile', () => ({
 
 const IR_PATH = '/repo/packages/contexture/garden.contexture.json';
 const ZOD_PATH = '/repo/packages/contexture/garden.schema.ts';
+const CONVEX_PATH = '/repo/packages/contexture/convex/schema.ts';
 const UNKNOWN_PATH = '/repo/packages/contexture/custom.ts';
 const USER_INDEX_PATH = '/repo/packages/contexture/src/index.ts';
 
@@ -55,6 +56,10 @@ beforeEach(() => {
       },
       reconcile: {
         writeGeneratedTarget: vi.fn().mockResolvedValue(undefined),
+        acceptGeneratedTarget: vi.fn().mockResolvedValue(undefined),
+      },
+      shell: {
+        openInEditor: vi.fn().mockResolvedValue(undefined),
       },
     },
     writable: true,
@@ -100,6 +105,30 @@ describe('ReconcileModal', () => {
     expect(screen.getByRole('button', { name: /regenerate from ir/i })).toBeDisabled();
   });
 
+  it('explains stale generated files as current-IR re-emit work', () => {
+    useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'stale' }]);
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady([], 'old generated source');
+
+    render(<ReconcileModal />);
+
+    expect(
+      screen.getByText(/still matches the last manifest, but not the current IR/i),
+    ).toBeVisible();
+  });
+
+  it('explains externally regenerated files as manifest work', () => {
+    useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'externally_regenerated' }]);
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady([], 'current generated source');
+
+    render(<ReconcileModal />);
+
+    expect(
+      screen.getByText(/already matches the current IR, but the manifest is out of date/i),
+    ).toBeVisible();
+  });
+
   it('does not regenerate a user-owned nested index.ts even though it looks like a schema index', () => {
     useReconcileStore.getState().open(USER_INDEX_PATH);
     useReconcileStore.getState().setReady([], 'user-owned index');
@@ -120,5 +149,167 @@ describe('ReconcileModal', () => {
     expect(window.contexture?.reconcile.writeGeneratedTarget).not.toHaveBeenCalled();
     expect(useDriftStore.getState().driftedPaths).toEqual([ZOD_PATH]);
     expect(useReconcileStore.getState().isOpen).toBe(false);
+  });
+
+  it('opens the generated file from the reconcile modal', () => {
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady([], 'hand edited source');
+
+    render(<ReconcileModal />);
+    fireEvent.click(screen.getByRole('button', { name: /open file/i }));
+
+    expect(window.contexture?.shell.openInEditor).toHaveBeenCalledWith(ZOD_PATH);
+  });
+
+  it('shows successful Convex CLI validation feedback after regenerating a configured Convex target', async () => {
+    vi.mocked(window.contexture?.reconcile.writeGeneratedTarget).mockResolvedValueOnce({
+      convexValidation: {
+        status: 'passed',
+        command: 'npx --no-install convex dev --once',
+      },
+    });
+    useDriftStore.getState().setDetected([{ path: CONVEX_PATH, status: 'modified' }]);
+    useReconcileStore.getState().open(CONVEX_PATH);
+    useReconcileStore.getState().setReady([], 'hand edited source');
+
+    render(<ReconcileModal />);
+    fireEvent.click(screen.getByRole('button', { name: /regenerate from ir/i }));
+
+    expect(await screen.findByText(/Convex CLI accepted/i)).toBeVisible();
+    expect(useReconcileStore.getState().isOpen).toBe(true);
+  });
+
+  it('writes the reconciled generated target before closing accepted proposals', async () => {
+    useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'modified' }]);
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      [
+        {
+          id: 'add-field',
+          label: 'Add field title to Plot',
+          lossy: false,
+          provenance: 'deterministic',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'title', type: { kind: 'string' } },
+          },
+        },
+      ],
+      'hand edited source',
+    );
+
+    render(<ReconcileModal />);
+    fireEvent.click(screen.getByRole('button', { name: /apply selected/i }));
+
+    await waitFor(() =>
+      expect(window.contexture?.reconcile.acceptGeneratedTarget).toHaveBeenCalledOnce(),
+    );
+    const [payload] =
+      vi.mocked(window.contexture?.reconcile.acceptGeneratedTarget).mock.calls[0] ?? [];
+    expect(payload).toMatchObject({ irPath: IR_PATH, targetPath: ZOD_PATH });
+    expect(payload?.contents).toContain('title');
+    expect(JSON.stringify(payload?.schema)).toContain('title');
+    expect(useDriftStore.getState().driftedPaths).toEqual([ZOD_PATH]);
+    expect(window.contexture?.drift.dismiss).not.toHaveBeenCalled();
+    expect(window.contexture?.drift.check).toHaveBeenCalledOnce();
+    expect(useReconcileStore.getState().isOpen).toBe(false);
+  });
+
+  it('shows proposal provenance for deterministic and assistant-backed ops', () => {
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      [
+        {
+          id: 'deterministic-op',
+          label: 'Add field title to Plot',
+          lossy: false,
+          provenance: 'deterministic',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'title', type: { kind: 'string' } },
+          },
+        },
+        {
+          id: 'provider-op',
+          label: 'Add field body to Plot',
+          lossy: false,
+          provenance: 'provider',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'body', type: { kind: 'string' } },
+          },
+        },
+      ],
+      'hand edited source',
+    );
+
+    render(<ReconcileModal />);
+
+    expect(screen.getByText('Deterministic')).toBeVisible();
+    expect(screen.getByText('Assistant')).toBeVisible();
+  });
+
+  it('explains when Convex reverse-mapping used assistant fallback', () => {
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      [
+        {
+          id: 'provider-op',
+          label: 'Add field body to Plot',
+          lossy: false,
+          provenance: 'provider',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'body', type: { kind: 'string' } },
+          },
+        },
+      ],
+      'hand edited source',
+      {
+        deterministicFallbackReason: 'Only `.index(...)` chains are supported on tables.',
+      },
+    );
+
+    render(<ReconcileModal />);
+
+    expect(screen.getByText(/could not safely reverse-map this Convex file/i)).toBeVisible();
+    expect(screen.getByText(/chains are supported on tables/i)).toBeVisible();
+    expect(screen.getByText(/Assistant fallback proposed the ops below/i)).toBeVisible();
+  });
+
+  it('rolls back accepted IR proposals when writing the reconciled target fails', async () => {
+    vi.mocked(window.contexture?.reconcile.acceptGeneratedTarget).mockRejectedValueOnce(
+      new Error('disk full'),
+    );
+    useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'modified' }]);
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      [
+        {
+          id: 'add-field',
+          label: 'Add field title to Plot',
+          lossy: false,
+          provenance: 'deterministic',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'title', type: { kind: 'string' } },
+          },
+        },
+      ],
+      'hand edited source',
+    );
+
+    render(<ReconcileModal />);
+    fireEvent.click(screen.getByRole('button', { name: /apply selected/i }));
+
+    await screen.findByText(/failed to accept reconciled generated file: disk full/i);
+    expect(useUndoStore.getState().schema).toEqual(SCHEMA);
+    expect(window.contexture?.drift.check).not.toHaveBeenCalled();
+    expect(useReconcileStore.getState().isOpen).toBe(true);
   });
 });

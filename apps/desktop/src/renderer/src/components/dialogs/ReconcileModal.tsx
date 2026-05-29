@@ -24,7 +24,7 @@ import { MultiFileDiff } from '@pierre/diffs/react';
 import { useChatThreads } from '@renderer/chat/useChatThreads';
 import { useSchemaAgentReconcile } from '@renderer/hooks/useSchemaAgentReconcile';
 import { useDocumentStore } from '@renderer/store/document';
-import { useDriftStore } from '@renderer/store/drift';
+import { type DriftFileStatus, useDriftStore } from '@renderer/store/drift';
 import { apply } from '@renderer/store/ops';
 import {
   type ReconcileOp,
@@ -38,7 +38,7 @@ import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { diffLines } from 'diff';
 import { Loader2, TriangleAlert } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -126,7 +126,25 @@ function generatedTargetKindFor(targetPath: string | null, irPath: string | null
   return targetKindFor(targetPath, irPath);
 }
 
+function reconcileStatusCopy(status: DriftFileStatus['status'] | null): string {
+  switch (status) {
+    case 'missing':
+    case 'unreadable':
+      return 'Contexture cannot read this generated file. Re-emitting from the IR can recreate it.';
+    case 'stale':
+      return 'This generated file still matches the last manifest, but not the current IR. Re-emitting from the IR should bring it up to date.';
+    case 'externally_regenerated':
+      return 'This generated file already matches the current IR, but the manifest is out of date.';
+    case 'modified':
+    case 'drifted':
+      return 'This generated file changed outside Contexture. Review it before choosing whether the IR or generated file should win.';
+    default:
+      return 'Review the generated file before choosing whether the IR or generated file should win.';
+  }
+}
+
 export function ReconcileModal(): React.JSX.Element {
+  const [convexValidationMessage, setConvexValidationMessage] = useState<string | null>(null);
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
   const proposedOps = useReconcileStore((s) => s.proposedOps);
@@ -134,6 +152,7 @@ export function ReconcileModal(): React.JSX.Element {
   const error = useReconcileStore((s) => s.error);
   const onDiskSource = useReconcileStore((s) => s.onDiskSource);
   const targetPath = useReconcileStore((s) => s.targetPath);
+  const deterministicFallbackReason = useReconcileStore((s) => s.deterministicFallbackReason);
   const close = useReconcileStore((s) => s.close);
   const setLoading = useReconcileStore((s) => s.setLoading);
   const setError = useReconcileStore((s) => s.setError);
@@ -149,9 +168,11 @@ export function ReconcileModal(): React.JSX.Element {
 
   const schema = useUndoStore((s) => s.schema);
   const filePath = useDocumentStore((s) => s.filePath);
+  const driftFiles = useDriftStore((s) => s.files);
 
   const displayName = targetPath ? shortPath(targetPath) : 'generated file';
   const targetKind = generatedTargetKindFor(targetPath, filePath);
+  const driftStatus = driftFiles.find((file) => file.path === targetPath)?.status ?? null;
 
   // Recompute the would-be emit each time the user toggles an op.
   // Cheap (pure function, < 10ms even on large schemas), so a
@@ -175,23 +196,81 @@ export function ReconcileModal(): React.JSX.Element {
   }, [onDiskSource, projection]);
 
   const handleApply = useCallback(() => {
-    setApplying();
-    const undo = useUndoStore.getState();
-    undo.begin();
-    for (let i = 0; i < proposedOps.length; i += 1) {
-      if (!selectedIndices.has(i)) continue;
-      const r = undo.apply(proposedOps[i].op, { source: 'reconcile' });
-      if ('error' in r) {
-        undo.rollback();
-        setError(r.error);
+    void (async () => {
+      if (
+        !filePath ||
+        !targetPath ||
+        targetKind === 'unknown' ||
+        projection.error ||
+        projection.emit.error ||
+        !projection.emit.source
+      ) {
+        setError(projection.error ?? projection.emit.error ?? 'Cannot emit reconciled target.');
         return;
       }
-    }
-    undo.commit();
-    useDriftStore.getState().setResolved();
-    void window.contexture?.drift.dismiss();
-    close();
-  }, [proposedOps, selectedIndices, setApplying, setError, close]);
+
+      const reconcileApi = window.contexture?.reconcile;
+      if (!reconcileApi) {
+        setError('Reconcile IPC bridge is unavailable.');
+        return;
+      }
+
+      setConvexValidationMessage(null);
+      setApplying();
+      const undo = useUndoStore.getState();
+      undo.begin();
+      for (let i = 0; i < proposedOps.length; i += 1) {
+        if (!selectedIndices.has(i)) continue;
+        const r = undo.apply(proposedOps[i].op, { source: 'reconcile' });
+        if ('error' in r) {
+          undo.rollback();
+          setError(r.error);
+          return;
+        }
+      }
+
+      try {
+        const result = await reconcileApi.acceptGeneratedTarget({
+          irPath: filePath,
+          targetPath,
+          contents: projection.emit.source,
+          schema: projection.schema,
+        });
+        if (result?.convexValidation.status === 'failed') {
+          undo.commit();
+          await window.contexture?.drift.check();
+          setError(convexValidationFailureMessage(result.convexValidation));
+          return;
+        }
+        const validationMessage = convexValidationSuccessMessage(result?.convexValidation);
+        if (validationMessage) {
+          undo.commit();
+          await window.contexture?.drift.check();
+          setConvexValidationMessage(validationMessage);
+          return;
+        }
+      } catch (err) {
+        undo.rollback();
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`Failed to accept reconciled generated file: ${message}`);
+        return;
+      }
+
+      undo.commit();
+      await window.contexture?.drift.check();
+      close();
+    })();
+  }, [
+    filePath,
+    targetPath,
+    targetKind,
+    projection,
+    proposedOps,
+    selectedIndices,
+    setApplying,
+    setError,
+    close,
+  ]);
 
   const handleRegenerate = useCallback(() => {
     if (
@@ -203,10 +282,20 @@ export function ReconcileModal(): React.JSX.Element {
     ) {
       return;
     }
+    setConvexValidationMessage(null);
     void window.contexture?.reconcile
       .writeGeneratedTarget({ irPath: filePath, targetPath, contents: currentEmit.source })
-      .then(async () => {
+      .then(async (result) => {
         await window.contexture?.drift.check();
+        if (result?.convexValidation.status === 'failed') {
+          setError(convexValidationFailureMessage(result.convexValidation));
+          return;
+        }
+        const validationMessage = convexValidationSuccessMessage(result?.convexValidation);
+        if (validationMessage) {
+          setConvexValidationMessage(validationMessage);
+          return;
+        }
         close();
       })
       .catch((err: unknown) => {
@@ -259,12 +348,21 @@ export function ReconcileModal(): React.JSX.Element {
     close();
   }, [schema, proposedOps, onDiskSource, displayName, filePath, history, close]);
 
+  const handleOpenFile = useCallback(() => {
+    if (!targetPath) return;
+    void window.contexture?.shell.openInEditor(targetPath);
+  }, [targetPath]);
+
   const handleRetry = useCallback(() => {
     setLoading();
   }, [setLoading]);
 
   const applyDisabled =
-    status !== 'ready' || selectedIndices.size === 0 || proposedOps.length === 0;
+    status !== 'ready' ||
+    selectedIndices.size === 0 ||
+    proposedOps.length === 0 ||
+    !!projection.error ||
+    !!projection.emit.error;
 
   const regenerateDisabled =
     !targetPath || targetKind === 'unknown' || !!currentEmit.error || !currentEmit.source;
@@ -287,6 +385,21 @@ export function ReconcileModal(): React.JSX.Element {
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+            {reconcileStatusCopy(driftStatus)}
+          </div>
+          {deterministicFallbackReason && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              Contexture could not safely reverse-map this Convex file deterministically:{' '}
+              {deterministicFallbackReason} Assistant fallback proposed the ops below.
+            </div>
+          )}
+          {convexValidationMessage && (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+              {convexValidationMessage}
+            </div>
+          )}
+
           <div className="flex flex-col border rounded-md overflow-hidden max-h-64">
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 text-xs">
               <span className="font-medium">Proposed ops</span>
@@ -352,6 +465,7 @@ export function ReconcileModal(): React.JSX.Element {
                       >
                         {entry.label}
                       </label>
+                      <ProvenanceBadge provenance={entry.provenance} />
                       {entry.lossy && <LossyBadge />}
                     </li>
                   ))}
@@ -409,6 +523,9 @@ export function ReconcileModal(): React.JSX.Element {
           <Button variant="ghost" onClick={close}>
             Leave dirty
           </Button>
+          <Button variant="outline" onClick={handleOpenFile} disabled={!targetPath}>
+            Open file
+          </Button>
           <Button
             variant="outline"
             onClick={handleRegenerate}
@@ -430,6 +547,46 @@ export function ReconcileModal(): React.JSX.Element {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type ConvexValidationResult = Awaited<
+  ReturnType<NonNullable<typeof window.contexture>['reconcile']['acceptGeneratedTarget']>
+>['convexValidation'];
+
+function convexValidationSuccessMessage(result: ConvexValidationResult | undefined): string | null {
+  if (!result || result.status === 'skipped') return null;
+  return 'Convex CLI accepted the reconciled generated files.';
+}
+
+function convexValidationFailureMessage(
+  result: Extract<ConvexValidationResult, { status: 'failed' }>,
+): string {
+  const output = result.output ? `\n\n${result.output}` : '';
+  return `Convex CLI validation failed after reconcile: ${result.error}${output}`;
+}
+
+function ProvenanceBadge({
+  provenance,
+}: {
+  provenance: ReconcileOp['provenance'];
+}): React.JSX.Element {
+  const label = provenance === 'deterministic' ? 'Deterministic' : 'Assistant';
+  const tooltip =
+    provenance === 'deterministic'
+      ? 'Contexture inferred this op from supported Convex schema syntax.'
+      : 'This op came from the assistant fallback.';
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-medium">
+            {label}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
