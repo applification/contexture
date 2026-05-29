@@ -153,6 +153,17 @@ body {
   }
 }
 
+@keyframes trusted-loop-trace {
+  from {
+    transform: scaleX(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
 .generated-line-highlight {
   animation: generated-line-confirm 2.2s ease-out 0.7s both;
 }
@@ -189,6 +200,23 @@ body {
   color: var(--syntax-string);
 }
 
+.trusted-loop-trace {
+  position: absolute;
+  top: 1.25rem;
+  left: 9%;
+  right: 9%;
+  height: 1px;
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--accent) 60%, transparent),
+    transparent
+  );
+  animation: trusted-loop-trace 0.8s ease-out 0.2s both;
+}
+
+
 /* Screenshot showcase treatment */
 .screenshot-glow {
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
@@ -219,7 +247,8 @@ body {
     animation: none;
   }
 
-  .generated-line-highlight {
+  .generated-line-highlight,
+  .trusted-loop-trace {
     animation: none;
   }
 }

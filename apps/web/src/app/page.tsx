@@ -689,6 +689,10 @@ function TrustedLoopSection() {
         </div>
 
         <MotionList className="relative grid gap-3 sm:grid-cols-5">
+          <div
+            aria-hidden="true"
+            className="trusted-loop-trace pointer-events-none hidden sm:block"
+          />
           {trustedLoopSteps.map((step, index) => (
             <MotionItem
               key={step.title}
