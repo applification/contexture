@@ -31,6 +31,7 @@ import {
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
@@ -65,6 +66,7 @@ export function FieldDetail({
   const hasSingleFieldIndex =
     tableIndexes?.some((index) => index.fields.length === 1 && index.fields[0] === field.name) ??
     false;
+  const parentKindLabel = tableIndexes ? 'table' : 'object';
   const addIndex = () => {
     if (!tableIndexes || hasSingleFieldIndex) return;
     dispatch({
@@ -75,11 +77,23 @@ export function FieldDetail({
   };
 
   return (
-    <div className="space-y-4 p-3" data-testid="field-detail">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">{field.name}</span>
+    <div className="space-y-4 p-3 pt-0" data-testid="field-detail">
+      <header
+        className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        data-testid="field-detail-header"
+      >
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {parentKindLabel}
+          </div>
+          <div className="truncate text-lg font-semibold leading-tight text-foreground">
+            {typeName}
+          </div>
+          <h2 className="truncate text-sm font-medium leading-snug text-muted-foreground">
+            {field.name}
+          </h2>
+        </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">{field.type.kind}</span>
           <Button
             type="button"
             variant="ghost"
@@ -91,7 +105,7 @@ export function FieldDetail({
             <Trash2 aria-hidden="true" />
           </Button>
         </div>
-      </div>
+      </header>
 
       <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
 
@@ -119,31 +133,28 @@ export function FieldDetail({
         />
       </div>
 
-      <div className="flex items-center gap-4 text-xs">
-        <Label htmlFor="field-optional" className="flex items-center gap-1">
-          <Checkbox
-            id="field-optional"
-            checked={field.optional === true}
-            onCheckedChange={(v) => update({ optional: v === true })}
-          />
-          optional
-        </Label>
-        <Label htmlFor="field-nullable" className="flex items-center gap-1">
-          <Checkbox
-            id="field-nullable"
-            checked={field.nullable === true}
-            onCheckedChange={(v) => update({ nullable: v === true })}
-          />
-          nullable
-        </Label>
-        <Label htmlFor="field-server-derived" className="flex items-center gap-1">
-          <Checkbox
-            id="field-server-derived"
-            checked={field.serverDerived === true}
-            onCheckedChange={(v) => update({ serverDerived: v === true ? true : undefined })}
-          />
-          server derived
-        </Label>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <CheckboxOption
+          id="field-optional"
+          label="Optional"
+          description="May be omitted"
+          checked={field.optional === true}
+          onCheckedChange={(v) => update({ optional: v === true })}
+        />
+        <CheckboxOption
+          id="field-nullable"
+          label="Nullable"
+          description="Allows null"
+          checked={field.nullable === true}
+          onCheckedChange={(v) => update({ nullable: v === true })}
+        />
+        <CheckboxOption
+          id="field-server-derived"
+          label="Server derived"
+          description="Computed by backend"
+          checked={field.serverDerived === true}
+          onCheckedChange={(v) => update({ serverDerived: v === true ? true : undefined })}
+        />
       </div>
 
       {tableIndexes && (
@@ -213,42 +224,40 @@ export function FieldTypeBody({
   return (
     <div className="space-y-3">
       {allowListToggle && (
-        <Label className="flex items-center gap-1 text-xs">
-          <Checkbox
-            checked={fieldType.kind === 'array'}
-            onCheckedChange={(checked) => {
-              if (checked === true && fieldType.kind !== 'array') {
-                onChange({ kind: 'array', element: fieldType });
-              } else if (checked !== true && fieldType.kind === 'array') {
-                onChange(fieldType.element);
-              }
-            }}
-          />
-          list
-        </Label>
+        <CheckboxOption
+          label="List"
+          description="Store multiple values"
+          checked={fieldType.kind === 'array'}
+          onCheckedChange={(checked) => {
+            if (checked === true && fieldType.kind !== 'array') {
+              onChange({ kind: 'array', element: fieldType });
+            } else if (checked !== true && fieldType.kind === 'array') {
+              onChange(fieldType.element);
+            }
+          }}
+        />
       )}
       <Row label="type">
-        <select
+        <Select
           value={fieldType.kind}
-          aria-label="Field type"
-          onChange={(ev) => {
-            const next = defaultFieldType(
-              ev.target.value as FieldType['kind'],
-              refTargets,
-              fieldType,
-            );
+          onValueChange={(value) => {
+            const next = defaultFieldType(value as FieldType['kind'], refTargets, fieldType);
             onChange(next);
           }}
-          className="w-full rounded border border-border bg-background p-1"
         >
-          <option value="string">string</option>
-          <option value="number">number</option>
-          <option value="boolean">boolean</option>
-          <option value="date">date</option>
-          <option value="literal">literal</option>
-          <option value="ref">ref</option>
-          <option value="array">array</option>
-        </select>
+          <SelectTrigger aria-label="Field type" className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="string">string</SelectItem>
+            <SelectItem value="number">number</SelectItem>
+            <SelectItem value="boolean">boolean</SelectItem>
+            <SelectItem value="date">date</SelectItem>
+            <SelectItem value="literal">literal</SelectItem>
+            <SelectItem value="ref">ref</SelectItem>
+            <SelectItem value="array">array</SelectItem>
+          </SelectContent>
+        </Select>
       </Row>
       {fieldTypeBody(
         fieldType,
@@ -341,12 +350,12 @@ function StringBody({
         />
       </Row>
       <Row label="format">
-        <select
-          defaultValue={value.format ?? ''}
-          onChange={(ev) =>
+        <Select
+          value={value.format ?? 'none'}
+          onValueChange={(nextValue) =>
             onChange({
               ...value,
-              format: (ev.target.value || undefined) as
+              format: (nextValue === 'none' ? undefined : nextValue) as
                 | 'email'
                 | 'url'
                 | 'uuid'
@@ -354,15 +363,22 @@ function StringBody({
                 | undefined,
             })
           }
-          data-testid="string-format-select"
-          className="w-full rounded border border-border bg-background p-1"
         >
-          <option value="">(none)</option>
-          <option value="email">email</option>
-          <option value="url">url</option>
-          <option value="uuid">uuid</option>
-          <option value="datetime">datetime</option>
-        </select>
+          <SelectTrigger
+            aria-label="String format"
+            data-testid="string-format-select"
+            className="h-8 text-xs"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">(none)</SelectItem>
+            <SelectItem value="email">email</SelectItem>
+            <SelectItem value="url">url</SelectItem>
+            <SelectItem value="uuid">uuid</SelectItem>
+            <SelectItem value="datetime">datetime</SelectItem>
+          </SelectContent>
+        </Select>
       </Row>
     </div>
   );
@@ -391,14 +407,13 @@ function NumberBody({
           onBlur={(ev) => onChange({ ...value, max: parseOptNum(ev.target.value) })}
         />
       </Row>
-      <Label htmlFor="field-int" className="flex items-center gap-1">
-        <Checkbox
-          id="field-int"
-          checked={value.int === true}
-          onCheckedChange={(v) => onChange({ ...value, int: v === true ? true : undefined })}
-        />
-        integer
-      </Label>
+      <CheckboxOption
+        id="field-int"
+        label="Integer"
+        description="No decimals"
+        checked={value.int === true}
+        onCheckedChange={(v) => onChange({ ...value, int: v === true ? true : undefined })}
+      />
     </div>
   );
 }
@@ -729,6 +744,33 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span>{label}</span>
       {children}
     </Label>
+  );
+}
+
+function CheckboxOption({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  id?: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean | 'indeterminate') => void;
+}) {
+  const checkboxId = id ?? `field-${label.replace(/\s+/gu, '-')}`;
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-border/70 bg-card/50 p-2">
+      <Checkbox id={checkboxId} checked={checked} onCheckedChange={onCheckedChange} />
+      <div className="min-w-0 space-y-0.5">
+        <Label htmlFor={checkboxId} className="block text-xs font-medium leading-none">
+          {label}
+        </Label>
+        <p className="text-[11px] leading-snug text-muted-foreground">{description}</p>
+      </div>
+    </div>
   );
 }
 

@@ -82,11 +82,24 @@ export function TypeDetail({
   const nameReserved = isTable && isConvexReservedName(type.name);
 
   return (
-    <div className="space-y-4 p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">{type.name}</span>
+    <div className="space-y-4 p-3 pt-0">
+      <header
+        className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        data-testid="type-detail-header"
+      >
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {isTable ? 'table' : type.kind}
+          </div>
+          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+            {type.name}
+          </h2>
+          <div
+            aria-hidden="true"
+            className="h-[1.25rem] truncate text-sm font-medium leading-snug text-muted-foreground"
+          />
+        </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">{type.kind}</span>
           <Button
             type="button"
             variant="ghost"
@@ -98,7 +111,7 @@ export function TypeDetail({
             <Trash2 aria-hidden="true" />
           </Button>
         </div>
-      </div>
+      </header>
 
       <ValidationIssues
         errors={validationErrors}

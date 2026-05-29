@@ -64,9 +64,9 @@
   --graph-node-body-bg: oklch(0.95 0.01 270 / 0.85);
   --graph-node-border: oklch(0.45 0.15 270 / 0.25);
   --graph-node-table-accent: oklch(0.66 0.13 195);
-  --graph-node-selected: oklch(0.75 0.15 195);
-  --graph-node-selected-bg: oklch(0.75 0.15 195 / 0.1);
-  --graph-node-adjacent: oklch(0.75 0.15 195 / 0.45);
+  --graph-node-selected: color-mix(in oklch, var(--muted-foreground) 74%, transparent);
+  --graph-node-selected-bg: color-mix(in oklch, var(--muted-foreground) 7%, transparent);
+  --graph-node-adjacent: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
   --graph-edge-property: oklch(0.65 0.12 280);
   --graph-edge-disjoint: oklch(0.60 0.12 15);
   --graph-edge-subclass: oklch(0.50 0.02 270);
@@ -127,9 +127,9 @@
   --graph-node-body-bg: oklch(0.18 0.02 270 / 0.92);
   --graph-node-border: oklch(0.25 0.02 270);
   --graph-node-table-accent: oklch(0.68 0.11 195);
-  --graph-node-selected: oklch(0.75 0.15 195);
-  --graph-node-selected-bg: oklch(0.75 0.15 195 / 0.1);
-  --graph-node-adjacent: oklch(0.75 0.15 195 / 0.45);
+  --graph-node-selected: color-mix(in oklch, var(--muted-foreground) 76%, transparent);
+  --graph-node-selected-bg: color-mix(in oklch, var(--muted-foreground) 8%, transparent);
+  --graph-node-adjacent: color-mix(in oklch, var(--muted-foreground) 30%, transparent);
   --graph-edge-property: oklch(0.65 0.08 280);
   --graph-edge-disjoint: oklch(0.65 0.12 15);
   --graph-edge-subclass: oklch(0.65 0.015 270);

@@ -51,8 +51,12 @@ describe('TypeDetail', () => {
 
     it('renders name, kind, and each field summary', () => {
       setup(type);
-      expect(screen.getByText('Plot')).toBeInTheDocument();
-      expect(screen.getByText('object')).toBeInTheDocument();
+      const header = screen.getByTestId('type-detail-header');
+      expect(header).toContainElement(screen.getByRole('heading', { name: 'Plot' }));
+      expect(header).toHaveTextContent('object');
+      expect(header).toHaveClass('border-b');
+      expect(header).toHaveClass('min-h-20');
+      expect(header.querySelector('[aria-hidden="true"]')).toHaveClass('h-[1.25rem]');
       const rows = screen.getAllByTestId('object-field-summary');
       expect(rows).toHaveLength(2);
       expect(screen.getByDisplayValue('area')).toBeInTheDocument();
