@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { fetchReleases } from '@/lib/changelog';
+import { getReleaseLinkLabel } from '@/lib/release-links';
 
 export const metadata: Metadata = {
   title: 'Changelog — Contexture',
@@ -52,6 +54,18 @@ function formatDate(iso: string): string {
     month: 'long',
     day: 'numeric',
   });
+}
+
+function getTextContent(children: ReactNode): string {
+  if (typeof children === 'string' || typeof children === 'number') {
+    return String(children);
+  }
+
+  if (Array.isArray(children)) {
+    return children.map(getTextContent).join('');
+  }
+
+  return '';
 }
 
 export default async function ChangelogPage() {
@@ -141,16 +155,22 @@ export default async function ChangelogPage() {
                           <ol className="list-decimal pl-6 mb-3 space-y-1">{children}</ol>
                         ),
                         li: ({ children }) => <li>{children}</li>,
-                        a: ({ href, children }) => (
-                          <a
-                            href={href}
-                            className="text-accent hover:underline"
-                            target={href?.startsWith('http') ? '_blank' : undefined}
-                            rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          >
-                            {children}
-                          </a>
-                        ),
+                        a: ({ href, children }) => {
+                          const visibleText = getTextContent(children);
+                          const label = getReleaseLinkLabel(href, visibleText);
+
+                          return (
+                            <a
+                              href={href}
+                              className="text-accent break-words [overflow-wrap:anywhere] hover:underline"
+                              target={href?.startsWith('http') ? '_blank' : undefined}
+                              rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                              title={href}
+                            >
+                              {label === visibleText ? children : label}
+                            </a>
+                          );
+                        },
                         code: ({ children }) => (
                           <code className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs">
                             {children}
