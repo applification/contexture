@@ -37,6 +37,22 @@ test.describe('Home page', () => {
     await expect(cards).toHaveCount(7);
   });
 
+  test('trusted loop section explains the product workflow', async ({ page }) => {
+    await page.goto('/');
+    const trustedLoop = page.locator('#trusted-loop');
+    await expect(trustedLoop).toBeVisible();
+    await expect(trustedLoop.locator('h2')).toContainText('From model change to drift clean');
+    await expect(trustedLoop.getByRole('heading', { name: 'Model', exact: true })).toBeVisible();
+    await expect(trustedLoop.getByRole('heading', { name: 'Emit', exact: true })).toBeVisible();
+    await expect(trustedLoop.getByRole('heading', { name: 'Verify', exact: true })).toBeVisible();
+    await expect(
+      trustedLoop.getByRole('heading', { name: 'Supervise', exact: true }),
+    ).toBeVisible();
+    await expect(
+      trustedLoop.getByRole('heading', { name: 'Reconcile', exact: true }),
+    ).toBeVisible();
+  });
+
   test('AI section promotes MCP-native model changes', async ({ page }) => {
     await page.goto('/');
     const aiSection = page.locator('section', {
@@ -46,8 +62,11 @@ test.describe('Home page', () => {
     await expect(aiSection.locator('text=Powered by Claude')).toHaveCount(0);
     await expect(aiSection.locator('text=MCP-native by design')).toBeVisible();
     await expect(
-      aiSection.locator('text=Add Memberships table with user and team refs'),
+      aiSection.locator('text=Add a memberships table with refs to users and teams'),
     ).toBeVisible();
+    await expect(aiSection.locator('text=5 proposed model changes')).toBeVisible();
+    await expect(aiSection.locator('text=Rejected duplicate table name Team')).toBeVisible();
+    await expect(aiSection.locator('text=Undo turn')).toBeVisible();
     await expect(aiSection.locator('text=discogsReleaseId')).toHaveCount(0);
   });
 
@@ -71,6 +90,17 @@ test.describe('Home page', () => {
     });
     const headings = useCases.locator('.uppercase');
     await expect(headings.first()).toContainText('Convex app schemas');
+  });
+
+  test('reconcile section frames generated drift as reviewable', async ({ page }) => {
+    await page.goto('/');
+    const reconcile = page.locator('section', {
+      has: page.locator('h2:has-text("Generated Convex files can drift")'),
+    });
+    await expect(reconcile).toBeVisible();
+    await expect(reconcile.getByText('Generated file changed outside Contexture')).toHaveCount(2);
+    await expect(reconcile.locator('text=Regenerate from IR')).toBeVisible();
+    await expect(reconcile.locator('text=Apply selected ops')).toBeVisible();
   });
 
   test('footer contains expected links', async ({ page }) => {

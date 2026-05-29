@@ -8,12 +8,22 @@ import {
   Download,
   FileCode2,
   GitGraph,
+  GitPullRequestArrow,
+  ListChecks,
   PlugZap,
+  RefreshCw,
   Shield,
-  Sparkles,
+  Undo2,
   Zap,
 } from 'lucide-react';
 import { DownloadButton } from '@/components/download-button';
+import {
+  HeroScreenshotMotion,
+  MotionItem,
+  MotionList,
+  MotionSection,
+  MotionStatusBadge,
+} from '@/components/homepage-motion';
 import { TrackedLink } from '@/components/tracked-link';
 import { AnimatedGraph } from '@/components/ui/animated-graph';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
@@ -129,28 +139,294 @@ const agentSteps = [
   },
 ];
 
-const convexPreviewLines = [
-  { id: 'server-import', text: 'import { defineSchema, defineTable } from "convex/server";' },
-  { id: 'values-import', text: 'import { v } from "convex/values";' },
-  { id: 'spacer-imports', text: '' },
-  { id: 'schema-open', text: 'export default defineSchema({' },
-  { id: 'users-open', text: '  users: defineTable({' },
-  { id: 'users-name', text: '    name: v.string(),' },
-  { id: 'users-email', text: '    email: v.string(),' },
-  { id: 'users-index', text: '  }).index("by_email", ["email"]),' },
-  { id: 'teams-open', text: '  teams: defineTable({' },
-  { id: 'teams-slug', text: '    slug: v.string(),' },
-  { id: 'teams-name', text: '    name: v.string(),' },
-  { id: 'teams-index', text: '  }).index("by_slug", ["slug"]),' },
-  { id: 'memberships-open', text: '  memberships: defineTable({' },
-  { id: 'memberships-user', text: '    userId: v.id("users"),' },
-  { id: 'memberships-team', text: '    teamId: v.id("teams"),' },
-  { id: 'memberships-role', text: '    role: v.union(v.literal("owner"), v.literal("member")),' },
-  { id: 'memberships-close', text: '  })' },
-  { id: 'memberships-user-index', text: '    .index("by_user", ["userId"])' },
-  { id: 'memberships-team-index', text: '    .index("by_team", ["teamId"]),' },
-  { id: 'schema-close', text: '});' },
+const trustedLoopSteps = [
+  {
+    icon: GitGraph,
+    title: 'Model',
+    description:
+      'Create Convex tables, refs, enums, indexes, and stdlib-backed fields on the graph.',
+  },
+  {
+    icon: FileCode2,
+    title: 'Emit',
+    description: 'Preview and write `convex/schema.ts` and `convex/validators.ts` from the IR.',
+  },
+  {
+    icon: Shield,
+    title: 'Verify',
+    description:
+      'Use the generated manifest to prove every emitted target still matches the model.',
+  },
+  {
+    icon: Bot,
+    title: 'Supervise',
+    description:
+      'Let agents propose constrained model ops, then review validation, diffs, and undo.',
+  },
+  {
+    icon: GitPullRequestArrow,
+    title: 'Reconcile',
+    description:
+      'When generated files change outside Contexture, choose whether IR or disk should win.',
+  },
 ];
+
+type SyntaxKind =
+  | 'function'
+  | 'identifier'
+  | 'keyword'
+  | 'module'
+  | 'plain'
+  | 'property'
+  | 'punctuation'
+  | 'string';
+
+type SyntaxPart = {
+  kind?: SyntaxKind;
+  key: string;
+  text: string;
+};
+
+type ConvexPreviewLine = {
+  id: string;
+  parts: SyntaxPart[];
+};
+
+let syntaxPartId = 0;
+
+function token(text: string, kind: SyntaxKind = 'plain'): SyntaxPart {
+  syntaxPartId += 1;
+  return { key: `${kind}-${syntaxPartId}`, text, kind };
+}
+
+const convexPreviewLines = [
+  {
+    id: 'server-import',
+    parts: [
+      token('import', 'keyword'),
+      token(' { ', 'punctuation'),
+      token('defineSchema', 'function'),
+      token(', ', 'punctuation'),
+      token('defineTable', 'function'),
+      token(' } ', 'punctuation'),
+      token('from', 'keyword'),
+      token(' ', 'plain'),
+      token('"convex/server"', 'module'),
+      token(';', 'punctuation'),
+    ],
+  },
+  {
+    id: 'values-import',
+    parts: [
+      token('import', 'keyword'),
+      token(' { ', 'punctuation'),
+      token('v', 'identifier'),
+      token(' } ', 'punctuation'),
+      token('from', 'keyword'),
+      token(' ', 'plain'),
+      token('"convex/values"', 'module'),
+      token(';', 'punctuation'),
+    ],
+  },
+  { id: 'spacer-imports', parts: [token(' ')] },
+  {
+    id: 'schema-open',
+    parts: [
+      token('export default', 'keyword'),
+      token(' ', 'plain'),
+      token('defineSchema', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-open',
+    parts: [
+      token('  '),
+      token('users', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-name',
+    parts: [
+      token('    '),
+      token('name', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-email',
+    parts: [
+      token('    '),
+      token('email', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'users-index',
+    parts: [
+      token('  }).', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_email"', 'string'),
+      token(', ', 'punctuation'),
+      token('["email"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-open',
+    parts: [
+      token('  '),
+      token('teams', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-slug',
+    parts: [
+      token('    '),
+      token('slug', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-name',
+    parts: [
+      token('    '),
+      token('name', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('string', 'function'),
+      token('(),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'teams-index',
+    parts: [
+      token('  }).', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_slug"', 'string'),
+      token(', ', 'punctuation'),
+      token('["slug"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-open',
+    parts: [
+      token('  '),
+      token('memberships', 'property'),
+      token(': ', 'punctuation'),
+      token('defineTable', 'function'),
+      token('({', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-user',
+    parts: [
+      token('    '),
+      token('userId', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('id', 'function'),
+      token('(', 'punctuation'),
+      token('"users"', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-team',
+    parts: [
+      token('    '),
+      token('teamId', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('id', 'function'),
+      token('(', 'punctuation'),
+      token('"teams"', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-role',
+    parts: [
+      token('    '),
+      token('role', 'property'),
+      token(': ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('union', 'function'),
+      token('(', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('literal', 'function'),
+      token('(', 'punctuation'),
+      token('"owner"', 'string'),
+      token('), ', 'punctuation'),
+      token('v', 'identifier'),
+      token('.', 'punctuation'),
+      token('literal', 'function'),
+      token('(', 'punctuation'),
+      token('"member"', 'string'),
+      token(')),', 'punctuation'),
+    ],
+  },
+  { id: 'memberships-close', parts: [token('  })', 'punctuation')] },
+  {
+    id: 'memberships-user-index',
+    parts: [
+      token('    .', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_user"', 'string'),
+      token(', ', 'punctuation'),
+      token('["userId"]', 'string'),
+      token(')', 'punctuation'),
+    ],
+  },
+  {
+    id: 'memberships-team-index',
+    parts: [
+      token('    .', 'punctuation'),
+      token('index', 'function'),
+      token('(', 'punctuation'),
+      token('"by_team"', 'string'),
+      token(', ', 'punctuation'),
+      token('["teamId"]', 'string'),
+      token('),', 'punctuation'),
+    ],
+  },
+  { id: 'schema-close', parts: [token('});', 'punctuation')] },
+] satisfies ConvexPreviewLine[];
+
+const highlightedConvexLineIds = new Set([
+  'memberships-open',
+  'memberships-user',
+  'memberships-team',
+  'memberships-user-index',
+  'memberships-team-index',
+]);
 
 function ConvexGeneratedPreview() {
   return (
@@ -160,18 +436,32 @@ function ConvexGeneratedPreview() {
           <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
           <div className="text-[11px] text-muted-foreground">Read-only generated output</div>
         </div>
-        <div className="rounded border border-success/20 bg-success/10 px-2 py-1 text-[10px] uppercase tracking-wide text-success">
+        <MotionStatusBadge
+          className="rounded border border-success/20 bg-success/10 px-2 py-1 text-[10px] uppercase tracking-wide text-success"
+          delay={0.34}
+        >
           Drift clean
-        </div>
+        </MotionStatusBadge>
       </div>
       <pre className="overflow-x-auto p-4 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
         <code>
           {convexPreviewLines.map((line, index) => (
-            <span key={line.id} className="block">
+            <span
+              key={line.id}
+              className={`block rounded-sm ${
+                highlightedConvexLineIds.has(line.id) ? 'generated-line-highlight' : ''
+              }`}
+            >
               <span className="mr-4 select-none text-muted-foreground/40">
                 {String(index + 1).padStart(2, '0')}
               </span>
-              <span>{line.text || ' '}</span>
+              <span>
+                {line.parts.map((part) => (
+                  <span key={part.key} className={`syntax-token syntax-${part.kind ?? 'plain'}`}>
+                    {part.text}
+                  </span>
+                ))}
+              </span>
             </span>
           ))}
         </code>
@@ -186,86 +476,219 @@ function ConvexGeneratedPreview() {
   );
 }
 
-function AgentConversationDemo() {
+function AgentTurnReviewDemo() {
+  const reviewRows = [
+    { label: 'Added table Memberships', status: 'applied' },
+    { label: 'Added ref userId -> users', status: 'applied' },
+    { label: 'Added index by_team', status: 'applied' },
+    { label: 'Rejected duplicate table name Team', status: 'rejected' },
+  ];
+
   return (
-    <div className="max-w-4xl mx-auto rounded-xl border border-border/60 bg-card/40 overflow-hidden text-left screenshot-glow">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-md border border-border/70 bg-card/70 text-left text-xs shadow-sm screenshot-glow">
+      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
-            <Bot className="size-4" />
+          <div className="size-7 rounded-md bg-accent/10 text-accent flex items-center justify-center">
+            <Bot className="size-3.5" />
           </div>
-          <div>
-            <div className="text-sm font-semibold">Contexture agent</div>
-            <div className="text-xs text-muted-foreground">MCP tools connected</div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">Agent turn review</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">
+              Codex · GPT-5.5 · committed
+            </div>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2.5 py-1 text-xs text-success">
+        <div className="hidden shrink-0 items-center gap-1.5 rounded-full border border-success/20 bg-success/10 px-2 py-1 text-[11px] text-success sm:flex">
           <CircleDot className="size-3" />
           Drift clean
         </div>
       </div>
 
-      <div className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
-        <div className="flex justify-end">
-          <div className="max-w-[88%] rounded-lg bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm sm:max-w-[72%]">
-            Add a memberships table with refs to users and teams, emit the Convex files, and check
-            drift.
+      <div className="grid gap-3 px-3 py-3 sm:grid-cols-[0.95fr_1.05fr]">
+        <div className="space-y-2">
+          <div className="rounded-md border border-border/70 bg-background/60 px-3 py-2.5">
+            <p className="text-xs leading-5 text-foreground">
+              Add a memberships table with refs to users and teams, emit the Convex files, and check
+              drift.
+            </p>
           </div>
+          <MotionList
+            className="overflow-hidden rounded-md border border-border/70 bg-background/60"
+            trigger="mount"
+          >
+            {agentSteps.map((step) => (
+              <MotionItem
+                key={step.tool}
+                className="flex items-start gap-2.5 border-b border-border/50 px-2.5 py-2 text-xs last:border-b-0"
+              >
+                <div className="mt-0.5 size-4 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
+                  <Check className="size-3" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-mono text-[11px] leading-4 text-primary dark:text-accent">
+                    {step.tool}
+                  </div>
+                  <div className="text-[11px] leading-4 text-muted-foreground">{step.label}</div>
+                </div>
+              </MotionItem>
+            ))}
+          </MotionList>
         </div>
 
-        <div className="flex items-start gap-3">
-          <div className="mt-1 size-7 rounded-md bg-accent/10 text-accent flex items-center justify-center shrink-0">
-            <Sparkles className="size-4" />
+        <div className="rounded-md border border-border/70 bg-background/70 p-2.5">
+          <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="font-semibold text-foreground">5 proposed model changes</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+                  committed
+                </span>
+                <span>3 applied</span>
+                <span className="text-warning">1 rejected</span>
+                <span>1 no-op</span>
+              </div>
+            </div>
+            <MotionStatusBadge delay={0.45}>
+              <button
+                type="button"
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+              >
+                <Undo2 className="size-3" />
+                Undo turn
+              </button>
+            </MotionStatusBadge>
           </div>
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="rounded-lg border border-border/60 bg-background/60 px-4 py-3">
-              <p className="text-sm leading-relaxed text-foreground">
-                I’ll update the source model first, regenerate convex/schema.ts and
-                convex/validators.ts, then verify the manifest so generated files stay disposable.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-border/60 bg-background/60 p-2">
-              {agentSteps.map((step) => (
-                <div
-                  key={step.tool}
-                  className="flex items-start gap-3 rounded-md px-2.5 py-2 text-sm"
+          <MotionList
+            className="overflow-hidden rounded-md border border-border/70"
+            trigger="mount"
+          >
+            {reviewRows.map((row) => (
+              <MotionItem
+                key={row.label}
+                className="flex items-center justify-between gap-2 border-b border-border/50 bg-card/40 px-2.5 py-2 text-[11px] last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-foreground">{row.label}</span>
+                <span
+                  className={
+                    row.status === 'applied'
+                      ? 'shrink-0 rounded border border-success/20 bg-success/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-success'
+                      : 'shrink-0 rounded border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warning'
+                  }
                 >
-                  <div className="mt-0.5 size-5 rounded-full bg-success/10 text-success flex items-center justify-center shrink-0">
-                    <Check className="size-3" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-xs text-primary dark:text-accent">
-                      {step.tool}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{step.label}</div>
-                  </div>
-                  <span className="rounded border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {step.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-lg border border-success/25 bg-success/10 px-4 py-3 text-sm text-foreground">
-              Done. The IR changed, generated targets were emitted, and drift is clean.
-            </div>
+                  {row.status}
+                </span>
+              </MotionItem>
+            ))}
+          </MotionList>
+          <div className="mt-2.5 rounded-md border border-primary/15 bg-primary/5 px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
+            Validation blocks unsafe ops before generated files are emitted.
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="border-t border-border/60 bg-background/50 p-3">
-        <div className="flex items-end gap-2 rounded-lg border border-border/70 bg-background px-3 py-2">
-          <div className="min-h-9 flex-1 text-sm text-muted-foreground flex items-center">
-            Ask the agent to change your model...
-          </div>
+function TrustedLoopSection() {
+  return (
+    <MotionSection
+      id="trusted-loop"
+      className="relative py-16 sm:py-24 px-4 sm:px-8 border-t border-border/30"
+    >
+      <div className="relative max-w-5xl mx-auto">
+        <div className="mb-10 max-w-2xl">
+          <p className="text-sm text-primary dark:text-accent font-medium mb-4 tracking-widest uppercase">
+            The trusted loop
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
+            From model change to drift clean, with review at every boundary.
+          </h2>
+          <p className="text-muted-foreground leading-relaxed">
+            Contexture works because every path leads back to the same source model: direct edits,
+            generated Convex files, external changes, and agent-authored operations.
+          </p>
+        </div>
+
+        <MotionList className="relative grid gap-3 sm:grid-cols-5">
           <div
             aria-hidden="true"
-            className="size-8 rounded-md bg-primary text-primary-foreground flex items-center justify-center"
-          >
-            <ArrowRight className="size-4" />
+            className="trusted-loop-trace pointer-events-none hidden sm:block"
+          />
+          {trustedLoopSteps.map((step, index) => (
+            <MotionItem
+              key={step.title}
+              className="relative z-10 rounded-xl border border-border/60 bg-card/50 p-5 transition-colors hover:border-primary/30"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <step.icon className="size-5 text-primary" />
+                </div>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+              </div>
+              <h3 className="mb-2 text-base font-semibold">{step.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{step.description}</p>
+            </MotionItem>
+          ))}
+        </MotionList>
+      </div>
+    </MotionSection>
+  );
+}
+
+function ReconcileDemo() {
+  const actions = [
+    'Generated file changed outside Contexture',
+    'Supported Convex edits become proposed IR ops',
+    'Uncovered diff stays visible for review',
+    'User chooses regenerate, apply ops, or leave dirty',
+  ];
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5 screenshot-glow">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+        <div>
+          <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
+          <div className="text-xs text-muted-foreground">
+            Generated file changed outside Contexture
           </div>
         </div>
+        <MotionStatusBadge
+          className="whitespace-nowrap rounded border border-warning/25 bg-warning/10 px-2 py-1 text-[10px] uppercase tracking-wide text-warning"
+          delay={0.15}
+        >
+          Needs review
+        </MotionStatusBadge>
+      </div>
+      <MotionList className="space-y-2">
+        {actions.map((action, index) => (
+          <MotionItem
+            key={action}
+            className="flex items-start gap-3 rounded-lg border border-border/50 bg-background/60 px-3 py-2.5 text-sm"
+          >
+            <div className="mt-0.5 size-5 rounded-full bg-accent/10 text-accent flex items-center justify-center shrink-0 text-[10px] font-semibold">
+              {index + 1}
+            </div>
+            <span className="text-muted-foreground">{action}</span>
+          </MotionItem>
+        ))}
+      </MotionList>
+      <div className="mt-4 grid gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+        >
+          <RefreshCw className="size-4" />
+          Regenerate from IR
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm font-medium text-muted-foreground"
+        >
+          <ListChecks className="size-4" />
+          Apply selected ops
+        </button>
       </div>
     </div>
   );
@@ -354,20 +777,20 @@ export default function Home() {
               Download for free
             </TrackedLink>
             <TrackedLink
-              event="github_click"
+              event="trusted_loop_click"
               properties={{ location: 'hero' }}
-              href="https://github.com/applification/contexture"
+              href="#trusted-loop"
               className="inline-flex items-center justify-center gap-2 border border-border w-full sm:w-auto px-6 py-2.5 sm:px-7 sm:py-3 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
             >
-              <GithubIcon className="size-4" />
-              View on GitHub
+              <ListChecks className="size-4" />
+              See the trusted loop
             </TrackedLink>
           </div>
         </div>
 
         {/* Hero screenshot — perspective tilt for depth */}
         <div className="relative max-w-5xl mx-auto pb-16 sm:pb-32">
-          <div
+          <HeroScreenshotMotion
             className="animate-fade-in-up-delay-3 relative rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500"
             style={{ perspective: '1200px' }}
           >
@@ -384,9 +807,14 @@ export default function Home() {
             </div>
             {/* Bottom fade */}
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
-          </div>
+            <div className="absolute bottom-5 right-5 hidden w-[360px] lg:block">
+              <ConvexGeneratedPreview />
+            </div>
+          </HeroScreenshotMotion>
         </div>
       </section>
+
+      <TrustedLoopSection />
 
       {/* Features */}
       <section
@@ -468,7 +896,7 @@ export default function Home() {
           </div>
 
           <div className="mb-12 sm:mb-16">
-            <AgentConversationDemo />
+            <AgentTurnReviewDemo />
           </div>
 
           {/* Two-column: generated surface preview + description */}
@@ -512,6 +940,46 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Reconcile */}
+      <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
+        <div className="relative max-w-5xl mx-auto grid gap-8 sm:grid-cols-5 sm:gap-12 items-center">
+          <div className="sm:col-span-3 space-y-6">
+            <div className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent font-medium px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+              <GitPullRequestArrow className="size-4" />
+              Reconcile as review
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Generated Convex files can drift. Contexture makes that reviewable.
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              If an agent, teammate, or stale generator changes a Contexture-owned file, reconcile
+              separates generated drift from source-model sync. For supported Convex schema edits,
+              Contexture can propose IR operations; for everything else, the diff stays explicit and
+              non-destructive.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-border/60 bg-card/50 p-5">
+                <h3 className="mb-2 text-sm font-semibold">IR stays the authority</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Re-emit generated files from the model, or accept supported changes back into the
+                  IR through reviewable ops.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-card/50 p-5">
+                <h3 className="mb-2 text-sm font-semibold">Dirty can be intentional</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Leave a generated file dirty when you are still investigating. Contexture keeps
+                  the state visible instead of silently resolving it.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <ReconcileDemo />
           </div>
         </div>
       </section>
