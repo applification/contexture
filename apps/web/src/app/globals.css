@@ -120,6 +120,54 @@ body {
   animation: fade-in-up 0.8s ease-out 0.45s both;
 }
 
+@keyframes generated-line-confirm {
+  0%,
+  28% {
+    background-color: transparent;
+    color: inherit;
+  }
+  44%,
+  74% {
+    background-color: color-mix(in oklch, var(--accent) 14%, transparent);
+    color: var(--foreground);
+  }
+  100% {
+    background-color: transparent;
+    color: inherit;
+  }
+}
+
+@keyframes trusted-loop-trace {
+  from {
+    transform: scaleX(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.generated-line-highlight {
+  animation: generated-line-confirm 2.2s ease-out 0.7s both;
+}
+
+.trusted-loop-trace {
+  position: absolute;
+  top: 1.25rem;
+  left: 9%;
+  right: 9%;
+  height: 1px;
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--accent) 60%, transparent),
+    transparent
+  );
+  animation: trusted-loop-trace 0.8s ease-out 0.2s both;
+}
+
 
 /* Screenshot showcase treatment */
 .screenshot-glow {
@@ -148,6 +196,11 @@ body {
   .animate-fade-in-up-delay-1,
   .animate-fade-in-up-delay-2,
   .animate-fade-in-up-delay-3 {
+    animation: none;
+  }
+
+  .generated-line-highlight,
+  .trusted-loop-trace {
     animation: none;
   }
 }
