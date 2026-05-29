@@ -38,7 +38,7 @@ import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { diffLines } from 'diff';
 import { Loader2, TriangleAlert } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -56,6 +56,8 @@ interface EmitResult {
   source: string;
   error: string | null;
 }
+
+type DiffMode = 'file-changes' | 'uncovered-changes';
 
 function safeEmitForTarget(
   schema: Schema,
@@ -144,6 +146,7 @@ function reconcileStatusCopy(status: DriftFileStatus['status'] | null): string {
 }
 
 export function ReconcileModal(): React.JSX.Element {
+  const [diffMode, setDiffMode] = useState<DiffMode>('file-changes');
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
   const proposedOps = useReconcileStore((s) => s.proposedOps);
@@ -193,6 +196,22 @@ export function ReconcileModal(): React.JSX.Element {
     if (projection.emit.error) return 0;
     return countResidualLines(projection.emit.source, onDiskSource);
   }, [onDiskSource, projection]);
+
+  const fileChangedLines = useMemo(() => {
+    if (onDiskSource === null) return 0;
+    if (currentEmit.error) return 0;
+    return countResidualLines(currentEmit.source, onDiskSource);
+  }, [onDiskSource, currentEmit]);
+
+  const selectedCount = selectedIndices.size;
+  const totalCount = proposedOps.length;
+  const activeDiff = diffMode === 'file-changes' ? currentEmit : projection.emit;
+  const activeDiffTitle =
+    diffMode === 'file-changes' ? 'Generated file change' : 'Uncovered after selected ops';
+  const activeDiffSubtitle =
+    diffMode === 'file-changes'
+      ? `Current Contexture emit to on-disk ${displayName}`
+      : `Contexture emit with selected ops to on-disk ${displayName}`;
 
   const handleApply = useCallback(() => {
     void (async () => {
@@ -353,15 +372,21 @@ export function ReconcileModal(): React.JSX.Element {
         <DialogHeader>
           <DialogTitle>Reconcile changes</DialogTitle>
           <DialogDescription>
-            <code className="font-mono">{displayName}</code> differs from Contexture's generated
-            output. Regenerate it from the current IR, leave it dirty, or use the proposal tools to
-            fold changes back into the model.
+            <code className="font-mono">{displayName}</code> changed outside Contexture. Review the
+            generated-file change, then choose which proposed model ops should be folded back into
+            the IR.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-            {reconcileStatusCopy(driftStatus)}
+            <div>{reconcileStatusCopy(driftStatus)}</div>
+            {status === 'ready' && totalCount > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Contexture found {totalCount} proposed model op{totalCount !== 1 ? 's' : ''} ·{' '}
+                {selectedCount} selected
+              </div>
+            )}
           </div>
           {deterministicFallbackReason && (
             <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
@@ -371,7 +396,14 @@ export function ReconcileModal(): React.JSX.Element {
           )}
           <div className="flex flex-col border rounded-md overflow-hidden max-h-64">
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 text-xs">
-              <span className="font-medium">Proposed ops</span>
+              <div>
+                <span className="font-medium">Proposed model ops</span>
+                {status === 'ready' && totalCount > 0 && (
+                  <span className="ml-2 text-muted-foreground">
+                    {selectedCount} selected of {totalCount}
+                  </span>
+                )}
+              </div>
               {status === 'ready' && proposedOps.length > 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <button
@@ -418,34 +450,66 @@ export function ReconcileModal(): React.JSX.Element {
                 </p>
               )}
               {(status === 'ready' || status === 'applying') && proposedOps.length > 0 && (
-                <ul className="space-y-2">
-                  {proposedOps.map((entry, i) => (
-                    <li key={entry.id} className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        id={`reconcile-op-${entry.id}`}
-                        checked={selectedIndices.has(i)}
-                        onCheckedChange={() => toggleOp(i)}
-                        aria-label={entry.label}
-                        className="mt-0.5"
-                      />
-                      <label
-                        htmlFor={`reconcile-op-${entry.id}`}
-                        className="flex-1 cursor-pointer leading-tight"
-                      >
-                        {entry.label}
-                      </label>
-                      <ProvenanceBadge provenance={entry.provenance} />
-                      {entry.lossy && <LossyBadge />}
-                    </li>
-                  ))}
-                </ul>
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Selected ops will update the IR and re-emit this generated file.
+                  </p>
+                  <ul className="space-y-2">
+                    {proposedOps.map((entry, i) => (
+                      <li key={entry.id} className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          id={`reconcile-op-${entry.id}`}
+                          checked={selectedIndices.has(i)}
+                          onCheckedChange={() => toggleOp(i)}
+                          aria-label={entry.label}
+                          className="mt-0.5"
+                        />
+                        <label
+                          htmlFor={`reconcile-op-${entry.id}`}
+                          className="flex-1 cursor-pointer leading-tight"
+                        >
+                          {entry.label}
+                        </label>
+                        <ProvenanceBadge provenance={entry.provenance} />
+                        {entry.lossy && <LossyBadge />}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </div>
 
           <div className="flex flex-col border rounded-md overflow-hidden min-h-[360px]">
-            <div className="px-3 py-2 border-b bg-muted/30 text-xs font-medium">
-              Diff (Contexture emit ↔ on-disk file)
+            <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30">
+              <div>
+                <div className="text-xs font-medium">{activeDiffTitle}</div>
+                <div className="text-xs text-muted-foreground">{activeDiffSubtitle}</div>
+              </div>
+              <div
+                role="tablist"
+                aria-label="Diff view"
+                className="inline-flex h-8 items-center justify-center rounded-md bg-card p-1 text-muted-foreground"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={diffMode === 'file-changes'}
+                  onClick={() => setDiffMode('file-changes')}
+                  className="inline-flex h-6 items-center justify-center whitespace-nowrap rounded-sm px-2 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-selected:bg-muted aria-selected:text-foreground aria-selected:shadow-sm"
+                >
+                  File changes
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={diffMode === 'uncovered-changes'}
+                  onClick={() => setDiffMode('uncovered-changes')}
+                  className="inline-flex h-6 items-center justify-center whitespace-nowrap rounded-sm px-2 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-selected:bg-muted aria-selected:text-foreground aria-selected:shadow-sm"
+                >
+                  Uncovered changes
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto max-h-[60vh]">
               {status === 'loading' && (
@@ -458,15 +522,22 @@ export function ReconcileModal(): React.JSX.Element {
               )}
               {(status === 'ready' || status === 'applying') &&
                 onDiskSource !== null &&
-                (projection.emit.error ? (
+                (activeDiff.error ? (
                   <p className="p-3 text-sm text-destructive">
-                    Cannot emit current schema: {projection.emit.error}
+                    Cannot emit current schema: {activeDiff.error}
                   </p>
+                ) : diffMode === 'uncovered-changes' && residualLines === 0 ? (
+                  <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-1 p-6 text-center">
+                    <p className="text-sm font-medium">No uncovered changes</p>
+                    <p className="text-sm text-muted-foreground">
+                      The selected ops reproduce the on-disk generated file.
+                    </p>
+                  </div>
                 ) : (
                   <MultiFileDiff
                     oldFile={{
                       name: displayName,
-                      contents: projection.emit.source,
+                      contents: activeDiff.source,
                       lang: displayName.endsWith('.json') ? 'json' : 'ts',
                     }}
                     newFile={{
@@ -481,8 +552,15 @@ export function ReconcileModal(): React.JSX.Element {
             </div>
             {(status === 'ready' || status === 'applying') && onDiskSource !== null && (
               <div className="px-3 py-2 border-t text-xs text-muted-foreground">
-                Residual: {residualLines} changed line{residualLines !== 1 ? 's' : ''} not covered
-                by selected ops
+                {diffMode === 'file-changes'
+                  ? `${fileChangedLines} changed line${
+                      fileChangedLines !== 1 ? 's' : ''
+                    } detected in the generated file.`
+                  : residualLines === 0
+                    ? '0 uncovered lines. The selected ops fully explain the on-disk edit.'
+                    : `${residualLines} uncovered line${
+                        residualLines !== 1 ? 's' : ''
+                      } remain outside the selected ops.`}
               </div>
             )}
           </div>
@@ -511,7 +589,7 @@ export function ReconcileModal(): React.JSX.Element {
             Open in chat
           </Button>
           <Button onClick={handleApply} disabled={applyDisabled}>
-            Apply selected
+            Apply selected ops
           </Button>
         </DialogFooter>
       </DialogContent>

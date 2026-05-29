@@ -1,3 +1,4 @@
+import { emitGeneratedTarget } from '@contexture/core/generated-targets';
 import { useChatThreadStore } from '@renderer/chat/useChatThreads';
 import { ReconcileModal } from '@renderer/components/dialogs/ReconcileModal';
 import { useDocumentStore } from '@renderer/store/document';
@@ -8,7 +9,18 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@pierre/diffs/react', () => ({
-  MultiFileDiff: () => <div data-testid="reconcile-diff" />,
+  MultiFileDiff: ({
+    oldFile,
+    newFile,
+  }: {
+    oldFile: { contents: string };
+    newFile: { contents: string };
+  }) => (
+    <div data-testid="reconcile-diff">
+      <div data-testid="reconcile-diff-old">{oldFile.contents}</div>
+      <div data-testid="reconcile-diff-new">{newFile.contents}</div>
+    </div>
+  ),
 }));
 
 vi.mock('@renderer/hooks/useSchemaAgentReconcile', () => ({
@@ -160,6 +172,53 @@ describe('ReconcileModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /open file/i }));
 
     expect(window.contexture?.shell.openInEditor).toHaveBeenCalledWith(ZOD_PATH);
+  });
+
+  it('opens on file changes and explains the uncovered changes view', async () => {
+    const projectedSchema = {
+      ...SCHEMA,
+      types: [
+        {
+          ...SCHEMA.types[0],
+          fields: [...SCHEMA.types[0].fields, { name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    } as const;
+    const onDiskSource = emitGeneratedTarget(projectedSchema, 'zod', IR_PATH);
+    useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'modified' }]);
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      [
+        {
+          id: 'add-title',
+          label: 'Add field title to Plot',
+          lossy: false,
+          provenance: 'deterministic',
+          op: {
+            kind: 'add_field',
+            typeName: 'Plot',
+            field: { name: 'title', type: { kind: 'string' } },
+          },
+        },
+      ],
+      onDiskSource,
+    );
+
+    render(<ReconcileModal />);
+
+    expect(screen.getByText('Generated file change')).toBeVisible();
+    expect(screen.getByText(/Current Contexture emit to on-disk/)).toBeVisible();
+    expect(screen.getByText('Proposed model ops')).toBeVisible();
+    expect(screen.getByText(/1 selected of 1/i)).toBeVisible();
+    expect(screen.getByTestId('reconcile-diff-new')).toHaveTextContent('title');
+
+    fireEvent.click(screen.getByRole('tab', { name: /uncovered changes/i }));
+
+    await waitFor(() => expect(screen.getByText('Uncovered after selected ops')).toBeVisible());
+    expect(screen.getByText(/0 uncovered lines/i)).toBeVisible();
+    expect(screen.getByText(/selected ops fully explain/i)).toBeVisible();
+    expect(screen.getByText(/selected ops reproduce the on-disk generated file/i)).toBeVisible();
+    expect(screen.getByRole('button', { name: /apply selected ops/i })).toBeEnabled();
   });
 
   it('closes after regenerating a configured Convex target without running CLI validation implicitly', async () => {
