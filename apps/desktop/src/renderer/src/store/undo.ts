@@ -43,8 +43,16 @@ export interface UndoMutationEvent {
 }
 
 export type UndoMutationListener = (event: UndoMutationEvent) => void;
+export interface UndoHistoryEvent {
+  action: 'undo' | 'redo';
+  before: Schema;
+  after: Schema;
+}
+
+export type UndoHistoryListener = (event: UndoHistoryEvent) => void;
 
 const mutationListeners = new Set<UndoMutationListener>();
+const historyListeners = new Set<UndoHistoryListener>();
 
 export interface UndoableState {
   schema: Schema;
@@ -113,6 +121,7 @@ export function createUndoableContextureStore(initial: Schema) {
         const prev = state.past[state.past.length - 1];
         const future = [state.schema, ...state.future];
         set({ schema: prev, past, future, ...recompute(past, future) });
+        notifyHistory(historyListeners, { action: 'undo', before: state.schema, after: prev });
       },
 
       redo: () => {
@@ -121,6 +130,7 @@ export function createUndoableContextureStore(initial: Schema) {
         const [next, ...future] = state.future;
         const past = [...state.past, state.schema];
         set({ schema: next, past, future, ...recompute(past, future) });
+        notifyHistory(historyListeners, { action: 'redo', before: state.schema, after: next });
       },
 
       begin: () => {
@@ -175,7 +185,18 @@ export function subscribeUndoMutations(listener: UndoMutationListener): () => vo
   };
 }
 
+export function subscribeUndoHistory(listener: UndoHistoryListener): () => void {
+  historyListeners.add(listener);
+  return () => {
+    historyListeners.delete(listener);
+  };
+}
+
 function notifyMutation(listeners: Set<UndoMutationListener>, event: UndoMutationEvent): void {
+  for (const listener of listeners) listener(event);
+}
+
+function notifyHistory(listeners: Set<UndoHistoryListener>, event: UndoHistoryEvent): void {
   for (const listener of listeners) listener(event);
 }
 

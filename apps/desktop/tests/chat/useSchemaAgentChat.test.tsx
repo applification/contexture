@@ -1,6 +1,7 @@
 import { useSchemaAgentModelsStore } from '@renderer/chat/schemaAgentModelsStore';
 import { useSchemaAgentSessionStore } from '@renderer/chat/schemaAgentSessionStore';
 import { useSchemaAgentChat } from '@renderer/chat/useSchemaAgentChat';
+import { useAgentTurnsStore } from '@renderer/store/agent-turns';
 import { useUndoStore } from '@renderer/store/undo';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +14,9 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
     assistantDelta: new Set<Listener<{ text: string }>>(),
     assistantFinal: new Set<Listener<{ text: string }>>(),
     toolCallStarted: new Set<Listener<{ id: string; name: string; input?: unknown }>>(),
+    toolCallFinished: new Set<
+      Listener<{ id: string; name: string; ok: boolean; result?: unknown }>
+    >(),
     error: new Set<Listener<{ message: string }>>(),
     statusChanged: new Set<Listener<unknown>>(),
     turnBegin: new Set<() => void>(),
@@ -69,7 +73,10 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
       listeners.toolCallStarted.add(l);
       return () => listeners.toolCallStarted.delete(l);
     },
-    onToolCallFinished: () => () => undefined,
+    onToolCallFinished: (l) => {
+      listeners.toolCallFinished.add(l);
+      return () => listeners.toolCallFinished.delete(l);
+    },
     onError: (l) => {
       listeners.error.add(l);
       return () => listeners.error.delete(l);
@@ -120,6 +127,11 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
         l(p);
       });
     },
+    toolCallFinished: (p: { id: string; name: string; ok: boolean; result?: unknown }) => {
+      listeners.toolCallFinished.forEach((l) => {
+        l(p);
+      });
+    },
     error: (p: { message: string }) => {
       listeners.error.forEach((l) => {
         l(p);
@@ -165,6 +177,7 @@ describe('useSchemaAgentChat', () => {
     localStorage.clear();
     useSchemaAgentModelsStore.getState().reset();
     useSchemaAgentSessionStore.getState().reset();
+    useAgentTurnsStore.getState().reset();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
   afterEach(cleanup);
@@ -262,6 +275,108 @@ describe('useSchemaAgentChat', () => {
     expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['A', 'B']);
     act(() => useUndoStore.getState().undo());
     expect(useUndoStore.getState().schema.types).toEqual([]);
+  });
+
+  it('records applied and rejected schema-agent ops as one reviewable turn', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('add a plot');
+    });
+    act(() => {
+      emit.turnBegin();
+      emit.toolCallStarted({ id: 'pending-1', name: 'add_type', input: { name: 'Plot' } });
+      emit.toolRequest({
+        id: '1',
+        op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      });
+      emit.toolCallStarted({ id: 'pending-2', name: 'add_type', input: { name: 'Plot' } });
+      emit.toolRequest({
+        id: '2',
+        op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      });
+      emit.assistantFinal({ text: 'Added Plot.' });
+      emit.turnCommit();
+    });
+
+    expect(useAgentTurnsStore.getState().turns).toEqual([
+      expect.objectContaining({
+        status: 'committed',
+        userMessage: 'add a plot',
+        assistantText: 'Added Plot.',
+        provider: 'codex',
+        model: 'gpt-5.4',
+        summary: 'Agent proposed 2 model changes: 1 applied, 1 rejected',
+        ops: [
+          expect.objectContaining({ id: '1', name: 'add_type', status: 'applied' }),
+          expect.objectContaining({ id: '2', name: 'add_type', status: 'rejected' }),
+        ],
+      }),
+    ]);
+  });
+
+  it('records completed non-op tools in the agent turn ledger', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('emit and check drift');
+    });
+    act(() => {
+      emit.turnBegin();
+      emit.toolCallStarted({ id: 'emit-1', name: 'emit_contexture', input: {} });
+      emit.toolCallFinished({
+        id: 'emit-1',
+        name: 'emit_contexture',
+        ok: true,
+        result: { emitted: ['convex/schema.ts'] },
+      });
+      emit.toolCallStarted({ id: 'drift-1', name: 'check_contexture_drift', input: {} });
+      emit.toolCallFinished({
+        id: 'drift-1',
+        name: 'check_contexture_drift',
+        ok: true,
+        result: { clean: true },
+      });
+      emit.turnCommit();
+    });
+
+    expect(useAgentTurnsStore.getState().turns[0]).toEqual(
+      expect.objectContaining({
+        summary: 'Agent emitted generated files and checked drift: clean',
+        ops: [
+          expect.objectContaining({ id: 'emit-1', name: 'emit_contexture', status: 'non_op' }),
+          expect.objectContaining({
+            id: 'drift-1',
+            name: 'check_contexture_drift',
+            status: 'non_op',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('marks provider threads stale after undo and redo', async () => {
+    const { api, emit } = makeApi();
+    renderHook(() => useSchemaAgentChat({ api }));
+
+    act(() => {
+      emit.threadUpdated({ thread: { provider: 'codex', threadId: 'thread-1' } });
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'Plot', fields: [] },
+      });
+      useUndoStore.getState().undo();
+    });
+
+    expect(useSchemaAgentSessionStore.getState().desynced).toBe(true);
   });
 
   it('surfaces non-ready Codex status', async () => {
@@ -639,6 +754,27 @@ describe('useSchemaAgentChat', () => {
 
     act(() => {
       emit.threadDesynced({ thread, reason: 'rollback failed' });
+    });
+
+    expect(result.current.providerThreadRef).toEqual(thread);
+    expect(result.current.desynced).toBe(true);
+  });
+
+  it('marks the provider thread stale when the model changes outside the agent', () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+    const thread = { provider: 'codex', threadId: 'thread-1' };
+
+    act(() => {
+      emit.threadUpdated({ thread });
+    });
+    expect(result.current.desynced).toBe(false);
+
+    act(() => {
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'ExternalEdit', fields: [] },
+      });
     });
 
     expect(result.current.providerThreadRef).toEqual(thread);

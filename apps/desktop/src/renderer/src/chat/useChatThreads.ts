@@ -16,7 +16,7 @@
  * schema authoring.
  */
 
-import type { ChatMessage } from '@contexture/core';
+import type { AgentTurnRecord, ChatMessage } from '@contexture/core';
 import { create } from 'zustand';
 
 export type ProviderKind = 'codex' | 'claude';
@@ -31,6 +31,7 @@ export interface ChatThread {
   modelOptions?: Record<string, string | boolean>;
   filePath: string | null;
   providerThreadRef?: unknown;
+  agentTurns?: AgentTurnRecord[];
   desynced?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -53,6 +54,7 @@ function loadThreads(): ChatThread[] {
       if (t.provider === undefined) t.provider = 'claude';
       if (t.filePath === undefined) t.filePath = null;
       if (!Array.isArray(t.messages)) t.messages = [];
+      if (t.agentTurns !== undefined && !Array.isArray(t.agentTurns)) t.agentTurns = [];
     }
     return threads;
   } catch {
@@ -95,6 +97,7 @@ export interface UseChatThreadsReturn {
     model?: string;
     effort?: string;
     modelOptions?: Record<string, string | boolean>;
+    agentTurns?: AgentTurnRecord[];
     filePath: string;
     messages?: ChatMessage[];
   }) => ChatThread;
@@ -105,6 +108,7 @@ export interface UseChatThreadsReturn {
     model?: string;
     effort?: string;
     modelOptions?: Record<string, string | boolean>;
+    agentTurns?: AgentTurnRecord[];
     filePath: string | null;
   }) => ChatThread | null;
   /** All threads for a given file, newest-first. */
@@ -145,6 +149,7 @@ export const useChatThreadStore = create<UseChatThreadsReturn>((set, get) => {
     model?: string;
     effort?: string;
     modelOptions?: Record<string, string | boolean>;
+    agentTurns?: AgentTurnRecord[];
     filePath: string | null;
     messages?: ChatMessage[];
   }): ChatThread {
@@ -159,6 +164,7 @@ export const useChatThreadStore = create<UseChatThreadsReturn>((set, get) => {
       model: input.model,
       effort: input.effort,
       modelOptions: input.modelOptions,
+      agentTurns: input.agentTurns,
       filePath: input.filePath,
       createdAt: now,
       updatedAt: now,
@@ -220,6 +226,7 @@ export const useChatThreadStore = create<UseChatThreadsReturn>((set, get) => {
               model: input.model,
               effort: input.effort,
               modelOptions: input.modelOptions,
+              agentTurns: input.agentTurns,
               filePath: input.filePath,
             });
 
@@ -230,6 +237,11 @@ export const useChatThreadStore = create<UseChatThreadsReturn>((set, get) => {
         effort: input.effort,
         modelOptions: input.modelOptions,
       });
+      replaceThread(thread.id, (current) =>
+        current.agentTurns === input.agentTurns
+          ? current
+          : { ...current, agentTurns: input.agentTurns, updatedAt: Date.now() },
+      );
       return get().threads.find((candidate) => candidate.id === thread.id) ?? thread;
     },
 

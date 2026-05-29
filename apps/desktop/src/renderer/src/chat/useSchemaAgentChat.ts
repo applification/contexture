@@ -1,6 +1,7 @@
 import type { ChatHistory, ChatMessage, ChatRole } from '@contexture/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ContextureSchemaAgentAPI } from '../../../preload/index.d';
+import { useAgentTurnsStore } from '../store/agent-turns';
 import { useChatComposerStore } from '../store/chat-composer';
 import type { ApplyResult, Op } from '../store/ops';
 import {
@@ -14,7 +15,7 @@ import {
   type SchemaAgentProvider,
   useSchemaAgentSettingsStore,
 } from '../store/schema-agent-settings';
-import { useUndoStore } from '../store/undo';
+import { subscribeUndoHistory, subscribeUndoMutations, useUndoStore } from '../store/undo';
 import {
   type SchemaAgentModelInfo,
   type SchemaAgentModelOptionDescriptor,
@@ -76,6 +77,14 @@ function mkMessage(role: ChatRole, content: string): ChatMessage {
   return { id: mkId(), role, content, createdAt: Date.now() };
 }
 
+function readToolError(result: unknown): string {
+  if (result && typeof result === 'object') {
+    const error = (result as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+  }
+  return 'Tool call failed';
+}
+
 export function useSchemaAgentChat({
   api,
   onMessagePersisted,
@@ -123,6 +132,7 @@ export function useSchemaAgentChat({
   const persistenceEnabled = useChatComposerStore((s) => s.chatHistoryPersistence);
   const assistantBufferRef = useRef('');
   const rafHandleRef = useRef<number | null>(null);
+  const pendingUserMessageRef = useRef<string | undefined>(undefined);
 
   const flushLiveAssistant = useCallback(() => {
     rafHandleRef.current = null;
@@ -182,12 +192,44 @@ export function useSchemaAgentChat({
     () => readEffortFromOptions(provider, selectedModelOptions, selectedModelInfo, effort),
     [provider, selectedModelOptions, selectedModelInfo, effort],
   );
+  const latestTurnContextRef = useRef({
+    schema,
+    provider,
+    model: selectedModel,
+    providerThreadRef,
+  });
   const modelsLoading = modelListState === 'loading' || modelListState === 'idle';
   const modelsUnavailable = modelListState === 'loaded' && visibleModels.length === 0;
 
   useEffect(() => {
     providerRef.current = provider;
   }, [provider]);
+
+  useEffect(() => {
+    latestTurnContextRef.current = {
+      schema,
+      provider,
+      model: selectedModel,
+      providerThreadRef,
+    };
+  }, [provider, providerThreadRef, schema, selectedModel]);
+
+  useEffect(() => {
+    const markDesynced = () => {
+      const thread = useSchemaAgentSessionStore.getState().providerThreadRef;
+      if (!thread) return;
+      setProviderThread(thread, true);
+    };
+    const unsubscribeMutations = subscribeUndoMutations((event) => {
+      if (event.meta.source === 'schema_agent') return;
+      markDesynced();
+    });
+    const unsubscribeHistory = subscribeUndoHistory(markDesynced);
+    return () => {
+      unsubscribeMutations();
+      unsubscribeHistory();
+    };
+  }, [setProviderThread]);
 
   useEffect(() => {
     let cancelled = false;
@@ -305,6 +347,7 @@ export function useSchemaAgentChat({
       const result: ApplyResult = useUndoStore
         .getState()
         .apply(op as Op, { source: 'schema_agent' });
+      useAgentTurnsStore.getState().recordToolResult({ id, op: op as Op, result });
       api.replyTool(id, result);
     });
   }, [api]);
@@ -329,10 +372,21 @@ export function useSchemaAgentChat({
   }, [api, scheduleLiveFlush]);
 
   useEffect(() => {
-    return api.onToolCallStarted(({ name }) => {
+    return api.onToolCallStarted(({ id, name, input }) => {
+      useAgentTurnsStore.getState().recordToolCallStarted({ id, name, input });
       appendMessage(mkMessage('assistant', `\`${name}\``));
     });
   }, [api, appendMessage]);
+
+  useEffect(() => {
+    return api.onToolCallFinished(({ id, name, ok, result }) => {
+      useAgentTurnsStore.getState().recordToolResult({
+        id,
+        name,
+        result: ok ? result : { error: readToolError(result) },
+      });
+    });
+  }, [api]);
 
   useEffect(() => {
     return api.onAssistantFinal(({ text }) => {
@@ -340,6 +394,7 @@ export function useSchemaAgentChat({
       assistantBufferRef.current = '';
       const trimmed = text.trim();
       const message = trimmed ? mkMessage('assistant', trimmed) : null;
+      if (trimmed) useAgentTurnsStore.getState().setAssistantText(trimmed);
       finishAssistant(message);
       if (message && persistenceEnabled) onMessagePersisted?.(message);
     });
@@ -365,6 +420,38 @@ export function useSchemaAgentChat({
       },
     };
     return bindTurnToUndo(subscriber, useUndoStore.getState());
+  }, [api]);
+
+  useEffect(() => {
+    const unsubBegin = api.onTurnBegin(() => {
+      const context = latestTurnContextRef.current;
+      useAgentTurnsStore.getState().begin({
+        userMessage: pendingUserMessageRef.current,
+        provider: context.provider,
+        model: context.model,
+        providerThreadRef: context.providerThreadRef,
+        before: context.schema,
+      });
+    });
+    const unsubCommit = api.onTurnCommit(() => {
+      useAgentTurnsStore.getState().finish({
+        status: 'committed',
+        after: useUndoStore.getState().schema,
+      });
+      pendingUserMessageRef.current = undefined;
+    });
+    const unsubRollback = api.onTurnRollback(() => {
+      useAgentTurnsStore.getState().finish({
+        status: 'rolled_back',
+        after: useUndoStore.getState().schema,
+      });
+      pendingUserMessageRef.current = undefined;
+    });
+    return () => {
+      unsubBegin();
+      unsubCommit();
+      unsubRollback();
+    };
   }, [api]);
 
   const send = useCallback(
@@ -393,6 +480,7 @@ export function useSchemaAgentChat({
       }
       const userMessage = mkMessage('user', trimmed);
       beginTurn(userMessage);
+      pendingUserMessageRef.current = trimmed;
       if (persistenceEnabled) onMessagePersisted?.(userMessage);
       assistantBufferRef.current = '';
       api.setIR(schema);
@@ -513,7 +601,10 @@ export function useSchemaAgentChat({
   );
 
   const hydrate = useCallback(
-    (next: ChatMessage[]) => hydrateHistoryState({ version: '1', messages: next }),
+    (next: ChatMessage[]) => {
+      hydrateHistoryState({ version: '1', messages: next });
+      useAgentTurnsStore.getState().reset();
+    },
     [hydrateHistoryState],
   );
   const hydrateHistory = useCallback(
@@ -526,6 +617,7 @@ export function useSchemaAgentChat({
           modelOptions: history.modelOptions,
         });
       }
+      useAgentTurnsStore.getState().hydrate(history.agentTurns ?? []);
       hydrateHistoryState(history);
       if (history.providerThreadRef) {
         api.threadSet(history.providerThreadRef).catch(() => undefined);
@@ -546,11 +638,15 @@ export function useSchemaAgentChat({
         ? { modelOptions: selectedModelOptions }
         : {}),
       ...(providerThreadRef ? { providerThreadRef } : {}),
+      ...(useAgentTurnsStore.getState().turns.length > 0
+        ? { agentTurns: useAgentTurnsStore.getState().turns }
+        : {}),
     };
     return history;
   }, [messages, provider, providerThreadRef, selectedEffort, selectedModel, selectedModelOptions]);
   const clear = useCallback(() => {
     clearTranscript();
+    useAgentTurnsStore.getState().reset();
     cancelLiveFlush();
     assistantBufferRef.current = '';
   }, [cancelLiveFlush, clearTranscript]);
