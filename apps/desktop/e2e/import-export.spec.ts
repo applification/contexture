@@ -22,8 +22,8 @@ test.describe('Import / export round-trip', () => {
     await page.waitForLoadState('domcontentloaded');
     // Prior specs in the same run leave an unsaved schema in
     // `window.localStorage` which `useSessionPersistence` restores on
-    // mount — that hides the empty state and the "Load allotment
-    // sample" button. Reset the in-memory schema to empty AND clear
+    // mount — that hides the empty state and the sample model button.
+    // Reset the in-memory schema to empty AND clear
     // the session key so the persistence loop doesn't immediately
     // re-write it (storage is cleared synchronously when the schema
     // becomes empty, but we belt-and-brace it).
@@ -45,7 +45,7 @@ test.describe('Import / export round-trip', () => {
   });
 
   test('round-trips the allotment sample through load + save', async () => {
-    await page.getByRole('button', { name: /load allotment sample/i }).click();
+    await page.getByRole('button', { name: /inspect sample convex model/i }).click();
     await expect(page.locator('[data-testid="type-node"]').first()).toBeVisible({
       timeout: 10_000,
     });

@@ -25,8 +25,10 @@ test.describe('App Launch', () => {
   });
 
   test('main content area renders', async () => {
-    // Empty state shows "Load allotment sample"; graph state shows .react-flow container
-    const hasEmptyState = await page.getByText('Load allotment sample').count();
+    // Empty state shows onboarding actions; graph state shows .react-flow container.
+    const hasEmptyState = await page
+      .getByRole('button', { name: /inspect sample convex model/i })
+      .count();
     const hasGraph = await page.locator('.react-flow').count();
     expect(hasEmptyState + hasGraph).toBeGreaterThan(0);
   });

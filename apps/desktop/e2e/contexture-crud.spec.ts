@@ -25,7 +25,7 @@ test.describe('Contexture CRUD', () => {
     await page.waitForLoadState('domcontentloaded');
     // `useSessionPersistence` restores any unsaved schema left in
     // `window.localStorage` by a prior spec, which would hide the
-    // empty state and the "Load allotment sample" button. Reset the
+    // empty state and the sample button. Reset the
     // in-memory schema to empty AND clear the session key so the
     // persistence loop doesn't immediately re-write it.
     await page.evaluate(() => {
@@ -46,8 +46,8 @@ test.describe('Contexture CRUD', () => {
   });
 
   test('loads the allotment sample and renders TypeNodes', async () => {
-    // Click the "Load allotment sample" button in the header.
-    const button = page.getByRole('button', { name: /load allotment sample/i });
+    // Click the sample model button in the start screen.
+    const button = page.getByRole('button', { name: /inspect sample convex model/i });
     await expect(button).toBeVisible({ timeout: 10_000 });
     await button.click();
 
@@ -133,7 +133,7 @@ test.describe('Contexture CRUD', () => {
     await expect(page.getByText('2 Convex tables · 3 refs · 3 indexes')).toBeVisible();
     await expect(page.getByText('no errors')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Schema' }).click();
+    await page.getByRole('button', { name: 'Schema', exact: true }).click();
     const source = page.getByTestId('schema-code');
     await expect(source).toContainText('user: defineTable');
     await expect(source).toContainText('.index("by_email", ["email"])');
