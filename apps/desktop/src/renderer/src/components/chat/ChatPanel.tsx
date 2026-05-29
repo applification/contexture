@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
+import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -144,6 +145,8 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   } = history;
 
   const [input, setInput] = useState('');
+  const [responsePending, setResponsePending] = useState(false);
+  const isWaitingForFinalResponse = responsePending || isStreaming;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Snapshot the last-persisted messages so we don't re-write the
@@ -221,6 +224,10 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     if (!desynced || !activeThreadId) return;
     markThreadDesynced(activeThreadId);
   }, [desynced, activeThreadId, markThreadDesynced]);
+
+  useEffect(() => {
+    if (!isStreaming) setResponsePending(false);
+  }, [isStreaming]);
 
   const messageCount = messages.length;
   useEffect(() => {
@@ -315,7 +322,12 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       const text = input.trim();
       if (!text || !canCompose) return;
       setInput('');
-      await send(text);
+      setResponsePending(true);
+      try {
+        await send(text);
+      } finally {
+        setResponsePending(false);
+      }
     },
     [canCompose, input, send],
   );
@@ -431,7 +443,12 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               </button>
             </div>
           )}
-          {recentAgentTurn && <AgentTurnSummaryCard turn={recentAgentTurn} />}
+          {recentAgentTurn && (
+            <AgentTurnSummaryCard
+              turn={recentAgentTurn}
+              isWaitingForFinalResponse={isWaitingForFinalResponse}
+            />
+          )}
           <div ref={messagesEndRef} />
         </div>
       )}
@@ -574,7 +591,13 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   );
 }
 
-function AgentTurnSummaryCard({ turn }: { turn: AgentTurnRecord }): React.JSX.Element {
+function AgentTurnSummaryCard({
+  turn,
+  isWaitingForFinalResponse,
+}: {
+  turn: AgentTurnRecord;
+  isWaitingForFinalResponse: boolean;
+}): React.JSX.Element {
   const applied = turn.ops.filter((op) => op.status === 'applied').length;
   const rejected = turn.ops.filter((op) => op.status === 'rejected').length;
   const pending =
@@ -601,9 +624,13 @@ function AgentTurnSummaryCard({ turn }: { turn: AgentTurnRecord }): React.JSX.El
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full rounded-md border border-border/70 bg-card/70 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          className={cn(
+            'relative w-full overflow-hidden rounded-md border border-border/70 bg-card/70 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition-colors',
+            'hover:border-primary/30 hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring',
+          )}
           data-testid="agent-turn-summary"
         >
+          {isWaitingForFinalResponse && <BorderBeam duration={6} size={100} />}
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="truncate font-medium text-foreground">{turn.summary}</div>

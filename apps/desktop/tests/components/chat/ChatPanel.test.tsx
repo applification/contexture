@@ -181,6 +181,62 @@ describe('ChatPanel', () => {
     expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
   });
 
+  it('highlights an applied agent turn while the final response is pending', () => {
+    useAgentTurnsStore.getState().begin({
+      before: { version: '1', types: [] },
+      userMessage: 'add a Plot type',
+      provider: 'codex',
+      model: 'gpt-5.4',
+    });
+    useAgentTurnsStore.getState().recordToolResult({
+      id: '1',
+      op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      result: { schema: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] } },
+    });
+
+    render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
+
+    expect(screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]')).not.toBe(
+      null,
+    );
+  });
+
+  it('highlights the agent turn from Enter submit until send completes', async () => {
+    let resolveSend: () => void = () => undefined;
+    const send = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+    useAgentTurnsStore.getState().begin({
+      before: { version: '1', types: [] },
+      userMessage: 'add a Plot type',
+      provider: 'codex',
+      model: 'gpt-5.4',
+    });
+
+    render(<ChatPanel chat={makeChat({ send })} />);
+
+    const textarea = screen.getByTestId('chat-input');
+    fireEvent.change(textarea, { target: { value: 'add a Plot type' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]'),
+      ).not.toBe(null),
+    );
+
+    resolveSend();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]')).toBe(
+        null,
+      ),
+    );
+  });
+
   it('does not offer agent turn undo after an intervening schema edit', async () => {
     useUndoStore.getState().apply({
       kind: 'add_type',
