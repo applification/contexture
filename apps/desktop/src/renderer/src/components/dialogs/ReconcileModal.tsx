@@ -212,6 +212,10 @@ export function ReconcileModal(): React.JSX.Element {
     diffMode === 'file-changes'
       ? `Current Contexture emit to on-disk ${displayName}`
       : `Contexture emit with selected ops to on-disk ${displayName}`;
+  const activeDiffHelper =
+    diffMode === 'file-changes'
+      ? 'This view always shows the original generated-file edit. Selection only affects Uncovered changes.'
+      : 'This view updates as you select ops, showing only changes not yet explained.';
 
   const handleApply = useCallback(() => {
     void (async () => {
@@ -485,6 +489,7 @@ export function ReconcileModal(): React.JSX.Element {
               <div>
                 <div className="text-xs font-medium">{activeDiffTitle}</div>
                 <div className="text-xs text-muted-foreground">{activeDiffSubtitle}</div>
+                <div className="text-xs text-muted-foreground">{activeDiffHelper}</div>
               </div>
               <div
                 role="tablist"

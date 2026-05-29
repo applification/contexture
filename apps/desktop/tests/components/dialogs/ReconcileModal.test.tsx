@@ -208,6 +208,7 @@ describe('ReconcileModal', () => {
 
     expect(screen.getByText('Generated file change')).toBeVisible();
     expect(screen.getByText(/Current Contexture emit to on-disk/)).toBeVisible();
+    expect(screen.getByText(/Selection only affects Uncovered changes/i)).toBeVisible();
     expect(screen.getByText('Proposed model ops')).toBeVisible();
     expect(screen.getByText(/1 selected of 1/i)).toBeVisible();
     expect(screen.getByTestId('reconcile-diff-new')).toHaveTextContent('title');
@@ -215,6 +216,7 @@ describe('ReconcileModal', () => {
     fireEvent.click(screen.getByRole('tab', { name: /uncovered changes/i }));
 
     await waitFor(() => expect(screen.getByText('Uncovered after selected ops')).toBeVisible());
+    expect(screen.getByText(/updates as you select ops/i)).toBeVisible();
     expect(screen.getByText(/0 uncovered lines/i)).toBeVisible();
     expect(screen.getByText(/selected ops fully explain/i)).toBeVisible();
     expect(screen.getByText(/selected ops reproduce the on-disk generated file/i)).toBeVisible();
