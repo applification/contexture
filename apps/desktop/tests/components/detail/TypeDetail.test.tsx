@@ -60,7 +60,7 @@ describe('TypeDetail', () => {
       const rows = screen.getAllByTestId('object-field-summary');
       expect(rows).toHaveLength(2);
       expect(screen.getByDisplayValue('area')).toBeInTheDocument();
-      expect(rows[1]).toHaveTextContent('?');
+      expect(rows[1]).not.toHaveTextContent('?');
     });
 
     it('renders field optionality as editable checkboxes', () => {

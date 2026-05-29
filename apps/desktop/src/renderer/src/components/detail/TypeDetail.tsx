@@ -294,9 +294,6 @@ function ObjectBody({
                       }
                     }}
                   />
-                  <span aria-hidden="true" className="inline-block w-[1ch] text-muted-foreground">
-                    {f.optional ? '?' : ''}
-                  </span>
                 </TableCell>
                 <TableCell className="px-2 py-1.5 text-center">
                   <Checkbox
