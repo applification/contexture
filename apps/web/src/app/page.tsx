@@ -512,7 +512,10 @@ function AgentTurnReviewDemo() {
               drift.
             </p>
           </div>
-          <MotionList className="overflow-hidden rounded-md border border-border/70 bg-background/60">
+          <MotionList
+            className="overflow-hidden rounded-md border border-border/70 bg-background/60"
+            trigger="mount"
+          >
             {agentSteps.map((step) => (
               <MotionItem
                 key={step.tool}
@@ -555,7 +558,10 @@ function AgentTurnReviewDemo() {
               </button>
             </MotionStatusBadge>
           </div>
-          <MotionList className="overflow-hidden rounded-md border border-border/70">
+          <MotionList
+            className="overflow-hidden rounded-md border border-border/70"
+            trigger="mount"
+          >
             {reviewRows.map((row) => (
               <MotionItem
                 key={row.label}

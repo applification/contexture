@@ -66,7 +66,15 @@ export function MotionSection({
   );
 }
 
-export function MotionList({ children, className }: { children: ReactNode; className?: string }) {
+export function MotionList({
+  children,
+  className,
+  trigger = 'in-view',
+}: {
+  children: ReactNode;
+  className?: string;
+  trigger?: 'in-view' | 'mount';
+}) {
   const ready = useMotionReady();
   const reducedMotion = useReducedMotion();
 
@@ -78,7 +86,9 @@ export function MotionList({ children, className }: { children: ReactNode; class
     <motion.div
       className={className}
       initial={reducedMotion ? false : 'hidden'}
-      animate="visible"
+      animate={trigger === 'mount' ? 'visible' : undefined}
+      whileInView={trigger === 'in-view' ? 'visible' : undefined}
+      viewport={trigger === 'in-view' ? { once: true, amount: 0.25 } : undefined}
       variants={reducedMotion ? undefined : listVariants}
     >
       {children}
