@@ -11,18 +11,7 @@ import {
   useSchemaAgentSettingsStore,
 } from '@renderer/store/schema-agent-settings';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
-import {
-  Bot,
-  Box,
-  ChevronDown,
-  GitBranch,
-  ListChecks,
-  Moon,
-  PanelRight,
-  Plus,
-  Sun,
-  Table2,
-} from 'lucide-react';
+import { Bot, ChevronDown, Moon, PanelRight, Plus, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +20,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { CreateTypeKind } from '../graph/interactions';
 import { GraphSearchBar } from './GraphSearchBar';
+import { TypeKindBadge, type TypeKindLabel } from './type-kind-badge';
+import { TypeKindIcon } from './type-kind-icon';
 
 interface ToolbarProps {
   onCreateType?: (kind: CreateTypeKind) => void;
@@ -151,26 +142,10 @@ export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-48 p-1" align="end">
-            <CreateTypeButton
-              icon={<Table2 className="size-4" />}
-              label="Table"
-              onClick={() => onCreateType('table')}
-            />
-            <CreateTypeButton
-              icon={<Box className="size-4" />}
-              label="Object"
-              onClick={() => onCreateType('object')}
-            />
-            <CreateTypeButton
-              icon={<ListChecks className="size-4" />}
-              label="Enum"
-              onClick={() => onCreateType('enum')}
-            />
-            <CreateTypeButton
-              icon={<GitBranch className="size-4" />}
-              label="Union"
-              onClick={() => onCreateType('union')}
-            />
+            <CreateTypeButton kind="table" label="Table" onClick={() => onCreateType('table')} />
+            <CreateTypeButton kind="object" label="Object" onClick={() => onCreateType('object')} />
+            <CreateTypeButton kind="enum" label="Enum" onClick={() => onCreateType('enum')} />
+            <CreateTypeButton kind="union" label="Union" onClick={() => onCreateType('union')} />
           </PopoverContent>
         </Popover>
       )}
@@ -296,11 +271,11 @@ export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
 }
 
 function CreateTypeButton({
-  icon,
+  kind,
   label,
   onClick,
 }: {
-  icon: React.ReactNode;
+  kind: TypeKindLabel;
   label: string;
   onClick: () => void;
 }): React.JSX.Element {
@@ -308,11 +283,12 @@ function CreateTypeButton({
     <Button
       type="button"
       variant="ghost"
+      aria-label={label}
       className="h-8 w-full justify-start gap-2 px-2 text-xs"
       onClick={onClick}
     >
-      {icon}
-      {label}
+      <TypeKindIcon kind={kind} />
+      <TypeKindBadge kind={kind} title={label} />
     </Button>
   );
 }

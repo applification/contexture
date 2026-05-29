@@ -15,25 +15,18 @@ import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { Search, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { TypeKindBadge, type TypeKindLabel } from './type-kind-badge';
+import { TypeKindIcon } from './type-kind-icon';
 
 interface Result {
   name: string;
   focusName: string;
   matchType: 'name' | 'description' | 'enum';
-  kindLabel: 'object' | 'table' | 'enum' | 'union' | 'raw';
+  kindLabel: TypeKindLabel;
   focusFieldName?: string;
   detail?: string;
 }
-
-const KIND_BADGE_STYLES: Record<Result['kindLabel'], CSSProperties> = {
-  object: badgeStyle('var(--graph-node-header-bg)'),
-  table: badgeStyle('var(--graph-node-table-accent)'),
-  enum: badgeStyle('var(--chart-3)'),
-  union: badgeStyle('var(--graph-edge-union)'),
-  raw: badgeStyle('var(--muted-foreground)'),
-};
 
 export function GraphSearchBar(): React.JSX.Element {
   const [query, setQuery] = useState('');
@@ -187,25 +180,15 @@ export function GraphSearchBar(): React.JSX.Element {
               key={`${r.name}-${r.focusName}-${r.detail ?? r.matchType}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(r)}
-              className={`flex w-full min-w-0 items-baseline gap-1.5 px-3 py-1.5 text-left text-xs transition-colors ${
+              className={`flex w-full min-w-0 items-center gap-1.5 px-3 py-1.5 text-left text-xs transition-colors ${
                 i === activeIndex
                   ? 'bg-secondary text-foreground'
                   : 'text-foreground hover:bg-secondary/60'
               }`}
             >
+              <TypeKindIcon kind={r.kindLabel} />
               <span className="min-w-0 flex-1 truncate">{r.name}</span>
-              <span
-                className="shrink-0 rounded border px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide"
-                style={KIND_BADGE_STYLES[r.kindLabel]}
-                title={r.detail}
-              >
-                {r.kindLabel}
-              </span>
-              {r.matchType === 'description' && (
-                <span className="shrink min-w-0 truncate text-muted-foreground/60">
-                  (in description)
-                </span>
-              )}
+              <TypeKindBadge kind={r.kindLabel} title={r.detail} />
             </button>
           ))}
         </div>
@@ -223,16 +206,8 @@ function unwrapRefTarget(t: FieldType): string | undefined {
 function kindLabel(type: {
   kind: 'object' | 'enum' | 'discriminatedUnion' | 'raw';
   table?: boolean;
-}): Result['kindLabel'] {
+}): TypeKindLabel {
   if (type.kind === 'object') return type.table ? 'table' : 'object';
   if (type.kind === 'discriminatedUnion') return 'union';
   return type.kind;
-}
-
-function badgeStyle(color: string): CSSProperties {
-  return {
-    background: `color-mix(in oklch, ${color} 12%, transparent)`,
-    borderColor: `color-mix(in oklch, ${color} 42%, var(--border))`,
-    color: `color-mix(in oklch, ${color} 70%, var(--foreground))`,
-  };
 }

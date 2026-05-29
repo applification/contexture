@@ -12,6 +12,7 @@ const schema: Schema = {
     {
       kind: 'object',
       name: 'Recipe',
+      description: 'Weeknight cooking plan',
       fields: [{ name: 'season', type: { kind: 'ref', typeName: 'Season' } }],
     },
     {
@@ -93,5 +94,16 @@ describe('GraphSearchBar', () => {
     expect(
       screen.getByRole('button', { name: /ArtworkSourceReference.*union/ }),
     ).toBeInTheDocument();
+  });
+
+  it('does not label description matches in the result row', () => {
+    render(<GraphSearchBar />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search types and enums' }), {
+      target: { value: 'weeknight' },
+    });
+
+    expect(screen.getByRole('button', { name: /Recipe.*object/ })).toBeInTheDocument();
+    expect(screen.queryByText('(in description)')).not.toBeInTheDocument();
   });
 });
