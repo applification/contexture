@@ -761,16 +761,33 @@ function CheckboxOption({
   onCheckedChange: (checked: boolean | 'indeterminate') => void;
 }) {
   const checkboxId = id ?? `field-${label.replace(/\s+/gu, '-')}`;
+  const labelId = `${checkboxId}-label`;
+  const descriptionId = `${checkboxId}-description`;
+
   return (
-    <div className="flex items-start gap-2 rounded-md border border-border/70 bg-card/50 p-2">
-      <Checkbox id={checkboxId} checked={checked} onCheckedChange={onCheckedChange} />
+    <Label
+      htmlFor={checkboxId}
+      className="flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-card/50 p-2 transition-colors hover:border-border hover:bg-muted/30 focus-within:border-ring focus-within:bg-muted/30"
+    >
+      <Checkbox
+        id={checkboxId}
+        checked={checked}
+        aria-labelledby={labelId}
+        aria-describedby={descriptionId}
+        onCheckedChange={onCheckedChange}
+      />
       <div className="min-w-0 space-y-0.5">
-        <Label htmlFor={checkboxId} className="block text-xs font-medium leading-none">
+        <span id={labelId} className="block text-xs font-medium leading-none">
           {label}
-        </Label>
-        <p className="text-[11px] leading-snug text-muted-foreground">{description}</p>
+        </span>
+        <p
+          id={descriptionId}
+          className="text-[11px] font-normal leading-snug text-muted-foreground"
+        >
+          {description}
+        </p>
       </div>
-    </div>
+    </Label>
   );
 }
 

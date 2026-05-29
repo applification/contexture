@@ -444,8 +444,8 @@ describe('FieldDetail', () => {
 
   it('optional / nullable checkboxes dispatch update_field', () => {
     const { dispatch } = setup({ name: 'n', type: { kind: 'string' } });
-    // First checkbox is "optional".
-    const optional = screen.getAllByRole('checkbox')[0];
+    const optional = screen.getByRole('checkbox', { name: 'Optional' });
+    expect(optional).toHaveAccessibleDescription('May be omitted');
     fireEvent.click(optional);
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
@@ -457,7 +457,9 @@ describe('FieldDetail', () => {
 
   it('server-derived checkbox dispatches update_field', () => {
     const { dispatch } = setup({ name: 'createdAt', type: { kind: 'date' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Server derived' }));
+    const serverDerived = screen.getByRole('checkbox', { name: 'Server derived' });
+    expect(serverDerived).toHaveAccessibleDescription('Computed by backend');
+    fireEvent.click(serverDerived);
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',

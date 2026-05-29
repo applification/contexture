@@ -215,20 +215,6 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         transition: 'opacity 0.15s ease, border-color 0.1s ease',
       }}
     >
-      {fieldsInSelectedType ? (
-        <div
-          aria-hidden="true"
-          data-testid="type-node-selection-rail"
-          style={{
-            position: 'absolute',
-            insetBlock: 0,
-            insetInlineStart: 0,
-            width: 4,
-            background: selectionAccent,
-            zIndex: 1,
-          }}
-        />
-      ) : null}
       {hasValidationIssues ? (
         <div
           aria-hidden="true"
@@ -556,7 +542,7 @@ function FieldRowButton({
         background: selected
           ? `color-mix(in oklch, ${selectionAccent} 22%, var(--graph-node-body-bg))`
           : groupSelected
-            ? `color-mix(in oklch, ${selectionAccent} 14%, var(--graph-node-body-bg))`
+            ? `color-mix(in oklch, ${selectionAccent} 10%, var(--graph-node-body-bg))`
             : highlighted
               ? `color-mix(in oklch, ${selectionAccent} 11%, var(--graph-node-body-bg))`
               : groupHighlighted
@@ -568,13 +554,15 @@ function FieldRowButton({
                     : undefined,
         boxShadow: selected
           ? `inset 4px 0 0 ${selectionAccent}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
-          : highlighted
-            ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 68%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
-            : searchFocused
-              ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
-              : hasValidationIssues
-                ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
-                : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
+          : groupSelected
+            ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 76%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+            : highlighted
+              ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 68%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+              : searchFocused
+                ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                : hasValidationIssues
+                  ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                  : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
       }}
     >
       <span

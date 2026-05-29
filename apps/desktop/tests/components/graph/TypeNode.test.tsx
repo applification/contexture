@@ -209,22 +209,24 @@ describe('TypeNode', () => {
 
     const fields = screen.getAllByTestId('type-node-field');
     expect(fields[0]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 14%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
     });
     expect(fields[1]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 14%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
     });
     expect(screen.getByText('name')).toHaveStyle({
       color: 'color-mix(in oklch, var(--graph-node-header-bg) 46%, var(--foreground))',
       fontWeight: '400',
     });
-    expect(screen.getByTestId('type-node-selection-rail')).toHaveStyle({
-      width: '4px',
-      background: 'var(--graph-node-header-bg)',
-    });
+    expect(fields[0].getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
+    );
+    expect(fields[1].getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
+    );
   });
 
-  it('uses a table rail only when the parent table is selected', () => {
+  it('uses table-accent field rails when the parent table is selected', () => {
     const data: TypeNodeData = {
       typeName: 'Posts',
       kind: 'object',
@@ -236,10 +238,9 @@ describe('TypeNode', () => {
 
     render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('type-node-selection-rail')).toHaveStyle({
-      width: '4px',
-      background: 'var(--graph-node-table-accent)',
-    });
+    expect(screen.getByTestId('type-node-field').getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-table-accent) 76%, transparent)',
+    );
   });
 
   it('uses a lighter selected-color treatment for field hover', () => {
