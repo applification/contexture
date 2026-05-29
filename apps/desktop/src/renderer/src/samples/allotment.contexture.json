@@ -37,6 +37,8 @@
       "kind": "object",
       "name": "Grower",
       "description": "Person responsible for a plot.",
+      "table": true,
+      "tableName": "growers",
       "fields": [
         { "name": "name", "type": { "kind": "ref", "typeName": "identity.PersonName" } },
         {
@@ -49,12 +51,15 @@
           "type": { "kind": "ref", "typeName": "identity.Handle" },
           "optional": true
         }
-      ]
+      ],
+      "indexes": [{ "name": "by_handle", "fields": ["handle"] }]
     },
     {
       "kind": "object",
       "name": "Plot",
       "description": "A single plot on the allotment.",
+      "table": true,
+      "tableName": "plots",
       "fields": [
         { "name": "name", "type": { "kind": "string", "min": 1 } },
         { "name": "areaSqm", "type": { "kind": "number", "min": 0 } },
@@ -64,39 +69,55 @@
           "optional": true
         },
         { "name": "grower", "type": { "kind": "ref", "typeName": "Grower" } }
-      ]
+      ],
+      "indexes": [{ "name": "by_grower", "fields": ["grower"] }]
     },
     {
       "kind": "object",
       "name": "Crop",
       "description": "A crop variety being grown.",
+      "table": true,
+      "tableName": "crops",
       "fields": [
         { "name": "name", "type": { "kind": "string", "min": 1 } },
         { "name": "family", "type": { "kind": "ref", "typeName": "CropFamily" } },
         { "name": "varietyNotes", "type": { "kind": "string" }, "optional": true }
-      ]
+      ],
+      "indexes": [{ "name": "by_family", "fields": ["family"] }]
     },
     {
       "kind": "object",
       "name": "Sowing",
       "description": "A planned or actual sowing of a crop into a plot.",
+      "table": true,
+      "tableName": "sowings",
       "fields": [
         { "name": "plot", "type": { "kind": "ref", "typeName": "Plot" } },
         { "name": "crop", "type": { "kind": "ref", "typeName": "Crop" } },
         { "name": "sownOn", "type": { "kind": "ref", "typeName": "common.ISODate" } },
         { "name": "season", "type": { "kind": "ref", "typeName": "Season" } }
+      ],
+      "indexes": [
+        { "name": "by_plot", "fields": ["plot"] },
+        { "name": "by_crop_and_season", "fields": ["crop", "season"] }
       ]
     },
     {
       "kind": "object",
       "name": "Harvest",
       "description": "A harvest event recording yield from a plot/crop pairing.",
+      "table": true,
+      "tableName": "harvests",
       "fields": [
         { "name": "plot", "type": { "kind": "ref", "typeName": "Plot" } },
         { "name": "crop", "type": { "kind": "ref", "typeName": "Crop" } },
         { "name": "date", "type": { "kind": "ref", "typeName": "common.ISODate" } },
         { "name": "quantityKg", "type": { "kind": "number", "min": 0 } },
         { "name": "notes", "type": { "kind": "string" }, "optional": true }
+      ],
+      "indexes": [
+        { "name": "by_plot_and_date", "fields": ["plot", "date"] },
+        { "name": "by_crop_and_date", "fields": ["crop", "date"] }
       ]
     }
   ]
