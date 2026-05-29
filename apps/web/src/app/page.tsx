@@ -430,7 +430,7 @@ const highlightedConvexLineIds = new Set([
 
 function ConvexGeneratedPreview() {
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 bg-card/70 text-left screenshot-glow">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/70 text-left screenshot-glow">
       <div className="flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3">
         <div>
           <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
@@ -443,7 +443,7 @@ function ConvexGeneratedPreview() {
           Drift clean
         </MotionStatusBadge>
       </div>
-      <pre className="overflow-x-auto p-4 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+      <pre className="max-w-full overflow-x-auto p-4 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
         <code>
           {convexPreviewLines.map((line, index) => (
             <span
@@ -468,7 +468,7 @@ function ConvexGeneratedPreview() {
       </pre>
       <div className="border-t border-border/60 bg-background/50 px-4 py-3">
         <div className="font-mono text-xs text-primary dark:text-accent">convex/validators.ts</div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground break-words">
           Reusable validators emit beside the schema for functions, forms, and app boundaries.
         </p>
       </div>
@@ -900,11 +900,11 @@ export default function Home() {
           </div>
 
           {/* Two-column: generated surface preview + description */}
-          <div className="grid sm:grid-cols-5 gap-8 sm:gap-12 items-center">
-            <div className="sm:col-span-2">
+          <div className="grid min-w-0 sm:grid-cols-5 gap-8 sm:gap-12 items-center">
+            <div className="min-w-0 sm:col-span-2">
               <ConvexGeneratedPreview />
             </div>
-            <div className="sm:col-span-3 space-y-6">
+            <div className="min-w-0 sm:col-span-3 space-y-6">
               <h3 className="text-2xl font-bold tracking-tight">
                 See generated Convex files before they land in git
               </h3>
@@ -918,7 +918,7 @@ export default function Home() {
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Zap className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">
+                  <span className="min-w-0 text-muted-foreground">
                     Convex schema, validators, Zod, JSON Schema, structured output, MCP, and forms
                   </span>
                 </div>
@@ -926,7 +926,7 @@ export default function Home() {
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Shield className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">
+                  <span className="min-w-0 text-muted-foreground">
                     Manifest-backed drift checks for every emitted target
                   </span>
                 </div>
@@ -934,7 +934,7 @@ export default function Home() {
                   <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
                     <Brain className="size-4 text-accent" />
                   </div>
-                  <span className="text-muted-foreground">
+                  <span className="min-w-0 text-muted-foreground">
                     MCP tools for agents that need to inspect, mutate, emit, and validate
                   </span>
                 </div>
@@ -946,8 +946,8 @@ export default function Home() {
 
       {/* Reconcile */}
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
-        <div className="relative max-w-5xl mx-auto grid gap-8 sm:grid-cols-5 sm:gap-12 items-center">
-          <div className="sm:col-span-3 space-y-6">
+        <div className="relative max-w-5xl mx-auto grid min-w-0 gap-8 sm:grid-cols-5 sm:gap-12 items-center">
+          <div className="min-w-0 sm:col-span-3 space-y-6">
             <div className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent font-medium px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
               <GitPullRequestArrow className="size-4" />
               Reconcile as review
@@ -978,7 +978,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="sm:col-span-2">
+          <div className="min-w-0 sm:col-span-2">
             <ReconcileDemo />
           </div>
         </div>
