@@ -25,7 +25,6 @@ import {
   MotionStatusBadge,
 } from '@/components/homepage-motion';
 import { TrackedLink } from '@/components/tracked-link';
-import { AnimatedGraph } from '@/components/ui/animated-graph';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { MobileNav } from '@/components/ui/mobile-nav';
 import { ThemeImage } from '@/components/ui/theme-image';
@@ -71,6 +70,86 @@ function GithubIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+
+function HeroSideGraph() {
+  const leftPaths = [
+    'M -24 156 C 58 148, 116 112, 204 132 S 310 214, 392 190',
+    'M -16 246 C 78 244, 134 294, 222 270 S 318 244, 406 286',
+    'M 18 354 C 104 326, 168 360, 248 338 S 330 286, 418 312',
+  ];
+  const rightPaths = [
+    'M 1464 146 C 1376 144, 1318 106, 1234 130 S 1124 222, 1042 190',
+    'M 1456 254 C 1362 252, 1304 300, 1218 270 S 1122 244, 1032 288',
+    'M 1422 358 C 1336 330, 1272 360, 1192 338 S 1112 288, 1024 314',
+  ];
+  const nodes = [
+    [126, 118, 'primary'],
+    [206, 132, 'accent'],
+    [300, 204, 'primary'],
+    [150, 296, 'primary'],
+    [246, 270, 'accent'],
+    [336, 256, 'primary'],
+    [116, 330, 'accent'],
+    [246, 338, 'primary'],
+    [392, 312, 'accent'],
+    [1314, 112, 'primary'],
+    [1234, 130, 'accent'],
+    [1136, 210, 'primary'],
+    [1292, 298, 'primary'],
+    [1218, 270, 'accent'],
+    [1108, 252, 'primary'],
+    [1324, 334, 'accent'],
+    [1192, 338, 'primary'],
+    [1048, 314, 'accent'],
+  ] as const;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute left-1/2 top-8 z-0 hidden h-[64%] w-screen -translate-x-1/2 lg:block"
+      viewBox="0 0 1440 520"
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <linearGradient id="hero-side-graph-left" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="var(--border)" stopOpacity="0" />
+          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.22" />
+          <stop offset="0.74" stopColor="var(--accent)" stopOpacity="0.26" />
+          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="hero-side-graph-right" x1="1" x2="0" y1="0" y2="0">
+          <stop offset="0" stopColor="var(--border)" stopOpacity="0" />
+          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.22" />
+          <stop offset="0.74" stopColor="var(--accent)" stopOpacity="0.26" />
+          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+        </linearGradient>
+        <filter id="hero-side-graph-soften" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="0.35" />
+        </filter>
+      </defs>
+      <g fill="none" strokeLinecap="round" strokeWidth="1.2" filter="url(#hero-side-graph-soften)">
+        {leftPaths.map((path) => (
+          <path key={path} d={path} stroke="url(#hero-side-graph-left)" />
+        ))}
+        {rightPaths.map((path) => (
+          <path key={path} d={path} stroke="url(#hero-side-graph-right)" />
+        ))}
+      </g>
+      <g>
+        {nodes.map(([cx, cy, tone]) => (
+          <circle
+            key={`${cx}-${cy}`}
+            cx={cx}
+            cy={cy}
+            r="4"
+            fill={`var(--${tone})`}
+            opacity={tone === 'accent' ? '0.36' : '0.26'}
+          />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -736,11 +815,6 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative px-4 sm:px-8">
-        {/* Animated node graph background — hidden on mobile to reduce GPU work */}
-        <div className="hidden sm:block">
-          <AnimatedGraph />
-        </div>
-
         <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-primary dark:text-accent font-medium mb-6 tracking-widest uppercase">
             Convex model editor + MCP server
@@ -790,8 +864,9 @@ export default function Home() {
 
         {/* Hero screenshot — perspective tilt for depth */}
         <div className="relative max-w-5xl mx-auto pb-16 sm:pb-32">
+          <HeroSideGraph />
           <HeroScreenshotMotion
-            className="animate-fade-in-up-delay-3 relative rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500"
+            className="animate-fade-in-up-delay-3 relative z-10 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500"
             style={{ perspective: '1200px' }}
           >
             <div style={{ transform: 'rotateX(2deg)', transformOrigin: 'bottom center' }}>
