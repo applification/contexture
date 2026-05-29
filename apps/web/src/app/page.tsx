@@ -25,6 +25,7 @@ import {
   MotionStatusBadge,
 } from '@/components/homepage-motion';
 import { TrackedLink } from '@/components/tracked-link';
+import { AnimatedGraph } from '@/components/ui/animated-graph';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { MobileNav } from '@/components/ui/mobile-nav';
 import { ThemeImage } from '@/components/ui/theme-image';
@@ -109,6 +110,7 @@ function HeroSideGraph() {
   return (
     <svg
       aria-hidden="true"
+      data-testid="hero-side-graph"
       className="pointer-events-none absolute left-1/2 top-8 z-0 hidden h-[64%] w-screen -translate-x-1/2 lg:block"
       viewBox="0 0 1440 520"
       preserveAspectRatio="none"
@@ -815,7 +817,14 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative px-4 sm:px-8">
-        <div className="relative max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
+        <div
+          data-testid="hero-animated-graph"
+          className="pointer-events-none absolute inset-0 z-0 hidden sm:block"
+        >
+          <AnimatedGraph />
+        </div>
+
+        <div className="relative z-10 max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
           <p className="animate-fade-in-up text-sm text-primary dark:text-accent font-medium mb-6 tracking-widest uppercase">
             Convex model editor + MCP server
           </p>
@@ -863,7 +872,7 @@ export default function Home() {
         </div>
 
         {/* Hero screenshot — perspective tilt for depth */}
-        <div className="relative max-w-5xl mx-auto pb-16 sm:pb-32">
+        <div className="relative z-10 max-w-5xl mx-auto pb-16 sm:pb-32">
           <HeroSideGraph />
           <HeroScreenshotMotion
             className="animate-fade-in-up-delay-3 relative z-10 rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500"

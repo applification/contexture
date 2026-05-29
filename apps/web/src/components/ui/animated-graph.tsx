@@ -22,8 +22,6 @@ export function AnimatedGraph() {
   const animRef = useRef<number>(0);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
     const cvs = canvasRef.current;
     if (!cvs) return;
 
@@ -32,31 +30,35 @@ export function AnimatedGraph() {
 
     const canvas = cvs;
     const ctx = context;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const w = () => canvas.offsetWidth;
+    const h = () => canvas.offsetHeight;
+
+    function seedNodes() {
+      nodesRef.current = Array.from({ length: NODE_COUNT }, (_, i) => ({
+        x: Math.random() * w(),
+        y: Math.random() * h(),
+        vx: (Math.random() - 0.5) * NODE_SPEED,
+        vy: (Math.random() - 0.5) * NODE_SPEED,
+        isAccent: i % 3 === 0,
+        outerR: 6 + Math.random() * 4,
+        innerR: 3 + Math.random() * 2,
+      }));
+    }
 
     function resize() {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = canvas.offsetWidth * dpr;
       canvas.height = canvas.offsetHeight * dpr;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     resize();
-
-    const w = () => canvas.offsetWidth;
-    const h = () => canvas.offsetHeight;
-
-    nodesRef.current = Array.from({ length: NODE_COUNT }, (_, i) => ({
-      x: Math.random() * w(),
-      y: Math.random() * h(),
-      vx: (Math.random() - 0.5) * NODE_SPEED,
-      vy: (Math.random() - 0.5) * NODE_SPEED,
-      isAccent: i % 3 === 0,
-      outerR: 6 + Math.random() * 4,
-      innerR: 3 + Math.random() * 2,
-    }));
+    seedNodes();
 
     const style = getComputedStyle(document.documentElement);
 
-    function draw() {
+    function draw(advance: boolean) {
       const width = w();
       const height = h();
       ctx.clearRect(0, 0, width, height);
@@ -65,13 +67,15 @@ export function AnimatedGraph() {
       const primary = style.getPropertyValue('--primary').trim();
       const accent = style.getPropertyValue('--accent').trim();
 
-      for (const node of nodes) {
-        node.x += node.vx;
-        node.y += node.vy;
-        if (node.x < 0 || node.x > width) node.vx *= -1;
-        if (node.y < 0 || node.y > height) node.vy *= -1;
-        node.x = Math.max(0, Math.min(width, node.x));
-        node.y = Math.max(0, Math.min(height, node.y));
+      if (advance) {
+        for (const node of nodes) {
+          node.x += node.vx;
+          node.y += node.vy;
+          if (node.x < 0 || node.x > width) node.vx *= -1;
+          if (node.y < 0 || node.y > height) node.vy *= -1;
+          node.x = Math.max(0, Math.min(width, node.x));
+          node.y = Math.max(0, Math.min(height, node.y));
+        }
       }
 
       for (let i = 0; i < nodes.length; i++) {
@@ -109,12 +113,23 @@ export function AnimatedGraph() {
       }
 
       ctx.globalAlpha = 1;
-      animRef.current = requestAnimationFrame(draw);
     }
 
-    draw();
+    function animate() {
+      draw(true);
+      animRef.current = requestAnimationFrame(animate);
+    }
 
-    const ro = new ResizeObserver(resize);
+    if (reduceMotion) {
+      draw(false);
+    } else {
+      animate();
+    }
+
+    const ro = new ResizeObserver(() => {
+      resize();
+      if (reduceMotion) draw(false);
+    });
     ro.observe(canvas);
 
     return () => {

@@ -9,6 +9,12 @@ test.describe('Home page', () => {
     await expect(page.locator('nav')).toBeVisible();
   });
 
+  test('hero keeps animated nodes and side graph treatment', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('hero-animated-graph').locator('canvas')).toBeVisible();
+    await expect(page.getByTestId('hero-side-graph')).toBeVisible();
+  });
+
   test('navigation links are present', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('nav a[href="#features"]')).toBeVisible();
