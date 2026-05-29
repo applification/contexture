@@ -27,7 +27,21 @@ import {
 } from '@contexture/core/generated-targets';
 import type { Schema } from '@contexture/core/ir';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
-import { ChevronDown, Clock, MousePointer2, SlidersHorizontal } from 'lucide-react';
+import {
+  Bot,
+  Boxes,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  FileCode2,
+  FilePlus2,
+  FolderOpen,
+  GitCompareArrows,
+  GitPullRequestArrow,
+  MousePointer2,
+  Save,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { useSchemaAgentChat } from './chat/useSchemaAgentChat';
@@ -68,6 +82,7 @@ import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
 import { useDocumentStore } from './store/document';
+import { useDriftStore } from './store/drift';
 import { useGraphLayoutStore } from './store/layout-config';
 import { useModelSyncStore } from './store/model-sync';
 import { type EdgeSelection, type FieldSelection, useGraphSelectionStore } from './store/selection';
@@ -97,6 +112,9 @@ export default function App(): React.JSX.Element {
   const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
+  const isDirty = useDocumentStore((s) => s.isDirty);
+  const filePath = useDocumentStore((s) => s.filePath);
+  const driftedPaths = useDriftStore((s) => s.driftedPaths);
 
   // Drive the collapse/expand imperative API from the UI-store flag so
   // the Toolbar's sidebar button toggles the same thing as a user drag
@@ -261,12 +279,6 @@ export default function App(): React.JSX.Element {
     return () => document.removeEventListener('keydown', onKey);
   }, [createFieldForSelectedType, createType, focusSelectedTypeName, selectedField]);
 
-  const loadSample = useCallback(() => {
-    useUndoStore
-      .getState()
-      .apply({ kind: 'replace_schema', schema: allotment as unknown as never });
-  }, []);
-
   const schemaAgentApi = useMemo(
     () =>
       typeof window !== 'undefined' && window.contexture?.schemaAgent
@@ -299,6 +311,26 @@ export default function App(): React.JSX.Element {
     onRestoreSession: () => undefined,
   });
 
+  const startNewModel = useCallback((): void => {
+    fileMenu.handleNew();
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('properties');
+  }, [fileMenu]);
+
+  const openExistingModel = useCallback((): void => {
+    void fileMenu.handleOpen();
+  }, [fileMenu]);
+
+  const loadSample = useCallback(() => {
+    fileMenu.handleNew();
+    useUndoStore
+      .getState()
+      .apply({ kind: 'replace_schema', schema: allotment as unknown as never }, { log: false });
+    useDocumentStore.getState().markDirty();
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('schema');
+  }, [fileMenu]);
+
   // Pull the recent-files list when the empty state might need it and
   // again whenever the file-path changes (a successful open/save
   // bumps the list).
@@ -319,14 +351,16 @@ export default function App(): React.JSX.Element {
 
   const detailTypeName = selectedField?.typeName ?? selectedEdge?.data.sourceType ?? selectedNodeId;
   const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
+  const onboardingState = useMemo(
+    () => buildOnboardingState(schema, activeTab, filePath, isDirty, driftedPaths.length),
+    [activeTab, driftedPaths.length, filePath, isDirty, schema],
+  );
 
   // Emit generated sources for the SchemaPanel. Only runs while the
   // Schema tab is active so we don't burn cycles on every IR change
   // when the user is looking at Chat / Properties. Wrapped in try/catch
   // so a malformed intermediate state (e.g. during a multi-op chat
   // turn) surfaces as an in-panel error rather than crashing the sidebar.
-  const filePath = useDocumentStore((s) => s.filePath);
-
   const schemaEmissions = useMemo((): {
     sources: SchemaPanelSource[];
     error: string | null;
@@ -412,7 +446,7 @@ export default function App(): React.JSX.Element {
             <ModelSyncBanner />
             <div className="relative flex-1 min-h-0">
               {hasSchema && (
-                <div className="absolute top-2 left-2 z-10">
+                <div className="absolute top-2 left-2 z-20">
                   <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
                     <PopoverTrigger asChild>
                       <Button
@@ -439,6 +473,8 @@ export default function App(): React.JSX.Element {
                 />
               ) : (
                 <EmptyState
+                  onNewModel={startNewModel}
+                  onOpenModel={openExistingModel}
                   onLoadSample={loadSample}
                   recentFiles={recentFiles}
                   onOpenRecent={fileMenu.handleOpenPath}
@@ -502,6 +538,16 @@ export default function App(): React.JSX.Element {
                 <ChatPanel chat={chat} />
               </div>
               <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                {hasSchema && (
+                  <OnboardingLoopPanel
+                    state={onboardingState}
+                    onSave={() => void fileMenu.handleSave()}
+                    onShowAgent={() => {
+                      useUIChromeStore.getState().setSidebarVisible(true);
+                      useUIChromeStore.getState().setSidebarTab('chat');
+                    }}
+                  />
+                )}
                 <SchemaPanel
                   sources={schemaEmissions.sources}
                   isEmpty={!hasSchema}
@@ -545,6 +591,8 @@ function edgeSelectionExists(schema: Schema, edge: EdgeSelection['data']): boole
 }
 
 function EmptyState({
+  onNewModel,
+  onOpenModel,
   onLoadSample,
   recentFiles,
   onOpenRecent,
@@ -552,6 +600,8 @@ function EmptyState({
   projectName = null,
   providerLabel,
 }: {
+  onNewModel: () => void;
+  onOpenModel: () => void;
   onLoadSample: () => void;
   recentFiles: string[];
   onOpenRecent: (path: string) => void;
@@ -580,41 +630,386 @@ function EmptyState({
           </p>
         </div>
       ) : (
-        <div className="relative z-10 text-center text-muted-foreground max-w-sm">
-          <h1 className="text-2xl font-semibold mb-1 text-foreground tracking-tight">Contexture</h1>
-          <p className="text-xs text-muted-foreground/70 mb-3">Convex model control plane</p>
-          <p className="text-sm mb-4">
-            Open a <code className="text-xs">.contexture.json</code> file or start chatting with
-            {` ${providerLabel}`} to create one.
-          </p>
-          <Button onClick={onLoadSample}>Load allotment sample</Button>
-
-          {recentFiles.length > 0 && (
-            <div className="mt-6 text-left">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70 mb-2">
-                <Clock className="size-3" />
-                <span>Recent files</span>
+        <div className="relative z-10 grid max-h-[calc(100%-2rem)] w-full max-w-5xl grid-cols-[minmax(0,1fr)_18rem] gap-4 overflow-y-auto px-6 py-2 text-muted-foreground max-lg:max-w-2xl max-lg:grid-cols-1">
+          <GhostSchemaPreview />
+          <section className="relative overflow-hidden rounded-md border border-border/60 bg-card/75 p-4 shadow-sm backdrop-blur-md">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+                  Contexture
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Start a Convex model, inspect generated files, and keep drift visible.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {['IR source', 'Generated schema', 'Drift checks', 'Agent ops'].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-0.5">
-                {recentFiles.slice(0, 5).map((fp) => (
+              <FileCode2 className="mt-1 size-5 shrink-0 text-primary" aria-hidden="true" />
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <StartAction
+                icon={<FilePlus2 />}
+                title="Create new Convex model"
+                description="Begin with an empty .contexture.json source of truth."
+                onClick={onNewModel}
+                testId="start-new-model"
+                emphasis
+              />
+              <StartAction
+                icon={<FolderOpen />}
+                title="Open existing model"
+                description="Load a saved .contexture.json bundle from disk."
+                onClick={onOpenModel}
+                testId="start-open-model"
+              />
+              <StartAction
+                icon={<Boxes />}
+                title="Inspect sample Convex model"
+                description="Open a small app with tables, refs, enums, indexes, and outputs."
+                onClick={onLoadSample}
+                testId="start-load-sample"
+              />
+              <StartAction
+                icon={<Bot />}
+                title={`Work with ${providerLabel}`}
+                description="Agent changes are proposed as Contexture ops for review."
+                onClick={() => {
+                  useUIChromeStore.getState().setSidebarVisible(true);
+                  useUIChromeStore.getState().setSidebarTab('chat');
+                }}
+                testId="start-open-agent"
+              />
+            </div>
+
+            <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+              <LoopStep label="1" text="Model tables, fields, refs, and indexes in the IR." />
+              <LoopStep label="2" text="Generate Convex schema and validators from the IR." />
+              <LoopStep label="3" text="Review drift and supervised agent ops before shipping." />
+            </div>
+          </section>
+
+          <section className="rounded-md border border-border/60 bg-card/75 p-3 shadow-sm backdrop-blur-md">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <Clock className="size-3.5" />
+              <span>Recent models</span>
+            </div>
+            {recentFiles.length > 0 ? (
+              <div className="space-y-1">
+                {recentFiles.slice(0, 6).map((fp) => (
                   <button
                     type="button"
                     key={fp}
                     onClick={() => onOpenRecent(fp)}
-                    className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-secondary/60 transition-colors truncate"
+                    className="w-full cursor-pointer rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     title={fp}
                   >
-                    {fp.split('/').pop()}
-                    <span className="text-muted-foreground/50 ml-1.5">
+                    <span className="block truncate font-medium text-foreground">
+                      {fp.split('/').pop()}
+                    </span>
+                    <span className="block truncate text-muted-foreground/70">
                       {fp.split('/').slice(0, -1).join('/')}
                     </span>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="rounded border border-dashed border-border/80 p-2 text-xs leading-snug">
+                Saved Contexture models appear here after you open or save them.
+              </p>
+            )}
+          </section>
         </div>
       )}
+    </div>
+  );
+}
+
+interface OnboardingState {
+  hasTable: boolean;
+  hasField: boolean;
+  hasRef: boolean;
+  hasIndex: boolean;
+  outputsVisible: boolean;
+  hasSavedOutputs: boolean;
+  driftClean: boolean;
+}
+
+function buildOnboardingState(
+  schema: Schema,
+  activeTab: string,
+  filePath: string | null,
+  isDirty: boolean,
+  driftedCount: number,
+): OnboardingState {
+  const objects = schema.types.filter((type) => type.kind === 'object');
+  return {
+    hasTable: objects.some((type) => type.table === true),
+    hasField: objects.some((type) => type.fields.length > 0),
+    hasRef: objects.some((type) => type.fields.some((field) => field.type.kind === 'ref')),
+    hasIndex: objects.some((type) => (type.indexes ?? []).length > 0),
+    outputsVisible: activeTab === 'schema',
+    hasSavedOutputs: filePath !== null && !isDirty,
+    driftClean: filePath !== null && driftedCount === 0,
+  };
+}
+
+function OnboardingLoopPanel({
+  state,
+  onSave,
+  onShowAgent,
+}: {
+  state: OnboardingState;
+  onSave: () => void;
+  onShowAgent: () => void;
+}): React.JSX.Element {
+  const steps = [
+    { label: 'Table', done: state.hasTable },
+    { label: 'Fields', done: state.hasField },
+    { label: 'Ref', done: state.hasRef },
+    { label: 'Index', done: state.hasIndex },
+    { label: 'Outputs', done: state.outputsVisible },
+    { label: 'Saved', done: state.hasSavedOutputs },
+    { label: 'Drift clean', done: state.driftClean },
+  ];
+
+  return (
+    <aside
+      className="border-b border-border bg-background p-3 text-xs"
+      aria-label="First Contexture loop"
+      data-testid="onboarding-loop"
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-foreground">First Convex loop</h2>
+          <p className="mt-0.5 text-muted-foreground">
+            The IR is the source; generated files can be replaced any time.
+          </p>
+        </div>
+        <GitCompareArrows className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </div>
+
+      <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {steps.map((step) => (
+          <li
+            key={step.label}
+            className="flex min-h-8 items-center gap-1.5 rounded border border-border/70 bg-card/70 px-2"
+            aria-label={`${step.label} ${step.done ? 'complete' : 'incomplete'}`}
+          >
+            {step.done ? (
+              <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+            ) : (
+              <span
+                className="size-3.5 shrink-0 rounded-full border border-muted-foreground/40"
+                aria-hidden="true"
+              />
+            )}
+            <span className={step.done ? 'text-foreground' : 'text-muted-foreground'}>
+              {step.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div
+          className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-secondary px-2 text-xs text-secondary-foreground"
+          aria-current="page"
+        >
+          <FileCode2 className="size-3.5" />
+          Generated files visible
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-8 gap-1.5 px-2 text-xs"
+          onClick={onSave}
+        >
+          <Save className="size-3.5" />
+          Save and emit
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-8 gap-1.5 px-2 text-xs"
+          onClick={onShowAgent}
+        >
+          <Bot className="size-3.5" />
+          Supervise agent ops
+        </Button>
+      </div>
+    </aside>
+  );
+}
+
+function StartAction({
+  icon,
+  title,
+  description,
+  onClick,
+  testId,
+  emphasis = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+  testId: string;
+  emphasis?: boolean;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-24 cursor-pointer items-start gap-3 rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        emphasis
+          ? 'border-primary/45 bg-primary/10 hover:border-primary/75 hover:bg-primary/20'
+          : 'border-border bg-background/70 hover:border-primary/45 hover:bg-primary/10'
+      }`}
+      data-testid={testId}
+    >
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-md [&>svg]:size-4 ${
+          emphasis ? 'bg-primary/15 text-primary' : 'bg-secondary text-muted-foreground'
+        }`}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-1 block text-xs leading-snug text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function GhostSchemaPreview(): React.JSX.Element {
+  return (
+    <div
+      className="pointer-events-none absolute -right-2 -top-8 z-0 hidden h-56 w-80 opacity-75 lg:block"
+      aria-hidden="true"
+    >
+      <svg className="h-full w-full overflow-visible" viewBox="0 0 320 224" role="presentation">
+        <path
+          d="M94 78 C140 42 170 34 226 58"
+          fill="none"
+          stroke="var(--graph-node-selected)"
+          strokeOpacity="0.36"
+          strokeWidth="2"
+        />
+        <path
+          d="M104 130 C148 154 186 154 232 128"
+          fill="none"
+          stroke="var(--graph-edge-ref)"
+          strokeOpacity="0.32"
+          strokeWidth="2"
+        />
+        <SchemaPreviewNode x={16} y={54} title="Plot" fields={['name', 'grower']} table />
+        <SchemaPreviewNode x={198} y={35} title="Grower" fields={['name', 'handle']} />
+        <SchemaPreviewNode x={202} y={114} title="Sowing" fields={['plot', 'season']} table />
+        <g transform="translate(44 168)">
+          <rect
+            width="176"
+            height="30"
+            rx="6"
+            fill="var(--card)"
+            fillOpacity="0.88"
+            stroke="var(--border)"
+          />
+          <FileCode2 className="translate-x-3 translate-y-2 text-primary" size={14} />
+          <text x="30" y="19" fill="var(--foreground)" fontSize="11" fontFamily="Geist">
+            convex/schema.ts
+          </text>
+          <GitPullRequestArrow
+            className="translate-x-[142px] translate-y-2 text-muted-foreground"
+            size={14}
+          />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function SchemaPreviewNode({
+  x,
+  y,
+  title,
+  fields,
+  table = false,
+}: {
+  x: number;
+  y: number;
+  title: string;
+  fields: string[];
+  table?: boolean;
+}): React.JSX.Element {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <rect
+        width="112"
+        height="72"
+        rx="8"
+        fill="var(--graph-node-body-bg)"
+        stroke={table ? 'var(--graph-node-selected)' : 'var(--graph-node-border)'}
+        strokeWidth={table ? 1.5 : 1}
+      />
+      <rect
+        width="112"
+        height="24"
+        rx="8"
+        fill={table ? 'var(--graph-node-table-header-bg)' : 'var(--graph-node-header-bg)'}
+      />
+      <path
+        d="M0 16 Q0 24 8 24 H104 Q112 24 112 16 V24 H0 Z"
+        fill={table ? 'var(--graph-node-table-header-bg)' : 'var(--graph-node-header-bg)'}
+      />
+      <text
+        x="10"
+        y="16"
+        fill="var(--graph-node-header-text)"
+        fontSize="11"
+        fontWeight="600"
+        fontFamily="Geist"
+      >
+        {title}
+      </text>
+      {fields.map((field, index) => (
+        <g key={field} transform={`translate(10 ${38 + index * 16})`}>
+          <circle r="2" fill="var(--graph-node-table-accent)" />
+          <text
+            x="9"
+            y="4"
+            fill="var(--foreground)"
+            fillOpacity="0.76"
+            fontSize="10"
+            fontFamily="Geist Mono"
+          >
+            {field}
+          </text>
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function LoopStep({ label, text }: { label: string; text: string }): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2 rounded border border-border/70 bg-background/70 p-2">
+      <span className="flex size-5 shrink-0 items-center justify-center rounded border border-border text-[10px] font-semibold text-foreground">
+        {label}
+      </span>
+      <span className="leading-snug">{text}</span>
     </div>
   );
 }

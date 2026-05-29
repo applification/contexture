@@ -29,6 +29,7 @@ export function GraphBackground() {
     // Store in consts so closures retain the non-null narrowing
     const canvas: HTMLCanvasElement = cvs;
     const ctx: CanvasRenderingContext2D = context;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function resize() {
       const dpr = window.devicePixelRatio || 1;
@@ -61,16 +62,19 @@ export function GraphBackground() {
 
       const nodes = nodesRef.current;
       const primaryColor = style.getPropertyValue('--primary').trim() || 'oklch(0.45 0.15 270)';
-      const accentColor = style.getPropertyValue('--accent').trim() || 'oklch(0.75 0.15 195)';
+      const accentColor =
+        style.getPropertyValue('--graph-node-selected').trim() || 'oklch(0.75 0.15 195)';
 
       // Update positions
-      for (const node of nodes) {
-        node.x += node.vx;
-        node.y += node.vy;
-        if (node.x < 0 || node.x > width) node.vx *= -1;
-        if (node.y < 0 || node.y > height) node.vy *= -1;
-        node.x = Math.max(0, Math.min(width, node.x));
-        node.y = Math.max(0, Math.min(height, node.y));
+      if (!reduceMotion) {
+        for (const node of nodes) {
+          node.x += node.vx;
+          node.y += node.vy;
+          if (node.x < 0 || node.x > width) node.vx *= -1;
+          if (node.y < 0 || node.y > height) node.vy *= -1;
+          node.x = Math.max(0, Math.min(width, node.x));
+          node.y = Math.max(0, Math.min(height, node.y));
+        }
       }
 
       // Draw connections
@@ -110,7 +114,9 @@ export function GraphBackground() {
 
       ctx.globalAlpha = 1;
 
-      animRef.current = requestAnimationFrame(draw);
+      if (!reduceMotion) {
+        animRef.current = requestAnimationFrame(draw);
+      }
     }
 
     draw();
