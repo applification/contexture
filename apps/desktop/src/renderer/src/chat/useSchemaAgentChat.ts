@@ -15,7 +15,7 @@ import {
   type SchemaAgentProvider,
   useSchemaAgentSettingsStore,
 } from '../store/schema-agent-settings';
-import { subscribeUndoMutations, useUndoStore } from '../store/undo';
+import { subscribeUndoHistory, subscribeUndoMutations, useUndoStore } from '../store/undo';
 import {
   type SchemaAgentModelInfo,
   type SchemaAgentModelOptionDescriptor,
@@ -75,6 +75,14 @@ function mkId(): string {
 
 function mkMessage(role: ChatRole, content: string): ChatMessage {
   return { id: mkId(), role, content, createdAt: Date.now() };
+}
+
+function readToolError(result: unknown): string {
+  if (result && typeof result === 'object') {
+    const error = (result as { error?: unknown }).error;
+    if (typeof error === 'string') return error;
+  }
+  return 'Tool call failed';
 }
 
 export function useSchemaAgentChat({
@@ -207,12 +215,20 @@ export function useSchemaAgentChat({
   }, [provider, providerThreadRef, schema, selectedModel]);
 
   useEffect(() => {
-    return subscribeUndoMutations((event) => {
-      if (event.meta.source === 'schema_agent') return;
-      const thread = latestTurnContextRef.current.providerThreadRef;
+    const markDesynced = () => {
+      const thread = useSchemaAgentSessionStore.getState().providerThreadRef;
       if (!thread) return;
       setProviderThread(thread, true);
+    };
+    const unsubscribeMutations = subscribeUndoMutations((event) => {
+      if (event.meta.source === 'schema_agent') return;
+      markDesynced();
     });
+    const unsubscribeHistory = subscribeUndoHistory(markDesynced);
+    return () => {
+      unsubscribeMutations();
+      unsubscribeHistory();
+    };
   }, [setProviderThread]);
 
   useEffect(() => {
@@ -361,6 +377,16 @@ export function useSchemaAgentChat({
       appendMessage(mkMessage('assistant', `\`${name}\``));
     });
   }, [api, appendMessage]);
+
+  useEffect(() => {
+    return api.onToolCallFinished(({ id, name, ok, result }) => {
+      useAgentTurnsStore.getState().recordToolResult({
+        id,
+        name,
+        result: ok ? result : { error: readToolError(result) },
+      });
+    });
+  }, [api]);
 
   useEffect(() => {
     return api.onAssistantFinal(({ text }) => {

@@ -103,7 +103,7 @@ export const useAgentTurnsStore = create<AgentTurnsState>((set, get) => ({
       const turns = state.turns.map((turn) => {
         if (turn.id !== activeTurnId) return turn;
         const existing = turn.ops.find((op) => op.id === input.id);
-        const status = isApplyError(input.result) ? 'rejected' : input.op ? 'applied' : 'non_op';
+        const status = input.op ? (isApplyError(input.result) ? 'rejected' : 'applied') : 'non_op';
         const nextOp: AgentTurnOpResult = {
           id: input.id,
           name: input.name ?? existing?.name ?? opKind(input.op),

@@ -5,7 +5,9 @@
  * discarded with a warning rather than blocking the Contexture IR.
  */
 
-import type { AgentTurnRecord } from './agent-turn-ledger';
+import type { AgentTurnOpResult, AgentTurnRecord } from './agent-turn-ledger';
+import { IRSchema } from './ir';
+import { OpSchema } from './ops';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -144,11 +146,66 @@ function sanitiseAgentTurns(input: unknown): AgentTurnRecord[] {
     ) {
       continue;
     }
-    turns.push(record as unknown as AgentTurnRecord);
+    turns.push({
+      id: record.id,
+      status: record.status,
+      startedAt: record.startedAt,
+      ...(typeof record.finishedAt === 'string' ? { finishedAt: record.finishedAt } : {}),
+      ...(typeof record.userMessage === 'string' ? { userMessage: record.userMessage } : {}),
+      ...(typeof record.assistantText === 'string' ? { assistantText: record.assistantText } : {}),
+      ...(typeof record.provider === 'string' ? { provider: record.provider } : {}),
+      ...(typeof record.model === 'string' ? { model: record.model } : {}),
+      ...(record.providerThreadRef ? { providerThreadRef: record.providerThreadRef } : {}),
+      ...(typeof record.beforeHash === 'string' ? { beforeHash: record.beforeHash } : {}),
+      ...(typeof record.afterHash === 'string' ? { afterHash: record.afterHash } : {}),
+      ...readSchemaField('before', record.before),
+      ...readSchemaField('after', record.after),
+      ops: sanitiseAgentTurnOps(record.ops),
+      summary: record.summary,
+    });
   }
   return turns;
 }
 
-function isAgentTurnStatus(value: unknown): boolean {
+function sanitiseAgentTurnOps(input: unknown): AgentTurnOpResult[] {
+  if (!Array.isArray(input)) return [];
+  const ops: AgentTurnOpResult[] = [];
+  for (const value of input) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    if (
+      typeof record.id !== 'string' ||
+      typeof record.name !== 'string' ||
+      !isAgentTurnOpStatus(record.status)
+    ) {
+      continue;
+    }
+    const parsedOp = OpSchema.safeParse(record.op);
+    ops.push({
+      id: record.id,
+      name: record.name,
+      status: record.status,
+      ...(record.input !== undefined ? { input: record.input } : {}),
+      ...(parsedOp.success ? { op: parsedOp.data } : {}),
+      ...(typeof record.error === 'string' ? { error: record.error } : {}),
+      ...(record.result !== undefined ? { result: record.result } : {}),
+    });
+  }
+  return ops;
+}
+
+function readSchemaField(
+  key: 'before' | 'after',
+  value: unknown,
+): Partial<Pick<AgentTurnRecord, 'before' | 'after'>> {
+  const parsed = IRSchema.safeParse(value);
+  return parsed.success ? { [key]: parsed.data } : {};
+}
+
+function isAgentTurnStatus(value: unknown): value is AgentTurnRecord['status'] {
   return value === 'running' || value === 'committed' || value === 'rolled_back';
+}
+
+function isAgentTurnOpStatus(value: unknown): value is AgentTurnOpResult['status'] {
+  return value === 'pending' || value === 'applied' || value === 'rejected' || value === 'non_op';
 }

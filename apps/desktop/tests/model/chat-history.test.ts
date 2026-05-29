@@ -87,6 +87,38 @@ describe('chat history sidecar', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('drops malformed agent turn snapshots and ops without discarding chat history', () => {
+    const raw = JSON.stringify({
+      version: '1',
+      messages: [{ id: 'm1', role: 'user', content: 'hi', createdAt: 1 }],
+      agentTurns: [
+        {
+          id: 'turn-1',
+          status: 'committed',
+          startedAt: '2026-05-29T09:00:00.000Z',
+          before: {},
+          after: { version: '1', types: [] },
+          ops: [
+            { id: 'op-1', name: 'add_type', status: 'applied', op: { kind: 'not_real' } },
+            { id: 'op-2', name: 'emit_contexture', status: 'non_op', result: { emitted: [] } },
+          ],
+          summary: 'Agent applied 1 model change',
+        },
+      ],
+    });
+    const { history, warnings } = loadChatHistory(raw);
+
+    expect(history.messages).toHaveLength(1);
+    expect(history.agentTurns?.[0]?.before).toBeUndefined();
+    expect(history.agentTurns?.[0]?.after).toEqual({ version: '1', types: [] });
+    expect(history.agentTurns?.[0]?.ops).toEqual([
+      expect.objectContaining({ id: 'op-1', name: 'add_type', status: 'applied' }),
+      expect.objectContaining({ id: 'op-2', name: 'emit_contexture', status: 'non_op' }),
+    ]);
+    expect(history.agentTurns?.[0]?.ops[0]?.op).toBeUndefined();
+    expect(warnings).toEqual([]);
+  });
+
   it('ignores unknown sidecar fields', () => {
     const raw = JSON.stringify({
       version: '1',

@@ -181,6 +181,38 @@ describe('ChatPanel', () => {
     expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
   });
 
+  it('does not offer agent turn undo after an intervening schema edit', async () => {
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    useAgentTurnsStore.getState().begin({
+      before: { version: '1', types: [] },
+      userMessage: 'add a Plot type',
+      provider: 'codex',
+      model: 'gpt-5.4',
+    });
+    useAgentTurnsStore.getState().recordToolResult({
+      id: '1',
+      op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      result: { schema: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] } },
+    });
+    useAgentTurnsStore.getState().finish({
+      status: 'committed',
+      after: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] },
+    });
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'ManualEdit', fields: [] },
+    });
+
+    render(<ChatPanel chat={makeChat()} />);
+
+    fireEvent.click(screen.getByTestId('agent-turn-summary'));
+    await waitFor(() => expect(screen.getByText('Schema diff')).toBeInTheDocument());
+    expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
+  });
+
   it('Enter in the textarea calls chat.send with the trimmed draft', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     render(<ChatPanel chat={makeChat({ send })} />);

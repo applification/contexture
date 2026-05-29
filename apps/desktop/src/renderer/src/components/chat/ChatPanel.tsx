@@ -27,6 +27,7 @@ import {
   type AgentTurnRecord,
   describeAgentTurnOp,
   diffAgentTurnSchema,
+  hashAgentTurnSchema,
   summarizeAgentTurnSchemaDiff,
 } from '@contexture/core/agent-turn-ledger';
 import { type ChatThread, useChatThreads } from '@renderer/chat/useChatThreads';
@@ -581,11 +582,19 @@ function AgentTurnSummaryCard({ turn }: { turn: AgentTurnRecord }): React.JSX.El
   const diffRows = summarizeAgentTurnSchemaDiff(diffAgentTurnSchema(turn.before, turn.after));
   const canUndo = useUndoStore((s) => s.canUndo);
   const undo = useUndoStore((s) => s.undo);
+  const schema = useUndoStore((s) => s.schema);
   const markRolledBack = useAgentTurnsStore((s) => s.markRolledBack);
+  const canUndoTurn =
+    turn.status === 'committed' &&
+    applied > 0 &&
+    canUndo &&
+    !!turn.afterHash &&
+    hashAgentTurnSchema(schema) === turn.afterHash;
   const handleUndo = useCallback(() => {
+    if (!canUndoTurn) return;
     undo();
     markRolledBack(turn.id);
-  }, [markRolledBack, turn.id, undo]);
+  }, [canUndoTurn, markRolledBack, turn.id, undo]);
 
   return (
     <Popover>
@@ -625,11 +634,7 @@ function AgentTurnSummaryCard({ turn }: { turn: AgentTurnRecord }): React.JSX.El
         sideOffset={8}
         className="w-[min(24rem,calc(100vw-2rem))] p-0"
       >
-        <AgentTurnDetail
-          turn={turn}
-          canUndo={turn.status === 'committed' && applied > 0 && canUndo}
-          onUndo={handleUndo}
-        />
+        <AgentTurnDetail turn={turn} canUndo={canUndoTurn} onUndo={handleUndo} />
       </PopoverContent>
     </Popover>
   );

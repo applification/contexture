@@ -14,6 +14,9 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
     assistantDelta: new Set<Listener<{ text: string }>>(),
     assistantFinal: new Set<Listener<{ text: string }>>(),
     toolCallStarted: new Set<Listener<{ id: string; name: string; input?: unknown }>>(),
+    toolCallFinished: new Set<
+      Listener<{ id: string; name: string; ok: boolean; result?: unknown }>
+    >(),
     error: new Set<Listener<{ message: string }>>(),
     statusChanged: new Set<Listener<unknown>>(),
     turnBegin: new Set<() => void>(),
@@ -70,7 +73,10 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
       listeners.toolCallStarted.add(l);
       return () => listeners.toolCallStarted.delete(l);
     },
-    onToolCallFinished: () => () => undefined,
+    onToolCallFinished: (l) => {
+      listeners.toolCallFinished.add(l);
+      return () => listeners.toolCallFinished.delete(l);
+    },
     onError: (l) => {
       listeners.error.add(l);
       return () => listeners.error.delete(l);
@@ -118,6 +124,11 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
     },
     toolCallStarted: (p: { id: string; name: string; input?: unknown }) => {
       listeners.toolCallStarted.forEach((l) => {
+        l(p);
+      });
+    },
+    toolCallFinished: (p: { id: string; name: string; ok: boolean; result?: unknown }) => {
+      listeners.toolCallFinished.forEach((l) => {
         l(p);
       });
     },
@@ -306,6 +317,66 @@ describe('useSchemaAgentChat', () => {
         ],
       }),
     ]);
+  });
+
+  it('records completed non-op tools in the agent turn ledger', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('emit and check drift');
+    });
+    act(() => {
+      emit.turnBegin();
+      emit.toolCallStarted({ id: 'emit-1', name: 'emit_contexture', input: {} });
+      emit.toolCallFinished({
+        id: 'emit-1',
+        name: 'emit_contexture',
+        ok: true,
+        result: { emitted: ['convex/schema.ts'] },
+      });
+      emit.toolCallStarted({ id: 'drift-1', name: 'check_contexture_drift', input: {} });
+      emit.toolCallFinished({
+        id: 'drift-1',
+        name: 'check_contexture_drift',
+        ok: true,
+        result: { clean: true },
+      });
+      emit.turnCommit();
+    });
+
+    expect(useAgentTurnsStore.getState().turns[0]).toEqual(
+      expect.objectContaining({
+        summary: 'Agent emitted generated files and checked drift: clean',
+        ops: [
+          expect.objectContaining({ id: 'emit-1', name: 'emit_contexture', status: 'non_op' }),
+          expect.objectContaining({
+            id: 'drift-1',
+            name: 'check_contexture_drift',
+            status: 'non_op',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('marks provider threads stale after undo and redo', async () => {
+    const { api, emit } = makeApi();
+    renderHook(() => useSchemaAgentChat({ api }));
+
+    act(() => {
+      emit.threadUpdated({ thread: { provider: 'codex', threadId: 'thread-1' } });
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'Plot', fields: [] },
+      });
+      useUndoStore.getState().undo();
+    });
+
+    expect(useSchemaAgentSessionStore.getState().desynced).toBe(true);
   });
 
   it('surfaces non-ready Codex status', async () => {
