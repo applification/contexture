@@ -5,6 +5,8 @@
  * discarded with a warning rather than blocking the Contexture IR.
  */
 
+import type { AgentTurnRecord } from './agent-turn-ledger';
+
 export type ChatRole = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
@@ -22,6 +24,7 @@ export interface ChatHistory {
   model?: string;
   effort?: string;
   modelOptions?: Record<string, string | boolean>;
+  agentTurns?: AgentTurnRecord[];
 }
 
 export interface LoadChatHistoryResult {
@@ -75,6 +78,7 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
   const model = typeof obj.model === 'string' ? obj.model : undefined;
   const effort = typeof obj.effort === 'string' ? obj.effort : undefined;
   const modelOptions = sanitiseModelOptions(obj.modelOptions);
+  const agentTurns = sanitiseAgentTurns(obj.agentTurns);
   return {
     history: {
       version: CHAT_HISTORY_VERSION,
@@ -84,6 +88,7 @@ export function loadChatHistory(raw: string): LoadChatHistoryResult {
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
       ...(modelOptions ? { modelOptions } : {}),
+      ...(agentTurns.length > 0 ? { agentTurns } : {}),
     },
     warnings: [],
   };
@@ -122,4 +127,28 @@ function sanitiseModelOptions(input: unknown): Record<string, string | boolean> 
       typeof entry[1] === 'string' || typeof entry[1] === 'boolean',
   );
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function sanitiseAgentTurns(input: unknown): AgentTurnRecord[] {
+  if (!Array.isArray(input)) return [];
+  const turns: AgentTurnRecord[] = [];
+  for (const value of input) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    if (
+      typeof record.id !== 'string' ||
+      !isAgentTurnStatus(record.status) ||
+      typeof record.startedAt !== 'string' ||
+      !Array.isArray(record.ops) ||
+      typeof record.summary !== 'string'
+    ) {
+      continue;
+    }
+    turns.push(record as unknown as AgentTurnRecord);
+  }
+  return turns;
+}
+
+function isAgentTurnStatus(value: unknown): boolean {
+  return value === 'running' || value === 'committed' || value === 'rolled_back';
 }

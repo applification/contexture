@@ -32,11 +32,40 @@ This is the difference between AI-assisted modeling and a chatbot that edits fil
 - Surface successful, rejected, and pending changes clearly.
 - Integrate agent changes with undo, reconcile, sync, and drift.
 
+## Current Baseline
+
+Contexture already has the foundations this goal depends on:
+
+- a closed-world op vocabulary shared by the UI, chat, CLI, and MCP paths
+- structural and semantic validation inside the shared op applier
+- provider-neutral schema-agent runtime adapters for Codex and Claude
+- whole-turn undo transactions for schema-agent tool calls
+- change-log storage and a Changes panel with raw-entry inspection
+- provider thread desync signaling
+- MCP tools for inspecting, validating, applying ops, emitting, and checking drift
+- reconcile and generated-drift flows that already preserve the IR as source of truth
+
+Goal 4 should therefore not create a second mutation or review system. It should
+promote these primitives into a durable, user-facing agent-turn oversight
+workflow.
+
 ## Key Work
+
+### Agent Turn Ledger
+
+- Add a durable agent-turn record that groups attempted ops, applied ops,
+  rejected ops, assistant output, provider/thread metadata, and final turn state.
+- Link each turn record to the undo transaction that landed its successful ops.
+- Store enough before/after hash context to prove which model snapshot the turn
+  started from and where it ended.
+- Preserve raw tool inputs/results for debugging while also producing readable
+  summaries for normal review.
+- Treat turns with no model changes as valid review units when they explain,
+  inspect, emit, or check drift.
 
 ### Operation-Centered Turns
 
-- Record every agent-applied op in a readable change log.
+- Record every agent-applied or rejected op in a readable turn ledger.
 - Group multiple ops into one agent turn.
 - Show user-facing summaries such as:
   - added `Release`
@@ -47,7 +76,8 @@ This is the difference between AI-assisted modeling and a chatbot that edits fil
 
 ### Review And Undo
 
-- Let users undo a whole agent turn.
+- Build on the existing whole-turn undo transaction so users can undo a whole
+  agent turn.
 - Consider before/after review for larger multi-op turns.
 - Show which ops succeeded and which were rejected.
 - Explain validation failures in terms both the user and agent can act on.
@@ -106,10 +136,35 @@ This is the difference between AI-assisted modeling and a chatbot that edits fil
 
 - Existing schema-agent provider runtime.
 - Existing op applier and semantic gate.
+- Existing whole-turn undo transaction boundary.
+- Existing change log and Changes panel.
 - Existing chat history and provider thread concepts.
 - Model authoring improvements that make ops map cleanly to visible model concepts.
 - Reconcile and drift flows for generated output review.
 
 ## Priority
 
-High. This becomes most valuable once Convex-first authoring and reconcile workflows are strong.
+High. The first implementation priority is a durable agent-turn ledger that
+captures attempted ops, applied ops, rejected ops, generated artifact actions,
+drift checks, assistant text, provider/thread metadata, and undo linkage as one
+reviewable unit.
+
+## Implementation Status
+
+Implemented in the desktop schema-agent workflow:
+
+- Durable agent-turn records are captured, persisted with chat history, and
+  restored when switching file-backed threads.
+- Each turn records provider/model metadata, assistant text, attempted tool
+  calls, applied/rejected op results, before/after schema snapshots, and
+  deterministic snapshot hashes.
+- The chat transcript shows the latest turn as a reviewable unit with applied,
+  rejected, and pending counts.
+- Hover/focus review shows readable operation rows, validation failures, a
+  schema diff summary, and the raw turn record for debugging.
+- Committed turns with applied ops expose whole-turn undo through the existing
+  schema-agent undo transaction.
+- Provider threads are marked desynced when non-agent model edits happen under
+  an active provider thread.
+- Generated emit and drift-check tool results are treated as no-model-change
+  turn actions when they appear in the provider tool stream.

@@ -7,6 +7,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./agent-turn-ledger": "./src/agent-turn-ledger.ts",
     "./change-log": "./src/change-log.ts",
     "./emit-ai-tool-schemas": "./src/emit-ai-tool-schemas.ts",
     "./emit-convex": "./src/emit-convex.ts",

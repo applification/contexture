@@ -22,14 +22,33 @@
  */
 
 import type { ChatMessage } from '@contexture/core';
+import {
+  type AgentTurnOpResult,
+  type AgentTurnRecord,
+  describeAgentTurnOp,
+  diffAgentTurnSchema,
+  summarizeAgentTurnSchemaDiff,
+} from '@contexture/core/agent-turn-ledger';
 import { type ChatThread, useChatThreads } from '@renderer/chat/useChatThreads';
 import type {
   SchemaAgentChatState,
   SchemaAgentModelOptionDescriptor,
 } from '@renderer/chat/useSchemaAgentChat';
+import { useAgentTurnsStore } from '@renderer/store/agent-turns';
 import { useDocumentStore } from '@renderer/store/document';
+import { useUndoStore } from '@renderer/store/undo';
 import { code } from '@streamdown/code';
-import { ArrowUp, BotMessageSquare, List, Square, SquarePen } from 'lucide-react';
+import {
+  ArrowUp,
+  BotMessageSquare,
+  CheckCircle2,
+  Clock3,
+  List,
+  RotateCcw,
+  Square,
+  SquarePen,
+  XCircle,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { Button } from '@/components/ui/button';
@@ -41,6 +60,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -66,6 +86,7 @@ function historyFromThread(thread: ChatThread) {
     ...(thread.effort ? { effort: thread.effort } : {}),
     ...(thread.modelOptions ? { modelOptions: thread.modelOptions } : {}),
     ...(thread.providerThreadRef ? { providerThreadRef: thread.providerThreadRef } : {}),
+    ...(thread.agentTurns ? { agentTurns: thread.agentTurns } : {}),
   };
 }
 
@@ -97,6 +118,8 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const unavailableMessage = chat.unavailableMessage;
   const providerThreadRef = chat.providerThreadRef;
   const desynced = chat.desynced;
+  const recentAgentTurn = useAgentTurnsStore((s) => s.turns[0] ?? null);
+  const agentTurns = useAgentTurnsStore((s) => s.turns);
   const hasUsableModel = providerModels.some((option) => option.id === modelSelectValue);
   const canCompose =
     isReady && !isStreaming && hasUsableModel && !modelsLoading && !modelsUnavailable;
@@ -126,6 +149,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   // active thread for no reason (hydrate from a switch would otherwise
   // trigger a spurious update).
   const prevMessagesRef = useRef<ChatMessage[] | null>(null);
+  const prevAgentTurnsRef = useRef<AgentTurnRecord[] | null>(null);
 
   // Enter the current document's chat scope. The store owns the
   // lifecycle policy: untitled documents stay ephemeral, while
@@ -135,16 +159,18 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     if (!thread) {
       hydrateHistory({ version: '1', messages: [] });
       prevMessagesRef.current = [];
+      prevAgentTurnsRef.current = [];
       return;
     }
     hydrateHistory(historyFromThread(thread));
     prevMessagesRef.current = thread.messages;
+    prevAgentTurnsRef.current = thread.agentTurns ?? [];
   }, [filePath, enterDocumentScope, hydrateHistory]);
 
   // Persist messages into the active file-backed thread whenever they
   // change. Untitled transcripts remain in-memory.
   useEffect(() => {
-    if (messages === prevMessagesRef.current) return;
+    if (messages === prevMessagesRef.current && agentTurns === prevAgentTurnsRef.current) return;
     if (messages.length === 0) return;
     persistActiveTranscript({
       messages,
@@ -152,9 +178,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       model,
       effort: thinkingBudget,
       modelOptions: currentModelOptions,
+      agentTurns,
       filePath,
     });
     prevMessagesRef.current = messages;
+    prevAgentTurnsRef.current = agentTurns;
   }, [
     messages,
     persistActiveTranscript,
@@ -162,6 +190,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     model,
     thinkingBudget,
     currentModelOptions,
+    agentTurns,
     filePath,
   ]);
 
@@ -213,6 +242,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       hydrateHistory({ version: '1', messages: [] });
       setInput('');
       prevMessagesRef.current = [];
+      prevAgentTurnsRef.current = [];
       setShowThreadList(false);
       return;
     }
@@ -231,6 +261,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     hydrateHistory({ version: '1', messages: [] });
     setInput('');
     prevMessagesRef.current = [];
+    prevAgentTurnsRef.current = [];
     setShowThreadList(false);
   }, [
     activeThreadId,
@@ -254,6 +285,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       switchThread(id);
       hydrateHistory(historyFromThread(thread));
       prevMessagesRef.current = thread.messages;
+      prevAgentTurnsRef.current = thread.agentTurns ?? [];
     },
     [threads, switchThread, hydrateHistory],
   );
@@ -266,9 +298,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       if (next) {
         hydrateHistory(historyFromThread(next));
         prevMessagesRef.current = next.messages;
+        prevAgentTurnsRef.current = next.agentTurns ?? [];
       } else {
         hydrateHistory({ version: '1', messages: [] });
         prevMessagesRef.current = [];
+        prevAgentTurnsRef.current = [];
       }
     },
     [activeThreadId, deleteThread, filePath, hydrateHistory],
@@ -396,6 +430,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               </button>
             </div>
           )}
+          {recentAgentTurn && <AgentTurnSummaryCard turn={recentAgentTurn} />}
           <div ref={messagesEndRef} />
         </div>
       )}
@@ -536,6 +571,228 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       </form>
     </div>
   );
+}
+
+function AgentTurnSummaryCard({ turn }: { turn: AgentTurnRecord }): React.JSX.Element {
+  const applied = turn.ops.filter((op) => op.status === 'applied').length;
+  const rejected = turn.ops.filter((op) => op.status === 'rejected').length;
+  const pending =
+    turn.status === 'running' ? turn.ops.filter((op) => op.status === 'pending').length : 0;
+  const diffRows = summarizeAgentTurnSchemaDiff(diffAgentTurnSchema(turn.before, turn.after));
+  const canUndo = useUndoStore((s) => s.canUndo);
+  const undo = useUndoStore((s) => s.undo);
+  const markRolledBack = useAgentTurnsStore((s) => s.markRolledBack);
+  const handleUndo = useCallback(() => {
+    undo();
+    markRolledBack(turn.id);
+  }, [markRolledBack, turn.id, undo]);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full rounded-md border border-border/70 bg-card/70 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          data-testid="agent-turn-summary"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate font-medium text-foreground">{turn.summary}</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <AgentTurnMetaPill>{turnStatusLabel(turn.status)}</AgentTurnMetaPill>
+                <span>{applied} applied</span>
+                {rejected > 0 && <span className="text-destructive">{rejected} rejected</span>}
+                {pending > 0 && <span>{pending} pending</span>}
+              </div>
+              {diffRows.length > 0 && (
+                <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                  {diffRows.slice(0, 2).join(', ')}
+                </div>
+              )}
+            </div>
+            {turn.status === 'committed' && applied > 0 && (
+              <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+            )}
+            {turn.status === 'rolled_back' && (
+              <RotateCcw className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            )}
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        side="top"
+        sideOffset={8}
+        className="w-[min(24rem,calc(100vw-2rem))] p-0"
+      >
+        <AgentTurnDetail
+          turn={turn}
+          canUndo={turn.status === 'committed' && applied > 0 && canUndo}
+          onUndo={handleUndo}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function AgentTurnDetail({
+  turn,
+  canUndo,
+  onUndo,
+}: {
+  turn: AgentTurnRecord;
+  canUndo: boolean;
+  onUndo: () => void;
+}): React.JSX.Element {
+  const diffRows = summarizeAgentTurnSchemaDiff(diffAgentTurnSchema(turn.before, turn.after));
+  const visibleOps = turn.ops.filter((op) => op.status !== 'pending' || turn.status === 'running');
+  const hiddenPending = turn.ops.length - visibleOps.length;
+  return (
+    <div className="max-h-96 overflow-y-auto text-xs">
+      <div className="border-b border-border/70 px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-foreground">{turn.summary}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {turn.provider ?? 'Agent'}
+              {turn.model ? ` · ${turn.model}` : ''} · {turnStatusLabel(turn.status)}
+            </div>
+          </div>
+          {canUndo && (
+            <button
+              type="button"
+              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border/70 px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+              onClick={onUndo}
+            >
+              <RotateCcw className="size-3" aria-hidden="true" />
+              Undo turn
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-2.5">
+        {diffRows.length > 0 && (
+          <div className="rounded-md border border-primary/15 bg-primary/5 px-2 py-1.5">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Schema diff
+            </div>
+            <ul className="space-y-0.5">
+              {diffRows.map((row) => (
+                <li key={row} className="text-[11px] leading-5 text-foreground">
+                  {row}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {visibleOps.length === 0 ? (
+          <div className="text-muted-foreground">No model operations recorded yet.</div>
+        ) : (
+          <details>
+            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Tool log
+            </summary>
+            <div className="mt-1 overflow-hidden rounded-md border border-border/70">
+              {visibleOps.map((op) => (
+                <AgentTurnOpRow key={op.id} op={op} />
+              ))}
+            </div>
+          </details>
+        )}
+        {hiddenPending > 0 && (
+          <div className="text-[11px] text-muted-foreground">
+            {hiddenPending} provisional tool {hiddenPending === 1 ? 'call was' : 'calls were'}{' '}
+            resolved by the applied operations above.
+          </div>
+        )}
+      </div>
+      <details className="border-t border-border/70 px-3 py-2">
+        <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Raw turn record
+        </summary>
+        <pre className="mt-2 max-h-40 overflow-auto rounded border border-border bg-muted/40 p-2 text-[10px]">
+          {JSON.stringify(turn, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
+function AgentTurnOpRow({ op }: { op: AgentTurnOpResult }): React.JSX.Element {
+  return (
+    <div className="border-b border-border/60 bg-background px-2.5 py-1.5 last:border-b-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-[12px] font-medium leading-5 text-foreground">
+            {describeAgentTurnOp(op)}
+          </div>
+          <div className="font-mono text-[10px] leading-4 text-muted-foreground">{op.name}</div>
+        </div>
+        <AgentTurnStatusPill status={op.status} />
+      </div>
+      {op.error && (
+        <div className="mt-1 whitespace-pre-wrap text-[11px] text-destructive">{op.error}</div>
+      )}
+    </div>
+  );
+}
+
+function AgentTurnMetaPill({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <span className="rounded-full border border-border/70 bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      {children}
+    </span>
+  );
+}
+
+function AgentTurnStatusPill({
+  status,
+}: {
+  status: AgentTurnOpResult['status'];
+}): React.JSX.Element {
+  const iconClass = 'size-3';
+  const content =
+    status === 'applied'
+      ? {
+          label: 'Applied',
+          icon: CheckCircle2,
+          className: 'border-success/30 bg-success/10 text-success',
+        }
+      : status === 'rejected'
+        ? {
+            label: 'Rejected',
+            icon: XCircle,
+            className: 'border-destructive/30 bg-destructive/10 text-destructive',
+          }
+        : status === 'pending'
+          ? {
+              label: 'Pending',
+              icon: Clock3,
+              className: 'border-border/70 bg-muted/60 text-muted-foreground',
+            }
+          : {
+              label: 'Tool',
+              icon: Clock3,
+              className: 'border-border/70 bg-muted/60 text-muted-foreground',
+            };
+  const Icon = content.icon;
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+        content.className,
+      )}
+    >
+      <Icon className={iconClass} aria-hidden="true" />
+      {content.label}
+    </span>
+  );
+}
+
+function turnStatusLabel(status: AgentTurnRecord['status']): string {
+  if (status === 'running') return 'running';
+  if (status === 'rolled_back') return 'rolled back';
+  return 'reviewable';
 }
 
 function MessageBubble({ message }: { message: ChatMessage }): React.JSX.Element {

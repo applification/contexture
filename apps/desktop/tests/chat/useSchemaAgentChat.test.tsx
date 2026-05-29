@@ -1,6 +1,7 @@
 import { useSchemaAgentModelsStore } from '@renderer/chat/schemaAgentModelsStore';
 import { useSchemaAgentSessionStore } from '@renderer/chat/schemaAgentSessionStore';
 import { useSchemaAgentChat } from '@renderer/chat/useSchemaAgentChat';
+import { useAgentTurnsStore } from '@renderer/store/agent-turns';
 import { useUndoStore } from '@renderer/store/undo';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -165,6 +166,7 @@ describe('useSchemaAgentChat', () => {
     localStorage.clear();
     useSchemaAgentModelsStore.getState().reset();
     useSchemaAgentSessionStore.getState().reset();
+    useAgentTurnsStore.getState().reset();
     useUndoStore.getState().apply({ kind: 'replace_schema', schema: { version: '1', types: [] } });
   });
   afterEach(cleanup);
@@ -262,6 +264,48 @@ describe('useSchemaAgentChat', () => {
     expect(useUndoStore.getState().schema.types.map((t) => t.name)).toEqual(['A', 'B']);
     act(() => useUndoStore.getState().undo());
     expect(useUndoStore.getState().schema.types).toEqual([]);
+  });
+
+  it('records applied and rejected schema-agent ops as one reviewable turn', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('add a plot');
+    });
+    act(() => {
+      emit.turnBegin();
+      emit.toolCallStarted({ id: 'pending-1', name: 'add_type', input: { name: 'Plot' } });
+      emit.toolRequest({
+        id: '1',
+        op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      });
+      emit.toolCallStarted({ id: 'pending-2', name: 'add_type', input: { name: 'Plot' } });
+      emit.toolRequest({
+        id: '2',
+        op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      });
+      emit.assistantFinal({ text: 'Added Plot.' });
+      emit.turnCommit();
+    });
+
+    expect(useAgentTurnsStore.getState().turns).toEqual([
+      expect.objectContaining({
+        status: 'committed',
+        userMessage: 'add a plot',
+        assistantText: 'Added Plot.',
+        provider: 'codex',
+        model: 'gpt-5.4',
+        summary: 'Agent proposed 2 model changes: 1 applied, 1 rejected',
+        ops: [
+          expect.objectContaining({ id: '1', name: 'add_type', status: 'applied' }),
+          expect.objectContaining({ id: '2', name: 'add_type', status: 'rejected' }),
+        ],
+      }),
+    ]);
   });
 
   it('surfaces non-ready Codex status', async () => {
@@ -639,6 +683,27 @@ describe('useSchemaAgentChat', () => {
 
     act(() => {
       emit.threadDesynced({ thread, reason: 'rollback failed' });
+    });
+
+    expect(result.current.providerThreadRef).toEqual(thread);
+    expect(result.current.desynced).toBe(true);
+  });
+
+  it('marks the provider thread stale when the model changes outside the agent', () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+    const thread = { provider: 'codex', threadId: 'thread-1' };
+
+    act(() => {
+      emit.threadUpdated({ thread });
+    });
+    expect(result.current.desynced).toBe(false);
+
+    act(() => {
+      useUndoStore.getState().apply({
+        kind: 'add_type',
+        type: { kind: 'object', name: 'ExternalEdit', fields: [] },
+      });
     });
 
     expect(result.current.providerThreadRef).toEqual(thread);

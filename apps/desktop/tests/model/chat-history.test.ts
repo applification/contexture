@@ -55,6 +55,38 @@ describe('chat history sidecar', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('round-trips agent turn records', () => {
+    const history = {
+      version: '1' as const,
+      messages: [{ id: 'm1', role: 'user' as const, content: 'add Plot', createdAt: 1 }],
+      agentTurns: [
+        {
+          id: 'turn-1',
+          status: 'committed' as const,
+          startedAt: '2026-05-29T09:00:00.000Z',
+          finishedAt: '2026-05-29T09:00:01.000Z',
+          ops: [
+            {
+              id: 'op-1',
+              name: 'add_type',
+              status: 'applied' as const,
+              op: {
+                kind: 'add_type' as const,
+                type: { kind: 'object' as const, name: 'Plot', fields: [] },
+              },
+            },
+          ],
+          summary: 'Agent applied 1 model change',
+        },
+      ],
+    };
+    const raw = saveChatHistory(history);
+    const { history: round, warnings } = loadChatHistory(raw);
+
+    expect(round).toEqual(history);
+    expect(warnings).toEqual([]);
+  });
+
   it('ignores unknown sidecar fields', () => {
     const raw = JSON.stringify({
       version: '1',

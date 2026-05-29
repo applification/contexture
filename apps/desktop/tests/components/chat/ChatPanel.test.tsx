@@ -6,7 +6,9 @@
 import { useChatThreadStore } from '@renderer/chat/useChatThreads';
 import type { SchemaAgentChatState } from '@renderer/chat/useSchemaAgentChat';
 import { ChatPanel } from '@renderer/components/chat/ChatPanel';
+import { useAgentTurnsStore } from '@renderer/store/agent-turns';
 import { useDocumentStore } from '@renderer/store/document';
+import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,6 +76,16 @@ function mockBridge(): void {
 
 beforeEach(() => {
   localStorage.clear();
+  useAgentTurnsStore.getState().reset();
+  useUndoStore.setState({
+    schema: { version: '1', types: [] },
+    past: [],
+    future: [],
+    txDepth: 0,
+    txStart: null,
+    canUndo: false,
+    canRedo: false,
+  });
   useChatThreadStore.getState().reloadFromStorage();
   useDocumentStore.setState({
     filePath: null,
@@ -118,6 +130,55 @@ describe('ChatPanel', () => {
   it('shows the streaming indicator while isStreaming is true', () => {
     render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
     expect(screen.getByText(/Codex is thinking/i)).toBeInTheDocument();
+  });
+
+  it('renders the latest agent turn summary for manual oversight', async () => {
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    useAgentTurnsStore.getState().begin({
+      before: { version: '1', types: [] },
+      userMessage: 'add a Plot type',
+      provider: 'codex',
+      model: 'gpt-5.4',
+    });
+    useAgentTurnsStore.getState().recordToolResult({
+      id: '1',
+      op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      result: { schema: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] } },
+    });
+    useAgentTurnsStore.getState().recordToolResult({
+      id: '2',
+      op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      result: { error: 'add_type: type "Plot" already exists' },
+    });
+    useAgentTurnsStore.getState().finish({
+      status: 'committed',
+      after: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] },
+    });
+
+    render(<ChatPanel chat={makeChat()} />);
+
+    expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent(
+      'Agent proposed 2 model changes: 1 applied, 1 rejected',
+    );
+    expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent('1 applied');
+    expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent('1 rejected');
+    fireEvent.click(screen.getByTestId('agent-turn-summary'));
+    await waitFor(() => expect(screen.getAllByText('Added Plot')).toHaveLength(2));
+    expect(screen.getByText('Schema diff')).toBeInTheDocument();
+    expect(screen.getByText('add_type: type "Plot" already exists')).toBeInTheDocument();
+    expect(screen.getByText('Raw turn record')).toBeInTheDocument();
+    expect(screen.getByText('Undo turn')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Undo turn'));
+    expect(useUndoStore.getState().schema.types).toEqual([]);
+    await waitFor(() =>
+      expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent(
+        'Agent turn undone: 1 model change rolled back',
+      ),
+    );
+    expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
   });
 
   it('Enter in the textarea calls chat.send with the trimmed draft', async () => {
