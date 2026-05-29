@@ -34,11 +34,7 @@ export interface AcceptGeneratedTargetInput extends WriteGeneratedTargetInput {
   schema: Schema;
 }
 
-export interface ReconcileWriteResult {
-  convexValidation: ConvexCliValidationResult;
-}
-
-interface ReconcileWriteDeps {
+interface ConvexValidationDeps {
   execFile?: ExecFileLike;
   env?: NodeJS.ProcessEnv;
 }
@@ -72,10 +68,7 @@ export async function readGeneratedTarget(input: unknown): Promise<string | null
   }
 }
 
-export async function writeGeneratedTarget(
-  input: unknown,
-  deps: ReconcileWriteDeps = {},
-): Promise<ReconcileWriteResult> {
+export async function writeGeneratedTarget(input: unknown): Promise<void> {
   const parsed = parseIpcPayload(
     'reconcile:write-generated-target',
     WriteGeneratedTargetInputSchema,
@@ -84,18 +77,9 @@ export async function writeGeneratedTarget(
   const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
   const manifestPath = bundlePathsFor(parsed.irPath).emitted;
   await writeGeneratedTargetContents(target, manifestPath, parsed.contents);
-  return {
-    convexValidation: await validateReconciledConvexProject(
-      { irPath: parsed.irPath, targetPath: parsed.targetPath },
-      deps,
-    ),
-  };
 }
 
-export async function acceptGeneratedTarget(
-  input: unknown,
-  deps: ReconcileWriteDeps = {},
-): Promise<ReconcileWriteResult> {
+export async function acceptGeneratedTarget(input: unknown): Promise<void> {
   const parsed = parseIpcPayload(
     'reconcile:accept-generated-target',
     AcceptGeneratedTargetInputSchema,
@@ -114,17 +98,27 @@ export async function acceptGeneratedTarget(
       schema: parsed.schema,
       fs: nodeFsAdapter,
     });
-    return {
-      convexValidation: await validateReconciledConvexProject(
-        { irPath: parsed.irPath, targetPath: parsed.targetPath },
-        deps,
-      ),
-    };
   } catch (err) {
     await restoreOptionalFile(target, previousTarget);
     await restoreOptionalFile(manifestPath, previousManifest);
     throw err;
   }
+}
+
+export async function validateConvexGeneratedTarget(
+  input: unknown,
+  deps: ConvexValidationDeps = {},
+): Promise<ConvexCliValidationResult> {
+  const parsed = parseIpcPayload(
+    'reconcile:validate-convex-generated-target',
+    GeneratedTargetInputSchema,
+    input,
+  );
+  assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  return validateReconciledConvexProject(
+    { irPath: parsed.irPath, targetPath: parsed.targetPath },
+    deps,
+  );
 }
 
 async function writeGeneratedTargetContents(
@@ -186,5 +180,8 @@ export function registerReconcileIpc(): void {
   );
   ipcMain.handle('reconcile:accept-generated-target', async (_evt, input: unknown) =>
     acceptGeneratedTarget(input),
+  );
+  ipcMain.handle('reconcile:validate-convex-generated-target', async (_evt, input: unknown) =>
+    validateConvexGeneratedTarget(input),
   );
 }

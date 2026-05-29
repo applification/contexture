@@ -38,7 +38,7 @@ import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { diffLines } from 'diff';
 import { Loader2, TriangleAlert } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -144,7 +144,6 @@ function reconcileStatusCopy(status: DriftFileStatus['status'] | null): string {
 }
 
 export function ReconcileModal(): React.JSX.Element {
-  const [convexValidationMessage, setConvexValidationMessage] = useState<string | null>(null);
   const isOpen = useReconcileStore((s) => s.isOpen);
   const status = useReconcileStore((s) => s.status);
   const proposedOps = useReconcileStore((s) => s.proposedOps);
@@ -215,7 +214,6 @@ export function ReconcileModal(): React.JSX.Element {
         return;
       }
 
-      setConvexValidationMessage(null);
       setApplying();
       const undo = useUndoStore.getState();
       undo.begin();
@@ -230,25 +228,12 @@ export function ReconcileModal(): React.JSX.Element {
       }
 
       try {
-        const result = await reconcileApi.acceptGeneratedTarget({
+        await reconcileApi.acceptGeneratedTarget({
           irPath: filePath,
           targetPath,
           contents: projection.emit.source,
           schema: projection.schema,
         });
-        if (result?.convexValidation.status === 'failed') {
-          undo.commit();
-          await window.contexture?.drift.check();
-          setError(convexValidationFailureMessage(result.convexValidation));
-          return;
-        }
-        const validationMessage = convexValidationSuccessMessage(result?.convexValidation);
-        if (validationMessage) {
-          undo.commit();
-          await window.contexture?.drift.check();
-          setConvexValidationMessage(validationMessage);
-          return;
-        }
       } catch (err) {
         undo.rollback();
         const message = err instanceof Error ? err.message : String(err);
@@ -282,20 +267,10 @@ export function ReconcileModal(): React.JSX.Element {
     ) {
       return;
     }
-    setConvexValidationMessage(null);
     void window.contexture?.reconcile
       .writeGeneratedTarget({ irPath: filePath, targetPath, contents: currentEmit.source })
-      .then(async (result) => {
+      .then(async () => {
         await window.contexture?.drift.check();
-        if (result?.convexValidation.status === 'failed') {
-          setError(convexValidationFailureMessage(result.convexValidation));
-          return;
-        }
-        const validationMessage = convexValidationSuccessMessage(result?.convexValidation);
-        if (validationMessage) {
-          setConvexValidationMessage(validationMessage);
-          return;
-        }
         close();
       })
       .catch((err: unknown) => {
@@ -394,12 +369,6 @@ export function ReconcileModal(): React.JSX.Element {
               {deterministicFallbackReason} Assistant fallback proposed the ops below.
             </div>
           )}
-          {convexValidationMessage && (
-            <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
-              {convexValidationMessage}
-            </div>
-          )}
-
           <div className="flex flex-col border rounded-md overflow-hidden max-h-64">
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 text-xs">
               <span className="font-medium">Proposed ops</span>
@@ -548,22 +517,6 @@ export function ReconcileModal(): React.JSX.Element {
       </DialogContent>
     </Dialog>
   );
-}
-
-type ConvexValidationResult = Awaited<
-  ReturnType<NonNullable<typeof window.contexture>['reconcile']['acceptGeneratedTarget']>
->['convexValidation'];
-
-function convexValidationSuccessMessage(result: ConvexValidationResult | undefined): string | null {
-  if (!result || result.status === 'skipped') return null;
-  return 'Convex CLI accepted the reconciled generated files.';
-}
-
-function convexValidationFailureMessage(
-  result: Extract<ConvexValidationResult, { status: 'failed' }>,
-): string {
-  const output = result.output ? `\n\n${result.output}` : '';
-  return `Convex CLI validation failed after reconcile: ${result.error}${output}`;
 }
 
 function ProvenanceBadge({

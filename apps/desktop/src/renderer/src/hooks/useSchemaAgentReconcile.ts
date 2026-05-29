@@ -80,6 +80,7 @@ export function useSchemaAgentReconcile(): void {
       }
 
       const schema = useUndoStore.getState().schema;
+      let validationSchema = schema;
       const reconcileApi = window.contexture?.reconcile;
       if (!reconcileApi) {
         reconcileStore.setError('Reconcile IPC bridge is unavailable.');
@@ -121,11 +122,12 @@ export function useSchemaAgentReconcile(): void {
           continue;
         }
         const op = entry.op as Op;
-        const applyResult: ApplyResult = apply(schema, op, STDLIB_REGISTRY);
+        const applyResult: ApplyResult = apply(validationSchema, op, STDLIB_REGISTRY);
         if ('error' in applyResult) {
           console.warn('[reconcile] dropping invalid op', op, applyResult.error);
           continue;
         }
+        validationSchema = applyResult.schema;
         validated.push({
           id: crypto.randomUUID(),
           op,

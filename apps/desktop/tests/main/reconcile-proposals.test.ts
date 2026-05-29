@@ -192,7 +192,7 @@ describe('generateReconcileProposal', () => {
     expect(codex.generateText).not.toHaveBeenCalled();
   });
 
-  it('proposes reviewable lossy ops for removed Convex fields and indexes', async () => {
+  it('relies on remove_field pruning when a removed Convex field owned the removed index', async () => {
     const current: Schema = {
       version: '1',
       types: [
@@ -236,12 +236,6 @@ describe('generateReconcileProposal', () => {
           op: { kind: 'remove_field', typeName: 'Post', fieldName: 'archived' },
           label: 'Remove field "archived" from "Post"',
           lossy: true,
-          provenance: 'deterministic',
-        },
-        {
-          op: { kind: 'remove_index', typeName: 'Post', name: 'by_archived' },
-          label: 'Remove index "by_archived" from "Post"',
-          lossy: false,
           provenance: 'deterministic',
         },
       ],

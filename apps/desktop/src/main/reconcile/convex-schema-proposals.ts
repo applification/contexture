@@ -110,6 +110,7 @@ function addIndexOps(
 ): void {
   const existingIndexes = new Map((existing.indexes ?? []).map((index) => [index.name, index]));
   const parsedIndexNames = new Set(table.indexes.map((index) => index.name));
+  const parsedFieldNames = new Set(table.fields.map((field) => field.name));
   for (const index of table.indexes) {
     const prior = existingIndexes.get(index.name);
     if (!prior) {
@@ -136,6 +137,7 @@ function addIndexOps(
   }
   for (const index of existing.indexes ?? []) {
     if (parsedIndexNames.has(index.name)) continue;
+    if (index.fields.some((field) => !parsedFieldNames.has(field))) continue;
     ops.push({
       op: { kind: 'remove_index', typeName: existing.name, name: index.name },
       label: `Remove index "${index.name}" from "${existing.name}"`,

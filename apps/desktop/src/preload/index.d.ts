@@ -172,13 +172,17 @@ export interface ContextureReconcileAPI {
     irPath: string;
     targetPath: string;
     contents: string;
-  }) => Promise<ReconcileWriteResult>;
+  }) => Promise<void>;
   acceptGeneratedTarget: (payload: {
     irPath: string;
     targetPath: string;
     contents: string;
     schema: unknown;
-  }) => Promise<ReconcileWriteResult>;
+  }) => Promise<void>;
+  validateConvexGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+  }) => Promise<ConvexCliValidationResult>;
   /**
    * Fire a one-shot schema-agent query that proposes IR ops to align
    * the current schema with the user's hand-edited on-disk source. The
@@ -197,10 +201,6 @@ export type ConvexCliValidationResult =
   | { status: 'skipped'; reason: string }
   | { status: 'passed'; command: string; output?: string }
   | { status: 'failed'; command: string; error: string; output?: string };
-
-export interface ReconcileWriteResult {
-  convexValidation: ConvexCliValidationResult;
-}
 
 export interface ContextureUpdateAPI {
   getState: () => Promise<UpdateState>;

@@ -57,6 +57,7 @@ beforeEach(() => {
       reconcile: {
         writeGeneratedTarget: vi.fn().mockResolvedValue(undefined),
         acceptGeneratedTarget: vi.fn().mockResolvedValue(undefined),
+        validateConvexGeneratedTarget: vi.fn().mockResolvedValue({ status: 'skipped' }),
       },
       shell: {
         openInEditor: vi.fn().mockResolvedValue(undefined),
@@ -161,13 +162,7 @@ describe('ReconcileModal', () => {
     expect(window.contexture?.shell.openInEditor).toHaveBeenCalledWith(ZOD_PATH);
   });
 
-  it('shows successful Convex CLI validation feedback after regenerating a configured Convex target', async () => {
-    vi.mocked(window.contexture?.reconcile.writeGeneratedTarget).mockResolvedValueOnce({
-      convexValidation: {
-        status: 'passed',
-        command: 'npx --no-install convex dev --once',
-      },
-    });
+  it('closes after regenerating a configured Convex target without running CLI validation implicitly', async () => {
     useDriftStore.getState().setDetected([{ path: CONVEX_PATH, status: 'modified' }]);
     useReconcileStore.getState().open(CONVEX_PATH);
     useReconcileStore.getState().setReady([], 'hand edited source');
@@ -175,8 +170,8 @@ describe('ReconcileModal', () => {
     render(<ReconcileModal />);
     fireEvent.click(screen.getByRole('button', { name: /regenerate from ir/i }));
 
-    expect(await screen.findByText(/Convex CLI accepted/i)).toBeVisible();
-    expect(useReconcileStore.getState().isOpen).toBe(true);
+    await waitFor(() => expect(useReconcileStore.getState().isOpen).toBe(false));
+    expect(window.contexture?.reconcile.validateConvexGeneratedTarget).not.toHaveBeenCalled();
   });
 
   it('writes the reconciled generated target before closing accepted proposals', async () => {

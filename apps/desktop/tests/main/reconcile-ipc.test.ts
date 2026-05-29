@@ -11,6 +11,7 @@ import {
 import {
   acceptGeneratedTarget,
   readGeneratedTarget,
+  validateConvexGeneratedTarget,
   writeGeneratedTarget,
 } from '@main/ipc/reconcile';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,7 +71,7 @@ describe('reconcile generated-target IPC helpers', () => {
     expect(manifest.files[targetPath]).toBe(hashContent('after\n'));
   });
 
-  it('runs one-shot Convex CLI validation for configured Convex targets', async () => {
+  it('runs one-shot Convex CLI validation only through the explicit validation IPC helper', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'contexture-reconcile-'));
     const ctxDir = join(dir, 'packages/contexture');
     await mkdir(ctxDir, { recursive: true });
@@ -84,8 +85,11 @@ describe('reconcile generated-target IPC helpers', () => {
       'utf8',
     );
 
-    const result = await writeGeneratedTarget(
-      { irPath, targetPath, contents: 'export default null;\n' },
+    await writeGeneratedTarget({ irPath, targetPath, contents: 'export default null;\n' });
+    expect(execFile).not.toHaveBeenCalled();
+
+    const result = await validateConvexGeneratedTarget(
+      { irPath, targetPath },
       { execFile, env: { CONVEX_DEPLOYMENT: 'dev:test' } },
     );
 
@@ -94,7 +98,7 @@ describe('reconcile generated-target IPC helpers', () => {
       ['--no-install', 'convex', 'dev', '--once'],
       expect.objectContaining({ cwd: ctxDir }),
     );
-    expect(result.convexValidation).toMatchObject({
+    expect(result).toMatchObject({
       status: 'passed',
       command: 'npx --no-install convex dev --once',
     });
@@ -109,13 +113,13 @@ describe('reconcile generated-target IPC helpers', () => {
     const execFile = vi.fn().mockResolvedValue({ stdout: 'validated\n', stderr: '' });
     await writeFile(irPath, '{"version":"1","types":[]}\n', 'utf8');
 
-    const result = await writeGeneratedTarget(
-      { irPath, targetPath, contents: 'export default null;\n' },
+    const result = await validateConvexGeneratedTarget(
+      { irPath, targetPath },
       { execFile, env: {} },
     );
 
     expect(execFile).not.toHaveBeenCalled();
-    expect(result.convexValidation).toMatchObject({
+    expect(result).toMatchObject({
       status: 'skipped',
       reason: 'No project package.json found.',
     });

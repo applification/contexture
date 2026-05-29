@@ -177,46 +177,31 @@ const reconcile = {
     irPath: string;
     targetPath: string;
     contents: string;
-  }): Promise<{
-    convexValidation: {
-      status: 'skipped' | 'passed' | 'failed';
-      reason?: string;
-      command?: string;
-      error?: string;
-      output?: string;
-    };
-  }> =>
-    ipcRenderer.invoke('reconcile:write-generated-target', payload) as Promise<{
-      convexValidation: {
-        status: 'skipped' | 'passed' | 'failed';
-        reason?: string;
-        command?: string;
-        error?: string;
-        output?: string;
-      };
-    }>,
+  }): Promise<void> =>
+    ipcRenderer.invoke('reconcile:write-generated-target', payload) as Promise<void>,
   acceptGeneratedTarget: (payload: {
     irPath: string;
     targetPath: string;
     contents: string;
     schema: unknown;
+  }): Promise<void> =>
+    ipcRenderer.invoke('reconcile:accept-generated-target', payload) as Promise<void>,
+  validateConvexGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
   }): Promise<{
-    convexValidation: {
+    status: 'skipped' | 'passed' | 'failed';
+    reason?: string;
+    command?: string;
+    error?: string;
+    output?: string;
+  }> =>
+    ipcRenderer.invoke('reconcile:validate-convex-generated-target', payload) as Promise<{
       status: 'skipped' | 'passed' | 'failed';
       reason?: string;
       command?: string;
       error?: string;
       output?: string;
-    };
-  }> =>
-    ipcRenderer.invoke('reconcile:accept-generated-target', payload) as Promise<{
-      convexValidation: {
-        status: 'skipped' | 'passed' | 'failed';
-        reason?: string;
-        command?: string;
-        error?: string;
-        output?: string;
-      };
     }>,
   /**
    * Fire a one-shot schema-agent query that returns reconcile ops for
