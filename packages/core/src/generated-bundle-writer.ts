@@ -12,10 +12,24 @@ import {
 } from './pipeline';
 
 export type GeneratedFileStatus = 'clean' | 'drifted' | 'unreadable';
+export type GeneratedDriftClassification =
+  | 'clean'
+  | 'missing'
+  | 'unreadable'
+  | 'modified'
+  | 'stale'
+  | 'externally_regenerated';
 
 export interface GeneratedFileCheck {
   path: string;
   status: GeneratedFileStatus;
+}
+
+export interface GeneratedDriftCheck {
+  path: string;
+  status: GeneratedDriftClassification;
+  matchesManifest: boolean;
+  matchesCurrentIr: boolean;
 }
 
 export interface GeneratedBundleFs {
@@ -105,10 +119,8 @@ export async function checkGeneratedManifestDrift(
   fs: Pick<GeneratedBundleFs, 'readFile'>,
 ): Promise<GeneratedFileCheck[]> {
   const paths = bundlePathsFor(irPath);
-  let manifest: EmittedManifest;
-  try {
-    manifest = JSON.parse(await fs.readFile(paths.emitted)) as EmittedManifest;
-  } catch {
+  const manifest = await readGeneratedManifest(paths.emitted, fs);
+  if (manifest === null) {
     return [];
   }
 
@@ -127,6 +139,77 @@ export async function checkGeneratedManifestDrift(
   }
 
   return checks;
+}
+
+export async function classifyGeneratedBundleDrift(
+  schema: Schema,
+  irPath: string,
+  fs: Pick<GeneratedBundleFs, 'readFile'>,
+  emitDeps?: EmitPipelineDeps,
+): Promise<GeneratedDriftCheck[]> {
+  const bundle = buildGeneratedBundle(schema, irPath, emitDeps);
+  const manifest = await readGeneratedManifest(bundle.paths.emitted, fs);
+  const manifestFiles = manifest?.files ?? {};
+  const emittedByPath = new Map(bundle.emitted.map((entry) => [entry.path, entry.content]));
+  const targetPaths = new Set([...Object.keys(manifestFiles), ...emittedByPath.keys()]);
+  const checks: GeneratedDriftCheck[] = [];
+
+  for (const path of targetPaths) {
+    const expectedContent = emittedByPath.get(path) ?? null;
+    const manifestHash = manifestFiles[path] ?? null;
+    let diskContent: string | null = null;
+    let readable = true;
+
+    try {
+      diskContent = await fs.readFile(path);
+    } catch (err) {
+      readable = false;
+      const code = (err as NodeJS.ErrnoException).code;
+      const status = code === 'ENOENT' ? 'missing' : 'unreadable';
+      checks.push({
+        path,
+        status,
+        matchesManifest: false,
+        matchesCurrentIr: false,
+      });
+    }
+
+    if (!readable || diskContent === null) continue;
+
+    const diskHash = hashContent(diskContent);
+    const matchesManifest = manifestHash !== null && diskHash === manifestHash;
+    const matchesCurrentIr = expectedContent !== null && diskContent === expectedContent;
+
+    let status: GeneratedDriftClassification;
+    if (matchesManifest && matchesCurrentIr) {
+      status = 'clean';
+    } else if (matchesManifest) {
+      status = 'stale';
+    } else if (matchesCurrentIr) {
+      status = 'externally_regenerated';
+    } else {
+      status = 'modified';
+    }
+
+    checks.push({ path, status, matchesManifest, matchesCurrentIr });
+  }
+
+  return checks;
+}
+
+async function readGeneratedManifest(
+  manifestPath: string,
+  fs: Pick<GeneratedBundleFs, 'readFile'>,
+): Promise<EmittedManifest | null> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(manifestPath)) as Partial<EmittedManifest>;
+    return {
+      version: '1',
+      files: parsed.files && typeof parsed.files === 'object' ? parsed.files : {},
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function writeGeneratedBundle(

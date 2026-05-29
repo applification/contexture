@@ -66,9 +66,18 @@ This is one of the strongest ways to make Contexture feel like a control plane r
 ### Convex-Specific Reconcile
 
 - Prioritize `convex/schema.ts` and `convex/validators.ts`.
+- Use deterministic Convex parsing for supported generated-code edits before asking an LLM to infer changes.
 - Detect table, field, and index changes that can map back to the IR.
 - Distinguish supported generated-code edits from arbitrary app code.
 - Explain when a generated Convex file cannot be reverse-mapped safely.
+
+### Convex CLI Validation
+
+- Treat Convex CLI feedback as downstream validation, not the source of truth.
+- After re-emitting or applying supported IR proposals, optionally run a Convex validation/check path when available.
+- Surface Convex schema, function, or push errors as project validation feedback after Contexture reconcile decisions are made.
+- Do not rely on scraping long-running `convex dev` watcher output as the reconcile authority.
+- Do not use private Convex package internals as a stable reverse-mapping API.
 
 ### Agent-Aware Reconcile
 
@@ -89,6 +98,7 @@ This is one of the strongest ways to make Contexture feel like a control plane r
 - A user can re-emit from IR and return to a clean manifest.
 - A user can keep a generated file dirty intentionally.
 - For supported generated Convex changes, a user can apply proposed IR ops and return to drift clean.
+- When Convex CLI validation is configured, a user can see whether reconciled generated files are accepted by Convex.
 - Reconcile makes agent-generated drift reviewable instead of frightening.
 
 ## Non-Goals
@@ -97,6 +107,7 @@ This is one of the strongest ways to make Contexture feel like a control plane r
 - Do not reverse-engineer every possible generated-code edit.
 - Do not merge source-model sync and generated-target drift into one ambiguous state.
 - Do not auto-apply inferred IR changes without user review.
+- Do not replace Contexture's manifest and IR authority with Convex CLI watcher output.
 
 ## Dependencies
 

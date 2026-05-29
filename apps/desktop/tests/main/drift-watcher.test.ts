@@ -5,6 +5,7 @@
  * fs.watch handler.
  */
 import { createHash } from 'node:crypto';
+import { buildGeneratedBundle, type Schema } from '@contexture/core';
 import { createDriftWatcher, detectDrift } from '@main/documents/drift-watcher';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -37,6 +38,14 @@ function makeReadFile(files: Record<string, string>) {
     if (path in files) return files[path];
     throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
   };
+}
+
+function generatedFilesFor(schema: Schema): Record<string, string> {
+  const bundle = buildGeneratedBundle(schema, IR_PATH);
+  return Object.fromEntries([
+    ...bundle.emitted.map((entry) => [entry.path, entry.content] as const),
+    [bundle.manifestFile.path, bundle.manifestFile.content] as const,
+  ]);
 }
 
 function makeWatcher(
@@ -250,6 +259,71 @@ describe('createDriftWatcher', () => {
       { path: WATCHED, status: 'drifted' },
       { path: SCHEMA_TS, status: 'unreadable' },
     ]);
+  });
+
+  it('calls onStatus with stale when files match the old manifest but not the current IR', async () => {
+    const originalSchema: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'Post', table: true, fields: [] }],
+    };
+    const currentSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const files = {
+      [IR_PATH]: `${JSON.stringify(currentSchema, null, 2)}\n`,
+      ...generatedFilesFor(originalSchema),
+    };
+    const onStatus = vi.fn();
+    const { watcher } = makeWatcher(files, { onStatus });
+
+    await watcher.check();
+
+    expect(onStatus).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ path: WATCHED, status: 'stale' })]),
+    );
+  });
+
+  it('calls onStatus with externally_regenerated when files match current IR but manifest is old', async () => {
+    const originalSchema: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'Post', table: true, fields: [] }],
+    };
+    const currentSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    };
+    const originalFiles = generatedFilesFor(originalSchema);
+    const currentFiles = generatedFilesFor(currentSchema);
+    const files = {
+      [IR_PATH]: `${JSON.stringify(currentSchema, null, 2)}\n`,
+      ...currentFiles,
+      [EMITTED]: originalFiles[EMITTED] ?? '',
+    };
+    const onStatus = vi.fn();
+    const { watcher } = makeWatcher(files, { onStatus });
+
+    await watcher.check();
+
+    expect(onStatus).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ path: WATCHED, status: 'externally_regenerated' }),
+      ]),
+    );
   });
 
   it('does not call onDrift when the emitted manifest cannot be read', async () => {

@@ -8,7 +8,7 @@ import { create } from 'zustand';
 
 export interface DriftFileStatus {
   path: string;
-  status: 'drifted' | 'unreadable';
+  status: 'drifted' | 'missing' | 'unreadable' | 'modified' | 'stale' | 'externally_regenerated';
 }
 
 interface DriftState {

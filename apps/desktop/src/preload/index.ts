@@ -179,6 +179,30 @@ const reconcile = {
     contents: string;
   }): Promise<void> =>
     ipcRenderer.invoke('reconcile:write-generated-target', payload) as Promise<void>,
+  acceptGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+    contents: string;
+    schema: unknown;
+  }): Promise<void> =>
+    ipcRenderer.invoke('reconcile:accept-generated-target', payload) as Promise<void>,
+  validateConvexGeneratedTarget: (payload: {
+    irPath: string;
+    targetPath: string;
+  }): Promise<{
+    status: 'skipped' | 'passed' | 'failed';
+    reason?: string;
+    command?: string;
+    error?: string;
+    output?: string;
+  }> =>
+    ipcRenderer.invoke('reconcile:validate-convex-generated-target', payload) as Promise<{
+      status: 'skipped' | 'passed' | 'failed';
+      reason?: string;
+      command?: string;
+      error?: string;
+      output?: string;
+    }>,
   /**
    * Fire a one-shot schema-agent query that returns reconcile ops for
    * the current IR + on-disk source of any emitted file.
@@ -187,11 +211,17 @@ const reconcile = {
     irJson: string;
     onDiskSource: string;
     targetKind: string;
-  }): Promise<{ ok: boolean; ops?: unknown[]; error?: string }> =>
+  }): Promise<{
+    ok: boolean;
+    ops?: unknown[];
+    error?: string;
+    deterministicFallbackReason?: string;
+  }> =>
     ipcRenderer.invoke('schema-agent:reconcile', payload) as Promise<{
       ok: boolean;
       ops?: unknown[];
       error?: string;
+      deterministicFallbackReason?: string;
     }>,
 };
 

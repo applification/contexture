@@ -1,5 +1,6 @@
 import type { Schema } from '@contexture/core';
 import type { ModelOptions, ProviderRuntime } from '../providers/runtime';
+import { proposeConvexSchemaOps } from './convex-schema-proposals';
 
 export interface ReconcileProposalInput {
   irJson: string;
@@ -7,7 +8,9 @@ export interface ReconcileProposalInput {
   targetKind: string;
 }
 
-export type ReconcileProposalResult = { ok: true; ops: unknown[] } | { ok: false; error: string };
+export type ReconcileProposalResult =
+  | { ok: true; ops: unknown[]; deterministicFallbackReason?: string }
+  | { ok: false; error: string };
 
 export interface GenerateReconcileProposalOptions {
   runtime: ProviderRuntime;
@@ -19,6 +22,13 @@ export interface GenerateReconcileProposalOptions {
 export async function generateReconcileProposal(
   options: GenerateReconcileProposalOptions,
 ): Promise<ReconcileProposalResult> {
+  let deterministicFallbackReason: string | undefined;
+  if (options.payload.targetKind === 'convex') {
+    const deterministic = proposeConvexSchemaOps(options.schema, options.payload.onDiskSource);
+    if (deterministic.ok) return { ok: true, ops: deterministic.ops };
+    deterministicFallbackReason = deterministic.error;
+  }
+
   const status = await options.runtime.getStatus();
   if (!isReadyForGeneration(status.readiness)) {
     return {
@@ -38,10 +48,21 @@ export async function generateReconcileProposal(
       schema: options.schema,
       ...(options.modelOptions ?? {}),
     });
-    return extractOpsArray(text);
+    const extracted = extractOpsArray(text);
+    if (!extracted.ok) return extracted;
+    return {
+      ok: true,
+      ops: extracted.ops.map(withProviderProvenance),
+      ...(deterministicFallbackReason ? { deterministicFallbackReason } : {}),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+function withProviderProvenance(entry: unknown): unknown {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+  return { ...entry, provenance: 'provider' };
 }
 
 function isReadyForGeneration(readiness: string): boolean {
@@ -65,6 +86,9 @@ const TARGET_KIND_DESCRIPTIONS: Record<string, string> = {
   convex:
     'a hand-edited `convex/schema.ts` file (Convex database schema). ' +
     'Focus on `defineTable`, `v.*` validators, and Convex index definitions.',
+  'convex-validators':
+    'a hand-edited `convex/validators.ts` file (reusable Convex validators). ' +
+    'Focus on exported `v.*` validators that mirror IR fields, refs, arrays, optionality, and nullability.',
   zod:
     'a hand-edited `.schema.ts` file (Zod schema mirror). ' +
     'Focus on `z.object`, `z.enum`, `z.discriminatedUnion`, and inferred TypeScript types.',

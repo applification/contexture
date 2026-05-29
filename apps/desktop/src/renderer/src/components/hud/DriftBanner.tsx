@@ -31,14 +31,32 @@ export function DriftBanner(): React.JSX.Element | null {
     const statuses =
       files.length > 0 ? files : driftedPaths.map((path) => ({ path, status: 'drifted' as const }));
     if (statuses.length === 0) return null;
-    const unreadableCount = statuses.filter((file) => file.status === 'unreadable').length;
+    const unavailableCount = statuses.filter(
+      (file) => file.status === 'unreadable' || file.status === 'missing',
+    ).length;
     if (statuses.length === 1) {
       const file = statuses[0];
       if (!file) return null;
-      if (file.status === 'unreadable') {
+      if (file.status === 'unreadable' || file.status === 'missing') {
         return (
           <>
             <code className="font-mono">{shortPath(file.path)}</code> is missing or unreadable.
+          </>
+        );
+      }
+      if (file.status === 'stale') {
+        return (
+          <>
+            <code className="font-mono">{shortPath(file.path)}</code> is stale and needs re-emitting
+            from the current IR.
+          </>
+        );
+      }
+      if (file.status === 'externally_regenerated') {
+        return (
+          <>
+            <code className="font-mono">{shortPath(file.path)}</code> matches the current IR, but
+            the manifest is out of date.
           </>
         );
       }
@@ -48,15 +66,15 @@ export function DriftBanner(): React.JSX.Element | null {
         </>
       );
     }
-    if (unreadableCount > 0) {
+    if (unavailableCount > 0) {
       return (
         <>
-          {statuses.length} generated files need attention, including {unreadableCount} missing or
+          {statuses.length} generated files need attention, including {unavailableCount} missing or
           unreadable.
         </>
       );
     }
-    return <>{statuses.length} generated files were modified outside Contexture.</>;
+    return <>{statuses.length} generated files need reconcile attention.</>;
   }, [files, driftedPaths]);
 
   if (!message) return null;
@@ -65,7 +83,8 @@ export function DriftBanner(): React.JSX.Element | null {
   // dismiss and let the banner re-appear for subsequent files, or use
   // the per-file list that drift detection surfaces.
   const reviewTarget =
-    (files.find((file) => file.status === 'drifted') ?? files[0])?.path ?? driftedPaths[0];
+    (files.find((file) => file.status !== 'missing' && file.status !== 'unreadable') ?? files[0])
+      ?.path ?? driftedPaths[0];
 
   return (
     <div

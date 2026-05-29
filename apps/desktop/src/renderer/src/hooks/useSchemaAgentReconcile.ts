@@ -28,6 +28,7 @@ interface RawReconcileEntry {
   op: unknown;
   label: unknown;
   lossy: unknown;
+  provenance?: unknown;
 }
 
 function isRawEntry(value: unknown): value is RawReconcileEntry {
@@ -79,6 +80,7 @@ export function useSchemaAgentReconcile(): void {
       }
 
       const schema = useUndoStore.getState().schema;
+      let validationSchema = schema;
       const reconcileApi = window.contexture?.reconcile;
       if (!reconcileApi) {
         reconcileStore.setError('Reconcile IPC bridge is unavailable.');
@@ -87,7 +89,12 @@ export function useSchemaAgentReconcile(): void {
 
       const targetKind = targetKindFor(targetPath, irPath);
 
-      let result: { ok: boolean; ops?: unknown[]; error?: string };
+      let result: {
+        ok: boolean;
+        ops?: unknown[];
+        error?: string;
+        deterministicFallbackReason?: string;
+      };
       try {
         result = await reconcileApi.query({
           irJson: JSON.stringify(schema),
@@ -115,21 +122,27 @@ export function useSchemaAgentReconcile(): void {
           continue;
         }
         const op = entry.op as Op;
-        const applyResult: ApplyResult = apply(schema, op, STDLIB_REGISTRY);
+        const applyResult: ApplyResult = apply(validationSchema, op, STDLIB_REGISTRY);
         if ('error' in applyResult) {
           console.warn('[reconcile] dropping invalid op', op, applyResult.error);
           continue;
         }
+        validationSchema = applyResult.schema;
         validated.push({
           id: crypto.randomUUID(),
           op,
           label: entry.label as string,
           lossy: entry.lossy as boolean,
+          provenance: entry.provenance === 'deterministic' ? 'deterministic' : 'provider',
         });
       }
 
       // Empty array is a valid result — schemas already aligned.
-      reconcileStore.setReady(validated, onDiskSource);
+      reconcileStore.setReady(validated, onDiskSource, {
+        ...(result.deterministicFallbackReason
+          ? { deterministicFallbackReason: result.deterministicFallbackReason }
+          : {}),
+      });
     })();
 
     return () => {

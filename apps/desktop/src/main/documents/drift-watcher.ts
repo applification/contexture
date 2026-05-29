@@ -18,7 +18,13 @@
  */
 import { createHash } from 'node:crypto';
 import { type FSWatcher, promises as fsPromises, watch } from 'node:fs';
-import { bundlePathsFor, generatedTargetsFor } from '@contexture/core';
+import {
+  bundlePathsFor,
+  classifyGeneratedBundleDrift,
+  type GeneratedDriftClassification,
+  generatedTargetsFor,
+  load,
+} from '@contexture/core';
 
 // ─── Pure detector ───────────────────────────────────────────────────
 
@@ -29,8 +35,10 @@ export interface DriftResult {
 
 export interface DriftProblem {
   path: string;
-  status: 'drifted' | 'unreadable';
+  status: GeneratedProblemStatus;
 }
+
+type GeneratedProblemStatus = Exclude<GeneratedDriftClassification, 'clean'> | 'drifted';
 
 export async function detectDrift(
   emittedJsonPath: string,
@@ -107,10 +115,13 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   let stopped = false;
 
   async function doCheck(): Promise<void> {
-    const results = await detectDrift(emittedJsonPath, readFile, { allowedPaths });
+    const results = await detectCurrentDrift(irPath, emittedJsonPath, readFile, allowedPaths);
     if (stopped || results.length === 0) return;
 
-    const problems = results.filter((r): r is DriftProblem => r.status !== 'match');
+    const problems = results.flatMap((result): DriftProblem[] => {
+      const status = problemStatusFor(result.status);
+      return status ? [{ path: result.path, status }] : [];
+    });
     const nowProblems = problems.map(problemKey);
     const wasProblematic = problemSet.size > 0;
     const isProblematic = problems.length > 0;
@@ -177,4 +188,28 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
 
 function problemKey(problem: DriftProblem): string {
   return `${problem.status}:${problem.path}`;
+}
+
+function problemStatusFor(
+  status: DriftResult['status'] | GeneratedDriftClassification,
+): GeneratedProblemStatus | null {
+  if (status === 'match' || status === 'clean') return null;
+  return status;
+}
+
+async function detectCurrentDrift(
+  irPath: string,
+  emittedJsonPath: string,
+  readFile: (path: string) => Promise<string>,
+  allowedPaths: readonly string[],
+): Promise<Array<{ path: string; status: DriftResult['status'] | GeneratedDriftClassification }>> {
+  try {
+    const { schema } = load(await readFile(irPath));
+    const allowed = new Set(allowedPaths);
+    return (await classifyGeneratedBundleDrift(schema, irPath, { readFile })).filter((result) =>
+      allowed.has(result.path),
+    );
+  } catch {
+    return detectDrift(emittedJsonPath, readFile, { allowedPaths });
+  }
 }

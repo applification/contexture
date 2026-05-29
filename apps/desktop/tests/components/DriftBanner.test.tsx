@@ -43,10 +43,37 @@ describe('DriftBanner', () => {
     );
   });
 
-  it('reviews a drifted file before an unreadable file', () => {
+  it('shows stale generated files as needing re-emit from the current IR', () => {
+    useDriftStore
+      .getState()
+      .setDetected([{ path: '/repo/packages/contexture/convex/schema.ts', status: 'stale' }]);
+
+    render(<DriftBanner />);
+
+    expect(screen.getByTestId('drift-banner')).toHaveTextContent(
+      'schema.ts is stale and needs re-emitting from the current IR.',
+    );
+  });
+
+  it('shows externally regenerated files as manifest-out-of-date', () => {
+    useDriftStore.getState().setDetected([
+      {
+        path: '/repo/packages/contexture/convex/schema.ts',
+        status: 'externally_regenerated',
+      },
+    ]);
+
+    render(<DriftBanner />);
+
+    expect(screen.getByTestId('drift-banner')).toHaveTextContent(
+      'schema.ts matches the current IR, but the manifest is out of date.',
+    );
+  });
+
+  it('reviews a readable file before an unreadable file', () => {
     useDriftStore.getState().setDetected([
       { path: '/repo/packages/contexture/garden.schema.json', status: 'unreadable' },
-      { path: '/repo/packages/contexture/garden.schema.ts', status: 'drifted' },
+      { path: '/repo/packages/contexture/garden.schema.ts', status: 'stale' },
     ]);
 
     render(<DriftBanner />);
