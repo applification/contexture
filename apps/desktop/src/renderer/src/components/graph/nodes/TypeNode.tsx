@@ -29,6 +29,7 @@ import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from '../ref-previe
 import type { EnumTargetRow, TypeNodeData } from '../schema-to-graph';
 
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
+export const TYPE_NODE_OBJECT_EVENT = 'contexture:type-select' as const;
 export const TYPE_NODE_ADD_FIELD_EVENT = 'contexture:type-node-add-field' as const;
 
 type TypeNodeKind = Node<TypeNodeData, 'type'>;
@@ -67,7 +68,10 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
   const { data, id } = props;
   const click = useGraphSelectionStore((s) => s.click);
   const primaryNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
+  const selectedField = useGraphSelectionStore((s) => s.state.selectedField);
+  const selectedEdge = useGraphSelectionStore((s) => s.state.selectedEdge);
   const adjacentNodeIds = useGraphSelectionStore((s) => s.state.adjacency.nodeIds);
+  const [headerHighlighted, setHeaderHighlighted] = useState(false);
 
   const isSelected = primaryNodeId === id;
   const isAdjacent = !isSelected && adjacentNodeIds.has(id);
@@ -82,6 +86,8 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     (data.previewDimmed === true && !isSelected && !isPreviewPrimary && !isPreviewAdjacent);
   const isSyncHighlighted = data.syncHighlighted === true && !isSelected && !isAdjacent;
   const hasValidationIssues = (data.validationIssueCount ?? 0) > 0;
+  const fieldsInSelectedType =
+    isSelected && selectedEdge === null && selectedField?.typeName !== data.typeName;
 
   const onFieldClick = useCallback(
     (field: TypeNodeData['fields'][number], ev: React.MouseEvent<HTMLElement>) => {
@@ -129,6 +135,19 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     },
     [data.typeName],
   );
+  const onHeaderSelect = useCallback(
+    (ev: React.MouseEvent<HTMLElement>) => {
+      ev.stopPropagation();
+      click(data.typeName, 'replace');
+      ev.currentTarget.dispatchEvent(
+        new CustomEvent(TYPE_NODE_OBJECT_EVENT, {
+          bubbles: true,
+          detail: { typeName: data.typeName },
+        }),
+      );
+    },
+    [click, data.typeName],
+  );
 
   const borderColor = isSelected
     ? 'var(--graph-node-selected)'
@@ -145,6 +164,16 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     () => (data.table ? 'var(--graph-node-table-header-bg)' : headerColorFor(data.kind)),
     [data.kind, data.table],
   );
+  const selectionAccent = useMemo(
+    () => (data.table ? 'var(--graph-node-table-accent)' : headerColorFor(data.kind)),
+    [data.kind, data.table],
+  );
+  const nodeKindLabel = data.table
+    ? 'table'
+    : data.kind === 'discriminatedUnion'
+      ? 'union'
+      : data.kind;
+  const baseNodeShadow = '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)';
   const node = (
     <div
       data-testid="type-node"
@@ -172,8 +201,10 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         WebkitBackdropFilter: 'blur(8px)',
         borderWidth,
         borderStyle,
-        borderColor,
-        boxShadow: '0 2px 10px oklch(0 0 0 / 0.18), 0 0 1px oklch(0 0 0 / 0.15)',
+        borderColor: headerHighlighted ? 'var(--graph-node-selected)' : borderColor,
+        boxShadow: headerHighlighted
+          ? `${baseNodeShadow}, 0 0 0 2px var(--graph-node-selected)`
+          : baseNodeShadow,
         background:
           isSelected || isPreviewPrimary ? 'var(--graph-node-selected-bg)' : 'transparent',
         outline: isSyncHighlighted
@@ -184,20 +215,6 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         transition: 'opacity 0.15s ease, border-color 0.1s ease',
       }}
     >
-      {data.table ? (
-        <div
-          aria-hidden="true"
-          data-testid="type-node-table-rail"
-          style={{
-            position: 'absolute',
-            insetBlock: 0,
-            insetInlineStart: 0,
-            width: 4,
-            background: 'var(--graph-node-table-accent)',
-            zIndex: 1,
-          }}
-        />
-      ) : null}
       {hasValidationIssues ? (
         <div
           aria-hidden="true"
@@ -226,9 +243,20 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         style={{ opacity: 0, top: '50%', left: '50%' }}
       />
 
-      <div
+      <button
+        type="button"
         data-testid="type-node-header"
+        title={`Show ${data.typeName} ${nodeKindLabel} properties`}
+        aria-label={`Show ${data.typeName} ${nodeKindLabel} properties`}
+        onClick={onHeaderSelect}
+        onMouseEnter={() => setHeaderHighlighted(true)}
+        onMouseLeave={() => setHeaderHighlighted(false)}
+        onFocus={() => setHeaderHighlighted(true)}
+        onBlur={() => setHeaderHighlighted(false)}
+        className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/70"
         style={{
+          width: '100%',
+          border: 'none',
           padding: '6px 10px',
           fontSize: 12,
           fontWeight: 600,
@@ -239,6 +267,8 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           alignItems: 'center',
           gap: 6,
           paddingLeft: data.table ? 12 : 10,
+          cursor: 'pointer',
+          textAlign: 'left',
         }}
       >
         {data.table ? (
@@ -295,9 +325,9 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         {data.table ? (
           <NodeKindLabel data-testid="type-node-table-label">table</NodeKindLabel>
         ) : (
-          <NodeKindLabel>{data.kind === 'discriminatedUnion' ? 'union' : data.kind}</NodeKindLabel>
+          <NodeKindLabel>{nodeKindLabel}</NodeKindLabel>
         )}
-      </div>
+      </button>
 
       {data.fields.length > 0 && (
         <div
@@ -311,6 +341,12 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
               key={f.name}
               field={f}
               selectedTarget={primaryNodeId}
+              selected={
+                selectedField?.typeName === data.typeName && selectedField.fieldName === f.name
+              }
+              selectionAccent={selectionAccent}
+              groupSelected={fieldsInSelectedType}
+              groupHighlighted={headerHighlighted}
               searchFocused={data.focusedFieldName === f.name}
               onFieldClick={onFieldClick}
               onRefPreview={onRefPreview}
@@ -431,12 +467,20 @@ function EnumHoverCardContent({ enumTarget }: { enumTarget: EnumTargetRow }) {
 function FieldRowButton({
   field,
   selectedTarget,
+  selected,
+  selectionAccent,
+  groupSelected,
+  groupHighlighted,
   searchFocused,
   onFieldClick,
   onRefPreview,
 }: {
   field: TypeNodeData['fields'][number];
   selectedTarget: string | null;
+  selected: boolean;
+  selectionAccent: string;
+  groupSelected: boolean;
+  groupHighlighted: boolean;
   searchFocused: boolean;
   onFieldClick: (field: TypeNodeData['fields'][number], ev: React.MouseEvent<HTMLElement>) => void;
   onRefPreview: (
@@ -448,6 +492,7 @@ function FieldRowButton({
   const refTargetSelected = field.refTarget !== undefined && field.refTarget === selectedTarget;
   const hasValidationIssues = (field.validationIssueCount ?? 0) > 0;
   const [enumCardOpen, setEnumCardOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
   const enumSummary = field.enumTarget ? `${field.summary.replace(/^→\s*/, '')} enum` : undefined;
   const isUnionRef = field.refTargetKind === 'discriminatedUnion';
   const button = (
@@ -455,12 +500,25 @@ function FieldRowButton({
       type="button"
       data-testid="type-node-field"
       data-field-name={field.name}
+      data-selected-field={selected ? 'true' : undefined}
       data-validation-issues={hasValidationIssues ? 'true' : undefined}
       onClick={(ev) => onFieldClick(field, ev)}
-      onFocus={field.enumTarget ? () => setEnumCardOpen(true) : undefined}
-      onBlur={field.enumTarget ? () => setEnumCardOpen(false) : undefined}
-      onMouseEnter={(ev) => onRefPreview(field, true, ev)}
-      onMouseLeave={(ev) => onRefPreview(field, false, ev)}
+      onFocus={() => {
+        setHighlighted(true);
+        if (field.enumTarget) setEnumCardOpen(true);
+      }}
+      onBlur={() => {
+        setHighlighted(false);
+        if (field.enumTarget) setEnumCardOpen(false);
+      }}
+      onMouseEnter={(ev) => {
+        setHighlighted(true);
+        onRefPreview(field, true, ev);
+      }}
+      onMouseLeave={(ev) => {
+        setHighlighted(false);
+        onRefPreview(field, false, ev);
+      }}
       onFocusCapture={(ev) => onRefPreview(field, true, ev)}
       onBlurCapture={(ev) => onRefPreview(field, false, ev)}
       aria-label={
@@ -469,7 +527,7 @@ function FieldRowButton({
           : undefined
       }
       data-search-focused={searchFocused ? 'true' : 'false'}
-      className="contexture-type-node-field hover:bg-accent/35 focus-visible:bg-accent/45 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
+      className="contexture-type-node-field focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -481,21 +539,43 @@ function FieldRowButton({
         border: 'none',
         cursor: 'pointer',
         textAlign: 'left',
-        background: searchFocused
-          ? 'var(--graph-node-selected-bg)'
-          : hasValidationIssues
-            ? 'color-mix(in oklch, var(--destructive) 10%, transparent)'
-            : undefined,
-        boxShadow: searchFocused
-          ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 0 0 1px color-mix(in oklch, var(--graph-node-selected) 34%, transparent)'
-          : hasValidationIssues
-            ? 'inset 3px 0 0 var(--destructive)'
-            : undefined,
+        background: selected
+          ? `color-mix(in oklch, ${selectionAccent} 22%, var(--graph-node-body-bg))`
+          : groupSelected
+            ? `color-mix(in oklch, ${selectionAccent} 10%, var(--graph-node-body-bg))`
+            : highlighted
+              ? `color-mix(in oklch, ${selectionAccent} 11%, var(--graph-node-body-bg))`
+              : groupHighlighted
+                ? `color-mix(in oklch, ${selectionAccent} 7%, var(--graph-node-body-bg))`
+                : searchFocused
+                  ? 'var(--graph-node-selected-bg)'
+                  : hasValidationIssues
+                    ? 'color-mix(in oklch, var(--destructive) 10%, transparent)'
+                    : undefined,
+        boxShadow: selected
+          ? `inset 4px 0 0 ${selectionAccent}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+          : groupSelected
+            ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 76%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+            : highlighted
+              ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 68%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+              : searchFocused
+                ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                : hasValidationIssues
+                  ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                  : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
       }}
     >
       <span
         style={{
-          color: hasValidationIssues ? 'var(--destructive)' : 'var(--muted-foreground)',
+          color: selected
+            ? `color-mix(in oklch, ${selectionAccent} 58%, var(--foreground))`
+            : groupSelected
+              ? `color-mix(in oklch, ${selectionAccent} 46%, var(--foreground))`
+              : highlighted
+                ? `color-mix(in oklch, ${selectionAccent} 38%, var(--foreground))`
+                : hasValidationIssues
+                  ? 'var(--destructive)'
+                  : 'var(--muted-foreground)',
           fontWeight: 400,
         }}
       >
@@ -514,11 +594,17 @@ function FieldRowButton({
         style={{
           color: refTargetSelected
             ? 'var(--graph-node-selected)'
-            : field.enumTarget
-              ? 'var(--muted-foreground)'
-              : field.refTarget
-                ? 'var(--graph-edge-property)'
-                : 'var(--muted-foreground)',
+            : selected
+              ? `color-mix(in oklch, ${selectionAccent} 62%, var(--foreground))`
+              : groupSelected
+                ? `color-mix(in oklch, ${selectionAccent} 48%, var(--foreground))`
+                : highlighted
+                  ? `color-mix(in oklch, ${selectionAccent} 42%, var(--foreground))`
+                  : field.enumTarget
+                    ? 'var(--muted-foreground)'
+                    : field.refTarget
+                      ? 'var(--graph-edge-property)'
+                      : 'var(--muted-foreground)',
           fontFamily: field.enumTarget
             ? 'var(--font-mono)'
             : field.refTarget

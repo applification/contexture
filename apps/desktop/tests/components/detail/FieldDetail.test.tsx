@@ -9,6 +9,7 @@ import { FieldDetail } from '@renderer/components/detail/FieldDetail';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { Op } from '@renderer/store/ops';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 function setup(
@@ -33,8 +34,27 @@ function setup(
   return { dispatch };
 }
 
+async function chooseSelectOption(label: string, option: string) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('combobox', { name: label }));
+  await user.click(screen.getByRole('option', { name: option }));
+}
+
 describe('FieldDetail', () => {
   afterEach(cleanup);
+
+  it('renders the selected field title as a panel header', () => {
+    setup({ name: 'showPrice', type: { kind: 'boolean' } });
+
+    const header = screen.getByTestId('field-detail-header');
+    expect(header).toContainElement(screen.getByRole('heading', { name: 'showPrice' }));
+    expect(header).toHaveTextContent('Plot');
+    expect(header).toHaveTextContent('object');
+    expect(screen.getByText('Plot')).toHaveClass('text-lg');
+    expect(screen.getByRole('heading', { name: 'showPrice' })).toHaveClass('text-sm');
+    expect(header).toHaveClass('border-b');
+    expect(header).toHaveClass('bg-muted/20');
+  });
 
   it('string: min/max/regex/format controls; blur dispatches update_field', () => {
     const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
@@ -49,10 +69,13 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('string: format select dispatches with correct format', () => {
+  it('string: format select dispatches with correct format', async () => {
     const { dispatch } = setup({ name: 'email', type: { kind: 'string' } });
-    const select = screen.getByTestId('string-format-select');
-    fireEvent.change(select, { target: { value: 'email' } });
+    expect(screen.getByTestId('string-format-select')).toHaveAttribute(
+      'aria-label',
+      'String format',
+    );
+    await chooseSelectOption('String format', 'email');
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -61,9 +84,9 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('type picker changes a field from string to number', () => {
+  it('type picker changes a field from string to number', async () => {
     const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
-    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'number' } });
+    await chooseSelectOption('Field type', 'number');
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -201,13 +224,13 @@ describe('FieldDetail', () => {
     expect(screen.queryByRole('button', { name: 'Add index' })).not.toBeInTheDocument();
   });
 
-  it('type picker creates a ref to the first available type', () => {
+  it('type picker creates a ref to the first available type', async () => {
     const { dispatch } = setup(
       { name: 'harvest', type: { kind: 'string' } },
       [],
       ['Harvest', 'Season'],
     );
-    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'ref' } });
+    await chooseSelectOption('Field type', 'ref');
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -216,9 +239,9 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('type picker creates a stdlib ref when no local type is available', () => {
+  it('type picker creates a stdlib ref when no local type is available', async () => {
     const { dispatch } = setup({ name: 'email', type: { kind: 'string' } });
-    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'ref' } });
+    await chooseSelectOption('Field type', 'ref');
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -365,9 +388,9 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('type picker wraps the current field as a string array', () => {
+  it('type picker wraps the current field as a string array', async () => {
     const { dispatch } = setup({ name: 'tags', type: { kind: 'string' } });
-    fireEvent.change(screen.getByLabelText('Field type'), { target: { value: 'array' } });
+    await chooseSelectOption('Field type', 'array');
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -378,7 +401,7 @@ describe('FieldDetail', () => {
 
   it('list toggle wraps the current type without resetting constraints', () => {
     const { dispatch } = setup({ name: 'tags', type: { kind: 'string', min: 2 } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'list' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'List' }));
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -392,7 +415,7 @@ describe('FieldDetail', () => {
       name: 'scores',
       type: { kind: 'array', element: { kind: 'number', int: true } },
     });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'list' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'List' }));
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -421,8 +444,8 @@ describe('FieldDetail', () => {
 
   it('optional / nullable checkboxes dispatch update_field', () => {
     const { dispatch } = setup({ name: 'n', type: { kind: 'string' } });
-    // First checkbox is "optional".
-    const optional = screen.getAllByRole('checkbox')[0];
+    const optional = screen.getByRole('checkbox', { name: 'Optional' });
+    expect(optional).toHaveAccessibleDescription('May be omitted');
     fireEvent.click(optional);
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
@@ -434,7 +457,9 @@ describe('FieldDetail', () => {
 
   it('server-derived checkbox dispatches update_field', () => {
     const { dispatch } = setup({ name: 'createdAt', type: { kind: 'date' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'server derived' }));
+    const serverDerived = screen.getByRole('checkbox', { name: 'Server derived' });
+    expect(serverDerived).toHaveAccessibleDescription('Computed by backend');
+    fireEvent.click(serverDerived);
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
@@ -449,7 +474,7 @@ describe('FieldDetail', () => {
       type: { kind: 'date' },
       serverDerived: true,
     });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'server derived' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Server derived' }));
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',

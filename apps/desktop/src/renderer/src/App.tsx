@@ -56,7 +56,7 @@ import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/graph/interactions';
-import { TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
+import { TYPE_NODE_EVENT, TYPE_NODE_OBJECT_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
@@ -142,6 +142,17 @@ export default function App(): React.JSX.Element {
     }
     document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
     return () => document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
+  }, []);
+
+  useEffect(() => {
+    function onTypeSelect(event: Event): void {
+      const detail = (event as CustomEvent<{ typeName?: unknown }>).detail;
+      if (typeof detail?.typeName !== 'string') return;
+      useUIChromeStore.getState().setSidebarVisible(true);
+      useUIChromeStore.getState().setSidebarTab('properties');
+    }
+    document.addEventListener(TYPE_NODE_OBJECT_EVENT, onTypeSelect);
+    return () => document.removeEventListener(TYPE_NODE_OBJECT_EVENT, onTypeSelect);
   }, []);
 
   useEffect(() => {

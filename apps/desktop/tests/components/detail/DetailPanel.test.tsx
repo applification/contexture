@@ -88,8 +88,9 @@ describe('DetailPanel', () => {
   it('renders TypeDetail when a type is selected', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot' }} />);
-    expect(screen.getByText('Plot')).toBeInTheDocument();
-    expect(screen.getByText('object')).toBeInTheDocument();
+    const header = screen.getByTestId('type-detail-header');
+    expect(header).toContainElement(screen.getByRole('heading', { name: 'Plot' }));
+    expect(header).toHaveTextContent('object');
   });
 
   it('renders FieldDetail when a type + field are selected', () => {

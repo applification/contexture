@@ -11,6 +11,7 @@
 import {
   TYPE_NODE_ADD_FIELD_EVENT,
   TYPE_NODE_EVENT,
+  TYPE_NODE_OBJECT_EVENT,
   TypeNode,
 } from '@renderer/components/graph/nodes/TypeNode';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
@@ -116,7 +117,10 @@ describe('TypeNode', () => {
     );
     expect(screen.getByTestId('type-node-validation-rail')).toBeInTheDocument();
     expect(field.dataset.validationIssues).toBe('true');
-    expect(field).toHaveStyle({ boxShadow: 'inset 3px 0 0 var(--destructive)' });
+    expect(field.getAttribute('style')).toContain('inset 3px 0 0 var(--destructive)');
+    expect(field.getAttribute('style')).toContain(
+      'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
+    );
   });
 
   it('raises a contexture:field-select event with typeName + fieldName when a field is clicked', () => {
@@ -124,7 +128,10 @@ describe('TypeNode', () => {
       typeName: 'Plot',
       kind: 'object',
       imported: false,
-      fields: [{ name: 'name', summary: 'string', optional: false, nullable: false }],
+      fields: [
+        { name: 'name', summary: 'string', optional: false, nullable: false },
+        { name: 'area', summary: 'number', optional: false, nullable: false },
+      ],
     };
     const handler = vi.fn();
     const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
@@ -136,6 +143,165 @@ describe('TypeNode', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     const event = handler.mock.calls[0][0] as CustomEvent<{ typeName: string; fieldName: string }>;
     expect(event.detail).toEqual({ typeName: 'Plot', fieldName: 'name' });
+  });
+
+  it('visually marks the selected field row', () => {
+    const data: TypeNodeData = {
+      typeName: 'Plot',
+      kind: 'object',
+      imported: false,
+      fields: [
+        { name: 'name', summary: 'string', optional: false, nullable: false },
+        { name: 'area', summary: 'number', optional: true, nullable: false },
+      ],
+    };
+    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'area' });
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    const fields = screen.getAllByTestId('type-node-field');
+    expect(fields[0].dataset.selectedField).toBeUndefined();
+    expect(fields[1].dataset.selectedField).toBe('true');
+    expect(fields[1]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 22%, var(--graph-node-body-bg))',
+    });
+    expect(fields[1].getAttribute('style')).toContain('inset 4px 0 0 var(--graph-node-header-bg)');
+    expect(fields[1].getAttribute('style')).toContain(
+      'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
+    );
+    expect(screen.getByText('area?')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--graph-node-header-bg) 58%, var(--foreground))',
+      fontWeight: '400',
+    });
+  });
+
+  it('uses the table accent for selected table field rows', () => {
+    const data: TypeNodeData = {
+      typeName: 'Posts',
+      kind: 'object',
+      imported: false,
+      table: true,
+      fields: [{ name: 'title', summary: 'string', optional: false, nullable: false }],
+    };
+    useGraphSelectionStore.getState().selectField({ typeName: 'Posts', fieldName: 'title' });
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field')).toHaveStyle({
+      background:
+        'color-mix(in oklch, var(--graph-node-table-accent) 22%, var(--graph-node-body-bg))',
+    });
+  });
+
+  it('tints every field row when the parent object is selected', () => {
+    const data: TypeNodeData = {
+      typeName: 'Plot',
+      kind: 'object',
+      imported: false,
+      fields: [
+        { name: 'name', summary: 'string', optional: false, nullable: false },
+        { name: 'area', summary: 'number', optional: false, nullable: false },
+      ],
+    };
+    useGraphSelectionStore.getState().click('Plot', 'replace');
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    const fields = screen.getAllByTestId('type-node-field');
+    expect(fields[0]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
+    });
+    expect(fields[1]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
+    });
+    expect(screen.getByText('name')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--graph-node-header-bg) 46%, var(--foreground))',
+      fontWeight: '400',
+    });
+    expect(fields[0].getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
+    );
+    expect(fields[1].getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
+    );
+  });
+
+  it('uses table-accent field rails when the parent table is selected', () => {
+    const data: TypeNodeData = {
+      typeName: 'Posts',
+      kind: 'object',
+      imported: false,
+      table: true,
+      fields: [{ name: 'title', summary: 'string', optional: false, nullable: false }],
+    };
+    useGraphSelectionStore.getState().click('Posts', 'replace');
+
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field').getAttribute('style')).toContain(
+      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-table-accent) 76%, transparent)',
+    );
+  });
+
+  it('uses a lighter selected-color treatment for field hover', () => {
+    const data: TypeNodeData = {
+      typeName: 'Plot',
+      kind: 'object',
+      imported: false,
+      fields: [
+        { name: 'name', summary: 'string', optional: false, nullable: false },
+        { name: 'area', summary: 'number', optional: false, nullable: false },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    const field = screen.getAllByTestId('type-node-field')[0];
+    fireEvent.mouseEnter(field);
+
+    expect(field).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 11%, var(--graph-node-body-bg))',
+    });
+    expect(screen.getByText('name')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--graph-node-header-bg) 38%, var(--foreground))',
+      fontWeight: '400',
+    });
+  });
+
+  it('uses the node header as an explicit route back to object properties', () => {
+    const data: TypeNodeData = {
+      typeName: 'Plot',
+      kind: 'object',
+      imported: false,
+      fields: [
+        { name: 'name', summary: 'string', optional: false, nullable: false },
+        { name: 'area', summary: 'number', optional: false, nullable: false },
+      ],
+    };
+    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'name' });
+    const handler = vi.fn();
+
+    const { container } = render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+    container.addEventListener(TYPE_NODE_OBJECT_EVENT, handler as EventListener);
+
+    const header = screen.getByTestId('type-node-header');
+    expect(header).toHaveAccessibleName('Show Plot object properties');
+    expect(header).toHaveAttribute('title', 'Show Plot object properties');
+    act(() => fireEvent.mouseOver(header));
+    expect(header).toHaveStyle({ background: 'var(--graph-node-header-bg)' });
+    expect(container.querySelector('[data-testid="type-node"]')?.getAttribute('style')).toContain(
+      '0 0 0 2px var(--graph-node-selected)',
+    );
+    expect(header.getAttribute('style')).not.toContain('inset 0 -2px');
+    expect(screen.getAllByTestId('type-node-field')[1]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 7%, var(--graph-node-body-bg))',
+    });
+
+    fireEvent.click(header);
+
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
+    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ typeName: 'Plot' });
   });
 
   it('selects referenced object targets when a ref field is clicked', () => {
@@ -177,10 +343,7 @@ describe('TypeNode', () => {
     expect(screen.getByTestId('type-node-header')).toHaveStyle({
       background: 'var(--graph-node-table-header-bg)',
     });
-    expect(screen.getByTestId('type-node-table-rail')).toHaveStyle({
-      width: '4px',
-      background: 'var(--graph-node-table-accent)',
-    });
+    expect(screen.queryByTestId('type-node-selection-rail')).not.toBeInTheDocument();
     expect(screen.getByTestId('type-node-table-icon')).toBeInTheDocument();
     expect(screen.getByTestId('type-node-table-label')).toHaveTextContent('table');
     expect(screen.getByTestId('type-node-table-label')).toHaveStyle({
