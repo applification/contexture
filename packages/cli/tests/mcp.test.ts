@@ -35,7 +35,7 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
 }
 
 describe('Contexture MCP server', () => {
-  it('lists inspect, validate, mutation, emit, and drift tools', async () => {
+  it('lists inspect, validate, typed mutation, emit, drift, and guidance tools', async () => {
     await withClient(async (client) => {
       const { tools } = await client.listTools();
       expect(tools).toEqual(
@@ -70,6 +70,34 @@ describe('Contexture MCP server', () => {
           }),
           expect.objectContaining({
             name: 'check_contexture_drift',
+            annotations: expect.objectContaining({
+              readOnlyHint: true,
+              destructiveHint: false,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'add_field',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'rename_type',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'add_index',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
+            name: 'get_contexture_integration_guidance',
             annotations: expect.objectContaining({
               readOnlyHint: true,
               destructiveHint: false,
@@ -110,9 +138,88 @@ describe('Contexture MCP server', () => {
             name: 'Plot',
             kind: 'object',
             table: true,
+            tableName: 'plot',
             fields: [{ name: 'name', type: 'string' }],
           },
         ],
+        generatedTargets: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'convex',
+            path: expect.stringContaining('convex/schema.ts'),
+            enabled: true,
+          }),
+          expect.objectContaining({
+            kind: 'convex-validators',
+            path: expect.stringContaining('convex/validators.ts'),
+            enabled: true,
+          }),
+        ]),
+        agent: expect.objectContaining({
+          preferredMutationTools: expect.arrayContaining(['add_field', 'rename_type', 'add_index']),
+        }),
+      });
+    });
+  });
+
+  it('includes indexes, descriptions, output config, and generated paths in inspect output', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      outputs: {
+        aiPipeline: {
+          mcpDefinitions: { enabled: true },
+        },
+      },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          description: 'A rentable garden plot.',
+          table: true,
+          tableName: 'plots',
+          fields: [
+            { name: 'name', description: 'Public plot name.', type: { kind: 'string' } },
+            { name: 'growerId', type: { kind: 'string' } },
+          ],
+          indexes: [{ name: 'by_grower', fields: ['growerId'] }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'inspect_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        outputConfig: expect.objectContaining({
+          aiPipeline: expect.objectContaining({
+            mcpDefinitions: { enabled: true },
+          }),
+        }),
+        types: [
+          expect.objectContaining({
+            name: 'Plot',
+            description: 'A rentable garden plot.',
+            tableName: 'plots',
+            indexes: [{ name: 'by_grower', fields: ['growerId'] }],
+            fields: [
+              expect.objectContaining({
+                name: 'name',
+                description: 'Public plot name.',
+              }),
+              expect.objectContaining({ name: 'growerId' }),
+            ],
+          }),
+        ],
+        generatedTargets: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'mcp-definitions',
+            enabled: true,
+            path: expect.stringContaining('.contexture/mcp-definitions.json'),
+          }),
+        ]),
       });
     });
   });
@@ -216,6 +323,125 @@ describe('Contexture MCP server', () => {
             message: expect.any(String),
           }),
         ],
+      });
+    });
+  });
+
+  it('validates bundled stdlib-qualified refs through the CLI MCP server', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Grower',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'validate_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        valid: true,
+        errors: [],
+      });
+    });
+  });
+
+  it('applies typed per-op MCP tools without requiring generic op JSON', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          table: true,
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'add_field',
+        arguments: {
+          irPath,
+          typeName: 'Plot',
+          field: { name: 'size', type: { kind: 'number', int: true } },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_field',
+        typeCount: 1,
+      });
+
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ name: string; fields?: Array<{ name: string }> }>;
+      };
+      expect(updatedIr.types[0]?.fields?.map((field) => field.name)).toEqual(['name', 'size']);
+    });
+  });
+
+  it('returns structured failures from typed per-op MCP tools', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Plot', fields: [] }],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'add_field',
+        arguments: {
+          irPath,
+          typeName: 'Missing',
+          field: { name: 'size', type: { kind: 'number' } },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: false,
+        opKind: 'add_field',
+        error: expect.stringContaining('Missing'),
+      });
+    });
+  });
+
+  it('provides repo integration guidance for MCP-capable agents', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [{ kind: 'object', name: 'Plot', table: true, fields: [] }],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'get_contexture_integration_guidance',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        sourceOfTruth: '.contexture.json',
+        safeLoop: [
+          'inspect_contexture',
+          'validate_contexture',
+          'emit_contexture',
+          'check_contexture_drift',
+        ],
+        prompt: expect.stringContaining('Use the Contexture MCP server'),
+        rules: expect.arrayContaining([
+          expect.stringContaining('Do not hand-edit generated files'),
+          expect.stringContaining('Prefer typed op tools'),
+        ]),
       });
     });
   });

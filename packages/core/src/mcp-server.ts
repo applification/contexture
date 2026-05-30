@@ -3,10 +3,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ZodError, z } from 'zod';
 import { createFileBackedForward, nodeFileBackedFs } from './file-forward';
 import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-writer';
+import { GENERATED_TARGETS } from './generated-targets';
 import type { FieldType, Schema, TypeDef } from './ir';
 import { load } from './load';
+import { createOpTools } from './op-tools';
 import { OpSchema } from './ops';
-import { assertContextureIrPath } from './paths';
+import { assertContextureIrPath, bundlePathsFor } from './paths';
 import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
 const VERSION = '0.0.0';
@@ -22,21 +24,40 @@ const IrPathInput = {
 const InspectTypeSchema = z.object({
   name: z.string(),
   kind: z.enum(['object', 'enum', 'discriminatedUnion', 'raw']),
+  description: z.string().optional(),
   table: z.boolean().optional(),
+  tableName: z.string().optional(),
   fieldCount: z.number().optional(),
   fields: z
     .array(
       z.object({
         name: z.string(),
+        description: z.string().optional(),
         type: z.string(),
         optional: z.boolean().optional(),
         nullable: z.boolean().optional(),
       }),
     )
     .optional(),
+  indexes: z
+    .array(
+      z.object({
+        name: z.string(),
+        fields: z.array(z.string()),
+      }),
+    )
+    .optional(),
   values: z.array(z.string()).optional(),
   variants: z.array(z.string()).optional(),
   discriminator: z.string().optional(),
+});
+
+const GeneratedTargetInspectSchema = z.object({
+  kind: z.string(),
+  group: z.enum(['convex', 'supporting', 'agent']),
+  label: z.string(),
+  path: z.string(),
+  enabled: z.boolean(),
 });
 
 const InspectOutput = {
@@ -52,6 +73,12 @@ const InspectOutput = {
       path: z.string(),
     }),
   ),
+  outputConfig: z.unknown().optional(),
+  generatedTargets: z.array(GeneratedTargetInspectSchema),
+  agent: z.object({
+    preferredMutationTools: z.array(z.string()),
+    safeLoop: z.array(z.string()),
+  }),
 };
 
 const ValidationIssueSchema = z.object({
@@ -108,6 +135,15 @@ const CheckContextureDriftOutput = {
       status: GeneratedFileStatusSchema,
     }),
   ),
+};
+
+const IntegrationGuidanceOutput = {
+  path: z.string(),
+  sourceOfTruth: z.literal('.contexture.json'),
+  safeLoop: z.array(z.string()),
+  preferredMutationTools: z.array(z.string()),
+  rules: z.array(z.string()),
+  prompt: z.string(),
 };
 
 export function createContextureMcpServer(options: ContextureMcpServerOptions = {}): McpServer {
@@ -212,6 +248,48 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       return jsonToolResult(structuredContent);
     },
   );
+
+  server.registerTool(
+    'get_contexture_integration_guidance',
+    {
+      title: 'Get Contexture Integration Guidance',
+      description:
+        'Return concise repo-integration guidance for agents using Contexture as the source of truth.',
+      inputSchema: IrPathInput,
+      outputSchema: IntegrationGuidanceOutput,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ irPath }) => {
+      const path = assertContextureIrPath(irPath);
+      const structuredContent = buildIntegrationGuidance(path);
+      return jsonToolResult(structuredContent);
+    },
+  );
+
+  for (const tool of createOpTools(async () => ({ error: 'unbound MCP op tool' }))) {
+    server.registerTool(
+      tool.name,
+      {
+        title: `Contexture ${tool.name}`,
+        description: `${tool.description} Mutates the .contexture.json file through the shared Contexture op applier and rewrites generated artifacts.`,
+        inputSchema: { ...IrPathInput, ...tool.inputSchema },
+        outputSchema: ApplyContextureOpOutput,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: false,
+        },
+      },
+      async (args) => {
+        const structuredContent = await applyTypedContextureOp(tool.name, args, options.stdlib);
+        return jsonToolResult(structuredContent);
+      },
+    );
+  }
 
   return server;
 }
@@ -351,6 +429,10 @@ function buildInspectSummary(
   schema: Schema,
   irPath: string,
 ): z.infer<z.ZodObject<typeof InspectOutput>> {
+  const paths = bundlePathsFor(irPath);
+  const preferredMutationTools = createOpTools(async () => ({ error: 'inspect only' })).map(
+    (tool) => tool.name,
+  );
   return {
     path: irPath,
     version: schema.version,
@@ -362,6 +444,23 @@ function buildInspectSummary(
       alias: imp.alias,
       path: imp.path,
     })),
+    ...(schema.outputs ? { outputConfig: schema.outputs } : {}),
+    generatedTargets: GENERATED_TARGETS.map((target) => ({
+      kind: target.kind,
+      group: target.group,
+      label: target.label,
+      path: target.path(paths),
+      enabled: target.enabled(schema),
+    })),
+    agent: {
+      preferredMutationTools,
+      safeLoop: [
+        'inspect_contexture',
+        'validate_contexture',
+        'emit_contexture',
+        'check_contexture_drift',
+      ],
+    },
   };
 }
 
@@ -370,20 +469,32 @@ function typeToInspectJson(type: TypeDef): z.infer<typeof InspectTypeSchema> {
     return {
       name: type.name,
       kind: 'object',
+      ...(type.description ? { description: type.description } : {}),
       ...(type.table ? { table: true } : {}),
+      ...(type.table ? { tableName: type.tableName ?? convexTableName(type.name) } : {}),
       fieldCount: type.fields.length,
       fields: type.fields.map((field) => ({
         name: field.name,
+        ...(field.description ? { description: field.description } : {}),
         type: fieldTypeToString(field.type),
         ...(field.optional ? { optional: true } : {}),
         ...(field.nullable ? { nullable: true } : {}),
       })),
+      ...((type.indexes?.length ?? 0) > 0
+        ? {
+            indexes: type.indexes?.map((index) => ({
+              name: index.name,
+              fields: index.fields,
+            })),
+          }
+        : {}),
     };
   }
   if (type.kind === 'enum') {
     return {
       name: type.name,
       kind: 'enum',
+      ...(type.description ? { description: type.description } : {}),
       values: type.values.map((value) => value.value),
     };
   }
@@ -391,11 +502,94 @@ function typeToInspectJson(type: TypeDef): z.infer<typeof InspectTypeSchema> {
     return {
       name: type.name,
       kind: 'discriminatedUnion',
+      ...(type.description ? { description: type.description } : {}),
       discriminator: type.discriminator,
       variants: type.variants,
     };
   }
-  return { name: type.name, kind: 'raw' };
+  return {
+    name: type.name,
+    kind: 'raw',
+    ...(type.description ? { description: type.description } : {}),
+  };
+}
+
+function convexTableName(typeName: string): string {
+  return `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}`;
+}
+
+async function applyTypedContextureOp(
+  opKind: string,
+  args: Record<string, unknown>,
+  catalog?: StdlibCatalog,
+): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
+  const irPath = typeof args.irPath === 'string' ? args.irPath : '';
+  let path: string;
+  try {
+    path = assertContextureIrPath(irPath);
+  } catch (err) {
+    return {
+      path: irPath,
+      applied: false,
+      opKind,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const { irPath: _irPath, ...toolArgs } = args;
+  const tools = new Map(
+    createOpTools(createFileBackedForward(path, { stdlib: catalog, changeSource: 'mcp' })).map(
+      (tool) => [tool.name, tool],
+    ),
+  );
+  const tool = tools.get(opKind);
+  if (!tool) return { path, applied: false, opKind, error: `unknown op tool: ${opKind}` };
+
+  try {
+    const result = await tool.handler(toolArgs);
+    if ('error' in result) return { path, applied: false, opKind, error: result.error };
+    return {
+      path,
+      applied: true,
+      opKind,
+      typeCount: result.schema.types.length,
+    };
+  } catch (err) {
+    return {
+      path,
+      applied: false,
+      opKind,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+function buildIntegrationGuidance(
+  irPath: string,
+): z.infer<z.ZodObject<typeof IntegrationGuidanceOutput>> {
+  const preferredMutationTools = createOpTools(async () => ({ error: 'guidance only' })).map(
+    (tool) => tool.name,
+  );
+  const safeLoop = [
+    'inspect_contexture',
+    'validate_contexture',
+    'emit_contexture',
+    'check_contexture_drift',
+  ];
+  return {
+    path: irPath,
+    sourceOfTruth: '.contexture.json',
+    safeLoop,
+    preferredMutationTools,
+    rules: [
+      'Treat the .contexture.json IR as the source of truth for domain-model changes.',
+      'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
+      'Prefer typed op tools such as add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
+      'After any model mutation, validate, emit generated targets, and check drift before finishing.',
+      'Wire generated outputs into the existing app architecture; Contexture does not own arbitrary application code.',
+    ],
+    prompt: `Use the Contexture MCP server to inspect ${irPath}, make domain-model changes with typed op tools, validate the IR, emit generated Convex and supporting targets, and check drift before finishing.`,
+  };
 }
 
 function fieldTypeToString(type: FieldType): string {
