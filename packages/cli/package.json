@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@contexture/core": "workspace:*",
+    "@contexture/stdlib": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.3.6"
   },
