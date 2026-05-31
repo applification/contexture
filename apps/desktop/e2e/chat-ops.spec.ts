@@ -11,7 +11,7 @@
  * variant belongs to a separate, network-opted-in suite.
  */
 import { expect, test } from '@playwright/test';
-import { launchElectron } from './electron-launch';
+import { closeElectron, launchElectron } from './electron-launch';
 
 test.describe('Chat-ops turn collapses to one undo entry', () => {
   let electronApp: Awaited<ReturnType<typeof launchElectron>>;
@@ -24,7 +24,7 @@ test.describe('Chat-ops turn collapses to one undo entry', () => {
   });
 
   test.afterAll(async () => {
-    await electronApp?.close();
+    await closeElectron(electronApp);
   });
 
   test('3 ops in a transaction → 3 animations + 1 undo step', async () => {

@@ -10,10 +10,17 @@ import {
   type SchemaAgentProvider,
   useSchemaAgentSettingsStore,
 } from '@renderer/store/schema-agent-settings';
-import { useUIChromeStore } from '@renderer/store/ui-chrome';
-import { Bot, ChevronDown, Moon, PanelRight, Plus, Sun } from 'lucide-react';
+import { type ThemePreference, useUIChromeStore } from '@renderer/store/ui-chrome';
+import { Bot, ChevronDown, Moon, PanelRight, Plus, Sun, SunMoon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -33,7 +40,8 @@ export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
     return null;
   });
   const theme = useUIChromeStore((s) => s.theme);
-  const toggleTheme = useUIChromeStore((s) => s.toggleTheme);
+  const resolvedTheme = useUIChromeStore((s) => s.resolvedTheme);
+  const setTheme = useUIChromeStore((s) => s.setTheme);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const toggleSidebar = useUIChromeStore((s) => s.toggleSidebar);
   const provider = useSchemaAgentSettingsStore((s) => s.provider);
@@ -150,15 +158,39 @@ export function Toolbar({ onCreateType }: ToolbarProps): React.JSX.Element {
         </Popover>
       )}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8"
-        title="Toggle theme"
-        onClick={toggleTheme}
-      >
-        {theme === 'dark' ? <Sun /> : <Moon />}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            title="Theme"
+            aria-label="Theme"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            {theme === 'system' ? <SunMoon /> : resolvedTheme === 'dark' ? <Moon /> : <Sun />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuRadioGroup
+            value={theme}
+            onValueChange={(value) => setTheme(value as ThemePreference)}
+          >
+            <DropdownMenuRadioItem value="system" className="gap-2">
+              <SunMoon className="size-4" />
+              System
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="light" className="gap-2">
+              <Sun className="size-4" />
+              Light
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="dark" className="gap-2">
+              <Moon className="size-4" />
+              Dark
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Popover
         open={providerPopoverOpen}

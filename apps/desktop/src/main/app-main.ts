@@ -87,7 +87,7 @@ app.whenReady().then(() => {
 
   const mainWindow = createWindow();
   Menu.setApplicationMenu(createMenu(mainWindow));
-  registerUpdateIpc(mainWindow);
+  registerUpdateIpc(mainWindow, { autoCheck: !isE2E });
   registerFileIpc(mainWindow);
   registerShellIpc();
   registerReconcileIpc();
