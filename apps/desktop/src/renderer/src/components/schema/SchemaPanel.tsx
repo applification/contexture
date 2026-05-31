@@ -58,6 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
@@ -128,8 +129,31 @@ const OUTPUT_GROUPS: { group: GeneratedTargetGroup; label: string }[] = [
   { group: 'agent', label: 'Agent and form targets' },
 ];
 
-const CODEX_MCP_INSTALL_COMMAND =
-  'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp';
+const CONTEXTURE_MCP_BIN_PATH =
+  '/Applications/Contexture.app/Contents/Resources/bin/contexture-mcp';
+
+const CODEX_MCP_INSTALL_COMMAND = `codex mcp add contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
+
+const CLAUDE_CODE_MCP_INSTALL_COMMAND = `claude mcp add --transport stdio --scope user contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
+
+const CLAUDE_DESKTOP_CONFIG_PATH =
+  '~/Library/Application Support/Claude/claude_desktop_config.json';
+
+const CLAUDE_DESKTOP_CONFIG_SNIPPET = `{
+  "mcpServers": {
+    "contexture": {
+      "command": "${CONTEXTURE_MCP_BIN_PATH}"
+    }
+  }
+}`;
+
+type AgentClient = 'codex' | 'claude-code' | 'claude-desktop';
+
+const AGENT_CLIENT_LABEL: Record<AgentClient, string> = {
+  codex: 'Codex',
+  'claude-code': 'Claude Code',
+  'claude-desktop': 'Claude Desktop',
+};
 
 const CONTEXTURE_MCP_TOOLS = [
   'inspect_contexture',
@@ -626,14 +650,15 @@ function AgentSetupPopover({
   onRequestSave?: () => void;
   compact?: boolean;
 }): React.JSX.Element {
+  const [activeClient, setActiveClient] = useState<AgentClient>('codex');
   const savedPrompt =
     documentFilePath === null
       ? null
       : `Use the Contexture MCP server to inspect ${documentFilePath}, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
   const smokeTest =
     documentFilePath === null
-      ? 'Ask Codex: "List the contexture MCP tools."'
-      : `Ask Codex: "List the contexture MCP tools, then inspect ${documentFilePath} and summarize the Convex tables."`;
+      ? 'Ask your agent: "List the contexture MCP tools."'
+      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath} and summarize the Convex tables."`;
   const copiedLabel =
     copied === 'install'
       ? 'Copied install command'
@@ -667,26 +692,101 @@ function AgentSetupPopover({
           {compact ? <span className="text-xs">Agent</span> : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-2" align="end" data-testid="agent-setup-content">
+      <PopoverContent className="w-96 p-2" align="end" data-testid="agent-setup-content">
         <div className="mb-2 px-1">
           <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
             Agent setup
           </h3>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Let Codex or another MCP-capable agent review and evolve this Convex model.
+            Connect Contexture's MCP server to your agent and evolve this Convex model.
           </p>
         </div>
 
-        <div className="space-y-1.5">
-          <AgentCopyRow
-            label="Codex install command"
-            value={CODEX_MCP_INSTALL_COMMAND}
-            copied={copied === 'install'}
-            onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
-            copyLabel="Copy Codex MCP install command"
-            testId="agent-setup-install"
-          />
+        <Tabs
+          value={activeClient}
+          onValueChange={(value) => setActiveClient(value as AgentClient)}
+          className="mb-2"
+        >
+          <TabsList
+            className="grid h-8 w-full grid-cols-3 p-0.5"
+            aria-label="MCP client install instructions"
+          >
+            <TabsTrigger
+              value="codex"
+              className="h-7 px-1 text-[11px]"
+              data-testid="agent-setup-tab-codex"
+            >
+              {AGENT_CLIENT_LABEL.codex}
+            </TabsTrigger>
+            <TabsTrigger
+              value="claude-code"
+              className="h-7 px-1 text-[11px]"
+              data-testid="agent-setup-tab-claude-code"
+            >
+              {AGENT_CLIENT_LABEL['claude-code']}
+            </TabsTrigger>
+            <TabsTrigger
+              value="claude-desktop"
+              className="h-7 px-1 text-[11px]"
+              data-testid="agent-setup-tab-claude-desktop"
+            >
+              {AGENT_CLIENT_LABEL['claude-desktop']}
+            </TabsTrigger>
+          </TabsList>
 
+          <TabsContent value="codex" className="mt-2">
+            <AgentCopyRow
+              label="Codex install command"
+              value={CODEX_MCP_INSTALL_COMMAND}
+              copied={copied === 'install'}
+              onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
+              copyLabel="Copy Codex MCP install command"
+              testId="agent-setup-install"
+            />
+            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+              Run in a terminal. Codex picks the server up on the next session.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="claude-code" className="mt-2">
+            <AgentCopyRow
+              label="Claude Code install command"
+              value={CLAUDE_CODE_MCP_INSTALL_COMMAND}
+              copied={copied === 'install'}
+              onCopy={() => onCopy('install', CLAUDE_CODE_MCP_INSTALL_COMMAND)}
+              copyLabel="Copy Claude Code MCP install command"
+              testId="agent-setup-claude-code-install"
+            />
+            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+              Run in a terminal. <code className="font-mono">--scope user</code> makes the server
+              available in every project; drop it to scope to the current directory. Verify with{' '}
+              <code className="font-mono">/mcp</code> inside Claude Code.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="claude-desktop" className="mt-2">
+            <AgentCopyRow
+              label="claude_desktop_config.json"
+              value={CLAUDE_DESKTOP_CONFIG_SNIPPET}
+              copied={copied === 'install'}
+              onCopy={() => onCopy('install', CLAUDE_DESKTOP_CONFIG_SNIPPET)}
+              copyLabel="Copy Claude Desktop MCP config"
+              testId="agent-setup-claude-desktop-install"
+            />
+            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+              Merge into{' '}
+              <code
+                className="font-mono break-all"
+                data-testid="agent-setup-claude-desktop-config-path"
+              >
+                {CLAUDE_DESKTOP_CONFIG_PATH}
+              </code>{' '}
+              (Settings → Developer → Edit Config), then restart Claude Desktop.
+            </p>
+          </TabsContent>
+        </Tabs>
+
+        <div className="space-y-1.5">
           {savedPrompt === null ? (
             <div
               className="rounded border border-dashed border-border/80 bg-background/60 p-2 text-[11px] leading-snug text-muted-foreground"
