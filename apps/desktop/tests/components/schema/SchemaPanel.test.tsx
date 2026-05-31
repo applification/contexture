@@ -92,6 +92,49 @@ describe('SchemaPanel', () => {
     expect(screen.getByText('Copied install command')).toBeInTheDocument();
   });
 
+  it('exposes Claude Code install instructions on the Claude Code tab', async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn();
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" onCopy={onCopy} />);
+
+    await user.click(screen.getByTestId('agent-setup'));
+    await user.click(screen.getByTestId('agent-setup-tab-claude-code'));
+    expect(screen.getByTestId('agent-setup-claude-code-install-value')).toHaveTextContent(
+      'claude mcp add --transport stdio --scope user contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
+    );
+
+    await user.click(screen.getByTestId('agent-setup-claude-code-install-copy'));
+    expect(onCopy).toHaveBeenCalledWith(
+      'claude mcp add --transport stdio --scope user contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
+    );
+  });
+
+  it('exposes a Claude Desktop config snippet and its file path', async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn();
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" onCopy={onCopy} />);
+
+    await user.click(screen.getByTestId('agent-setup'));
+    await user.click(screen.getByTestId('agent-setup-tab-claude-desktop'));
+    const snippet = screen.getByTestId('agent-setup-claude-desktop-install-value');
+    expect(snippet).toHaveTextContent('"mcpServers"');
+    expect(snippet).toHaveTextContent('"contexture"');
+    expect(snippet).toHaveTextContent(
+      '"command": "/Applications/Contexture.app/Contents/Resources/bin/contexture-mcp"',
+    );
+    expect(screen.getByTestId('agent-setup-claude-desktop-config-path')).toHaveTextContent(
+      '~/Library/Application Support/Claude/claude_desktop_config.json',
+    );
+
+    await user.click(screen.getByTestId('agent-setup-claude-desktop-install-copy'));
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    const copied = onCopy.mock.calls[0]?.[0] ?? '';
+    expect(copied).toContain('"mcpServers"');
+    expect(copied).toContain(
+      '"command": "/Applications/Contexture.app/Contents/Resources/bin/contexture-mcp"',
+    );
+  });
+
   it('uses the saved document path in the Agent setup prompt and smoke test', () => {
     const onCopy = vi.fn();
     render(
@@ -108,7 +151,7 @@ describe('SchemaPanel', () => {
       'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
     expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask Codex: "List the contexture MCP tools, then inspect /repo/garden.contexture.json and summarize the Convex tables."',
+      'Ask your agent: "List the contexture MCP tools, then inspect /repo/garden.contexture.json and summarize the Convex tables."',
     );
 
     fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
@@ -134,7 +177,7 @@ describe('SchemaPanel', () => {
     );
     expect(screen.queryByLabelText('Saved-document prompt')).not.toBeInTheDocument();
     expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask Codex: "List the contexture MCP tools."',
+      'Ask your agent: "List the contexture MCP tools."',
     );
 
     fireEvent.click(screen.getByText('Save first'));
