@@ -21,7 +21,7 @@ test.describe('App Launch', () => {
   });
 
   test('toolbar is visible', async () => {
-    await expect(page.locator('[title="Toggle theme"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Theme' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('main content area renders', async () => {
