@@ -10,7 +10,7 @@
  * UI would perform on save / reopen.
  */
 import { expect, test } from '@playwright/test';
-import { launchElectron } from './electron-launch';
+import { closeElectron, launchElectron } from './electron-launch';
 
 test.describe('Import / export round-trip', () => {
   let electronApp: Awaited<ReturnType<typeof launchElectron>>;
@@ -41,7 +41,7 @@ test.describe('Import / export round-trip', () => {
   });
 
   test.afterAll(async () => {
-    await electronApp?.close();
+    await closeElectron(electronApp);
   });
 
   test('round-trips the allotment sample through load + save', async () => {

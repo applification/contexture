@@ -14,7 +14,7 @@
  * observable outcome of cancelling a turn: the graph reverts.
  */
 import { expect, test } from '@playwright/test';
-import { launchElectron } from './electron-launch';
+import { closeElectron, launchElectron } from './electron-launch';
 
 test.describe('Chat cancel rolls back mid-turn ops', () => {
   let electronApp: Awaited<ReturnType<typeof launchElectron>>;
@@ -27,7 +27,7 @@ test.describe('Chat cancel rolls back mid-turn ops', () => {
   });
 
   test.afterAll(async () => {
-    await electronApp?.close();
+    await closeElectron(electronApp);
   });
 
   test('begin + ops + rollback → graph state reverts to pre-turn', async () => {
