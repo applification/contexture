@@ -13,12 +13,19 @@ export interface UpdateState {
 let state: UpdateState = { status: 'idle' };
 let win: BrowserWindow | null = null;
 
+interface RegisterUpdateIpcOptions {
+  autoCheck?: boolean;
+}
+
 function broadcast(next: UpdateState): void {
   state = next;
   win?.webContents.send('update:state', state);
 }
 
-export function registerUpdateIpc(mainWindow: BrowserWindow): void {
+export function registerUpdateIpc(
+  mainWindow: BrowserWindow,
+  options: RegisterUpdateIpcOptions = {},
+): void {
   win = mainWindow;
 
   autoUpdater.autoDownload = false;
@@ -78,6 +85,8 @@ export function registerUpdateIpc(mainWindow: BrowserWindow): void {
   });
 
   ipcMain.handle('update:get-state', () => state);
+
+  if (options.autoCheck === false) return;
 
   // Check on startup after a short delay, then every 4 hours
   setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);

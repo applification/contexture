@@ -13,7 +13,7 @@
  * `tests/main/write-bundle-atomic.test.ts`.
  */
 import { expect, test } from '@playwright/test';
-import { launchElectron } from './electron-launch';
+import { closeElectron, launchElectron } from './electron-launch';
 
 test.describe('Contexture CRUD', () => {
   let electronApp: Awaited<ReturnType<typeof launchElectron>>;
@@ -42,7 +42,7 @@ test.describe('Contexture CRUD', () => {
   });
 
   test.afterAll(async () => {
-    await electronApp?.close();
+    await closeElectron(electronApp);
   });
 
   test('loads the allotment sample and renders TypeNodes', async () => {
