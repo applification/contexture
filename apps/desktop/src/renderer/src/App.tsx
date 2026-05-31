@@ -37,7 +37,6 @@ import {
   FilePlus2,
   FolderOpen,
   GitCompareArrows,
-  GitPullRequestArrow,
   MousePointer2,
   Save,
   SlidersHorizontal,
@@ -642,7 +641,6 @@ function EmptyState({
         </div>
       ) : (
         <div className="relative z-10 grid max-h-[calc(100%-2rem)] w-full max-w-5xl grid-cols-[minmax(0,1fr)_18rem] gap-4 overflow-y-auto px-6 py-2 text-muted-foreground max-lg:max-w-2xl max-lg:grid-cols-1">
-          <GhostSchemaPreview />
           <section className="relative overflow-hidden rounded-md border border-border/60 bg-card/75 p-4 shadow-sm backdrop-blur-md">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -902,115 +900,6 @@ function StartAction({
         <span className="mt-1 block text-xs leading-snug text-muted-foreground">{description}</span>
       </span>
     </button>
-  );
-}
-
-function GhostSchemaPreview(): React.JSX.Element {
-  return (
-    <div
-      className="pointer-events-none absolute -right-2 -top-8 z-0 hidden h-56 w-80 opacity-75 lg:block"
-      aria-hidden="true"
-    >
-      <svg className="h-full w-full overflow-visible" viewBox="0 0 320 224" role="presentation">
-        <path
-          d="M94 78 C140 42 170 34 226 58"
-          fill="none"
-          stroke="var(--graph-node-selected)"
-          strokeOpacity="0.36"
-          strokeWidth="2"
-        />
-        <path
-          d="M104 130 C148 154 186 154 232 128"
-          fill="none"
-          stroke="var(--graph-edge-ref)"
-          strokeOpacity="0.32"
-          strokeWidth="2"
-        />
-        <SchemaPreviewNode x={16} y={54} title="Plot" fields={['name', 'grower']} table />
-        <SchemaPreviewNode x={198} y={35} title="Grower" fields={['name', 'handle']} />
-        <SchemaPreviewNode x={202} y={114} title="Sowing" fields={['plot', 'season']} table />
-        <g transform="translate(44 168)">
-          <rect
-            width="176"
-            height="30"
-            rx="6"
-            fill="var(--card)"
-            fillOpacity="0.88"
-            stroke="var(--border)"
-          />
-          <FileCode2 className="translate-x-3 translate-y-2 text-primary" size={14} />
-          <text x="30" y="19" fill="var(--foreground)" fontSize="11" fontFamily="Geist">
-            convex/schema.ts
-          </text>
-          <GitPullRequestArrow
-            className="translate-x-[142px] translate-y-2 text-muted-foreground"
-            size={14}
-          />
-        </g>
-      </svg>
-    </div>
-  );
-}
-
-function SchemaPreviewNode({
-  x,
-  y,
-  title,
-  fields,
-  table = false,
-}: {
-  x: number;
-  y: number;
-  title: string;
-  fields: string[];
-  table?: boolean;
-}): React.JSX.Element {
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <rect
-        width="112"
-        height="72"
-        rx="8"
-        fill="var(--graph-node-body-bg)"
-        stroke={table ? 'var(--graph-node-selected)' : 'var(--graph-node-border)'}
-        strokeWidth={table ? 1.5 : 1}
-      />
-      <rect
-        width="112"
-        height="24"
-        rx="8"
-        fill={table ? 'var(--graph-node-table-header-bg)' : 'var(--graph-node-header-bg)'}
-      />
-      <path
-        d="M0 16 Q0 24 8 24 H104 Q112 24 112 16 V24 H0 Z"
-        fill={table ? 'var(--graph-node-table-header-bg)' : 'var(--graph-node-header-bg)'}
-      />
-      <text
-        x="10"
-        y="16"
-        fill="var(--graph-node-header-text)"
-        fontSize="11"
-        fontWeight="600"
-        fontFamily="Geist"
-      >
-        {title}
-      </text>
-      {fields.map((field, index) => (
-        <g key={field} transform={`translate(10 ${38 + index * 16})`}>
-          <circle r="2" fill="var(--graph-node-table-accent)" />
-          <text
-            x="9"
-            y="4"
-            fill="var(--foreground)"
-            fillOpacity="0.76"
-            fontSize="10"
-            fontFamily="Geist Mono"
-          >
-            {field}
-          </text>
-        </g>
-      ))}
-    </g>
   );
 }
 
