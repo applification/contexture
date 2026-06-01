@@ -194,7 +194,7 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
               {seedNotice && (
                 <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />
               )}
-              <div className="relative min-h-0">
+              <div className="relative min-h-0 flex-1">
                 <RecordTable
                   entity={selectedEntity}
                   records={records}
@@ -459,7 +459,7 @@ function PlaygroundRecordForm({
           />
         ))}
       </FieldGroup>
-      <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t bg-background/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t bg-background p-3">
         <Button
           type="button"
           variant="outline"
