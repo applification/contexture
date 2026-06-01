@@ -22,6 +22,7 @@
  */
 
 import type { Schema } from '@contexture/core/ir';
+import type { ChatContextAttachment } from './chat-attachments';
 
 export interface StdlibEntry {
   /** Namespace path, e.g. `'common'` or `'place'`. */
@@ -58,6 +59,7 @@ export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): st
 export interface BuildUserMessageInput {
   ir: Schema;
   userMessage: string;
+  attachments?: ChatContextAttachment[];
 }
 
 /**
@@ -66,13 +68,36 @@ export interface BuildUserMessageInput {
  * replays the original system prompt) Claude always sees the current schema.
  */
 export function buildUserMessage(input: BuildUserMessageInput): string {
+  const parts = ['<current_ir>', JSON.stringify(input.ir, null, 2), '</current_ir>', ''];
+  if (input.attachments && input.attachments.length > 0) {
+    parts.push(renderAttachments(input.attachments), '');
+  }
+  parts.push(input.userMessage);
+  return parts.join('\n');
+}
+
+function renderAttachments(attachments: ChatContextAttachment[]): string {
   return [
-    '<current_ir>',
-    JSON.stringify(input.ir, null, 2),
-    '</current_ir>',
-    '',
-    input.userMessage,
+    '<attached_files>',
+    ...attachments.map((attachment) =>
+      [
+        `<file path="${escapeAttribute(attachment.path)}" name="${escapeAttribute(attachment.name)}"${
+          attachment.truncated ? ' truncated="true"' : ''
+        }>`,
+        attachment.content,
+        '</file>',
+      ].join('\n'),
+    ),
+    '</attached_files>',
   ].join('\n');
+}
+
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 const HEADER = `
@@ -92,6 +117,9 @@ The current IR is supplied at the top of each user message inside a
 \`<current_ir>\` block — parse it directly to understand the existing
 model before proposing edits. Prefer surgical ops over
 \`replace_schema\`; the bulk rewrite is an escape hatch, not a default.
+When the user explicitly attaches files, their contents appear in an
+\`<attached_files>\` block after the IR; use them as context, but keep edits
+inside the Contexture op tools.
 
 Skills are available and auto-load on topic match:
 - \`model-domain\` — use when the user asks to model a new domain from

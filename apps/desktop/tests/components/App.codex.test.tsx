@@ -22,6 +22,7 @@ beforeEach(() => {
       saveAsDialog: vi.fn(async () => null),
       pickDirectory: vi.fn(async () => null),
       pickContextureFile: vi.fn(async () => null),
+      pickChatContextFiles: vi.fn(async () => []),
       save: vi.fn(async () => undefined),
       read: vi.fn(async () => null),
       getRecentFiles: vi.fn(async () => []),

@@ -13,9 +13,14 @@
  * drive them directly without booting Electron.
  */
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { ChatHistory, Layout } from '@contexture/core';
 import { hashContent, IRSchema, type Schema, save as saveIR } from '@contexture/core';
+import {
+  CHAT_CONTEXT_MAX_FILE_BYTES,
+  CHAT_CONTEXT_MAX_TOTAL_BYTES,
+  type ChatContextAttachment,
+} from '@shared/chat-attachments';
 import { app, type BrowserWindow, dialog, type FileFilter, ipcMain } from 'electron';
 import { z } from 'zod';
 import {
@@ -38,6 +43,29 @@ export const CONTEXTURE_OPEN_FILTER: FileFilter = {
 };
 
 export const CONTEXTURE_SAVE_FILTER: FileFilter = CONTEXTURE_OPEN_FILTER;
+
+export const CHAT_CONTEXT_FILE_FILTER: FileFilter = {
+  name: 'Text Files',
+  extensions: [
+    'txt',
+    'md',
+    'json',
+    'jsonc',
+    'ts',
+    'tsx',
+    'js',
+    'jsx',
+    'mjs',
+    'cjs',
+    'css',
+    'html',
+    'yml',
+    'yaml',
+    'toml',
+    'xml',
+    'csv',
+  ],
+};
 
 export interface HandleSaveInput {
   irPath: string;
@@ -72,6 +100,11 @@ export interface OpenResult {
   chat: ChatHistory;
   /** Sidecar warnings (not IR — those come from renderer-side `load()`). */
   warnings: OpenWarning[];
+}
+
+export interface PickChatContextFilesDeps {
+  showOpenDialog: typeof dialog.showOpenDialog;
+  readFile: (path: string) => Promise<string>;
 }
 
 let store: DocumentStore | null = null;
@@ -123,6 +156,60 @@ export async function handleOpen(irPath: string): Promise<OpenResult | null> {
   };
 }
 
+export async function handlePickChatContextFiles(
+  mainWindow: BrowserWindow,
+  deps: PickChatContextFilesDeps = {
+    showOpenDialog: dialog.showOpenDialog,
+    readFile: (path) => getStore().readFile(path),
+  },
+): Promise<ChatContextAttachment[]> {
+  const result = await deps.showOpenDialog(mainWindow, {
+    title: 'Attach Files to Chat',
+    filters: [CHAT_CONTEXT_FILE_FILTER],
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return [];
+
+  const attachments: ChatContextAttachment[] = [];
+  let totalBytes = 0;
+  for (const filePath of result.filePaths) {
+    if (totalBytes >= CHAT_CONTEXT_MAX_TOTAL_BYTES) break;
+    const raw = await deps.readFile(filePath);
+    if (raw.includes('\0')) {
+      throw new Error(`Cannot attach binary file: ${filePath}`);
+    }
+    const { content, size, truncated } = trimChatContextContent(
+      raw,
+      Math.min(CHAT_CONTEXT_MAX_FILE_BYTES, CHAT_CONTEXT_MAX_TOTAL_BYTES - totalBytes),
+    );
+    totalBytes += size;
+    attachments.push({
+      id: `${filePath}:${hashContent(content).slice(0, 12)}`,
+      path: filePath,
+      name: basename(filePath),
+      size,
+      content,
+      ...(truncated ? { truncated: true } : {}),
+    });
+  }
+  return attachments;
+}
+
+function trimChatContextContent(
+  content: string,
+  maxBytes: number,
+): { content: string; size: number; truncated: boolean } {
+  const bytes = Buffer.byteLength(content, 'utf8');
+  if (bytes <= maxBytes) return { content, size: bytes, truncated: false };
+
+  let trimmed = content;
+  while (Buffer.byteLength(trimmed, 'utf8') > maxBytes && trimmed.length > 0) {
+    const excess = Buffer.byteLength(trimmed, 'utf8') - maxBytes;
+    trimmed = trimmed.slice(0, Math.max(0, trimmed.length - Math.ceil(excess / 2)));
+  }
+  return { content: trimmed, size: Buffer.byteLength(trimmed, 'utf8'), truncated: true };
+}
+
 /**
  * Register `ipcMain` handlers for file operations. Call once at app start
  * with the main window so dialogs anchor correctly.
@@ -156,6 +243,10 @@ export function registerFileIpc(mainWindow: BrowserWindow): void {
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
+
+  ipcMain.handle('file:pick-chat-context-files', async () =>
+    handlePickChatContextFiles(mainWindow),
+  );
 
   ipcMain.handle('file:save-as-dialog', async () => {
     const result = await dialog.showSaveDialog(mainWindow, {

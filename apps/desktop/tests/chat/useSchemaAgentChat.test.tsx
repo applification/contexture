@@ -195,8 +195,30 @@ describe('useSchemaAgentChat', () => {
 
     expect(result.current.messages.map((m) => [m.role, m.content])).toEqual([['user', 'hello']]);
     expect(calls.setIR).toHaveBeenCalledTimes(1);
-    expect(calls.send).toHaveBeenCalledWith('hello');
+    expect(calls.send).toHaveBeenCalledWith('hello', []);
     expect(result.current.isStreaming).toBe(true);
+  });
+
+  it('forwards explicit file attachments with the user message', async () => {
+    const { api, calls } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await act(async () => undefined);
+    await act(async () => {
+      await result.current.send('model this API', [
+        {
+          id: 'api',
+          path: '/repo/src/api.ts',
+          name: 'api.ts',
+          size: 22,
+          content: 'export const api = {};',
+        },
+      ]);
+    });
+
+    expect(calls.send).toHaveBeenCalledWith('model this API', [
+      expect.objectContaining({ path: '/repo/src/api.ts', content: 'export const api = {};' }),
+    ]);
   });
 
   it('aggregates deltas and flushes on assistant_final', async () => {

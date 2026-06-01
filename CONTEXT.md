@@ -35,7 +35,7 @@ Contexture is the domain-model control plane for AI-native TypeScript apps. Thes
 - **Provider runtime**: A concrete adapter for a model/provider, such as Codex or Claude, behind the schema-agent contract.
 - **Provider thread**: Provider-owned conversation state. Contexture stores only opaque thread references and marks them desynced when rollback or resume cannot be trusted.
 - **CLI surface**: The `contexture` command-line interface for inspecting, validating, mutating, emitting, and checking drift in downstream projects.
-- **MCP surface**: The `contexture-mcp` server, or packaged app `--mcp` entrypoint, exposing inspect, validate, apply-op, emit, and drift-check tools to agents.
+- **MCP surface**: The standalone `contexture-mcp` server packaged with the app, exposing inspect, validate, apply-op, emit, and drift-check tools to agents without launching the desktop UI.
 - **Schema-only mode**: The provider runtime posture where the model receives only Contexture schema tools, not filesystem, shell, browser, or repository mutation tools.
 
 ## Standard Library

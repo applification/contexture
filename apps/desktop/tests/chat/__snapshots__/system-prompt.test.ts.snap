@@ -17,6 +17,9 @@ The current IR is supplied at the top of each user message inside a
 \`<current_ir>\` block — parse it directly to understand the existing
 model before proposing edits. Prefer surgical ops over
 \`replace_schema\`; the bulk rewrite is an escape hatch, not a default.
+When the user explicitly attaches files, their contents appear in an
+\`<attached_files>\` block after the IR; use them as context, but keep edits
+inside the Contexture op tools.
 
 Skills are available and auto-load on topic match:
 - \`model-domain\` — use when the user asks to model a new domain from

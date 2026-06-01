@@ -32,6 +32,7 @@ import {
 } from '@contexture/core/agent-turn-ledger';
 import { type ChatThread, useChatThreads } from '@renderer/chat/useChatThreads';
 import type {
+  ChatContextAttachment,
   SchemaAgentChatState,
   SchemaAgentModelOptionDescriptor,
 } from '@renderer/chat/useSchemaAgentChat';
@@ -44,10 +45,15 @@ import {
   BotMessageSquare,
   CheckCircle2,
   Clock3,
+  File,
+  FileText,
+  Image,
   List,
+  Plus,
   RotateCcw,
   Square,
   SquarePen,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,6 +61,12 @@ import { Streamdown } from 'streamdown';
 import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Empty,
   EmptyDescription,
@@ -145,6 +157,8 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   } = history;
 
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<ChatContextAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [responsePending, setResponsePending] = useState(false);
   const isWaitingForFinalResponse = responsePending || isStreaming;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -322,14 +336,17 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
       const text = input.trim();
       if (!text || !canCompose) return;
       setInput('');
+      const turnAttachments = attachments;
+      setAttachments([]);
+      setAttachmentError(null);
       setResponsePending(true);
       try {
-        await send(text);
+        await send(text, turnAttachments);
       } finally {
         setResponsePending(false);
       }
     },
-    [canCompose, input, send],
+    [attachments, canCompose, input, send],
   );
 
   const handleKeyDown = useCallback(
@@ -345,6 +362,25 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const handleAbort = useCallback(() => {
     void chat.abort();
   }, [chat]);
+
+  const handleAttachFiles = useCallback(async (_kind: 'photos' | 'files') => {
+    setAttachmentError(null);
+    try {
+      const picked = await window.contexture.file.pickChatContextFiles();
+      if (picked.length === 0) return;
+      setAttachments((current) => {
+        const byPath = new Map(current.map((attachment) => [attachment.path, attachment]));
+        for (const attachment of picked) byPath.set(attachment.path, attachment);
+        return [...byPath.values()];
+      });
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col min-h-0" data-testid="chat-panel">
@@ -476,7 +512,66 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
             )}
             data-testid="chat-input"
           />
+          {(attachments.length > 0 || attachmentError) && (
+            <div className="flex flex-wrap gap-1.5 px-2 pb-1">
+              {attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-md border border-border bg-muted/60 px-1.5 text-xs text-muted-foreground"
+                  data-testid="chat-attachment-chip"
+                  title={attachment.path}
+                >
+                  <FileText className="size-3 shrink-0" />
+                  <span className="max-w-40 truncate">{attachment.name}</span>
+                  {attachment.truncated && <span className="text-[10px]">trimmed</span>}
+                  <button
+                    type="button"
+                    className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    onClick={() => removeAttachment(attachment.id)}
+                    aria-label={`Remove ${attachment.name}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+              {attachmentError && (
+                <span className="text-xs text-destructive" data-testid="chat-attachment-error">
+                  {attachmentError}
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 px-2 pb-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!canCompose}
+                  className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Add context"
+                  aria-label="Add context"
+                  data-testid="chat-add-context"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-48">
+                <DropdownMenuItem
+                  onSelect={() => void handleAttachFiles('photos')}
+                  data-testid="chat-add-photos"
+                >
+                  <Image className="size-4" />
+                  Add photos
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void handleAttachFiles('files')}
+                  data-testid="chat-add-files"
+                >
+                  <File className="size-4" />
+                  Add files
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Select value={modelSelectValue} onValueChange={setModel}>
               <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
                 <SelectValue />

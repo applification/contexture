@@ -23,6 +23,8 @@ function mockFileBridge(): { save: ReturnType<typeof vi.fn> } {
       onMenuSave: () => () => undefined,
       onMenuSaveAs: () => () => undefined,
       pickDirectory: vi.fn(async () => null),
+      pickContextureFile: vi.fn(async () => null),
+      pickChatContextFiles: vi.fn(async () => []),
     },
   };
   return { save };

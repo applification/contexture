@@ -1,4 +1,5 @@
 import type { Schema } from '@contexture/core';
+import type { ChatContextAttachment } from '@shared/chat-attachments';
 
 export type ProviderKind = 'codex' | 'claude';
 
@@ -79,6 +80,7 @@ export interface SendTurnInput {
   thread: ProviderThreadRef;
   message: string;
   schema: Schema;
+  attachments?: ChatContextAttachment[];
   model?: string;
   effort?: string;
   options?: ModelOptions;

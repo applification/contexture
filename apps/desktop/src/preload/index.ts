@@ -24,8 +24,11 @@ function subscribe(channel: string, listener: (payload: unknown) => void): Unsub
 }
 
 const schemaAgent = {
-  send: (message: string) =>
-    ipcRenderer.invoke('schema-agent:send', message) as Promise<{ ok: boolean; error?: string }>,
+  send: (message: string, attachments = []) =>
+    ipcRenderer.invoke('schema-agent:send', { message, attachments }) as Promise<{
+      ok: boolean;
+      error?: string;
+    }>,
   setIR: (ir: unknown) => ipcRenderer.send('schema-agent:set-ir', ir),
   abort: (): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('schema-agent:abort') as Promise<{ ok: boolean; error?: string }>,
@@ -92,6 +95,8 @@ const file = {
   /** Show a file picker filtered to .contexture.json; returns path or null if cancelled. */
   pickContextureFile: () =>
     ipcRenderer.invoke('file:pick-contexture-file') as Promise<string | null>,
+  /** Pick text files and return contents to attach to the next chat turn. */
+  pickChatContextFiles: () => ipcRenderer.invoke('file:pick-chat-context-files'),
   /** Write the five-file bundle atomically under `irPath`. */
   save: (payload: {
     irPath: string;

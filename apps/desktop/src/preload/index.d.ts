@@ -1,5 +1,14 @@
 type Unsubscribe = () => void;
 
+export interface ChatContextAttachment {
+  id: string;
+  path: string;
+  name: string;
+  size: number;
+  content: string;
+  truncated?: boolean;
+}
+
 export type UpdateState =
   | { status: 'idle' }
   | { status: 'checking' }
@@ -9,7 +18,10 @@ export type UpdateState =
   | { status: 'error'; message?: string };
 
 export interface ContextureSchemaAgentAPI {
-  send: (message: string) => Promise<{ ok: boolean; error?: string }>;
+  send: (
+    message: string,
+    attachments?: ChatContextAttachment[],
+  ) => Promise<{ ok: boolean; error?: string }>;
   setIR: (ir: unknown) => void;
   abort: () => Promise<{ ok: boolean; error?: string }>;
   getStatus: () => Promise<unknown>;
@@ -89,6 +101,8 @@ export interface ContextureFileAPI {
   pickDirectory: () => Promise<string | null>;
   /** Pick a .contexture.json file; returns the absolute path or null if cancelled. */
   pickContextureFile: () => Promise<string | null>;
+  /** Pick text files and return their contents as explicit chat context attachments. */
+  pickChatContextFiles: () => Promise<ChatContextAttachment[]>;
   save: (payload: {
     irPath: string;
     schema: unknown;

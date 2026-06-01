@@ -71,6 +71,9 @@ function mockBridge(): void {
       threadSet: vi.fn(async () => ({ ok: true })),
       threadClear: vi.fn(async () => ({ ok: true })),
     },
+    file: {
+      pickChatContextFiles: vi.fn(async () => []),
+    },
   };
 }
 
@@ -237,6 +240,75 @@ describe('ChatPanel', () => {
     );
   });
 
+  it('opens a plus menu with separate photo and file context actions', async () => {
+    render(<ChatPanel chat={makeChat()} />);
+
+    fireEvent.pointerDown(screen.getByTestId('chat-add-context'));
+
+    expect(await screen.findByTestId('chat-add-photos')).toHaveTextContent('Add photos');
+    expect(screen.getByTestId('chat-add-files')).toHaveTextContent('Add files');
+  });
+
+  it('attaches selected files from the file context action to the next chat turn', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const pickChatContextFiles = vi.fn(async () => [
+      {
+        id: 'api',
+        path: '/repo/src/api.ts',
+        name: 'api.ts',
+        size: 22,
+        content: 'export const api = {};',
+      },
+    ]);
+    (
+      window as unknown as { contexture: { file: { pickChatContextFiles: unknown } } }
+    ).contexture.file.pickChatContextFiles = pickChatContextFiles;
+
+    render(<ChatPanel chat={makeChat({ send })} />);
+
+    fireEvent.pointerDown(screen.getByTestId('chat-add-context'));
+    fireEvent.click(await screen.findByTestId('chat-add-files'));
+    await waitFor(() =>
+      expect(screen.getByTestId('chat-attachment-chip')).toHaveTextContent('api.ts'),
+    );
+
+    const textarea = screen.getByTestId('chat-input');
+    fireEvent.change(textarea, { target: { value: 'model this API' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith('model this API', [
+        expect.objectContaining({ path: '/repo/src/api.ts', content: 'export const api = {};' }),
+      ]),
+    );
+    expect(screen.queryByTestId('chat-attachment-chip')).not.toBeInTheDocument();
+  });
+
+  it('attaches selected files from the photo context action to the next chat turn', async () => {
+    const pickChatContextFiles = vi.fn(async () => [
+      {
+        id: 'photo-note',
+        path: '/repo/photo-notes.md',
+        name: 'photo-notes.md',
+        size: 28,
+        content: 'Screenshot notes for the model.',
+      },
+    ]);
+    (
+      window as unknown as { contexture: { file: { pickChatContextFiles: unknown } } }
+    ).contexture.file.pickChatContextFiles = pickChatContextFiles;
+
+    render(<ChatPanel chat={makeChat()} />);
+
+    fireEvent.pointerDown(screen.getByTestId('chat-add-context'));
+    fireEvent.click(await screen.findByTestId('chat-add-photos'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('chat-attachment-chip')).toHaveTextContent('photo-notes.md'),
+    );
+    expect(pickChatContextFiles).toHaveBeenCalledTimes(1);
+  });
+
   it('does not offer agent turn undo after an intervening schema edit', async () => {
     useUndoStore.getState().apply({
       kind: 'add_type',
@@ -279,7 +351,7 @@ describe('ChatPanel', () => {
     const textarea = screen.getByTestId('chat-input');
     fireEvent.change(textarea, { target: { value: '  hello  ' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
-    expect(send).toHaveBeenCalledWith('hello');
+    expect(send).toHaveBeenCalledWith('hello', []);
   });
 
   it('Shift+Enter inserts a newline instead of submitting', async () => {

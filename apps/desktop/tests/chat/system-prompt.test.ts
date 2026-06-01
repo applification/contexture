@@ -149,6 +149,28 @@ describe('buildUserMessage', () => {
     expect(out.endsWith(weird)).toBe(true);
   });
 
+  it('includes explicit attached files between the IR and user message', () => {
+    const out = buildUserMessage({
+      ir: sampleIR,
+      userMessage: 'model this API',
+      attachments: [
+        {
+          id: 'a',
+          path: '/repo/src/api.ts',
+          name: 'api.ts',
+          size: 17,
+          content: 'export const api = {};',
+        },
+      ],
+    });
+
+    expect(out).toContain('<attached_files>');
+    expect(out).toContain('<file path="/repo/src/api.ts" name="api.ts">');
+    expect(out).toContain('export const api = {};');
+    expect(out.indexOf('</current_ir>')).toBeLessThan(out.indexOf('<attached_files>'));
+    expect(out.indexOf('</attached_files>')).toBeLessThan(out.indexOf('model this API'));
+  });
+
   it('is deterministic for identical inputs', () => {
     const a = buildUserMessage({ ir: sampleIR, userMessage: 'x' });
     const b = buildUserMessage({ ir: sampleIR, userMessage: 'x' });
