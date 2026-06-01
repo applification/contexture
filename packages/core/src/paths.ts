@@ -51,6 +51,11 @@ export function contextureDirFor(irPath: string): string {
   return `${bundleLayoutFor(irDir).projectDir}/.contexture`;
 }
 
+export function projectDirFor(irPath: string): string {
+  const normalized = normalizeContexturePath(irPath);
+  return bundleLayoutFor(dirname(normalized)).projectDir;
+}
+
 export function baseNameFor(irPath: string): string {
   const slash = irPath.lastIndexOf('/');
   const leaf = slash === -1 ? irPath : irPath.slice(slash + 1);
@@ -105,6 +110,38 @@ export function generatedTargetsFor(irPath: string): GeneratedTarget[] {
   ];
 }
 
+export function sourceLabelForIrPath(irPath: string): string {
+  return relativePath(projectDirFor(irPath), assertContextureIrPath(irPath));
+}
+
+export function manifestKeyForGeneratedPath(irPath: string, generatedPath: string): string {
+  return relativePath(projectDirFor(irPath), normalizeContexturePath(generatedPath));
+}
+
+export function resolveManifestGeneratedPath(irPath: string, manifestKey: string): string {
+  const normalizedKey = normalizeContexturePath(manifestKey);
+  const targets = generatedTargetsFor(irPath);
+  const byCurrentKey = new Map(
+    targets.map((target) => [manifestKeyForGeneratedPath(irPath, target.path), target.path]),
+  );
+
+  const direct = byCurrentKey.get(normalizedKey);
+  if (direct) return direct;
+
+  if (isAbsolutePath(normalizedKey)) {
+    const currentTarget = targets.find((target) => target.path === normalizedKey);
+    if (currentTarget) return currentTarget.path;
+
+    const suffixTarget = targets.find((target) => {
+      const currentKey = manifestKeyForGeneratedPath(irPath, target.path);
+      return normalizedKey.endsWith(`/${currentKey}`);
+    });
+    if (suffixTarget) return suffixTarget.path;
+  }
+
+  return joinPath(projectDirFor(irPath), normalizedKey);
+}
+
 export function generatedTargetForPath(irPath: string, targetPath: string): GeneratedTarget | null {
   const target = normalizeContexturePath(targetPath);
   return generatedTargetsFor(irPath).find((candidate) => candidate.path === target) ?? null;
@@ -133,6 +170,26 @@ function normalizeContexturePath(path: string): string {
 
   if (prefix) return `${prefix}${parts.join('/')}`;
   return parts.length > 0 ? parts.join('/') : '.';
+}
+
+function isAbsolutePath(path: string): boolean {
+  return path.startsWith('/') || /^[A-Za-z]:\//.test(path);
+}
+
+function joinPath(base: string, path: string): string {
+  if (isAbsolutePath(path)) return normalizeContexturePath(path);
+  return normalizeContexturePath(`${base}/${path}`);
+}
+
+function relativePath(from: string, to: string): string {
+  const fromParts = normalizeContexturePath(from).split('/').filter(Boolean);
+  const toParts = normalizeContexturePath(to).split('/').filter(Boolean);
+  let common = 0;
+  while (fromParts[common] === toParts[common] && common < fromParts.length) common += 1;
+  const up = fromParts.slice(common).map(() => '..');
+  const down = toParts.slice(common);
+  const rel = [...up, ...down].join('/');
+  return rel || '.';
 }
 
 interface BundleLayout {

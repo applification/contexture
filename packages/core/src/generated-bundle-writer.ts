@@ -2,7 +2,7 @@ import { DEFAULT_CHAT_HISTORY, saveChatHistory } from './chat-history';
 import type { Schema } from './ir';
 import { DEFAULT_LAYOUT, saveLayout } from './layout';
 import { save } from './load';
-import { type BundlePaths, bundlePathsFor } from './paths';
+import { type BundlePaths, bundlePathsFor, resolveManifestGeneratedPath } from './paths';
 import {
   type EmitPipelineDeps,
   type EmittedManifest,
@@ -125,7 +125,8 @@ export async function checkGeneratedManifestDrift(
   }
 
   const checks: GeneratedFileCheck[] = [];
-  for (const [path, expectedHash] of Object.entries(manifest.files ?? {})) {
+  for (const [manifestKey, expectedHash] of Object.entries(manifest.files ?? {})) {
+    const path = resolveManifestGeneratedPath(irPath, manifestKey);
     let content: string | undefined;
     try {
       content = await fs.readFile(path);
@@ -149,7 +150,12 @@ export async function classifyGeneratedBundleDrift(
 ): Promise<GeneratedDriftCheck[]> {
   const bundle = buildGeneratedBundle(schema, irPath, emitDeps);
   const manifest = await readGeneratedManifest(bundle.paths.emitted, fs);
-  const manifestFiles = manifest?.files ?? {};
+  const manifestFiles = Object.fromEntries(
+    Object.entries(manifest?.files ?? {}).map(([manifestKey, hash]) => [
+      resolveManifestGeneratedPath(irPath, manifestKey),
+      hash,
+    ]),
+  );
   const emittedByPath = new Map(bundle.emitted.map((entry) => [entry.path, entry.content]));
   const targetPaths = new Set([...Object.keys(manifestFiles), ...emittedByPath.keys()]);
   const checks: GeneratedDriftCheck[] = [];

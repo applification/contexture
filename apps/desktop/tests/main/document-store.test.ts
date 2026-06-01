@@ -316,11 +316,11 @@ describe('DocumentStore', () => {
     // (it's the source of truth) so it is not in the manifest.
     expect(Object.keys(manifest.files).sort()).toEqual(
       [
-        '/work/schema/garden.schema.ts',
-        '/work/schema/garden.schema.json',
-        '/work/schema/index.ts',
-        '/work/convex/schema.ts',
-        '/work/convex/validators.ts',
+        'schema/garden.schema.ts',
+        'schema/garden.schema.json',
+        'schema/index.ts',
+        'convex/schema.ts',
+        'convex/validators.ts',
       ].sort(),
     );
     for (const hash of Object.values(manifest.files)) {

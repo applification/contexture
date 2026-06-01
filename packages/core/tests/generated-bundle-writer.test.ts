@@ -160,6 +160,34 @@ describe('generated bundle writer', () => {
     expect(fs.files.get(irPath)).toContain('"title"');
   });
 
+  it('accepts a manifest written from a different absolute checkout root', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+    const manifest = JSON.parse(
+      fs.files.get('/proj/packages/contexture/.contexture/emitted.json') ?? '{}',
+    ) as { files: Record<string, string> };
+    await fs.writeFile(
+      '/proj/packages/contexture/.contexture/emitted.json',
+      `${JSON.stringify(
+        {
+          version: '1',
+          files: Object.fromEntries(
+            Object.entries(manifest.files).map(([key, hash]) => [
+              `/Users/rufus/Apps/plantry/${key}`,
+              hash,
+            ]),
+          ),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const checks = await classifyGeneratedBundleDrift(schema, irPath, fs);
+
+    expect(checks.every((check) => check.status === 'clean')).toBe(true);
+  });
+
   it('allows explicit re-emits to overwrite generated drift', async () => {
     const fs = createFs();
     await writeGeneratedBundle({ irPath, schema, fs });

@@ -5,6 +5,7 @@ import {
   type EmittedManifest,
   type GeneratedBundleFs,
   hashContent,
+  manifestKeyForGeneratedPath,
   type Schema,
   writeGeneratedBundle,
 } from '@contexture/core';
@@ -68,7 +69,9 @@ describe('reconcile generated-target IPC helpers', () => {
     await writeGeneratedTarget({ irPath, targetPath, contents: 'after\n' });
 
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as EmittedManifest;
-    expect(manifest.files[targetPath]).toBe(hashContent('after\n'));
+    expect(manifest.files[manifestKeyForGeneratedPath(irPath, targetPath)]).toBe(
+      hashContent('after\n'),
+    );
   });
 
   it('runs one-shot Convex CLI validation only through the explicit validation IPC helper', async () => {

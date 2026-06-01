@@ -4,6 +4,9 @@ import {
   bundlePathsFor,
   generatedTargetForPath,
   generatedTargetsFor,
+  manifestKeyForGeneratedPath,
+  resolveManifestGeneratedPath,
+  sourceLabelForIrPath,
 } from '../src';
 
 describe('Contexture path policy', () => {
@@ -62,5 +65,19 @@ describe('Contexture path policy', () => {
       )?.kind,
     ).toBe('mcp-definitions');
     expect(generatedTargetForPath(irPath, '/repo/packages/contexture/src/index.ts')).toBeNull();
+  });
+
+  it('derives checkout-stable source labels and manifest keys', () => {
+    const irPath = '/Users/rufus/Apps/plantry/plantry.contexture.json';
+    expect(sourceLabelForIrPath(irPath)).toBe('plantry.contexture.json');
+    expect(manifestKeyForGeneratedPath(irPath, '/Users/rufus/Apps/plantry/convex/schema.ts')).toBe(
+      'convex/schema.ts',
+    );
+    expect(
+      resolveManifestGeneratedPath(
+        '/Users/davehudson/Apps/plantry/plantry.contexture.json',
+        '/Users/rufus/Apps/plantry/convex/schema.ts',
+      ),
+    ).toBe('/Users/davehudson/Apps/plantry/convex/schema.ts');
   });
 });

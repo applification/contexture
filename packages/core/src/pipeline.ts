@@ -6,7 +6,7 @@ import {
   isGeneratedTargetEnabled,
 } from './generated-targets';
 import type { Schema } from './ir';
-import { bundlePathsFor } from './paths';
+import { bundlePathsFor, manifestKeyForGeneratedPath, sourceLabelForIrPath } from './paths';
 
 export type { EmitPipelineDeps } from './generated-targets';
 export type { BundlePaths } from './paths';
@@ -25,9 +25,13 @@ export {
   generatedTargetsFor,
   IR_SUFFIX,
   LAYOUT_FILE,
+  manifestKeyForGeneratedPath,
+  projectDirFor,
+  resolveManifestGeneratedPath,
   SCHEMA_DIR,
   SCHEMA_JSON_SUFFIX,
   SCHEMA_TS_SUFFIX,
+  sourceLabelForIrPath,
 } from './paths';
 
 export interface EmittedManifest {
@@ -49,9 +53,11 @@ export function hashContent(content: string): string {
   return createHash('sha256').update(content, 'utf8').digest('hex');
 }
 
-export function buildManifest(entries: ReadonlyArray<FileEntry>): EmittedManifest {
+export function buildManifest(irPath: string, entries: ReadonlyArray<FileEntry>): EmittedManifest {
   const files: Record<string, string> = {};
-  for (const { path, content } of entries) files[path] = hashContent(content);
+  for (const { path, content } of entries) {
+    files[manifestKeyForGeneratedPath(irPath, path)] = hashContent(content);
+  }
   return { version: '1', files };
 }
 
@@ -60,12 +66,13 @@ export function runEmitPipeline(
   irPath: string,
   deps: EmitPipelineDeps = {},
 ): EmitPipelineResult {
+  const sourceLabel = sourceLabelForIrPath(irPath);
   const emitted = GENERATED_TARGETS.filter((target) =>
     isGeneratedTargetEnabled(schema, target.kind),
   ).map((target) => ({
     path: target.path(bundlePathsFor(irPath)),
-    content: emitGeneratedTarget(schema, target.kind, irPath, deps),
+    content: emitGeneratedTarget(schema, target.kind, sourceLabel, deps),
   }));
 
-  return { emitted, manifest: buildManifest(emitted) };
+  return { emitted, manifest: buildManifest(irPath, emitted) };
 }
