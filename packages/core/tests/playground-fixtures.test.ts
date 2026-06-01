@@ -51,6 +51,38 @@ const todoSchema: Schema = {
   ],
 };
 
+const pantrySchema: Schema = {
+  version: '1',
+  types: [
+    {
+      kind: 'object',
+      name: 'Household',
+      table: true,
+      fields: [{ name: 'name', type: { kind: 'string' } }],
+    },
+    {
+      kind: 'object',
+      name: 'PantryItem',
+      table: true,
+      fields: [
+        { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+        { name: 'name', type: { kind: 'string' } },
+        { name: 'quantity', type: { kind: 'string' } },
+        { name: 'notes', type: { kind: 'string' }, optional: true },
+      ],
+    },
+    {
+      kind: 'object',
+      name: 'Recipe',
+      table: true,
+      fields: [
+        { name: 'name', type: { kind: 'string' } },
+        { name: 'description', type: { kind: 'string' }, optional: true },
+      ],
+    },
+  ],
+};
+
 describe('generatePlaygroundFixtures', () => {
   it('generates dependency-aware table records with valid refs and semantic values', () => {
     const result = generatePlaygroundFixtures(todoSchema, {
@@ -115,5 +147,24 @@ describe('generatePlaygroundFixtures', () => {
         }),
       ]),
     );
+  });
+
+  it('uses entity-aware semantics for pantry and household records', () => {
+    const result = generatePlaygroundFixtures(pantrySchema, {
+      seed: 'pantry-demo',
+      countsByType: { Household: 1, PantryItem: 3, Recipe: 2 },
+    });
+
+    const household = result.recordsByType.Household?.[0];
+    const pantryItem = result.recordsByType.PantryItem?.[0];
+    const recipe = result.recordsByType.Recipe?.[0];
+
+    expect(result.warnings).toEqual([]);
+    expect(household?.value.name).toMatch(/^The .+ Household$/);
+    expect(pantryItem?.value.name).toEqual(expect.any(String));
+    expect(pantryItem?.value.name).not.toMatch(/\s[A-Z][a-z]+$/);
+    expect(pantryItem?.value.quantity).toMatch(/^(1|2|3|500|750) (kg|g|ml|jar|tin|pack)$/);
+    expect(recipe?.value.name).toEqual(expect.any(String));
+    expect(recipe?.value.name).not.toMatch(/^The .+ Household$/);
   });
 });

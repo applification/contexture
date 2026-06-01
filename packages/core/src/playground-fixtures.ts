@@ -61,6 +61,7 @@ export function generatePlaygroundFixtures(
         typeName: entity.typeName,
         value: generateEntityValue({
           entity,
+          entityCategory: inferEntityCategory(entity),
           index,
           random,
           recordsByType: { ...options.existingRecordsByType, ...recordsByType },
@@ -79,6 +80,7 @@ export function generatePlaygroundFixtures(
 
 interface GenerateValueContext {
   entity: PlaygroundEntity;
+  entityCategory: EntityCategory;
   index: number;
   random: FixtureRandom;
   recordsByType: Record<string, Array<{ id: string; value: Record<string, unknown> }>>;
@@ -90,6 +92,13 @@ interface FixtureRandom {
   personName(): string;
   email(): string;
   url(): string;
+  ingredient(): string;
+  dish(): string;
+  productName(): string;
+  companyName(): string;
+  city(): string;
+  streetAddress(): string;
+  lastName(): string;
   words(options: { min: number; max: number }): string;
   sentence(): string;
   number(options: { min: number; max: number; int?: boolean }): number;
@@ -100,6 +109,17 @@ interface FixtureRandom {
   slug(value: string): string;
 }
 
+type EntityCategory =
+  | 'household'
+  | 'person'
+  | 'pantry'
+  | 'recipe'
+  | 'todo'
+  | 'list'
+  | 'company'
+  | 'place'
+  | 'generic';
+
 function createFixtureRandom(seed: string): FixtureRandom {
   faker.seed(hashSeed(seed));
   return {
@@ -107,6 +127,13 @@ function createFixtureRandom(seed: string): FixtureRandom {
     personName: () => faker.person.fullName(),
     email: () => faker.internet.email().toLowerCase(),
     url: () => faker.internet.url(),
+    ingredient: () => faker.food.ingredient(),
+    dish: () => faker.food.dish(),
+    productName: () => faker.commerce.productName(),
+    companyName: () => faker.company.name(),
+    city: () => faker.location.city(),
+    streetAddress: () => faker.location.streetAddress(),
+    lastName: () => faker.person.lastName(),
     words: (options) => faker.lorem.words({ min: options.min, max: options.max }),
     sentence: () => faker.lorem.sentence(),
     number: (options) =>
@@ -188,10 +215,14 @@ function generateText(
   if (control.constraints.format === 'url' || field.includes('url')) return ctx.random.url();
   if (control.constraints.format === 'uuid' || field === 'uuid') return ctx.random.stringUuid();
   if (field.includes('slug')) return ctx.random.slug(`${ctx.entity.typeName} ${ctx.index + 1}`);
-  if (field === 'name' || label.endsWith(' name')) return ctx.random.personName();
+  if (isNameField(field, label)) return nameForEntity(ctx);
   if (field === 'title' || field.endsWith('title')) return titleForEntity(ctx.entity, ctx);
+  if (field.includes('quantity') || field.includes('amount')) return quantityForEntity(ctx);
+  if (field.includes('unit')) return unitForEntity(ctx);
+  if (field.includes('address')) return ctx.random.streetAddress();
+  if (field.includes('city')) return ctx.random.city();
   if (field.includes('description') || field.includes('notes') || field.includes('summary')) {
-    return ctx.random.sentence();
+    return sentenceForEntity(ctx);
   }
   if (field.includes('status') || field.includes('state'))
     return ctx.random.pick(['draft', 'active', 'done']) ?? 'active';
@@ -203,9 +234,34 @@ function generateText(
   });
 }
 
-function titleForEntity(entity: PlaygroundEntity, ctx: GenerateValueContext): string {
-  const typeName = entity.typeName.toLowerCase();
-  if (typeName.includes('todo') || typeName.includes('task')) {
+function nameForEntity(ctx: GenerateValueContext): string {
+  switch (ctx.entityCategory) {
+    case 'household':
+      return `The ${ctx.random.lastName()} Household`;
+    case 'person':
+      return ctx.random.personName();
+    case 'pantry':
+      return ctx.random.ingredient();
+    case 'recipe':
+      return ctx.random.dish();
+    case 'todo':
+      return titleForEntity(ctx.entity, ctx);
+    case 'list':
+      return (
+        ctx.random.pick(['Weekly groceries', 'Weekend jobs', 'Launch checklist', 'House admin']) ??
+        ctx.random.words({ min: 2, max: 4 })
+      );
+    case 'company':
+      return ctx.random.companyName();
+    case 'place':
+      return ctx.random.city();
+    case 'generic':
+      return ctx.random.words({ min: 2, max: 4 });
+  }
+}
+
+function titleForEntity(_entity: PlaygroundEntity, ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'todo') {
     return (
       ctx.random.pick([
         'Review onboarding flow',
@@ -216,7 +272,47 @@ function titleForEntity(entity: PlaygroundEntity, ctx: GenerateValueContext): st
       ]) ?? ctx.random.words({ min: 2, max: 5 })
     );
   }
+  if (ctx.entityCategory === 'recipe') return ctx.random.dish();
+  if (ctx.entityCategory === 'pantry') return ctx.random.ingredient();
+  if (ctx.entityCategory === 'household') return nameForEntity(ctx);
   return ctx.random.words({ min: 2, max: 5 });
+}
+
+function sentenceForEntity(ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'pantry') {
+    return (
+      ctx.random.pick([
+        'Stored for quick weeknight meals.',
+        'Check the quantity before the next shop.',
+        'Usually kept in the main pantry.',
+      ]) ?? ctx.random.sentence()
+    );
+  }
+  if (ctx.entityCategory === 'recipe') {
+    return (
+      ctx.random.pick([
+        'Simple enough for a weeknight dinner.',
+        'Works well with pantry staples.',
+        'Best served fresh with a side salad.',
+      ]) ?? ctx.random.sentence()
+    );
+  }
+  return ctx.random.sentence();
+}
+
+function quantityForEntity(ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe') {
+    const amount = ctx.random.pick(['1', '2', '3', '500', '750']) ?? '1';
+    return `${amount} ${unitForEntity(ctx)}`;
+  }
+  return String(ctx.random.number({ min: 1, max: 20, int: true }));
+}
+
+function unitForEntity(ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe') {
+    return ctx.random.pick(['kg', 'g', 'ml', 'jar', 'tin', 'pack']) ?? 'pack';
+  }
+  return ctx.random.pick(['item', 'unit', 'pack']) ?? 'item';
 }
 
 function generateRef(control: PlaygroundRefControl, ctx: GenerateValueContext): string | undefined {
@@ -359,6 +455,32 @@ function tableRefNames(fields: readonly PlaygroundControl[]): string[] {
     }
   }
   return [...refs].sort();
+}
+
+function inferEntityCategory(entity: PlaygroundEntity): EntityCategory {
+  const haystack =
+    `${entity.typeName} ${entity.tableName} ${entity.description ?? ''}`.toLowerCase();
+  if (matchesAny(haystack, ['household', 'family', 'home'])) return 'household';
+  if (matchesAny(haystack, ['user', 'person', 'member', 'contact', 'assignee'])) return 'person';
+  if (matchesAny(haystack, ['pantry', 'ingredient', 'grocery', 'food', 'stock', 'inventory'])) {
+    return 'pantry';
+  }
+  if (matchesAny(haystack, ['recipe', 'meal', 'dish', 'menu'])) return 'recipe';
+  if (matchesAny(haystack, ['todo', 'task', 'checklist', 'issue'])) return 'todo';
+  if (matchesAny(haystack, ['list', 'collection'])) return 'list';
+  if (matchesAny(haystack, ['company', 'organisation', 'organization', 'vendor', 'supplier'])) {
+    return 'company';
+  }
+  if (matchesAny(haystack, ['place', 'address', 'location', 'venue'])) return 'place';
+  return 'generic';
+}
+
+function matchesAny(value: string, needles: readonly string[]): boolean {
+  return needles.some((needle) => value.includes(needle));
+}
+
+function isNameField(field: string, label: string): boolean {
+  return field === 'name' || field.endsWith('name') || label.endsWith(' name');
 }
 
 function fixtureId(typeName: string, index: number, random: FixtureRandom): string {
