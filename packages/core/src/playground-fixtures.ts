@@ -4,8 +4,10 @@ import { generateFixtureValue } from './fixture-generators';
 import type { Schema } from './ir';
 import {
   buildPlaygroundContract,
+  type PlaygroundArrayElementControl,
   type PlaygroundControl,
   type PlaygroundEntity,
+  type PlaygroundFieldConstraints,
   type PlaygroundRefControl,
   type PlaygroundScalarControl,
 } from './playground-contract';
@@ -240,7 +242,7 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
     case 'ref':
       return generateRef(control, ctx);
     case 'array':
-      return [];
+      return generateArray(control, ctx);
     case 'object': {
       const objectValue: Record<string, unknown> = {};
       for (const field of control.fields) {
@@ -254,6 +256,79 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
     case 'unsupported':
       return undefined;
   }
+}
+
+function generateArray(control: PlaygroundControl & { kind: 'array' }, ctx: GenerateValueContext) {
+  const min = control.min ?? 0;
+  const max = control.max ?? Math.max(min, 3);
+  const count = Math.max(min, Math.min(max, defaultArrayCount(control)));
+  return Array.from({ length: count }, () =>
+    generateArrayElement(control.element, control.fieldName, ctx),
+  ).filter((value) => value !== undefined);
+}
+
+function defaultArrayCount(control: PlaygroundControl & { kind: 'array' }): number {
+  if (control.min !== undefined && control.min > 0) return control.min;
+  if (fieldLooksLike(control.fieldName, ['tag', 'keyword', 'label'])) return 3;
+  return 2;
+}
+
+function generateArrayElement(
+  element: PlaygroundArrayElementControl,
+  fieldName: string,
+  ctx: GenerateValueContext,
+): unknown {
+  switch (element.kind) {
+    case 'text':
+      return generateText(arrayScalarControl(element, fieldName), ctx);
+    case 'number':
+      return ctx.random.number({
+        min: element.constraints.min ?? 1,
+        max: element.constraints.max ?? 20,
+        int: element.constraints.int,
+      });
+    case 'boolean':
+      return ctx.random.boolean();
+    case 'date':
+      return dateFieldLooksFuture(fieldName) ? ctx.random.soonDate() : ctx.random.recentDate();
+    case 'literal':
+      return element.constraints.literalValue;
+    case 'enum':
+      return ctx.random.pick(element.options.map((option) => option.value));
+    case 'ref': {
+      const record = ctx.random.pick(ctx.recordsByType[element.targetTypeName] ?? []);
+      return record?.id;
+    }
+    case 'object': {
+      const objectValue: Record<string, unknown> = {};
+      for (const field of element.fields) {
+        if (field.serverDerived || field.kind === 'unsupported') continue;
+        const generated = generateControlValue(field, ctx);
+        if (generated === undefined && !field.required) continue;
+        objectValue[field.fieldName] = generated;
+      }
+      return objectValue;
+    }
+    case 'array':
+      return [];
+    case 'unsupported':
+      return undefined;
+  }
+}
+
+function arrayScalarControl(
+  element: { constraints: PlaygroundFieldConstraints },
+  fieldName: string,
+): PlaygroundScalarControl & { kind: 'text' } {
+  return {
+    kind: 'text',
+    fieldName: singularFieldName(fieldName),
+    label: fieldName,
+    required: true,
+    nullable: false,
+    serverDerived: false,
+    constraints: element.constraints,
+  };
 }
 
 function generateHintedValue(control: PlaygroundControl): unknown {
@@ -678,6 +753,12 @@ function isNameField(field: string, label: string): boolean {
 function fieldLooksLike(fieldName: string, needles: readonly string[]): boolean {
   const field = fieldName.toLowerCase();
   return needles.some((needle) => field.includes(needle));
+}
+
+function singularFieldName(fieldName: string): string {
+  if (fieldName.endsWith('ies')) return `${fieldName.slice(0, -3)}y`;
+  if (fieldName.endsWith('s') && fieldName.length > 1) return fieldName.slice(0, -1);
+  return fieldName;
 }
 
 function fixtureId(typeName: string, index: number, random: FixtureRandom): string {

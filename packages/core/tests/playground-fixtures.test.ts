@@ -27,6 +27,17 @@ const todoSchema: Schema = {
       fields: [
         { name: 'name', type: { kind: 'string' } },
         { name: 'email', type: { kind: 'string', format: 'email' } },
+        { name: 'profile', type: { kind: 'ref', typeName: 'UserProfile' } },
+        { name: 'tags', type: { kind: 'array', element: { kind: 'string' } } },
+      ],
+    },
+    {
+      kind: 'object',
+      name: 'UserProfile',
+      fields: [
+        { name: 'bio', type: { kind: 'string' } },
+        { name: 'timezone', type: { kind: 'string' } },
+        { name: 'notificationsEnabled', type: { kind: 'boolean' } },
       ],
     },
     {
@@ -138,6 +149,14 @@ describe('generatePlaygroundFixtures', () => {
     const [item] = result.recordsByType.TodoItem ?? [];
 
     expect(user?.value.email).toEqual(expect.stringMatching(/@/));
+    expect(user?.value.profile).toMatchObject({
+      bio: expect.any(String),
+      timezone: expect.any(String),
+      notificationsEnabled: expect.any(Boolean),
+    });
+    expect(user?.value.tags).toSatisfy(
+      (value: unknown) => Array.isArray(value) && value.length === 3,
+    );
     expect(list?.value.ownerId).toSatisfy(
       (id: unknown) => typeof id === 'string' && userIds.has(id),
     );
