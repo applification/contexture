@@ -16,6 +16,36 @@ describe('chat history sidecar', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('round-trips user message attachment metadata without requiring file content', () => {
+    const history = {
+      version: '1' as const,
+      messages: [
+        {
+          id: 'm1',
+          role: 'user' as const,
+          content: 'model this API',
+          createdAt: 1000,
+          contextAttachments: [
+            {
+              id: 'api',
+              path: '/repo/src/api.ts',
+              name: 'api.ts',
+              size: 22,
+              truncated: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    const raw = saveChatHistory(history);
+    const { history: round, warnings } = loadChatHistory(raw);
+
+    expect(round).toEqual(history);
+    expect(warnings).toEqual([]);
+    expect(round.messages[0]?.contextAttachments?.[0]).not.toHaveProperty('content');
+  });
+
   it('discards unknown-version files and returns defaults with a warning', () => {
     const raw = JSON.stringify({
       version: '99',

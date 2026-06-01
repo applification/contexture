@@ -166,6 +166,8 @@ describe('ChatPanel', () => {
     expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent(
       'Agent proposed 2 model changes: 1 applied, 1 rejected',
     );
+    expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent('2 tool calls');
+    expect(screen.getByTestId('agent-turn-tool-summary')).toHaveTextContent('add_type x2');
     expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent('1 applied');
     expect(screen.getByTestId('agent-turn-summary')).toHaveTextContent('1 rejected');
     fireEvent.click(screen.getByTestId('agent-turn-summary'));
@@ -184,6 +186,24 @@ describe('ChatPanel', () => {
     expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
   });
 
+  it('hides legacy inline tool-call messages from the transcript', () => {
+    render(
+      <ChatPanel
+        chat={makeChat({
+          messages: [
+            { id: 'u', role: 'user', content: 'add a Plot type', createdAt: 1 },
+            { id: 'tool', role: 'assistant', content: '`replace_schema`', createdAt: 2 },
+            { id: 'a', role: 'assistant', content: 'Done.', createdAt: 3 },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId('chat-message-tool')).not.toBeInTheDocument();
+    expect(screen.queryByText('replace_schema')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-message-assistant')).toHaveTextContent('Done.');
+  });
+
   it('highlights an applied agent turn while the final response is pending', () => {
     useAgentTurnsStore.getState().begin({
       before: { version: '1', types: [] },
@@ -199,9 +219,7 @@ describe('ChatPanel', () => {
 
     render(<ChatPanel chat={makeChat({ isStreaming: true })} />);
 
-    expect(screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]')).not.toBe(
-      null,
-    );
+    expect(screen.getByTestId('agent-turn-pending-highlight')).toBeInTheDocument();
   });
 
   it('highlights the agent turn from Enter submit until send completes', async () => {
@@ -226,17 +244,13 @@ describe('ChatPanel', () => {
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
     await waitFor(() =>
-      expect(
-        screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]'),
-      ).not.toBe(null),
+      expect(screen.getByTestId('agent-turn-pending-highlight')).toBeInTheDocument(),
     );
 
     resolveSend();
 
     await waitFor(() =>
-      expect(screen.getByTestId('agent-turn-summary').querySelector('[aria-hidden="true"]')).toBe(
-        null,
-      ),
+      expect(screen.queryByTestId('agent-turn-pending-highlight')).not.toBeInTheDocument(),
     );
   });
 
@@ -281,7 +295,35 @@ describe('ChatPanel', () => {
         expect.objectContaining({ path: '/repo/src/api.ts', content: 'export const api = {};' }),
       ]),
     );
+    expect(pickChatContextFiles).toHaveBeenCalledWith('files');
     expect(screen.queryByTestId('chat-attachment-chip')).not.toBeInTheDocument();
+  });
+
+  it('shows submitted file context on the user message', () => {
+    render(
+      <ChatPanel
+        chat={makeChat({
+          messages: [
+            {
+              id: 'u1',
+              role: 'user',
+              content: 'model this API',
+              createdAt: 1,
+              contextAttachments: [
+                {
+                  id: 'api',
+                  path: '/repo/src/api.ts',
+                  name: 'api.ts',
+                  size: 22,
+                },
+              ],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('chat-message-context-attachments')).toHaveTextContent('api.ts');
   });
 
   it('attaches selected files from the photo context action to the next chat turn', async () => {
@@ -306,7 +348,7 @@ describe('ChatPanel', () => {
     await waitFor(() =>
       expect(screen.getByTestId('chat-attachment-chip')).toHaveTextContent('photo-notes.md'),
     );
-    expect(pickChatContextFiles).toHaveBeenCalledTimes(1);
+    expect(pickChatContextFiles).toHaveBeenCalledWith('photos');
   });
 
   it('does not offer agent turn undo after an intervening schema edit', async () => {

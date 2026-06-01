@@ -940,6 +940,11 @@ describe('CodexProviderRuntime', () => {
     });
     connection.emitNotification({
       jsonrpc: '2.0',
+      method: 'item/agentMessage/delta',
+      params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-2', delta: 'World' },
+    });
+    connection.emitNotification({
+      jsonrpc: '2.0',
       method: 'turn/completed',
       params: {
         threadId: 'thread-1',
@@ -969,11 +974,15 @@ describe('CodexProviderRuntime', () => {
       done: false,
     });
     await expect(iterator.next()).resolves.toEqual({
+      value: { type: 'assistant_delta', text: 'World', boundary: 'new_message' },
+      done: false,
+    });
+    await expect(iterator.next()).resolves.toEqual({
       value: { type: 'turn_completed' },
       done: false,
     });
     await expect(iterator.next()).resolves.toEqual({
-      value: { type: 'assistant_final', text: 'Hello' },
+      value: { type: 'assistant_final', text: 'Hello\n\nWorld' },
       done: false,
     });
     await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });

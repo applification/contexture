@@ -1,6 +1,7 @@
 import { IRSchema, type Schema } from '@contexture/core';
 import {
   CHAT_CONTEXT_MAX_FILE_BYTES,
+  CHAT_CONTEXT_MAX_IMAGE_BYTES,
   CHAT_CONTEXT_MAX_TOTAL_BYTES,
 } from '@shared/chat-attachments';
 import type { BrowserWindow } from 'electron';
@@ -85,18 +86,26 @@ const ChatContextAttachmentSchema = z
     id: IpcString,
     path: IpcString,
     name: IpcString,
-    size: z.number().int().nonnegative().max(CHAT_CONTEXT_MAX_FILE_BYTES),
+    size: z.number().int().nonnegative(),
     content: z.string(),
+    kind: z.enum(['text', 'image']).optional(),
+    mimeType: IpcString.optional(),
+    encoding: z.literal('base64').optional(),
     truncated: z.boolean().optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
     const contentBytes = Buffer.byteLength(input.content, 'utf8');
-    if (contentBytes > CHAT_CONTEXT_MAX_FILE_BYTES) {
+    const isImage = input.kind === 'image';
+    const maxBytes = isImage ? CHAT_CONTEXT_MAX_IMAGE_BYTES : CHAT_CONTEXT_MAX_FILE_BYTES;
+    const measuredBytes = isImage ? input.size : contentBytes;
+    if (measuredBytes > maxBytes) {
       ctx.addIssue({
         code: 'custom',
-        path: ['content'],
-        message: 'Attached file content exceeds the per-file chat context limit.',
+        path: [isImage ? 'size' : 'content'],
+        message: isImage
+          ? 'Attached image exceeds the per-file chat context limit.'
+          : 'Attached file content exceeds the per-file chat context limit.',
       });
     }
   });

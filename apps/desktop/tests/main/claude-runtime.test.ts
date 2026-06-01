@@ -111,6 +111,7 @@ describe('ClaudeProviderRuntime', () => {
     const queryFn = interruptibleQuery([
       { type: 'system', subtype: 'init', session_id: 'session-1' },
       { type: 'assistant', message: { content: [{ type: 'text', text: 'Sure.' }] } },
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'Next step.' }] } },
       {
         type: 'assistant',
         message: {
@@ -146,10 +147,11 @@ describe('ClaudeProviderRuntime', () => {
     expect(events).toEqual([
       { type: 'turn_started', thread },
       { type: 'thread_resumed', thread },
-      { type: 'assistant_delta', text: 'Sure.' },
+      { type: 'assistant_delta', text: 'Sure.', boundary: 'new_message' },
+      { type: 'assistant_delta', text: 'Next step.', boundary: 'new_message' },
       { type: 'tool_call_started', id: 'tool-1', name: 'add_type', input: { payload: {} } },
       { type: 'turn_completed' },
-      { type: 'assistant_final', text: 'Sure.' },
+      { type: 'assistant_final', text: 'Sure.\n\nNext step.' },
     ]);
     expect(queryFn).toHaveBeenCalledWith(
       expect.objectContaining({

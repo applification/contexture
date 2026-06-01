@@ -44,6 +44,7 @@ import {
   ArrowUp,
   BotMessageSquare,
   CheckCircle2,
+  ChevronRight,
   Clock3,
   File,
   FileText,
@@ -53,11 +54,13 @@ import {
   RotateCcw,
   Square,
   SquarePen,
+  Wrench,
   X,
   XCircle,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
+import { Badge } from '@/components/ui/badge';
 import { BorderBeam } from '@/components/ui/border-beam';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -363,10 +366,10 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     void chat.abort();
   }, [chat]);
 
-  const handleAttachFiles = useCallback(async (_kind: 'photos' | 'files') => {
+  const handleAttachFiles = useCallback(async (kind: 'photos' | 'files') => {
     setAttachmentError(null);
     try {
-      const picked = await window.contexture.file.pickChatContextFiles();
+      const picked = await window.contexture.file.pickChatContextFiles(kind);
       if (picked.length === 0) return;
       setAttachments((current) => {
         const byPath = new Map(current.map((attachment) => [attachment.path, attachment]));
@@ -447,7 +450,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               </EmptyHeader>
             </Empty>
           )}
-          {messages.map((m) => (
+          {messages.filter(isVisibleTranscriptMessage).map((m) => (
             <MessageBubble key={m.id} message={m} />
           ))}
           {isStreaming && liveAssistant.trim().length > 0 && (
@@ -698,6 +701,8 @@ function AgentTurnSummaryCard({
   const pending =
     turn.status === 'running' ? turn.ops.filter((op) => op.status === 'pending').length : 0;
   const diffRows = summarizeAgentTurnSchemaDiff(diffAgentTurnSchema(turn.before, turn.after));
+  const toolSummary = summarizeTurnTools(turn.ops);
+  const toolCount = turn.ops.length;
   const canUndo = useUndoStore((s) => s.canUndo);
   const undo = useUndoStore((s) => s.undo);
   const schema = useUndoStore((s) => s.schema);
@@ -720,33 +725,82 @@ function AgentTurnSummaryCard({
         <button
           type="button"
           className={cn(
-            'relative w-full overflow-hidden rounded-md border border-border/70 bg-card/70 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition-colors',
-            'hover:border-primary/30 hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring',
+            'group relative w-full overflow-hidden rounded-lg border border-border/70 bg-card px-3 py-3 text-left text-xs text-muted-foreground shadow-sm transition-colors',
+            'hover:border-primary/30 hover:bg-accent/35 focus:outline-none focus:ring-1 focus:ring-ring',
           )}
           data-testid="agent-turn-summary"
         >
-          {isWaitingForFinalResponse && <BorderBeam duration={6} size={100} />}
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate font-medium text-foreground">{turn.summary}</div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <AgentTurnMetaPill>{turnStatusLabel(turn.status)}</AgentTurnMetaPill>
-                <span>{applied} applied</span>
-                {rejected > 0 && <span className="text-destructive">{rejected} rejected</span>}
-                {pending > 0 && <span>{pending} pending</span>}
-              </div>
-              {diffRows.length > 0 && (
-                <div className="mt-1 truncate text-[11px] text-muted-foreground">
-                  {diffRows.slice(0, 2).join(', ')}
-                </div>
-              )}
+          {isWaitingForFinalResponse && (
+            <span data-testid="agent-turn-pending-highlight">
+              <BorderBeam duration={6} size={100} />
+            </span>
+          )}
+          <div className="flex items-start gap-2.5">
+            <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
+              <Wrench className="size-3.5" aria-hidden="true" />
             </div>
-            {turn.status === 'committed' && applied > 0 && (
-              <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
-            )}
-            {turn.status === 'rolled_back' && (
-              <RotateCcw className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">
+                  {turn.summary}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {turn.status === 'committed' && applied > 0 && (
+                    <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
+                  )}
+                  {turn.status === 'rolled_back' && (
+                    <RotateCcw className="size-4 text-muted-foreground" aria-hidden="true" />
+                  )}
+                  <ChevronRight
+                    className="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                  {turnStatusLabel(turn.status)}
+                </Badge>
+                {toolCount > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                    {toolCount} tool {toolCount === 1 ? 'call' : 'calls'}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                  {applied} applied
+                </Badge>
+                {rejected > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="h-5 border-destructive/30 px-1.5 py-0 text-[11px] font-medium text-destructive"
+                  >
+                    {rejected} rejected
+                  </Badge>
+                )}
+                {pending > 0 && (
+                  <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                    {pending} pending
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-2 grid gap-1.5">
+                {toolSummary && (
+                  <div
+                    className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground"
+                    data-testid="agent-turn-tool-summary"
+                  >
+                    <Wrench className="size-3 shrink-0" aria-hidden="true" />
+                    <span className="truncate font-mono">{toolSummary}</span>
+                  </div>
+                )}
+                {diffRows.length > 0 && (
+                  <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <CheckCircle2 className="size-3 shrink-0 text-success" aria-hidden="true" />
+                    <span className="truncate">{diffRows.slice(0, 2).join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </button>
       </PopoverTrigger>
@@ -864,14 +918,6 @@ function AgentTurnOpRow({ op }: { op: AgentTurnOpResult }): React.JSX.Element {
   );
 }
 
-function AgentTurnMetaPill({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return (
-    <span className="rounded-full border border-border/70 bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-      {children}
-    </span>
-  );
-}
-
 function AgentTurnStatusPill({
   status,
 }: {
@@ -922,28 +968,48 @@ function turnStatusLabel(status: AgentTurnRecord['status']): string {
   return 'reviewable';
 }
 
+function summarizeTurnTools(ops: AgentTurnOpResult[]): string | null {
+  if (ops.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const op of ops) counts.set(op.name, (counts.get(op.name) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([name, count]) => (count === 1 ? name : `${name} x${count}`))
+    .join(', ');
+}
+
+function isToolStatusMessage(message: ChatMessage): boolean {
+  return message.role === 'assistant' && /^`[A-Za-z_][\w-]*`$/.test(message.content);
+}
+
+function isVisibleTranscriptMessage(message: ChatMessage): boolean {
+  return !isToolStatusMessage(message);
+}
+
 function MessageBubble({ message }: { message: ChatMessage }): React.JSX.Element {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end" data-testid="chat-message-user">
-        <div className="bg-primary text-primary-foreground text-sm rounded-lg px-3 py-1.5 max-w-[85%] whitespace-pre-wrap">
-          {message.content}
+        <div className="bg-primary text-primary-foreground text-sm rounded-lg px-3 py-1.5 max-w-[85%]">
+          <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.contextAttachments && message.contextAttachments.length > 0 && (
+            <div
+              className="mt-2 flex flex-wrap justify-end gap-1.5"
+              data-testid="chat-message-context-attachments"
+            >
+              {message.contextAttachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-md border border-primary-foreground/25 bg-primary-foreground/10 px-1.5 text-xs text-primary-foreground/85"
+                  title={attachment.path}
+                >
+                  <FileText className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="max-w-40 truncate">{attachment.name}</span>
+                  {attachment.truncated && <span className="text-[10px]">trimmed</span>}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-    );
-  }
-
-  // A tool-use status line looks like a single backticked tool name.
-  // Render it as a compact chip
-  // rather than a full markdown bubble so the transcript stays readable.
-  const isToolStatus = /^`[A-Za-z_][\w-]*`$/.test(message.content);
-  if (isToolStatus) {
-    return (
-      <div
-        className="text-[10px] text-muted-foreground bg-secondary/50 rounded px-2 py-1 font-mono"
-        data-testid="chat-message-tool"
-      >
-        ⚡ {message.content.slice(1, -1)}
       </div>
     );
   }

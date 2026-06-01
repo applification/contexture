@@ -169,7 +169,7 @@ export interface AccountUpdatedNotification extends ServerNotification {
 
 export interface AgentMessageDeltaNotification extends ServerNotification {
   method: 'item/agentMessage/delta';
-  params: { threadId: string; turnId?: string; delta: string };
+  params: { threadId: string; turnId?: string; itemId?: string; delta: string };
 }
 
 export interface ItemNotification extends ServerNotification {
