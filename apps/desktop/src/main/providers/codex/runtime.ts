@@ -553,6 +553,7 @@ function buildSchemaOnlyInstructions(): string {
     'You are Contexture schema chat.',
     'Use only the Contexture schema tools provided by this client.',
     'Do not read files, write files, run shell commands, browse, or mutate a repository.',
+    'You may use file contents explicitly attached inside the user message as context.',
     'Treat the current Contexture IR in the user message as authoritative.',
   ].join('\n');
 }

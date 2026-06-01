@@ -1,4 +1,8 @@
 import { IRSchema, type Schema } from '@contexture/core';
+import {
+  CHAT_CONTEXT_MAX_FILE_BYTES,
+  CHAT_CONTEXT_MAX_TOTAL_BYTES,
+} from '@shared/chat-attachments';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
@@ -76,6 +80,45 @@ const ProviderThreadRefSchema = z
     opaque: z.unknown().optional(),
   })
   .strict();
+const ChatContextAttachmentSchema = z
+  .object({
+    id: IpcString,
+    path: IpcString,
+    name: IpcString,
+    size: z.number().int().nonnegative().max(CHAT_CONTEXT_MAX_FILE_BYTES),
+    content: z.string(),
+    truncated: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    const contentBytes = Buffer.byteLength(input.content, 'utf8');
+    if (contentBytes > CHAT_CONTEXT_MAX_FILE_BYTES) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['content'],
+        message: 'Attached file content exceeds the per-file chat context limit.',
+      });
+    }
+  });
+const SchemaAgentSendPayloadSchema = z
+  .object({
+    message: IpcString,
+    attachments: z.array(ChatContextAttachmentSchema).default([]),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    const total = input.attachments.reduce(
+      (sum, attachment) => sum + Buffer.byteLength(attachment.content, 'utf8'),
+      0,
+    );
+    if (total > CHAT_CONTEXT_MAX_TOTAL_BYTES) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['attachments'],
+        message: 'Attached files exceed the chat context size limit.',
+      });
+    }
+  });
 const ReconcileProposalPayloadSchema = z
   .object({
     irJson: z.string(),
@@ -153,9 +196,13 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     }
   });
 
-  ipcMain.handle('schema-agent:send', async (_evt, userMessage: unknown) => {
+  ipcMain.handle('schema-agent:send', async (_evt, payload: unknown) => {
     try {
-      await driver.send(parseIpcPayload('schema-agent:send', IpcString, userMessage));
+      const parsed =
+        typeof payload === 'string'
+          ? { message: parseIpcPayload('schema-agent:send', IpcString, payload), attachments: [] }
+          : parseIpcPayload('schema-agent:send', SchemaAgentSendPayloadSchema, payload);
+      await driver.send(parsed.message, parsed.attachments);
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

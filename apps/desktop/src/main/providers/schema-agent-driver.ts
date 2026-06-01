@@ -1,4 +1,5 @@
 import type { Schema } from '@contexture/core';
+import type { ChatContextAttachment } from '@shared/chat-attachments';
 import { buildUserMessage } from '@shared/system-prompt';
 import type { ChatTurnController } from '../ipc/chat-turn';
 import type {
@@ -40,7 +41,7 @@ export class SchemaAgentDriver {
     this.#deps = deps;
   }
 
-  async send(userMessage: string): Promise<void> {
+  async send(userMessage: string, attachments: ChatContextAttachment[] = []): Promise<void> {
     const {
       runtime: staticRuntime,
       getRuntime,
@@ -68,7 +69,8 @@ export class SchemaAgentDriver {
         for await (const event of runtime.sendTurn({
           thread,
           schema,
-          message: buildUserMessage({ ir: schema, userMessage }),
+          message: buildUserMessage({ ir: schema, userMessage, attachments }),
+          attachments,
           ...modelOptions,
         })) {
           handleRuntimeEvent(event, transport, setThreadRef);

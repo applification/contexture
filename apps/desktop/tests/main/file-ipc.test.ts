@@ -1,12 +1,14 @@
 import { createDocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import {
+  CHAT_CONTEXT_FILE_FILTER,
   CONTEXTURE_OPEN_FILTER,
   CONTEXTURE_SAVE_FILTER,
   handleOpen,
+  handlePickChatContextFiles,
   setDocumentStoreForTesting,
 } from '@main/ipc/file';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('handleOpen (routes through DocumentStore)', () => {
   const irPath = '/work/garden.contexture.json';
@@ -67,5 +69,59 @@ describe('file IPC open/save filters', () => {
 
   it('restricts Save dialogs to .json', () => {
     expect(CONTEXTURE_SAVE_FILTER.extensions).toEqual(['json']);
+  });
+
+  it('restricts chat context attachment dialogs to text-like files', () => {
+    expect(CHAT_CONTEXT_FILE_FILTER.extensions).toContain('ts');
+    expect(CHAT_CONTEXT_FILE_FILTER.extensions).toContain('md');
+    expect(CHAT_CONTEXT_FILE_FILTER.extensions).not.toContain('png');
+  });
+});
+
+describe('handlePickChatContextFiles', () => {
+  const window = {} as Parameters<typeof handlePickChatContextFiles>[0];
+
+  it('returns explicit text attachments for selected files', async () => {
+    const result = await handlePickChatContextFiles(window, {
+      showOpenDialog: vi.fn(async () => ({
+        canceled: false,
+        filePaths: ['/repo/src/api.ts'],
+      })),
+      readFile: vi.fn(async () => 'export const api = {};'),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        path: '/repo/src/api.ts',
+        name: 'api.ts',
+        content: 'export const api = {};',
+      }),
+    );
+    expect(result[0]?.truncated).toBeUndefined();
+  });
+
+  it('returns no attachments when the picker is cancelled', async () => {
+    const result = await handlePickChatContextFiles(window, {
+      showOpenDialog: vi.fn(async () => ({
+        canceled: true,
+        filePaths: [],
+      })),
+      readFile: vi.fn(async () => 'unused'),
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it('rejects binary-looking files before adding them to context', async () => {
+    await expect(
+      handlePickChatContextFiles(window, {
+        showOpenDialog: vi.fn(async () => ({
+          canceled: false,
+          filePaths: ['/repo/image.png'],
+        })),
+        readFile: vi.fn(async () => 'abc\0def'),
+      }),
+    ).rejects.toThrow(/binary file/);
   });
 });

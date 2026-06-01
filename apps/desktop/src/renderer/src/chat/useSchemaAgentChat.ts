@@ -1,6 +1,6 @@
 import type { ChatHistory, ChatMessage, ChatRole } from '@contexture/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { ContextureSchemaAgentAPI } from '../../../preload/index.d';
+import type { ChatContextAttachment, ContextureSchemaAgentAPI } from '../../../preload/index.d';
 import { useAgentTurnsStore } from '../store/agent-turns';
 import { useChatComposerStore } from '../store/chat-composer';
 import type { ApplyResult, Op } from '../store/ops';
@@ -25,6 +25,7 @@ import { useSchemaAgentSessionStore } from './schemaAgentSessionStore';
 import { bindTurnToUndo, type IpcSubscriber } from './turn-binder';
 
 export type {
+  ChatContextAttachment,
   SchemaAgentModelInfo,
   SchemaAgentModelOptionDescriptor,
   SchemaAgentModelOptions,
@@ -55,7 +56,7 @@ export interface SchemaAgentChatState {
   providerThreadRef: unknown;
   desynced: boolean;
   clearAuthRequired: () => void;
-  send: (text: string) => Promise<void>;
+  send: (text: string, attachments?: ChatContextAttachment[]) => Promise<void>;
   abort: () => Promise<void>;
   hydrate: (messages: ChatMessage[]) => void;
   hydrateHistory: (history: ChatHistory) => void;
@@ -455,7 +456,7 @@ export function useSchemaAgentChat({
   }, [api]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, attachments: ChatContextAttachment[] = []) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming || !isReady) return;
       if (!selectedModel) {
@@ -484,7 +485,7 @@ export function useSchemaAgentChat({
       if (persistenceEnabled) onMessagePersisted?.(userMessage);
       assistantBufferRef.current = '';
       api.setIR(schema);
-      const result = await api.send(trimmed);
+      const result = await api.send(trimmed, attachments);
       if (!result.ok) {
         const message = result.error ?? 'Schema-agent send failed';
         const errorMessage = mkMessage('assistant', `Error: ${message}`);
