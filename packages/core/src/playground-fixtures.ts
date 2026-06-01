@@ -94,10 +94,23 @@ interface FixtureRandom {
   url(): string;
   ingredient(): string;
   dish(): string;
+  fruit(): string;
+  vegetable(): string;
+  meat(): string;
+  product(): string;
   productName(): string;
+  productDescription(): string;
   companyName(): string;
+  jobTitle(): string;
   city(): string;
+  country(): string;
   streetAddress(): string;
+  phoneNumber(): string;
+  amount(): string;
+  currencyCode(): string;
+  vehicle(): string;
+  bookTitle(): string;
+  musicSong(): string;
   lastName(): string;
   words(options: { min: number; max: number }): string;
   sentence(): string;
@@ -112,12 +125,18 @@ interface FixtureRandom {
 type EntityCategory =
   | 'household'
   | 'person'
+  | 'food'
   | 'pantry'
   | 'recipe'
   | 'todo'
   | 'list'
+  | 'commerce'
   | 'company'
+  | 'finance'
   | 'place'
+  | 'vehicle'
+  | 'book'
+  | 'music'
   | 'generic';
 
 function createFixtureRandom(seed: string): FixtureRandom {
@@ -129,10 +148,23 @@ function createFixtureRandom(seed: string): FixtureRandom {
     url: () => faker.internet.url(),
     ingredient: () => faker.food.ingredient(),
     dish: () => faker.food.dish(),
+    fruit: () => faker.food.fruit(),
+    vegetable: () => faker.food.vegetable(),
+    meat: () => faker.food.meat(),
+    product: () => faker.commerce.product(),
     productName: () => faker.commerce.productName(),
+    productDescription: () => faker.commerce.productDescription(),
     companyName: () => faker.company.name(),
+    jobTitle: () => faker.person.jobTitle(),
     city: () => faker.location.city(),
+    country: () => faker.location.country(),
     streetAddress: () => faker.location.streetAddress(),
+    phoneNumber: () => faker.phone.number(),
+    amount: () => faker.finance.amount({ min: 10, max: 250, dec: 2 }),
+    currencyCode: () => faker.finance.currencyCode(),
+    vehicle: () => faker.vehicle.vehicle(),
+    bookTitle: () => faker.book.title(),
+    musicSong: () => faker.music.songName(),
     lastName: () => faker.person.lastName(),
     words: (options) => faker.lorem.words({ min: options.min, max: options.max }),
     sentence: () => faker.lorem.sentence(),
@@ -169,7 +201,7 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
       return generateText(control as PlaygroundScalarControl & { kind: 'text' }, ctx);
     case 'number':
       if (fieldLooksLike(control.fieldName, ['quantity', 'amount', 'count'])) {
-        return ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe'
+        return entityCategoryUsesFood(ctx.entityCategory)
           ? ctx.random.number({ min: 1, max: 12, int: true })
           : ctx.random.number({
               min: control.constraints.min ?? 1,
@@ -224,6 +256,12 @@ function generateText(
   if (control.constraints.format === 'url' || field.includes('url')) return ctx.random.url();
   if (control.constraints.format === 'uuid' || field === 'uuid') return ctx.random.stringUuid();
   if (field.includes('slug')) return ctx.random.slug(`${ctx.entity.typeName} ${ctx.index + 1}`);
+  if (field.includes('phone') || field.includes('mobile')) return ctx.random.phoneNumber();
+  if (field.includes('currency')) return ctx.random.currencyCode();
+  if (field.includes('price') || field.includes('cost') || field.includes('total')) {
+    return ctx.random.amount();
+  }
+  if (field.includes('country')) return ctx.random.country();
   if (field.includes('storagelocation') || field.includes('storage_location')) {
     return storageLocationForEntity(ctx);
   }
@@ -254,6 +292,7 @@ function nameForEntity(ctx: GenerateValueContext): string {
       return `The ${ctx.random.lastName()} Household`;
     case 'person':
       return ctx.random.personName();
+    case 'food':
     case 'pantry':
       return ctx.random.ingredient();
     case 'recipe':
@@ -265,10 +304,20 @@ function nameForEntity(ctx: GenerateValueContext): string {
         ctx.random.pick(['Weekly groceries', 'Weekend jobs', 'Launch checklist', 'House admin']) ??
         ctx.random.words({ min: 2, max: 4 })
       );
+    case 'commerce':
+      return ctx.random.productName();
     case 'company':
       return ctx.random.companyName();
+    case 'finance':
+      return ctx.random.amount();
     case 'place':
       return ctx.random.city();
+    case 'vehicle':
+      return ctx.random.vehicle();
+    case 'book':
+      return ctx.random.bookTitle();
+    case 'music':
+      return ctx.random.musicSong();
     case 'generic':
       return ctx.random.words({ min: 2, max: 4 });
   }
@@ -287,13 +336,14 @@ function titleForEntity(_entity: PlaygroundEntity, ctx: GenerateValueContext): s
     );
   }
   if (ctx.entityCategory === 'recipe') return ctx.random.dish();
-  if (ctx.entityCategory === 'pantry') return ctx.random.ingredient();
+  if (entityCategoryUsesFood(ctx.entityCategory)) return ctx.random.ingredient();
+  if (ctx.entityCategory === 'commerce') return ctx.random.productName();
   if (ctx.entityCategory === 'household') return nameForEntity(ctx);
   return ctx.random.words({ min: 2, max: 5 });
 }
 
 function sentenceForEntity(ctx: GenerateValueContext): string {
-  if (ctx.entityCategory === 'pantry') {
+  if (ctx.entityCategory === 'pantry' || ctx.entityCategory === 'food') {
     return (
       ctx.random.pick([
         'Stored for quick weeknight meals.',
@@ -302,6 +352,7 @@ function sentenceForEntity(ctx: GenerateValueContext): string {
       ]) ?? ctx.random.sentence()
     );
   }
+  if (ctx.entityCategory === 'commerce') return ctx.random.productDescription();
   if (ctx.entityCategory === 'recipe') {
     return (
       ctx.random.pick([
@@ -315,7 +366,7 @@ function sentenceForEntity(ctx: GenerateValueContext): string {
 }
 
 function quantityForEntity(ctx: GenerateValueContext): string {
-  if (ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe') {
+  if (entityCategoryUsesFood(ctx.entityCategory)) {
     const amount = ctx.random.pick(['1', '2', '3', '500', '750']) ?? '1';
     return `${amount} ${unitForEntity(ctx)}`;
   }
@@ -323,14 +374,14 @@ function quantityForEntity(ctx: GenerateValueContext): string {
 }
 
 function unitForEntity(ctx: GenerateValueContext): string {
-  if (ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe') {
+  if (entityCategoryUsesFood(ctx.entityCategory)) {
     return ctx.random.pick(['kg', 'g', 'ml', 'jar', 'tin', 'pack']) ?? 'pack';
   }
   return ctx.random.pick(['item', 'unit', 'pack']) ?? 'item';
 }
 
 function storageLocationForEntity(ctx: GenerateValueContext): string {
-  if (ctx.entityCategory === 'pantry') {
+  if (entityCategoryUsesFood(ctx.entityCategory)) {
     return (
       ctx.random.pick(['Pantry', 'Fridge', 'Freezer', 'Cupboard', 'Allotment shed']) ?? 'Pantry'
     );
@@ -339,7 +390,7 @@ function storageLocationForEntity(ctx: GenerateValueContext): string {
 }
 
 function sourceTypeForEntity(ctx: GenerateValueContext): string {
-  if (ctx.entityCategory === 'pantry') {
+  if (entityCategoryUsesFood(ctx.entityCategory)) {
     return ctx.random.pick(['manual', 'shopping-list', 'recipe-leftover']) ?? 'manual';
   }
   return ctx.random.pick(['manual', 'imported', 'system']) ?? 'manual';
@@ -490,24 +541,65 @@ function tableRefNames(fields: readonly PlaygroundControl[]): string[] {
 function inferEntityCategory(entity: PlaygroundEntity): EntityCategory {
   const identity = `${entity.typeName} ${entity.tableName}`.toLowerCase();
   const haystack = `${identity} ${entity.description ?? ''}`.toLowerCase();
+  const compactIdentity = identity.replace(/[^a-z0-9]/g, '');
+  const fieldNames = entity.fields.map((field) => field.fieldName.toLowerCase());
+
+  if (
+    matchesAny(compactIdentity, [
+      'shoppinglistitem',
+      'groceryitem',
+      'ingredientitem',
+      'pantryitem',
+      'fooditem',
+      'stockitem',
+      'produceitem',
+    ])
+  ) {
+    return 'food';
+  }
   if (matchesAny(identity, ['pantry', 'ingredient', 'grocery', 'food', 'stock', 'inventory'])) {
     return 'pantry';
   }
+  if (identity.includes('shopping') && entityLooksLikeFoodItem(fieldNames)) return 'food';
   if (matchesAny(identity, ['recipe', 'meal', 'dish', 'menu'])) return 'recipe';
   if (matchesAny(identity, ['todo', 'task', 'checklist', 'issue'])) return 'todo';
   if (matchesAny(identity, ['household', 'family', 'home'])) return 'household';
   if (matchesAny(identity, ['user', 'person', 'member', 'contact', 'assignee'])) return 'person';
-  if (matchesAny(identity, ['list', 'collection'])) return 'list';
+  if (matchesAny(identity, ['product', 'order', 'cart', 'catalogue', 'catalog', 'sku'])) {
+    return 'commerce';
+  }
   if (matchesAny(identity, ['company', 'organisation', 'organization', 'vendor', 'supplier'])) {
     return 'company';
   }
+  if (matchesAny(identity, ['invoice', 'payment', 'transaction', 'account', 'budget'])) {
+    return 'finance';
+  }
   if (matchesAny(identity, ['place', 'address', 'location', 'venue'])) return 'place';
+  if (matchesAny(identity, ['vehicle', 'car', 'bike', 'bicycle'])) return 'vehicle';
+  if (matchesAny(identity, ['book', 'author', 'publisher'])) return 'book';
+  if (matchesAny(identity, ['song', 'album', 'artist', 'playlist', 'track'])) return 'music';
+  if (matchesAny(identity, ['list', 'collection'])) return 'list';
   if (matchesAny(haystack, ['pantry', 'ingredient', 'grocery', 'food', 'stock', 'inventory'])) {
-    return 'pantry';
+    return 'food';
   }
   if (matchesAny(haystack, ['recipe', 'meal', 'dish', 'menu'])) return 'recipe';
   if (matchesAny(haystack, ['household', 'family', 'home'])) return 'household';
+  if (matchesAny(haystack, ['product', 'order', 'cart', 'catalogue', 'catalog'])) {
+    return 'commerce';
+  }
   return 'generic';
+}
+
+function entityLooksLikeFoodItem(fieldNames: readonly string[]): boolean {
+  const hasName = fieldNames.some((field) => field === 'name' || field.endsWith('name'));
+  const hasFoodShape = fieldNames.some((field) =>
+    matchesAny(field, ['quantity', 'unit', 'ingredient', 'pantry', 'purchased', 'checked']),
+  );
+  return hasName && hasFoodShape;
+}
+
+function entityCategoryUsesFood(category: EntityCategory): boolean {
+  return category === 'food' || category === 'pantry' || category === 'recipe';
 }
 
 function matchesAny(value: string, needles: readonly string[]): boolean {

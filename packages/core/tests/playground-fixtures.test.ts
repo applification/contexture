@@ -83,6 +83,29 @@ const pantrySchema: Schema = {
         { name: 'description', type: { kind: 'string' }, optional: true },
       ],
     },
+    {
+      kind: 'object',
+      name: 'ShoppingListItem',
+      description: 'A food item the household plans to buy.',
+      table: true,
+      fields: [
+        { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+        { name: 'name', type: { kind: 'string' } },
+        { name: 'quantity', type: { kind: 'number' } },
+        { name: 'unit', type: { kind: 'string' } },
+        { name: 'purchased', type: { kind: 'boolean' } },
+      ],
+    },
+    {
+      kind: 'object',
+      name: 'Product',
+      table: true,
+      fields: [
+        { name: 'name', type: { kind: 'string' } },
+        { name: 'description', type: { kind: 'string' } },
+        { name: 'price', type: { kind: 'string' } },
+      ],
+    },
   ],
 };
 
@@ -161,6 +184,8 @@ describe('generatePlaygroundFixtures', () => {
     const household = result.recordsByType.Household?.[0];
     const pantryItem = result.recordsByType.PantryItem?.[0];
     const recipe = result.recordsByType.Recipe?.[0];
+    const shoppingListItem = result.recordsByType.ShoppingListItem?.[0];
+    const product = result.recordsByType.Product?.[0];
 
     expect(result.warnings).toEqual([]);
     expect(household?.value.name).toMatch(/^The .+ Household$/);
@@ -175,5 +200,14 @@ describe('generatePlaygroundFixtures', () => {
     );
     expect(recipe?.value.name).toEqual(expect.any(String));
     expect(recipe?.value.name).not.toMatch(/^The .+ Household$/);
+    expect(shoppingListItem?.value.name).toEqual(expect.any(String));
+    expect(shoppingListItem?.value.name).not.toMatch(/Household$/);
+    expect(shoppingListItem?.value.quantity).toSatisfy(
+      (value: unknown) => typeof value === 'number' && value >= 1 && value <= 12,
+    );
+    expect(['kg', 'g', 'ml', 'jar', 'tin', 'pack']).toContain(shoppingListItem?.value.unit);
+    expect(product?.value.name).toEqual(expect.any(String));
+    expect(product?.value.description).toEqual(expect.any(String));
+    expect(product?.value.price).toEqual(expect.stringMatching(/^\d+\.\d{2}$/));
   });
 });
