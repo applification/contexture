@@ -11,11 +11,22 @@ import { OpSchema } from './ops';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
+export interface ChatMessageContextAttachment {
+  id: string;
+  path: string;
+  name: string;
+  size: number;
+  kind?: 'text' | 'image';
+  mimeType?: string;
+  truncated?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
   createdAt: number;
+  contextAttachments?: ChatMessageContextAttachment[];
 }
 
 export interface ChatHistory {
@@ -109,14 +120,47 @@ function sanitiseMessages(input: unknown): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const value of input) {
     if (!value || typeof value !== 'object') continue;
-    const { id, role, content, createdAt } = value as Record<string, unknown>;
+    const { id, role, content, createdAt, contextAttachments } = value as Record<string, unknown>;
     if (
       typeof id === 'string' &&
       (role === 'user' || role === 'assistant' || role === 'system') &&
       typeof content === 'string' &&
       typeof createdAt === 'number'
     ) {
-      out.push({ id, role, content, createdAt });
+      const attachments = sanitiseContextAttachments(contextAttachments);
+      out.push({
+        id,
+        role,
+        content,
+        createdAt,
+        ...(attachments.length > 0 ? { contextAttachments: attachments } : {}),
+      });
+    }
+  }
+  return out;
+}
+
+function sanitiseContextAttachments(input: unknown): ChatMessageContextAttachment[] {
+  if (!Array.isArray(input)) return [];
+  const out: ChatMessageContextAttachment[] = [];
+  for (const value of input) {
+    if (!value || typeof value !== 'object') continue;
+    const { id, path, name, size, kind, mimeType, truncated } = value as Record<string, unknown>;
+    if (
+      typeof id === 'string' &&
+      typeof path === 'string' &&
+      typeof name === 'string' &&
+      typeof size === 'number'
+    ) {
+      out.push({
+        id,
+        path,
+        name,
+        size,
+        ...(kind === 'text' || kind === 'image' ? { kind } : {}),
+        ...(typeof mimeType === 'string' ? { mimeType } : {}),
+        ...(truncated === true ? { truncated: true } : {}),
+      });
     }
   }
   return out;

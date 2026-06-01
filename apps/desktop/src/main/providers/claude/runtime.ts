@@ -25,6 +25,7 @@ import type {
   StartLoginInput,
   StartThreadInput,
 } from '../runtime';
+import { appendAssistantText } from '../runtime';
 import { claudeCliInfoToStatus, detectClaudeCli, type ExecFileFn } from './cli';
 
 export const CLAUDE_PROVIDER_CAPABILITIES: ProviderCapabilities = {
@@ -188,7 +189,9 @@ export class ClaudeProviderRuntime implements ProviderRuntime {
 
         const event = mapClaudeMessage(message);
         if (!event) continue;
-        if (event.type === 'assistant_delta') finalAssistant += event.text;
+        if (event.type === 'assistant_delta') {
+          finalAssistant = appendAssistantText(finalAssistant, event.text, event.boundary);
+        }
         yield event;
         if (event.type === 'turn_failed') return;
       }
@@ -236,7 +239,9 @@ export class ClaudeProviderRuntime implements ProviderRuntime {
     try {
       for await (const message of iterator) {
         const event = mapClaudeMessage(message);
-        if (event?.type === 'assistant_delta') buffered += event.text;
+        if (event?.type === 'assistant_delta') {
+          buffered = appendAssistantText(buffered, event.text, event.boundary);
+        }
         if (event?.type === 'tool_call_started') {
           throw new Error(`Claude reconcile proposal requested forbidden tool: ${event.name}`);
         }
@@ -321,7 +326,9 @@ function mapClaudeMessage(message: unknown): ProviderRuntimeEvent | null {
   if (msg.type === 'assistant') {
     const content = Array.isArray(msg.message?.content) ? msg.message.content : [];
     const textParts = content.filter(isTextPart).map((part) => part.text);
-    if (textParts.length > 0) return { type: 'assistant_delta', text: textParts.join('') };
+    if (textParts.length > 0) {
+      return { type: 'assistant_delta', text: textParts.join('\n\n'), boundary: 'new_message' };
+    }
     const toolUse = content.find(isToolUsePart);
     if (toolUse) {
       return {

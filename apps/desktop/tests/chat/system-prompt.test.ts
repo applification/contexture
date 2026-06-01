@@ -171,6 +171,31 @@ describe('buildUserMessage', () => {
     expect(out.indexOf('</attached_files>')).toBeLessThan(out.indexOf('model this API'));
   });
 
+  it('includes image attachments with their media metadata', () => {
+    const out = buildUserMessage({
+      ir: sampleIR,
+      userMessage: 'model this screenshot',
+      attachments: [
+        {
+          id: 'image',
+          path: '/repo/image.png',
+          name: 'image.png',
+          size: 4,
+          content: 'iVBORw==',
+          kind: 'image',
+          mimeType: 'image/png',
+          encoding: 'base64',
+        },
+      ],
+    });
+
+    expect(out).toContain(
+      '<image path="/repo/image.png" name="image.png" mime_type="image/png" encoding="base64">',
+    );
+    expect(out).toContain('iVBORw==');
+    expect(out).toContain('</image>');
+  });
+
   it('is deterministic for identical inputs', () => {
     const a = buildUserMessage({ ir: sampleIR, userMessage: 'x' });
     const b = buildUserMessage({ ir: sampleIR, userMessage: 'x' });

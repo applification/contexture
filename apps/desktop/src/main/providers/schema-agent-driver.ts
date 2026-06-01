@@ -111,7 +111,10 @@ function handleRuntimeEvent(
       transport.send(SCHEMA_AGENT_THREAD_UPDATED, { thread: event.thread });
       return;
     case 'assistant_delta':
-      transport.send(SCHEMA_AGENT_ASSISTANT_DELTA, { text: event.text });
+      transport.send(SCHEMA_AGENT_ASSISTANT_DELTA, {
+        text: event.text,
+        boundary: event.boundary,
+      });
       return;
     case 'assistant_final':
       transport.send(SCHEMA_AGENT_ASSISTANT_FINAL, { text: event.text });

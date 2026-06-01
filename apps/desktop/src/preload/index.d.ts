@@ -6,6 +6,9 @@ export interface ChatContextAttachment {
   name: string;
   size: number;
   content: string;
+  kind?: 'text' | 'image';
+  mimeType?: string;
+  encoding?: 'base64';
   truncated?: boolean;
 }
 
@@ -41,7 +44,9 @@ export interface ContextureSchemaAgentAPI {
   threadSet: (thread: unknown) => Promise<{ ok: boolean }>;
   threadClear: () => Promise<{ ok: boolean }>;
   replyTool: (id: string, result: unknown) => void;
-  onAssistantDelta: (listener: (payload: { text: string }) => void) => Unsubscribe;
+  onAssistantDelta: (
+    listener: (payload: { text: string; boundary?: 'new_message' }) => void,
+  ) => Unsubscribe;
   onAssistantFinal: (listener: (payload: { text: string }) => void) => Unsubscribe;
   onToolCallStarted: (
     listener: (payload: { id: string; name: string; input?: unknown }) => void,
@@ -85,6 +90,15 @@ export interface OpenedDocument {
       role: 'user' | 'assistant' | 'system';
       content: string;
       createdAt: number;
+      contextAttachments?: Array<{
+        id: string;
+        path: string;
+        name: string;
+        size: number;
+        kind?: 'text' | 'image';
+        mimeType?: string;
+        truncated?: boolean;
+      }>;
     }>;
     provider?: 'codex' | 'claude';
     providerThreadRef?: unknown;
@@ -102,7 +116,7 @@ export interface ContextureFileAPI {
   /** Pick a .contexture.json file; returns the absolute path or null if cancelled. */
   pickContextureFile: () => Promise<string | null>;
   /** Pick text files and return their contents as explicit chat context attachments. */
-  pickChatContextFiles: () => Promise<ChatContextAttachment[]>;
+  pickChatContextFiles: (kind?: 'photos' | 'files') => Promise<ChatContextAttachment[]>;
   save: (payload: {
     irPath: string;
     schema: unknown;

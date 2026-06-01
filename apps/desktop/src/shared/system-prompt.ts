@@ -77,19 +77,21 @@ export function buildUserMessage(input: BuildUserMessageInput): string {
 }
 
 function renderAttachments(attachments: ChatContextAttachment[]): string {
-  return [
-    '<attached_files>',
-    ...attachments.map((attachment) =>
-      [
-        `<file path="${escapeAttribute(attachment.path)}" name="${escapeAttribute(attachment.name)}"${
-          attachment.truncated ? ' truncated="true"' : ''
-        }>`,
-        attachment.content,
-        '</file>',
-      ].join('\n'),
-    ),
-    '</attached_files>',
-  ].join('\n');
+  return ['<attached_files>', ...attachments.map(renderAttachment), '</attached_files>'].join('\n');
+}
+
+function renderAttachment(attachment: ChatContextAttachment): string {
+  const attrs = [
+    `path="${escapeAttribute(attachment.path)}"`,
+    `name="${escapeAttribute(attachment.name)}"`,
+    attachment.mimeType ? `mime_type="${escapeAttribute(attachment.mimeType)}"` : null,
+    attachment.encoding ? `encoding="${attachment.encoding}"` : null,
+    attachment.truncated ? 'truncated="true"' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const tag = attachment.kind === 'image' ? 'image' : 'file';
+  return [`<${tag} ${attrs}>`, attachment.content, `</${tag}>`].join('\n');
 }
 
 function escapeAttribute(value: string): string {

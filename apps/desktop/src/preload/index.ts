@@ -57,7 +57,7 @@ const schemaAgent = {
     ipcRenderer.invoke('schema-agent:thread-clear') as Promise<{ ok: boolean }>,
   replyTool: (id: string, result: unknown) =>
     ipcRenderer.send('schema-agent:tool-reply', { id, result }),
-  onAssistantDelta: (listener: (payload: { text: string }) => void) =>
+  onAssistantDelta: (listener: (payload: { text: string; boundary?: 'new_message' }) => void) =>
     subscribe('schema-agent:assistant-delta', listener as (p: unknown) => void),
   onAssistantFinal: (listener: (payload: { text: string }) => void) =>
     subscribe('schema-agent:assistant-final', listener as (p: unknown) => void),
@@ -96,7 +96,8 @@ const file = {
   pickContextureFile: () =>
     ipcRenderer.invoke('file:pick-contexture-file') as Promise<string | null>,
   /** Pick text files and return contents to attach to the next chat turn. */
-  pickChatContextFiles: () => ipcRenderer.invoke('file:pick-chat-context-files'),
+  pickChatContextFiles: (kind = 'files') =>
+    ipcRenderer.invoke('file:pick-chat-context-files', { kind }),
   /** Write the five-file bundle atomically under `irPath`. */
   save: (payload: {
     irPath: string;

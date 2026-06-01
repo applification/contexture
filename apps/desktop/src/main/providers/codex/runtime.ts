@@ -19,6 +19,7 @@ import type {
   StartLoginInput,
   StartThreadInput,
 } from '../runtime';
+import { appendAssistantText } from '../runtime';
 import { type CodexAppServerConnection, startCodexAppServer } from './app-server';
 import { codexCliInfoToStatus, detectCodexCli, type ExecFileFn } from './cli';
 import { handleCodexDynamicToolCall, toCodexDynamicTools } from './tools';
@@ -230,6 +231,7 @@ export class CodexProviderRuntime implements ProviderRuntime {
     const queue = new AsyncEventQueue<ProviderRuntimeEvent>();
     let turnId: string | null = null;
     let finalAssistant = '';
+    let currentAssistantItemId: string | null = null;
 
     const offNotification = connection.client.onNotification((message) => {
       const statusEvent = this.#mapStatusNotification(message as ServerNotification);
@@ -239,7 +241,18 @@ export class CodexProviderRuntime implements ProviderRuntime {
       }
       const event = mapCodexNotification(message as ServerNotification, input.thread, turnId);
       if (!event) return;
-      if (event.type === 'assistant_delta') finalAssistant += event.text;
+      if (event.type === 'assistant_delta') {
+        const itemId = readAgentMessageItemId(message as ServerNotification);
+        const boundary: 'new_message' | undefined =
+          itemId && currentAssistantItemId && itemId !== currentAssistantItemId
+            ? 'new_message'
+            : undefined;
+        if (itemId) currentAssistantItemId = itemId;
+        const delta = boundary ? { ...event, boundary } : event;
+        finalAssistant = appendAssistantText(finalAssistant, delta.text, delta.boundary);
+        queue.push(delta);
+        return;
+      }
       queue.push(event);
       if (
         event.type === 'turn_completed' ||
@@ -317,7 +330,9 @@ export class CodexProviderRuntime implements ProviderRuntime {
     this.#textGenerationThreads.add(thread.threadId);
     try {
       for await (const event of this.sendTurn({ ...input, thread })) {
-        if (event.type === 'assistant_delta') buffered += event.text;
+        if (event.type === 'assistant_delta') {
+          buffered = appendAssistantText(buffered, event.text, event.boundary);
+        }
         if (event.type === 'tool_call_started') {
           throw new Error(`Codex reconcile proposal requested forbidden tool: ${event.name}`);
         }
@@ -562,6 +577,14 @@ function readCurrentTurnId(thread: ProviderThreadRef): string | null {
   if (!thread.opaque || typeof thread.opaque !== 'object') return null;
   const currentTurnId = (thread.opaque as { currentTurnId?: unknown }).currentTurnId;
   return typeof currentTurnId === 'string' && currentTurnId.length > 0 ? currentTurnId : null;
+}
+
+function readAgentMessageItemId(message: ServerNotification): string | null {
+  if (message.method !== 'item/agentMessage/delta') return null;
+  const params = message.params;
+  if (!params || typeof params !== 'object') return null;
+  const itemId = (params as { itemId?: unknown }).itemId;
+  return typeof itemId === 'string' && itemId.length > 0 ? itemId : null;
 }
 
 function writeCurrentTurnId(thread: ProviderThreadRef, turnId: string): void {

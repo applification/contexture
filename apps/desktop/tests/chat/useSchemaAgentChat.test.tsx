@@ -11,7 +11,7 @@ type Listener<T> = (payload: T) => void;
 
 function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticated_chatgpt' }) {
   const listeners = {
-    assistantDelta: new Set<Listener<{ text: string }>>(),
+    assistantDelta: new Set<Listener<{ text: string; boundary?: 'new_message' }>>(),
     assistantFinal: new Set<Listener<{ text: string }>>(),
     toolCallStarted: new Set<Listener<{ id: string; name: string; input?: unknown }>>(),
     toolCallFinished: new Set<
@@ -112,7 +112,7 @@ function makeApi(status: unknown = { provider: 'codex', readiness: 'authenticate
   };
 
   const emit = {
-    assistantDelta: (p: { text: string }) => {
+    assistantDelta: (p: { text: string; boundary?: 'new_message' }) => {
       listeners.assistantDelta.forEach((l) => {
         l(p);
       });
@@ -219,6 +219,19 @@ describe('useSchemaAgentChat', () => {
     expect(calls.send).toHaveBeenCalledWith('model this API', [
       expect.objectContaining({ path: '/repo/src/api.ts', content: 'export const api = {};' }),
     ]);
+    expect(result.current.messages[0]).toMatchObject({
+      role: 'user',
+      content: 'model this API',
+      contextAttachments: [
+        {
+          id: 'api',
+          path: '/repo/src/api.ts',
+          name: 'api.ts',
+          size: 22,
+        },
+      ],
+    });
+    expect(result.current.messages[0]?.contextAttachments?.[0]).not.toHaveProperty('content');
   });
 
   it('aggregates deltas and flushes on assistant_final', async () => {
@@ -240,6 +253,26 @@ describe('useSchemaAgentChat', () => {
       ['assistant', 'Hello world'],
     ]);
     expect(result.current.isStreaming).toBe(false);
+  });
+
+  it('preserves assistant message boundaries while streaming', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await act(async () => undefined);
+    await act(async () => {
+      await result.current.send('hi');
+    });
+    act(() => {
+      emit.assistantDelta({ text: 'First update.' });
+      emit.assistantDelta({ text: 'Second update.', boundary: 'new_message' });
+      emit.assistantFinal({ text: 'First update.\n\nSecond update.' });
+    });
+
+    expect(result.current.messages.map((m) => [m.role, m.content])).toEqual([
+      ['user', 'hi'],
+      ['assistant', 'First update.\n\nSecond update.'],
+    ]);
   });
 
   it('surfaces schema-agent send failures that happen before streaming starts', async () => {
@@ -338,6 +371,29 @@ describe('useSchemaAgentChat', () => {
           expect.objectContaining({ id: '2', name: 'add_type', status: 'rejected' }),
         ],
       }),
+    ]);
+  });
+
+  it('keeps tool-call status out of the chat transcript', async () => {
+    const { api, emit } = makeApi();
+    const { result } = renderHook(() => useSchemaAgentChat({ api }));
+
+    await waitFor(() => {
+      expect(result.current.model).toBe('gpt-5.4');
+    });
+    await act(async () => {
+      await result.current.send('add a plot');
+    });
+    act(() => {
+      emit.turnBegin();
+      emit.toolCallStarted({ id: 'pending-1', name: 'add_type', input: { name: 'Plot' } });
+    });
+
+    expect(result.current.messages.map((m) => [m.role, m.content])).toEqual([
+      ['user', 'add a plot'],
+    ]);
+    expect(useAgentTurnsStore.getState().turns[0]?.ops).toEqual([
+      expect.objectContaining({ id: 'pending-1', name: 'add_type', status: 'pending' }),
     ]);
   });
 

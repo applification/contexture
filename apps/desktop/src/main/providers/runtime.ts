@@ -132,7 +132,7 @@ export type ProviderRuntimeEvent =
   | { type: 'thread_started'; thread: ProviderThreadRef }
   | { type: 'thread_resumed'; thread: ProviderThreadRef }
   | { type: 'turn_started'; thread: ProviderThreadRef }
-  | { type: 'assistant_delta'; text: string }
+  | { type: 'assistant_delta'; text: string; boundary?: 'new_message' }
   | { type: 'assistant_final'; text: string }
   | { type: 'tool_call_started'; id: string; name: string; input?: unknown }
   | { type: 'tool_call_finished'; id: string; name: string; ok: boolean; result?: unknown }
@@ -158,4 +158,14 @@ export interface ProviderRuntime {
   startLogin(input: StartLoginInput): Promise<LoginFlow>;
   cancelLogin(input: CancelLoginInput): Promise<void>;
   logout(): Promise<void>;
+}
+
+export function appendAssistantText(
+  current: string,
+  text: string,
+  boundary?: 'new_message',
+): string {
+  if (!text) return current;
+  if (boundary === 'new_message' && current.trim().length > 0) return `${current}\n\n${text}`;
+  return current + text;
 }

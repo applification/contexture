@@ -2,6 +2,7 @@ import { createDocumentStore } from '@main/documents/document-store';
 import { createMemFsAdapter } from '@main/documents/mem-fs-adapter';
 import {
   CHAT_CONTEXT_FILE_FILTER,
+  CHAT_CONTEXT_PHOTO_FILTER,
   CONTEXTURE_OPEN_FILTER,
   CONTEXTURE_SAVE_FILTER,
   handleOpen,
@@ -76,6 +77,12 @@ describe('file IPC open/save filters', () => {
     expect(CHAT_CONTEXT_FILE_FILTER.extensions).toContain('md');
     expect(CHAT_CONTEXT_FILE_FILTER.extensions).not.toContain('png');
   });
+
+  it('restricts chat photo attachment dialogs to image files', () => {
+    expect(CHAT_CONTEXT_PHOTO_FILTER.extensions).toContain('png');
+    expect(CHAT_CONTEXT_PHOTO_FILTER.extensions).toContain('jpg');
+    expect(CHAT_CONTEXT_PHOTO_FILTER.extensions).not.toContain('ts');
+  });
 });
 
 describe('handlePickChatContextFiles', () => {
@@ -96,9 +103,63 @@ describe('handlePickChatContextFiles', () => {
         path: '/repo/src/api.ts',
         name: 'api.ts',
         content: 'export const api = {};',
+        kind: 'text',
       }),
     );
     expect(result[0]?.truncated).toBeUndefined();
+  });
+
+  it('returns base64 image attachments from the photo picker', async () => {
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const result = await handlePickChatContextFiles(
+      window,
+      {
+        showOpenDialog: vi.fn(async () => ({
+          canceled: false,
+          filePaths: ['/repo/image.png'],
+        })),
+        readFile: vi.fn(async () => 'unused'),
+        readBinaryFile: vi.fn(async () => image),
+      },
+      'photos',
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        path: '/repo/image.png',
+        name: 'image.png',
+        size: image.byteLength,
+        content: image.toString('base64'),
+        kind: 'image',
+        mimeType: 'image/png',
+        encoding: 'base64',
+      }),
+    ]);
+  });
+
+  it('allows modest images after base64 expansion', async () => {
+    const image = Buffer.alloc(118 * 1024, 1);
+    const result = await handlePickChatContextFiles(
+      window,
+      {
+        showOpenDialog: vi.fn(async () => ({
+          canceled: false,
+          filePaths: ['/repo/screenshot.png'],
+        })),
+        readFile: vi.fn(async () => 'unused'),
+        readBinaryFile: vi.fn(async () => image),
+      },
+      'photos',
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        path: '/repo/screenshot.png',
+        size: image.byteLength,
+        content: image.toString('base64'),
+        kind: 'image',
+      }),
+    ]);
   });
 
   it('returns no attachments when the picker is cancelled', async () => {

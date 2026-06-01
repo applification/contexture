@@ -78,12 +78,39 @@ function mkMessage(role: ChatRole, content: string): ChatMessage {
   return { id: mkId(), role, content, createdAt: Date.now() };
 }
 
+function mkUserMessage(content: string, attachments: ChatContextAttachment[]): ChatMessage {
+  return {
+    ...mkMessage('user', content),
+    ...(attachments.length > 0
+      ? {
+          contextAttachments: attachments.map(
+            ({ id, path, name, size, kind, mimeType, truncated }) => ({
+              id,
+              path,
+              name,
+              size,
+              ...(kind ? { kind } : {}),
+              ...(mimeType ? { mimeType } : {}),
+              ...(truncated ? { truncated: true } : {}),
+            }),
+          ),
+        }
+      : {}),
+  };
+}
+
 function readToolError(result: unknown): string {
   if (result && typeof result === 'object') {
     const error = (result as { error?: unknown }).error;
     if (typeof error === 'string') return error;
   }
   return 'Tool call failed';
+}
+
+function appendAssistantText(current: string, text: string, boundary?: 'new_message'): string {
+  if (!text) return current;
+  if (boundary === 'new_message' && current.trim().length > 0) return `${current}\n\n${text}`;
+  return current + text;
 }
 
 export function useSchemaAgentChat({
@@ -366,8 +393,8 @@ export function useSchemaAgentChat({
   }, [api, setProviderThread]);
 
   useEffect(() => {
-    return api.onAssistantDelta(({ text }) => {
-      assistantBufferRef.current += text;
+    return api.onAssistantDelta(({ text, boundary }) => {
+      assistantBufferRef.current = appendAssistantText(assistantBufferRef.current, text, boundary);
       scheduleLiveFlush();
     });
   }, [api, scheduleLiveFlush]);
@@ -375,9 +402,8 @@ export function useSchemaAgentChat({
   useEffect(() => {
     return api.onToolCallStarted(({ id, name, input }) => {
       useAgentTurnsStore.getState().recordToolCallStarted({ id, name, input });
-      appendMessage(mkMessage('assistant', `\`${name}\``));
     });
-  }, [api, appendMessage]);
+  }, [api]);
 
   useEffect(() => {
     return api.onToolCallFinished(({ id, name, ok, result }) => {
@@ -479,7 +505,7 @@ export function useSchemaAgentChat({
         appendMessage(mkMessage('assistant', `Error: ${message}`));
         return;
       }
-      const userMessage = mkMessage('user', trimmed);
+      const userMessage = mkUserMessage(trimmed, attachments);
       beginTurn(userMessage);
       pendingUserMessageRef.current = trimmed;
       if (persistenceEnabled) onMessagePersisted?.(userMessage);
