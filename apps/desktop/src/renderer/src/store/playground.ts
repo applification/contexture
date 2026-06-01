@@ -16,6 +16,10 @@ interface PlaygroundStoreShape {
   selectType(typeName: string | null): void;
   selectRecord(typeName: string, recordId: string | null): void;
   upsertRecord(typeName: string, recordId: string | null, value: Record<string, unknown>): string;
+  insertRecords(
+    recordsByType: Record<string, Array<{ id: string; value: Record<string, unknown> }>>,
+    mode?: 'append' | 'replace',
+  ): void;
   deleteRecord(typeName: string, recordId: string): void;
   clearType(typeName: string): void;
   clearAll(): void;
@@ -61,6 +65,38 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
       selectedRecordId: id,
     }));
     return id;
+  },
+
+  insertRecords: (incoming, mode = 'append') => {
+    const now = Date.now();
+    const nextRecordsByType = Object.fromEntries(
+      Object.entries(incoming).map(([typeName, records]) => [
+        typeName,
+        records.map((record) => ({
+          id: record.id,
+          typeName,
+          value: record.value,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      ]),
+    );
+
+    set((state) => {
+      const recordsByType = { ...state.recordsByType };
+      for (const [typeName, records] of Object.entries(nextRecordsByType)) {
+        recordsByType[typeName] =
+          mode === 'replace' ? records : [...records, ...(recordsByType[typeName] ?? [])];
+      }
+      const selectedTypeName = state.selectedTypeName ?? Object.keys(nextRecordsByType)[0] ?? null;
+      return {
+        recordsByType,
+        selectedTypeName,
+        selectedRecordId: selectedTypeName
+          ? (recordsByType[selectedTypeName]?.[0]?.id ?? null)
+          : null,
+      };
+    });
   },
 
   deleteRecord: (typeName, recordId) => {

@@ -7,8 +7,9 @@ import {
   type PlaygroundEntity,
   type PlaygroundRefControl,
 } from '@contexture/core/playground-contract';
+import { generatePlaygroundFixtures } from '@contexture/core/playground-fixtures';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Database, FileJson2, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import { Check, Database, FileJson2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
 import type { RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, type FieldValues, useForm } from 'react-hook-form';
@@ -38,6 +39,7 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   const selectType = usePlaygroundStore((state) => state.selectType);
   const selectRecord = usePlaygroundStore((state) => state.selectRecord);
   const upsertRecord = usePlaygroundStore((state) => state.upsertRecord);
+  const insertRecords = usePlaygroundStore((state) => state.insertRecords);
   const deleteRecord = usePlaygroundStore((state) => state.deleteRecord);
   const clearType = usePlaygroundStore((state) => state.clearType);
   const pruneTypes = usePlaygroundStore((state) => state.pruneTypes);
@@ -58,6 +60,7 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   const selectedRecord = records.find((record) => record.id === selectedRecordId) ?? null;
   const recordCount = Object.values(recordsByType).reduce((sum, list) => sum + list.length, 0);
   const formRecord = formOpen ? selectedRecord : null;
+  const [seedNotice, setSeedNotice] = useState<string | null>(null);
 
   const openNewRecord = () => {
     if (!selectedEntity) return;
@@ -72,6 +75,26 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   };
 
   const closeForm = () => setFormOpen(false);
+
+  const seedRecords = (scope: 'current' | 'all') => {
+    if (scope === 'current' && !selectedEntity) return;
+    const result = generatePlaygroundFixtures(schema, {
+      seed: `${scope}:${Date.now()}`,
+      count: 5,
+      typeNames: scope === 'current' && selectedEntity ? [selectedEntity.typeName] : undefined,
+      existingRecordsByType: recordsByType,
+    });
+    insertRecords(result.recordsByType);
+    const generatedCount = Object.values(result.recordsByType).reduce(
+      (sum, list) => sum + list.length,
+      0,
+    );
+    setSeedNotice(
+      result.warnings.length > 0
+        ? `Seeded ${generatedCount} records with ${result.warnings.length} warnings.`
+        : `Seeded ${generatedCount} records.`,
+    );
+  };
 
   if (contract.entities.length === 0) {
     return (
@@ -108,8 +131,13 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
                 entity={selectedEntity}
                 records={records}
                 onNew={openNewRecord}
+                onSeedCurrent={() => seedRecords('current')}
+                onSeedAll={() => seedRecords('all')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
+              {seedNotice && (
+                <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />
+              )}
               <div className="relative min-h-0 flex-1">
                 <RecordTable
                   entity={selectedEntity}
@@ -154,13 +182,18 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
             onSelect={selectType}
           />
           {selectedEntity && (
-            <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <section className="flex min-h-0 flex-col">
               <EntityToolbar
                 entity={selectedEntity}
                 records={records}
                 onNew={openNewRecord}
+                onSeedCurrent={() => seedRecords('current')}
+                onSeedAll={() => seedRecords('all')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
+              {seedNotice && (
+                <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />
+              )}
               <div className="relative min-h-0">
                 <RecordTable
                   entity={selectedEntity}
@@ -314,11 +347,15 @@ function EntityToolbar({
   entity,
   records,
   onNew,
+  onSeedCurrent,
+  onSeedAll,
   onClear,
 }: {
   entity: PlaygroundEntity;
   records: PlaygroundRecord[];
   onNew: () => void;
+  onSeedCurrent: () => void;
+  onSeedAll: () => void;
   onClear: () => void;
 }): React.JSX.Element {
   return (
@@ -342,6 +379,19 @@ function EntityToolbar({
           type="button"
           variant="ghost"
           size="icon"
+          title="Seed current entity"
+          onClick={onSeedCurrent}
+        >
+          <Sparkles aria-hidden="true" />
+        </Button>
+        <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={onSeedAll}>
+          <Sparkles aria-hidden="true" />
+          All
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           title="Clear records"
           onClick={onClear}
           disabled={records.length === 0}
@@ -349,6 +399,23 @@ function EntityToolbar({
           <RotateCcw aria-hidden="true" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+function SeedNotice({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+      <span className="min-w-0 truncate">{message}</span>
+      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={onDismiss}>
+        <X aria-hidden="true" className="size-3" />
+      </Button>
     </div>
   );
 }

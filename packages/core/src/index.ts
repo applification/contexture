@@ -22,5 +22,6 @@ export * from './op-tools';
 export * from './ops';
 export * from './pipeline';
 export * from './playground-contract';
+export * from './playground-fixtures';
 export * from './semantic-validation';
 export * from './validation-repairs';
