@@ -58,6 +58,7 @@ import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/g
 import { TYPE_NODE_EVENT, TYPE_NODE_OBJECT_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
+import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
@@ -569,6 +570,11 @@ export default function App(): React.JSX.Element {
                   onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                 />
+              </div>
+              <div
+                className={activeTab !== 'playground' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}
+              >
+                <PlaygroundPanel schema={schema} />
               </div>
               <div className={activeTab !== 'changes' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <ChangesPanel />

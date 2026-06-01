@@ -30,6 +30,7 @@
     "./op-tools": "./src/op-tools.ts",
     "./paths": "./src/paths.ts",
     "./pipeline": "./src/pipeline.ts",
+    "./playground-contract": "./src/playground-contract.ts",
     "./semantic-validation": "./src/semantic-validation.ts",
     "./validation-repairs": "./src/validation-repairs.ts"
   },
