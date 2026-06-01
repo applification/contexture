@@ -11,7 +11,7 @@ import {
   runEmitPipeline,
 } from './pipeline';
 
-export type GeneratedFileStatus = 'clean' | 'drifted' | 'unreadable';
+export type GeneratedFileStatus = 'clean' | 'missing' | 'drifted' | 'unreadable';
 export type GeneratedDriftClassification =
   | 'clean'
   | 'missing'
@@ -133,7 +133,7 @@ export async function checkGeneratedManifestDrift(
       content = undefined;
     }
 
-    if (content === undefined) checks.push({ path, status: 'unreadable' });
+    if (content === undefined) checks.push({ path, status: 'missing' });
     else if (hashContent(content) !== expectedHash) checks.push({ path, status: 'drifted' });
     else checks.push({ path, status: 'clean' });
   }
@@ -228,7 +228,7 @@ export async function writeGeneratedBundle(
 
   if (driftPreflight) {
     const drift = (await checkGeneratedManifestDrift(irPath, fs)).filter(
-      (check) => check.status !== 'clean',
+      (check) => check.status !== 'clean' && check.status !== 'missing',
     );
     if (drift.length > 0) throw new GeneratedBundleDriftError(drift);
   }

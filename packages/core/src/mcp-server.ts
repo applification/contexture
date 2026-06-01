@@ -117,7 +117,7 @@ const EmitContextureOutput = {
   }),
 };
 
-const GeneratedFileStatusSchema = z.enum(['clean', 'drifted', 'unreadable']);
+const GeneratedFileStatusSchema = z.enum(['clean', 'missing', 'drifted', 'unreadable']);
 
 const CheckContextureDriftOutput = {
   path: z.string(),

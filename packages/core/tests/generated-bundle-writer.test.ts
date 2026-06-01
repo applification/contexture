@@ -133,6 +133,33 @@ describe('generated bundle writer', () => {
     expect(fs.files.get('/proj/packages/contexture/app.schema.ts')).toBe('// hand edit\n');
   });
 
+  it('allows save to recreate generated files missing from the last manifest', async () => {
+    const fs = createFs();
+    await writeGeneratedBundle({ irPath, schema, fs });
+    await fs.remove('/proj/packages/contexture/app.schema.ts');
+
+    await writeGeneratedBundle({
+      irPath,
+      schema: {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Post',
+            table: true,
+            fields: [{ name: 'title', type: { kind: 'string' } }],
+          },
+        ],
+      },
+      fs,
+    });
+
+    expect(fs.files.get('/proj/packages/contexture/app.schema.ts')).toContain(
+      '@contexture-generated',
+    );
+    expect(fs.files.get(irPath)).toContain('"title"');
+  });
+
   it('allows explicit re-emits to overwrite generated drift', async () => {
     const fs = createFs();
     await writeGeneratedBundle({ irPath, schema, fs });

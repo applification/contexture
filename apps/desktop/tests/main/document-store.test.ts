@@ -328,7 +328,7 @@ describe('DocumentStore', () => {
     }
   });
 
-  it('bundle-mode save refuses to clobber drifted generated files', async () => {
+  it('bundle-mode save preserves drifted generated files while saving the IR', async () => {
     await harness.store.save({
       irPath,
       schema: sampleIR,
@@ -336,19 +336,21 @@ describe('DocumentStore', () => {
       chat: sampleChat,
     });
     await harness.fs.writeFile(schemaTsPath, '// hand edit\n');
+    const updated: Schema = {
+      version: '1',
+      types: [{ kind: 'object', name: 'Updated', fields: [] }],
+    };
 
-    await expect(
-      harness.store.save({
-        irPath,
-        schema: { version: '1', types: [{ kind: 'object', name: 'Updated', fields: [] }] },
-        layout: sampleLayout,
-        chat: sampleChat,
-      }),
-    ).rejects.toThrow(/Generated files have drifted/);
+    await harness.store.save({
+      irPath,
+      schema: updated,
+      layout: sampleLayout,
+      chat: sampleChat,
+    });
 
     expect(await harness.fs.readFile(schemaTsPath)).toBe('// hand edit\n');
     const reopened = await harness.store.open(irPath);
-    expect(reopened.schema).toEqual(sampleIR);
+    expect(reopened.schema).toEqual(updated);
   });
 
   it('saving a bare legacy IR initializes bundle mode and writes a schema index', async () => {

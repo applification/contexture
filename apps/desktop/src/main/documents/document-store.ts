@@ -27,13 +27,16 @@ import {
   emitZod as defaultEmitZod,
   detectDocumentMode,
   type FileEntry,
+  GeneratedBundleDriftError,
   type Layout,
   loadChatHistory,
   load as loadIR,
   loadLayout,
   type Schema,
   saveChatHistory,
+  save as saveIR,
   saveLayout,
+  writeFilesAtomic,
   writeGeneratedBundle,
 } from '@contexture/core';
 import { STDLIB_NAMESPACES } from '@shared/stdlib-registry';
@@ -198,20 +201,28 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
       chat: saveChatHistory(input.chat),
     });
 
-    await writeGeneratedBundle({
-      irPath,
-      schema: input.schema,
-      fs,
-      sidecars,
-      driftPreflight: hasExistingBundle,
-      generatedTargetPreflight: !hasExistingBundle,
-      emitDeps: {
-        emitZod,
-        emitJsonSchema,
-        emitSchemaIndex,
-        emitConvex,
-      },
-    });
+    try {
+      await writeGeneratedBundle({
+        irPath,
+        schema: input.schema,
+        fs,
+        sidecars,
+        driftPreflight: hasExistingBundle,
+        generatedTargetPreflight: !hasExistingBundle,
+        emitDeps: {
+          emitZod,
+          emitJsonSchema,
+          emitSchemaIndex,
+          emitConvex,
+        },
+      });
+    } catch (err) {
+      if (!(hasExistingBundle && err instanceof GeneratedBundleDriftError)) throw err;
+      await writeFilesAtomic(fs, [
+        { path: paths.ir, content: `${saveIR(input.schema)}\n` },
+        ...sidecars,
+      ]);
+    }
     await bumpRecent(irPath);
   }
 
