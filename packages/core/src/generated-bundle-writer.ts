@@ -2,7 +2,7 @@ import { DEFAULT_CHAT_HISTORY, saveChatHistory } from './chat-history';
 import type { Schema } from './ir';
 import { DEFAULT_LAYOUT, saveLayout } from './layout';
 import { save } from './load';
-import { type BundlePaths, bundlePathsFor } from './paths';
+import { type BundlePaths, bundlePathsFor, resolveManifestGeneratedPath } from './paths';
 import {
   type EmitPipelineDeps,
   type EmittedManifest,
@@ -11,7 +11,7 @@ import {
   runEmitPipeline,
 } from './pipeline';
 
-export type GeneratedFileStatus = 'clean' | 'drifted' | 'unreadable';
+export type GeneratedFileStatus = 'clean' | 'missing' | 'drifted' | 'unreadable';
 export type GeneratedDriftClassification =
   | 'clean'
   | 'missing'
@@ -125,7 +125,8 @@ export async function checkGeneratedManifestDrift(
   }
 
   const checks: GeneratedFileCheck[] = [];
-  for (const [path, expectedHash] of Object.entries(manifest.files ?? {})) {
+  for (const [manifestKey, expectedHash] of Object.entries(manifest.files ?? {})) {
+    const path = resolveManifestGeneratedPath(irPath, manifestKey);
     let content: string | undefined;
     try {
       content = await fs.readFile(path);
@@ -133,7 +134,7 @@ export async function checkGeneratedManifestDrift(
       content = undefined;
     }
 
-    if (content === undefined) checks.push({ path, status: 'unreadable' });
+    if (content === undefined) checks.push({ path, status: 'missing' });
     else if (hashContent(content) !== expectedHash) checks.push({ path, status: 'drifted' });
     else checks.push({ path, status: 'clean' });
   }
@@ -149,7 +150,12 @@ export async function classifyGeneratedBundleDrift(
 ): Promise<GeneratedDriftCheck[]> {
   const bundle = buildGeneratedBundle(schema, irPath, emitDeps);
   const manifest = await readGeneratedManifest(bundle.paths.emitted, fs);
-  const manifestFiles = manifest?.files ?? {};
+  const manifestFiles = Object.fromEntries(
+    Object.entries(manifest?.files ?? {}).map(([manifestKey, hash]) => [
+      resolveManifestGeneratedPath(irPath, manifestKey),
+      hash,
+    ]),
+  );
   const emittedByPath = new Map(bundle.emitted.map((entry) => [entry.path, entry.content]));
   const targetPaths = new Set([...Object.keys(manifestFiles), ...emittedByPath.keys()]);
   const checks: GeneratedDriftCheck[] = [];
@@ -228,7 +234,7 @@ export async function writeGeneratedBundle(
 
   if (driftPreflight) {
     const drift = (await checkGeneratedManifestDrift(irPath, fs)).filter(
-      (check) => check.status !== 'clean',
+      (check) => check.status !== 'clean' && check.status !== 'missing',
     );
     if (drift.length > 0) throw new GeneratedBundleDriftError(drift);
   }

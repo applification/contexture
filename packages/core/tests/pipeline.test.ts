@@ -52,10 +52,27 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/app.schema.ts',
       '/repo/packages/contexture/index.ts',
     ]);
-    expect(Object.keys(manifest.files)).toEqual([
-      '/repo/packages/contexture/app.schema.ts',
-      '/repo/packages/contexture/index.ts',
-    ]);
+    expect(Object.keys(manifest.files)).toEqual(['app.schema.ts', 'index.ts']);
+  });
+
+  it('uses stable source labels and manifest keys across checkout roots', () => {
+    const first = runEmitPipeline(baseSchema, '/Users/rufus/Apps/plantry/plantry.contexture.json');
+    const second = runEmitPipeline(
+      baseSchema,
+      '/Users/davehudson/Apps/plantry/plantry.contexture.json',
+    );
+
+    const firstByRelativePath = new Map(
+      first.emitted.map((file) => [file.path.replace('/Users/rufus/Apps/plantry/', ''), file]),
+    );
+    for (const secondFile of second.emitted) {
+      const key = secondFile.path.replace('/Users/davehudson/Apps/plantry/', '');
+      expect(secondFile.content).toBe(firstByRelativePath.get(key)?.content);
+    }
+
+    expect(first.manifest.files).toEqual(second.manifest.files);
+    expect(first.emitted[0]?.content).toContain('Source: plantry.contexture.json');
+    expect(first.emitted[0]?.content).not.toContain('/Users/rufus');
   });
 
   it('omits AI-pipeline outputs until they are explicitly enabled', () => {
@@ -101,9 +118,7 @@ describe('runEmitPipeline output config', () => {
     );
     const toolSchemas = emitted.find((file) => file.path.endsWith('ai-tool-schemas.json'));
     expect(toolSchemas?.content).toContain('submit_post');
-    expect(manifest.files).toHaveProperty(
-      '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
-    );
+    expect(manifest.files).toHaveProperty('.contexture/ai-tool-schemas.json');
   });
 
   it('emits opt-in structured-output schemas, MCP definitions, and form validators', () => {
@@ -132,12 +147,8 @@ describe('runEmitPipeline output config', () => {
     expect(emitted.map((file) => file.path)).toContain(
       '/repo/packages/contexture/form-validators.ts',
     );
-    expect(manifest.files).toHaveProperty(
-      '/repo/packages/contexture/.contexture/structured-output-schemas.json',
-    );
-    expect(manifest.files).toHaveProperty(
-      '/repo/packages/contexture/.contexture/mcp-definitions.json',
-    );
-    expect(manifest.files).toHaveProperty('/repo/packages/contexture/form-validators.ts');
+    expect(manifest.files).toHaveProperty('.contexture/structured-output-schemas.json');
+    expect(manifest.files).toHaveProperty('.contexture/mcp-definitions.json');
+    expect(manifest.files).toHaveProperty('form-validators.ts');
   });
 });

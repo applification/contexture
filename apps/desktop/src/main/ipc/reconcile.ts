@@ -5,6 +5,7 @@ import {
   type EmittedManifest,
   hashContent,
   IRSchema,
+  manifestKeyForGeneratedPath,
   type Schema,
   save as saveIR,
   writeGeneratedBundle,
@@ -76,7 +77,7 @@ export async function writeGeneratedTarget(input: unknown): Promise<void> {
   );
   const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
   const manifestPath = bundlePathsFor(parsed.irPath).emitted;
-  await writeGeneratedTargetContents(target, manifestPath, parsed.contents);
+  await writeGeneratedTargetContents(parsed.irPath, target, manifestPath, parsed.contents);
 }
 
 export async function acceptGeneratedTarget(input: unknown): Promise<void> {
@@ -91,7 +92,7 @@ export async function acceptGeneratedTarget(input: unknown): Promise<void> {
   const previousManifest = await readOptionalFile(manifestPath);
 
   try {
-    await writeGeneratedTargetContents(target, manifestPath, parsed.contents);
+    await writeGeneratedTargetContents(parsed.irPath, target, manifestPath, parsed.contents);
     acknowledgeModelSyncSelfWrite(parsed.irPath, hashContent(`${saveIR(parsed.schema)}\n`));
     await writeGeneratedBundle({
       irPath: parsed.irPath,
@@ -122,22 +123,24 @@ export async function validateConvexGeneratedTarget(
 }
 
 async function writeGeneratedTargetContents(
+  irPath: string,
   target: string,
   manifestPath: string,
   contents: string,
 ): Promise<void> {
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, contents, 'utf8');
-  await writeGeneratedManifestHash(manifestPath, target, contents);
+  await writeGeneratedManifestHash(irPath, manifestPath, target, contents);
 }
 
 async function writeGeneratedManifestHash(
+  irPath: string,
   manifestPath: string,
   targetPath: string,
   contents: string,
 ): Promise<void> {
   const manifest = await readGeneratedManifest(manifestPath);
-  manifest.files[targetPath] = hashContent(contents);
+  manifest.files[manifestKeyForGeneratedPath(irPath, targetPath)] = hashContent(contents);
   await mkdir(dirname(manifestPath), { recursive: true });
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }

@@ -164,6 +164,34 @@ describe('detectDrift', () => {
 
     expect(results).toEqual([{ path: WATCHED, status: 'match' }]);
   });
+
+  it('resolves relative manifest entries against the current bundle root', async () => {
+    const content = 'defineSchema({})';
+    const files: Record<string, string> = {
+      [WATCHED]: content,
+      [EMITTED]: makeManifest({ 'convex/schema.ts': content }),
+    };
+
+    const results = await detectDrift(EMITTED, makeReadFile(files), {
+      allowedPaths: [WATCHED],
+    });
+
+    expect(results).toEqual([{ path: WATCHED, status: 'match' }]);
+  });
+
+  it('maps old absolute manifest entries to the current checkout path by target suffix', async () => {
+    const content = 'defineSchema({})';
+    const files: Record<string, string> = {
+      [WATCHED]: content,
+      [EMITTED]: makeManifest({ '/Users/rufus/Apps/plantry/convex/schema.ts': content }),
+    };
+
+    const results = await detectDrift(EMITTED, makeReadFile(files), {
+      allowedPaths: [WATCHED],
+    });
+
+    expect(results).toEqual([{ path: WATCHED, status: 'match' }]);
+  });
 });
 
 // ─── createDriftWatcher (multi-file) ─────────────────────────────────

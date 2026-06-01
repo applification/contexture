@@ -58,7 +58,8 @@ export async function detectDrift(
   const allowed = options.allowedPaths ? new Set(options.allowedPaths) : null;
 
   const results: DriftResult[] = [];
-  for (const [filePath, expectedHash] of Object.entries(files)) {
+  for (const [manifestKey, expectedHash] of Object.entries(files)) {
+    const filePath = resolveManifestPath(emittedJsonPath, manifestKey, options.allowedPaths);
     if (allowed && !allowed.has(filePath)) continue;
     let actual: string | null;
     try {
@@ -195,6 +196,51 @@ function problemStatusFor(
 ): GeneratedProblemStatus | null {
   if (status === 'match' || status === 'clean') return null;
   return status;
+}
+
+function resolveManifestPath(
+  emittedJsonPath: string,
+  manifestKey: string,
+  allowedPaths?: readonly string[],
+): string {
+  const normalized = manifestKey.replaceAll('\\', '/');
+  if (isAbsolutePath(normalized)) {
+    const bySuffix = allowedPaths?.find((path) =>
+      normalized.endsWith(`/${relativeToProject(path)}`),
+    );
+    return bySuffix ?? normalized;
+  }
+  return `${projectDirFromEmittedPath(emittedJsonPath)}/${normalized}`;
+}
+
+function projectDirFromEmittedPath(emittedJsonPath: string): string {
+  return dirname(dirname(emittedJsonPath.replaceAll('\\', '/')));
+}
+
+function relativeToProject(path: string): string {
+  const normalized = path.replaceAll('\\', '/');
+  const marker = '/.contexture/';
+  const markerIndex = normalized.indexOf(marker);
+  if (markerIndex !== -1) {
+    return normalized.slice(markerIndex + marker.length);
+  }
+
+  const parts = normalized.split('/').filter(Boolean);
+  const convexIndex = parts.lastIndexOf('convex');
+  if (convexIndex !== -1) return parts.slice(convexIndex).join('/');
+  const schemaIndex = parts.lastIndexOf('schema');
+  if (schemaIndex !== -1) return parts.slice(schemaIndex).join('/');
+  return parts.slice(-1).join('/');
+}
+
+function isAbsolutePath(path: string): boolean {
+  return path.startsWith('/') || /^[A-Za-z]:\//.test(path);
+}
+
+function dirname(path: string): string {
+  const slash = path.lastIndexOf('/');
+  if (slash <= 0) return slash === 0 ? '/' : '.';
+  return path.slice(0, slash);
 }
 
 async function detectCurrentDrift(
