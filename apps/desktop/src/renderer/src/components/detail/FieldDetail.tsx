@@ -228,42 +228,41 @@ function FieldSampleDataSection({
   const selectedGenerator = field.sampleData?.generator ?? AUTO_SAMPLE_DATA;
 
   return (
-    <details className="space-y-2 rounded-md border border-border px-3 py-2">
-      <summary className="cursor-default select-none text-xs font-medium">Sample data</summary>
-      <div className="space-y-2 pt-2">
-        <div className="space-y-1">
-          <Label htmlFor="field-sample-data-generator">Generator</Label>
-          <Select
-            value={selectedGenerator}
-            onValueChange={(value) => {
-              const generator = value === AUTO_SAMPLE_DATA ? undefined : value;
-              update({
-                sampleData: generator ? { ...field.sampleData, generator } : undefined,
-              });
-            }}
-          >
-            <SelectTrigger id="field-sample-data-generator" className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
-              {modules.map((module) => (
-                <SelectGroup key={module.id}>
-                  <SelectLabel>{module.label}</SelectLabel>
-                  {generators
-                    .filter((generator) => generator.module === module.id)
-                    .map((generator) => (
-                      <SelectItem key={generator.id} value={generator.id}>
-                        {generator.label}
-                      </SelectItem>
-                    ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <section className="space-y-2 rounded-md border border-border px-3 py-2">
+      <Label htmlFor="field-sample-data-generator" className="text-xs">
+        Sample data
+      </Label>
+      <div className="space-y-1">
+        <Select
+          value={selectedGenerator}
+          onValueChange={(value) => {
+            const generator = value === AUTO_SAMPLE_DATA ? undefined : value;
+            update({
+              sampleData: generator ? { ...field.sampleData, generator } : undefined,
+            });
+          }}
+        >
+          <SelectTrigger id="field-sample-data-generator" className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
+            {modules.map((module) => (
+              <SelectGroup key={module.id}>
+                <SelectLabel>{module.label}</SelectLabel>
+                {generators
+                  .filter((generator) => generator.module === module.id)
+                  .map((generator) => (
+                    <SelectItem key={generator.id} value={generator.id}>
+                      {generator.label}
+                    </SelectItem>
+                  ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-    </details>
+    </section>
   );
 }
 

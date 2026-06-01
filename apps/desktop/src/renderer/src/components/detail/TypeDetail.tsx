@@ -151,41 +151,40 @@ function SampleDataSection({ type, dispatch }: TypeDetailProps) {
   const category = type.sampleData?.category ?? AUTO_SAMPLE_DATA;
 
   return (
-    <details className="space-y-2 rounded-md border border-border px-3 py-2">
-      <summary className="cursor-default select-none text-xs font-medium">Sample data</summary>
-      <div className="space-y-2 pt-2">
-        <div className="space-y-1">
-          <Label htmlFor="type-sample-data-category">Category</Label>
-          <Select
-            value={category}
-            onValueChange={(value) => {
-              const nextCategory = value === AUTO_SAMPLE_DATA ? undefined : value;
-              dispatch({
-                kind: 'update_type',
-                name: type.name,
-                patch: typePatch({
-                  sampleData: nextCategory
-                    ? { ...type.sampleData, category: nextCategory }
-                    : undefined,
-                }),
-              });
-            }}
-          >
-            <SelectTrigger id="type-sample-data-category" className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
-              {modules.map((module) => (
-                <SelectItem key={module.id} value={module.id}>
-                  {module.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <section className="space-y-2 rounded-md border border-border px-3 py-2">
+      <Label htmlFor="type-sample-data-category" className="text-xs">
+        Sample data
+      </Label>
+      <div className="space-y-1">
+        <Select
+          value={category}
+          onValueChange={(value) => {
+            const nextCategory = value === AUTO_SAMPLE_DATA ? undefined : value;
+            dispatch({
+              kind: 'update_type',
+              name: type.name,
+              patch: typePatch({
+                sampleData: nextCategory
+                  ? { ...type.sampleData, category: nextCategory }
+                  : undefined,
+              }),
+            });
+          }}
+        >
+          <SelectTrigger id="type-sample-data-category" className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
+            {modules.map((module) => (
+              <SelectItem key={module.id} value={module.id}>
+                {module.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-    </details>
+    </section>
   );
 }
 
