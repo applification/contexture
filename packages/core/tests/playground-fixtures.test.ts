@@ -63,11 +63,14 @@ const pantrySchema: Schema = {
     {
       kind: 'object',
       name: 'PantryItem',
+      description: 'A pantry item owned by a Household.',
       table: true,
       fields: [
         { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
         { name: 'name', type: { kind: 'string' } },
-        { name: 'quantity', type: { kind: 'string' } },
+        { name: 'quantity', type: { kind: 'number' } },
+        { name: 'unit', type: { kind: 'string' } },
+        { name: 'storageLocation', type: { kind: 'string' } },
         { name: 'notes', type: { kind: 'string' }, optional: true },
       ],
     },
@@ -162,8 +165,14 @@ describe('generatePlaygroundFixtures', () => {
     expect(result.warnings).toEqual([]);
     expect(household?.value.name).toMatch(/^The .+ Household$/);
     expect(pantryItem?.value.name).toEqual(expect.any(String));
-    expect(pantryItem?.value.name).not.toMatch(/\s[A-Z][a-z]+$/);
-    expect(pantryItem?.value.quantity).toMatch(/^(1|2|3|500|750) (kg|g|ml|jar|tin|pack)$/);
+    expect(pantryItem?.value.name).not.toMatch(/Household$/);
+    expect(pantryItem?.value.quantity).toSatisfy(
+      (value: unknown) => typeof value === 'number' && value >= 1 && value <= 12,
+    );
+    expect(['kg', 'g', 'ml', 'jar', 'tin', 'pack']).toContain(pantryItem?.value.unit);
+    expect(['Pantry', 'Fridge', 'Freezer', 'Cupboard', 'Allotment shed']).toContain(
+      pantryItem?.value.storageLocation,
+    );
     expect(recipe?.value.name).toEqual(expect.any(String));
     expect(recipe?.value.name).not.toMatch(/^The .+ Household$/);
   });

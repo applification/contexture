@@ -168,6 +168,15 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
     case 'text':
       return generateText(control as PlaygroundScalarControl & { kind: 'text' }, ctx);
     case 'number':
+      if (fieldLooksLike(control.fieldName, ['quantity', 'amount', 'count'])) {
+        return ctx.entityCategory === 'pantry' || ctx.entityCategory === 'recipe'
+          ? ctx.random.number({ min: 1, max: 12, int: true })
+          : ctx.random.number({
+              min: control.constraints.min ?? 1,
+              max: control.constraints.max ?? 20,
+              int: true,
+            });
+      }
       return ctx.random.number({
         min: control.constraints.min ?? 1,
         max: control.constraints.max ?? 100,
@@ -215,6 +224,11 @@ function generateText(
   if (control.constraints.format === 'url' || field.includes('url')) return ctx.random.url();
   if (control.constraints.format === 'uuid' || field === 'uuid') return ctx.random.stringUuid();
   if (field.includes('slug')) return ctx.random.slug(`${ctx.entity.typeName} ${ctx.index + 1}`);
+  if (field.includes('storagelocation') || field.includes('storage_location')) {
+    return storageLocationForEntity(ctx);
+  }
+  if (field.includes('sourcetype') || field.includes('source_type'))
+    return sourceTypeForEntity(ctx);
   if (isNameField(field, label)) return nameForEntity(ctx);
   if (field === 'title' || field.endsWith('title')) return titleForEntity(ctx.entity, ctx);
   if (field.includes('quantity') || field.includes('amount')) return quantityForEntity(ctx);
@@ -313,6 +327,22 @@ function unitForEntity(ctx: GenerateValueContext): string {
     return ctx.random.pick(['kg', 'g', 'ml', 'jar', 'tin', 'pack']) ?? 'pack';
   }
   return ctx.random.pick(['item', 'unit', 'pack']) ?? 'item';
+}
+
+function storageLocationForEntity(ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'pantry') {
+    return (
+      ctx.random.pick(['Pantry', 'Fridge', 'Freezer', 'Cupboard', 'Allotment shed']) ?? 'Pantry'
+    );
+  }
+  return ctx.random.pick(['Main storage', 'Back room', 'Archive']) ?? 'Main storage';
+}
+
+function sourceTypeForEntity(ctx: GenerateValueContext): string {
+  if (ctx.entityCategory === 'pantry') {
+    return ctx.random.pick(['manual', 'shopping-list', 'recipe-leftover']) ?? 'manual';
+  }
+  return ctx.random.pick(['manual', 'imported', 'system']) ?? 'manual';
 }
 
 function generateRef(control: PlaygroundRefControl, ctx: GenerateValueContext): string | undefined {
@@ -458,20 +488,25 @@ function tableRefNames(fields: readonly PlaygroundControl[]): string[] {
 }
 
 function inferEntityCategory(entity: PlaygroundEntity): EntityCategory {
-  const haystack =
-    `${entity.typeName} ${entity.tableName} ${entity.description ?? ''}`.toLowerCase();
-  if (matchesAny(haystack, ['household', 'family', 'home'])) return 'household';
-  if (matchesAny(haystack, ['user', 'person', 'member', 'contact', 'assignee'])) return 'person';
+  const identity = `${entity.typeName} ${entity.tableName}`.toLowerCase();
+  const haystack = `${identity} ${entity.description ?? ''}`.toLowerCase();
+  if (matchesAny(identity, ['pantry', 'ingredient', 'grocery', 'food', 'stock', 'inventory'])) {
+    return 'pantry';
+  }
+  if (matchesAny(identity, ['recipe', 'meal', 'dish', 'menu'])) return 'recipe';
+  if (matchesAny(identity, ['todo', 'task', 'checklist', 'issue'])) return 'todo';
+  if (matchesAny(identity, ['household', 'family', 'home'])) return 'household';
+  if (matchesAny(identity, ['user', 'person', 'member', 'contact', 'assignee'])) return 'person';
+  if (matchesAny(identity, ['list', 'collection'])) return 'list';
+  if (matchesAny(identity, ['company', 'organisation', 'organization', 'vendor', 'supplier'])) {
+    return 'company';
+  }
+  if (matchesAny(identity, ['place', 'address', 'location', 'venue'])) return 'place';
   if (matchesAny(haystack, ['pantry', 'ingredient', 'grocery', 'food', 'stock', 'inventory'])) {
     return 'pantry';
   }
   if (matchesAny(haystack, ['recipe', 'meal', 'dish', 'menu'])) return 'recipe';
-  if (matchesAny(haystack, ['todo', 'task', 'checklist', 'issue'])) return 'todo';
-  if (matchesAny(haystack, ['list', 'collection'])) return 'list';
-  if (matchesAny(haystack, ['company', 'organisation', 'organization', 'vendor', 'supplier'])) {
-    return 'company';
-  }
-  if (matchesAny(haystack, ['place', 'address', 'location', 'venue'])) return 'place';
+  if (matchesAny(haystack, ['household', 'family', 'home'])) return 'household';
   return 'generic';
 }
 
@@ -481,6 +516,11 @@ function matchesAny(value: string, needles: readonly string[]): boolean {
 
 function isNameField(field: string, label: string): boolean {
   return field === 'name' || field.endsWith('name') || label.endsWith(' name');
+}
+
+function fieldLooksLike(fieldName: string, needles: readonly string[]): boolean {
+  const field = fieldName.toLowerCase();
+  return needles.some((needle) => field.includes(needle));
 }
 
 function fixtureId(typeName: string, index: number, random: FixtureRandom): string {
