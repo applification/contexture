@@ -46,7 +46,7 @@ export const AnimatedThemeToggler = ({
     const maxRadius = Math.hypot(Math.max(x, viewportWidth - x), Math.max(y, viewportHeight - y));
 
     const applyTheme = () => {
-      const newTheme = !isDark;
+      const newTheme = !document.documentElement.classList.contains('dark');
       setIsDark(newTheme);
       document.documentElement.classList.toggle('dark', newTheme);
       localStorage.setItem('theme', newTheme ? 'dark' : 'light');
@@ -81,7 +81,7 @@ export const AnimatedThemeToggler = ({
         );
       });
     }
-  }, [isDark, duration]);
+  }, [duration]);
 
   return (
     <button
