@@ -1,4 +1,4 @@
-import type { FieldDef, FieldType, Schema, TypeDef } from './ir';
+import type { FieldDef, FieldType, SampleDataHint, Schema, TypeDef } from './ir';
 
 export type PlaygroundControlKind =
   | 'text'
@@ -37,6 +37,7 @@ export interface PlaygroundFieldBase {
   nullable: boolean;
   defaultValue?: unknown;
   serverDerived: boolean;
+  sampleData?: SampleDataHint;
 }
 
 export interface PlaygroundScalarControl extends PlaygroundFieldBase {
@@ -94,6 +95,7 @@ export interface PlaygroundEntity {
   typeName: string;
   tableName: string;
   description?: string;
+  sampleData?: SampleDataHint;
   fields: PlaygroundControl[];
   indexes: readonly string[];
   displayFieldName?: string;
@@ -178,6 +180,7 @@ function buildEntity(
     typeName: type.name,
     tableName: tableName(type),
     description: type.description,
+    sampleData: type.sampleData,
     fields: type.fields.map((field) => buildControl(field, typeByName, stack)),
     indexes: (type.indexes ?? []).map((index) => index.name),
     displayFieldName: displayFieldName(type),
@@ -197,6 +200,7 @@ function buildControl(
     nullable: field.nullable === true,
     defaultValue: field.default,
     serverDerived: field.serverDerived === true,
+    sampleData: field.sampleData,
   };
   return { ...base, ...buildControlShape(field.type, typeByName, stack) } as PlaygroundControl;
 }

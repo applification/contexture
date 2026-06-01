@@ -41,6 +41,13 @@ const RefFieldTypeSchema = z.object({
   typeName: z.string().min(1),
 });
 
+const SampleDataHintSchema = z.object({
+  category: z.string().min(1).optional(),
+  generator: z.string().min(1).optional(),
+});
+
+export type SampleDataHint = z.infer<typeof SampleDataHintSchema>;
+
 // Recursive discriminated union: `array.element` refers back to `FieldType`.
 // The explicit `z.ZodType<FieldType>` annotation breaks the circularity for
 // TypeScript; the `FieldType` itself is inferred further down.
@@ -85,6 +92,7 @@ export const FieldDefSchema = z.object({
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
   serverDerived: z.boolean().optional(),
+  sampleData: SampleDataHintSchema.optional(),
 });
 
 export type FieldDef = z.infer<typeof FieldDefSchema>;
@@ -104,12 +112,14 @@ const ObjectTypeDefSchema = z.object({
   table: z.boolean().optional(),
   tableName: z.string().min(1).optional(),
   indexes: z.array(IndexDefSchema).optional(),
+  sampleData: SampleDataHintSchema.optional(),
 });
 
 const EnumTypeDefSchema = z.object({
   kind: z.literal('enum'),
   name: z.string().min(1),
   description: z.string().optional(),
+  sampleData: SampleDataHintSchema.optional(),
   values: z.array(
     z.object({
       value: z.string().min(1),
@@ -122,6 +132,7 @@ const DiscriminatedUnionTypeDefSchema = z.object({
   kind: z.literal('discriminatedUnion'),
   name: z.string().min(1),
   description: z.string().optional(),
+  sampleData: SampleDataHintSchema.optional(),
   discriminator: z.string().min(1),
   variants: z.array(z.string().min(1)),
 });
@@ -130,6 +141,7 @@ const RawTypeDefSchema = z.object({
   kind: z.literal('raw'),
   name: z.string().min(1),
   description: z.string().optional(),
+  sampleData: SampleDataHintSchema.optional(),
   zod: z.string().min(1),
   jsonSchema: z.record(z.string(), z.unknown()),
   import: z

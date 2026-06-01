@@ -12,6 +12,8 @@
  * direct edits interleave cleanly with chat-driven ops. Edits fire on
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
+
+import { listFixtureModules } from '@contexture/core/fixture-generators';
 import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
@@ -34,6 +36,7 @@ import {
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Textarea } from '../ui/textarea';
 import { ModelShapeHints } from './ModelShapeHints';
@@ -41,6 +44,7 @@ import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues
 
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
 export const FOCUS_TYPE_NAME_EVENT = 'contexture:focus-type-name';
+const AUTO_SAMPLE_DATA = '__auto__';
 
 function isConvexReservedName(name: string): boolean {
   return name.startsWith('_');
@@ -123,6 +127,7 @@ export function TypeDetail({
       <ModelShapeHints hints={modelingHints} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
+      <SampleDataSection type={type} dispatch={dispatch} />
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
       )}
@@ -138,6 +143,49 @@ export function TypeDetail({
       )}
       {type.kind === 'raw' && <RawBody type={type} dispatch={dispatch} />}
     </div>
+  );
+}
+
+function SampleDataSection({ type, dispatch }: TypeDetailProps) {
+  const modules = listFixtureModules();
+  const category = type.sampleData?.category ?? AUTO_SAMPLE_DATA;
+
+  return (
+    <details className="space-y-2 rounded-md border border-border px-3 py-2">
+      <summary className="cursor-default select-none text-xs font-medium">Sample data</summary>
+      <div className="space-y-2 pt-2">
+        <div className="space-y-1">
+          <Label htmlFor="type-sample-data-category">Category</Label>
+          <Select
+            value={category}
+            onValueChange={(value) => {
+              const nextCategory = value === AUTO_SAMPLE_DATA ? undefined : value;
+              dispatch({
+                kind: 'update_type',
+                name: type.name,
+                patch: typePatch({
+                  sampleData: nextCategory
+                    ? { ...type.sampleData, category: nextCategory }
+                    : undefined,
+                }),
+              });
+            }}
+          >
+            <SelectTrigger id="type-sample-data-category" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
+              {modules.map((module) => (
+                <SelectItem key={module.id} value={module.id}>
+                  {module.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </details>
   );
 }
 

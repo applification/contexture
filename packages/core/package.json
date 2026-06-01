@@ -19,6 +19,7 @@
     "./emit-zod": "./src/emit-zod.ts",
     "./document-bundle": "./src/document-bundle.ts",
     "./file-forward": "./src/file-forward.ts",
+    "./fixture-generators": "./src/fixture-generators.ts",
     "./generated-bundle-writer": "./src/generated-bundle-writer.ts",
     "./generated-targets": "./src/generated-targets.ts",
     "./ir": "./src/ir.ts",

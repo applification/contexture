@@ -10,6 +10,12 @@
  * Every edit dispatches `update_field` through the shared op vocabulary;
  * nothing here mutates the store directly.
  */
+
+import {
+  type FixtureValueType,
+  listFixtureGenerators,
+  listFixtureModules,
+} from '@contexture/core/fixture-generators';
 import type { FieldDef, FieldType, IndexDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
@@ -31,10 +37,20 @@ import {
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
+
+const AUTO_SAMPLE_DATA = '__auto__';
 
 export interface FieldDetailProps {
   typeName: string;
@@ -192,9 +208,80 @@ export function FieldDetail({
         onCreateRefTarget={onCreateRefTarget}
         onCreateAndSelectRefTarget={onCreateAndSelectRefTarget}
       />
+      <FieldSampleDataSection field={field} update={update} />
       <ModelShapeHints hints={modelingHints} />
     </div>
   );
+}
+
+function FieldSampleDataSection({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  const generators = listFixtureGenerators({ valueType: fixtureValueTypeForField(field.type) });
+  const modules = listFixtureModules().filter((module) =>
+    generators.some((generator) => generator.module === module.id),
+  );
+  const selectedGenerator = field.sampleData?.generator ?? AUTO_SAMPLE_DATA;
+
+  return (
+    <details className="space-y-2 rounded-md border border-border px-3 py-2">
+      <summary className="cursor-default select-none text-xs font-medium">Sample data</summary>
+      <div className="space-y-2 pt-2">
+        <div className="space-y-1">
+          <Label htmlFor="field-sample-data-generator">Generator</Label>
+          <Select
+            value={selectedGenerator}
+            onValueChange={(value) => {
+              const generator = value === AUTO_SAMPLE_DATA ? undefined : value;
+              update({
+                sampleData: generator ? { ...field.sampleData, generator } : undefined,
+              });
+            }}
+          >
+            <SelectTrigger id="field-sample-data-generator" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
+              {modules.map((module) => (
+                <SelectGroup key={module.id}>
+                  <SelectLabel>{module.label}</SelectLabel>
+                  {generators
+                    .filter((generator) => generator.module === module.id)
+                    .map((generator) => (
+                      <SelectItem key={generator.id} value={generator.id}>
+                        {generator.label}
+                      </SelectItem>
+                    ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function fixtureValueTypeForField(fieldType: FieldType): FixtureValueType {
+  switch (fieldType.kind) {
+    case 'string':
+    case 'literal':
+    case 'ref':
+      return 'string';
+    case 'number':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'date':
+      return 'date';
+    case 'array':
+      return 'unknown';
+  }
 }
 
 /**

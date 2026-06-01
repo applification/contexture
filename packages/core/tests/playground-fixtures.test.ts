@@ -106,6 +106,16 @@ const pantrySchema: Schema = {
         { name: 'price', type: { kind: 'string' } },
       ],
     },
+    {
+      kind: 'object',
+      name: 'Account',
+      table: true,
+      sampleData: { category: 'person' },
+      fields: [
+        { name: 'name', type: { kind: 'string' } },
+        { name: 'contact', type: { kind: 'string' }, sampleData: { generator: 'internet.email' } },
+      ],
+    },
   ],
 };
 
@@ -186,6 +196,7 @@ describe('generatePlaygroundFixtures', () => {
     const recipe = result.recordsByType.Recipe?.[0];
     const shoppingListItem = result.recordsByType.ShoppingListItem?.[0];
     const product = result.recordsByType.Product?.[0];
+    const account = result.recordsByType.Account?.[0];
 
     expect(result.warnings).toEqual([]);
     expect(household?.value.name).toMatch(/^The .+ Household$/);
@@ -209,5 +220,8 @@ describe('generatePlaygroundFixtures', () => {
     expect(product?.value.name).toEqual(expect.any(String));
     expect(product?.value.description).toEqual(expect.any(String));
     expect(product?.value.price).toEqual(expect.stringMatching(/^\d+\.\d{2}$/));
+    expect(account?.value.name).toEqual(expect.any(String));
+    expect(account?.value.name).not.toMatch(/Household$/);
+    expect(account?.value.contact).toEqual(expect.stringMatching(/@/));
   });
 });

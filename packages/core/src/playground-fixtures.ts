@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { z } from 'zod';
+import { generateFixtureValue } from './fixture-generators';
 import type { Schema } from './ir';
 import {
   buildPlaygroundContract,
@@ -142,30 +143,33 @@ type EntityCategory =
 function createFixtureRandom(seed: string): FixtureRandom {
   faker.seed(hashSeed(seed));
   return {
-    stringUuid: () => faker.string.uuid(),
-    personName: () => faker.person.fullName(),
-    email: () => faker.internet.email().toLowerCase(),
-    url: () => faker.internet.url(),
-    ingredient: () => faker.food.ingredient(),
-    dish: () => faker.food.dish(),
-    fruit: () => faker.food.fruit(),
-    vegetable: () => faker.food.vegetable(),
-    meat: () => faker.food.meat(),
-    product: () => faker.commerce.product(),
-    productName: () => faker.commerce.productName(),
-    productDescription: () => faker.commerce.productDescription(),
-    companyName: () => faker.company.name(),
-    jobTitle: () => faker.person.jobTitle(),
-    city: () => faker.location.city(),
-    country: () => faker.location.country(),
-    streetAddress: () => faker.location.streetAddress(),
-    phoneNumber: () => faker.phone.number(),
-    amount: () => faker.finance.amount({ min: 10, max: 250, dec: 2 }),
-    currencyCode: () => faker.finance.currencyCode(),
-    vehicle: () => faker.vehicle.vehicle(),
-    bookTitle: () => faker.book.title(),
-    musicSong: () => faker.music.songName(),
-    lastName: () => faker.person.lastName(),
+    stringUuid: () => stringFixture('string.uuid', () => faker.string.uuid()),
+    personName: () => stringFixture('person.fullName', () => faker.person.fullName()),
+    email: () => stringFixture('internet.email', () => faker.internet.email()).toLowerCase(),
+    url: () => stringFixture('internet.url', () => faker.internet.url()),
+    ingredient: () => stringFixture('food.ingredient', () => faker.food.ingredient()),
+    dish: () => stringFixture('food.dish', () => faker.food.dish()),
+    fruit: () => stringFixture('food.fruit', () => faker.food.fruit()),
+    vegetable: () => stringFixture('food.vegetable', () => faker.food.vegetable()),
+    meat: () => stringFixture('food.meat', () => faker.food.meat()),
+    product: () => stringFixture('commerce.product', () => faker.commerce.product()),
+    productName: () => stringFixture('commerce.productName', () => faker.commerce.productName()),
+    productDescription: () =>
+      stringFixture('commerce.productDescription', () => faker.commerce.productDescription()),
+    companyName: () => stringFixture('company.name', () => faker.company.name()),
+    jobTitle: () => stringFixture('person.jobTitle', () => faker.person.jobTitle()),
+    city: () => stringFixture('location.city', () => faker.location.city()),
+    country: () => stringFixture('location.country', () => faker.location.country()),
+    streetAddress: () =>
+      stringFixture('location.streetAddress', () => faker.location.streetAddress()),
+    phoneNumber: () => stringFixture('phone.number', () => faker.phone.number()),
+    amount: () =>
+      stringFixture('finance.amount', () => faker.finance.amount({ min: 10, max: 250, dec: 2 })),
+    currencyCode: () => stringFixture('finance.currencyCode', () => faker.finance.currencyCode()),
+    vehicle: () => stringFixture('vehicle.vehicle', () => faker.vehicle.vehicle()),
+    bookTitle: () => stringFixture('book.title', () => faker.book.title()),
+    musicSong: () => stringFixture('music.songName', () => faker.music.songName()),
+    lastName: () => stringFixture('person.lastName', () => faker.person.lastName()),
     words: (options) => faker.lorem.words({ min: options.min, max: options.max }),
     sentence: () => faker.lorem.sentence(),
     number: (options) =>
@@ -182,6 +186,11 @@ function createFixtureRandom(seed: string): FixtureRandom {
   };
 }
 
+function stringFixture(id: string, fallback: () => string): string {
+  const generated = generateFixtureValue(id);
+  return typeof generated === 'string' ? generated : fallback();
+}
+
 function generateEntityValue(ctx: GenerateValueContext): Record<string, unknown> {
   const value: Record<string, unknown> = {};
   for (const control of ctx.entity.fields) {
@@ -195,6 +204,8 @@ function generateEntityValue(ctx: GenerateValueContext): Record<string, unknown>
 
 function generateControlValue(control: PlaygroundControl, ctx: GenerateValueContext): unknown {
   if (control.defaultValue !== undefined) return control.defaultValue;
+  const hintedValue = generateHintedValue(control);
+  if (hintedValue !== undefined) return hintedValue;
 
   switch (control.kind) {
     case 'text':
@@ -242,6 +253,32 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
     }
     case 'unsupported':
       return undefined;
+  }
+}
+
+function generateHintedValue(control: PlaygroundControl): unknown {
+  const generator = control.sampleData?.generator;
+  if (!generator) return undefined;
+  const generated = generateFixtureValue(generator);
+  if (generated === undefined) return undefined;
+  switch (control.kind) {
+    case 'text':
+    case 'ref':
+      return String(generated);
+    case 'number': {
+      const numeric = typeof generated === 'number' ? generated : Number(generated);
+      return Number.isFinite(numeric) ? numeric : undefined;
+    }
+    case 'boolean':
+      return typeof generated === 'boolean' ? generated : undefined;
+    case 'date':
+      return generated instanceof Date ? generated.toISOString().slice(0, 10) : String(generated);
+    case 'literal':
+    case 'enum':
+    case 'array':
+    case 'object':
+    case 'unsupported':
+      return generated;
   }
 }
 
@@ -539,6 +576,9 @@ function tableRefNames(fields: readonly PlaygroundControl[]): string[] {
 }
 
 function inferEntityCategory(entity: PlaygroundEntity): EntityCategory {
+  const hintedCategory = entityCategoryFromFixtureModule(entity.sampleData?.category);
+  if (hintedCategory) return hintedCategory;
+
   const identity = `${entity.typeName} ${entity.tableName}`.toLowerCase();
   const haystack = `${identity} ${entity.description ?? ''}`.toLowerCase();
   const compactIdentity = identity.replace(/[^a-z0-9]/g, '');
@@ -588,6 +628,31 @@ function inferEntityCategory(entity: PlaygroundEntity): EntityCategory {
     return 'commerce';
   }
   return 'generic';
+}
+
+function entityCategoryFromFixtureModule(moduleName: string | undefined): EntityCategory | null {
+  switch (moduleName) {
+    case 'person':
+      return 'person';
+    case 'food':
+      return 'food';
+    case 'commerce':
+      return 'commerce';
+    case 'company':
+      return 'company';
+    case 'finance':
+      return 'finance';
+    case 'location':
+      return 'place';
+    case 'vehicle':
+      return 'vehicle';
+    case 'book':
+      return 'book';
+    case 'music':
+      return 'music';
+    default:
+      return null;
+  }
 }
 
 function entityLooksLikeFoodItem(fieldNames: readonly string[]): boolean {
