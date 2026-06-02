@@ -28,6 +28,7 @@
  */
 
 import type { FieldDef, FieldType, Schema, TypeDef } from '@contexture/core/ir';
+import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import type { Edge, Node } from '@xyflow/react';
 
 type TableTypeDef = Extract<TypeDef, { kind: 'object' }> & { table: true };
@@ -49,6 +50,8 @@ export interface TypeNodeData extends Record<string, unknown> {
   validationIssueCount?: number;
   /** True when the source `ObjectTypeDef` carries `table: true`. */
   table?: boolean;
+  /** True when this imported node represents a bundled stdlib type. */
+  stdlib?: boolean;
   /** Local object nodes can create fields directly from the canvas. */
   canAddFields?: boolean;
 }
@@ -71,6 +74,8 @@ export interface FieldRow {
   refTargetKind?: TypeDef['kind'];
   /** Local enum metadata when this field references an enum TypeDef. */
   enumTarget?: EnumTargetRow;
+  /** Bundled stdlib metadata when this field references `namespace.Type`. */
+  stdlibTarget?: StdlibTargetRow;
   validationIssueCount?: number;
 }
 
@@ -78,6 +83,13 @@ export interface EnumTargetRow {
   name: string;
   description?: string;
   values: ReadonlyArray<EnumValueRow>;
+}
+
+export interface StdlibTargetRow {
+  name: string;
+  description?: string;
+  kind: TypeDef['kind'];
+  values?: ReadonlyArray<EnumValueRow>;
 }
 
 export interface RefEdgeData extends Record<string, unknown> {
@@ -88,6 +100,8 @@ export interface RefEdgeData extends Record<string, unknown> {
   discriminator?: string;
   /** True when the target is an imported (out-of-file) type. */
   crossBoundary: boolean;
+  /** True when the target is a bundled stdlib type. */
+  stdlib?: boolean;
   previewHighlighted?: boolean;
   previewDimmed?: boolean;
 }
@@ -120,19 +134,20 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
   const edges: Edge<RefEdgeData>[] = [];
   const externalNodeIds = new Set<string>();
 
-  const ensureExternalNode = (target: string): boolean => {
+  const ensureExternalNode = (target: string): { crossBoundary: boolean; stdlib: boolean } => {
     const crossBoundary = target.includes('.') || !localNames.has(target);
+    const stdlib = isStdlibRef(target);
     if (crossBoundary && !externalNodeIds.has(target)) {
       externalNodeIds.add(target);
-      nodes.push(externalNodeFor(target, positions?.[target] ?? DEFAULT_POSITION));
+      nodes.push(externalNodeFor(target, positions?.[target] ?? DEFAULT_POSITION, stdlib));
     }
-    return crossBoundary;
+    return { crossBoundary, stdlib };
   };
 
   for (const type of schema.types) {
     if (type.kind === 'discriminatedUnion') {
       for (const variant of type.variants) {
-        const crossBoundary = ensureExternalNode(variant);
+        const { crossBoundary, stdlib } = ensureExternalNode(variant);
         edges.push({
           id: `${type.name}.variant->${variant}`,
           source: type.name,
@@ -144,6 +159,7 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
             targetType: variant,
             discriminator: type.discriminator,
             crossBoundary,
+            stdlib,
           },
         });
       }
@@ -154,7 +170,7 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
     for (const field of type.fields) {
       const target = unwrapRefTarget(field.type);
       if (target) {
-        const crossBoundary = ensureExternalNode(target);
+        const { crossBoundary, stdlib } = ensureExternalNode(target);
 
         edges.push({
           id: `${type.name}.${field.name}->${target}`,
@@ -167,6 +183,7 @@ export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphRe
             sourceField: field.name,
             targetType: target,
             crossBoundary,
+            stdlib,
           },
         });
         continue;
@@ -218,7 +235,11 @@ function localNodeFor(
   };
 }
 
-function externalNodeFor(typeName: string, position: { x: number; y: number }): Node<TypeNodeData> {
+function externalNodeFor(
+  typeName: string,
+  position: { x: number; y: number },
+  stdlib: boolean,
+): Node<TypeNodeData> {
   return {
     id: typeName,
     type: 'type',
@@ -228,6 +249,7 @@ function externalNodeFor(typeName: string, position: { x: number; y: number }): 
       kind: 'object',
       fields: [],
       imported: true,
+      stdlib,
     },
   };
 }
@@ -280,6 +302,7 @@ function fieldRow(field: FieldDef, localTypes: ReadonlyMap<string, TypeDef>): Fi
   const target = unwrapRefTarget(field.type);
   const refTargetType = target ? localTypes.get(target) : undefined;
   const enumTarget = refTargetType?.kind === 'enum' ? refTargetType : undefined;
+  const stdlibTarget = target && !refTargetType ? stdlibTargetRow(target) : undefined;
   return {
     name: field.name,
     summary: summariseFieldType(field.type),
@@ -294,7 +317,30 @@ function fieldRow(field: FieldDef, localTypes: ReadonlyMap<string, TypeDef>): Fi
           values: enumTarget.values.map(enumValueRow),
         }
       : undefined,
+    stdlibTarget,
   };
+}
+
+function stdlibTargetRow(typeName: string): StdlibTargetRow | undefined {
+  if (!isStdlibRef(typeName)) return undefined;
+  const type = STDLIB_TYPE_DEFINITIONS.get(typeName);
+  if (!type) return undefined;
+  return {
+    name: typeName,
+    description: type.description,
+    kind: type.kind,
+    values: type.kind === 'enum' ? type.values.map(enumValueRow) : undefined,
+  };
+}
+
+function isStdlibRef(typeName: string): boolean {
+  const [namespace, name, ...rest] = typeName.split('.');
+  return (
+    rest.length === 0 &&
+    namespace !== undefined &&
+    name !== undefined &&
+    STDLIB_REGISTRY.hasType(namespace, name)
+  );
 }
 
 export function summariseFieldType(t: FieldType): string {

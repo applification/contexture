@@ -127,6 +127,17 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
         </label>
         <label
           className="flex items-center gap-2 text-xs text-foreground"
+          htmlFor="graph-control-show-stdlib"
+        >
+          <Checkbox
+            id="graph-control-show-stdlib"
+            checked={graphLayout.showStdlib}
+            onCheckedChange={(checked) => setGraphLayout({ showStdlib: checked === true })}
+          />
+          Show stdlib nodes
+        </label>
+        <label
+          className="flex items-center gap-2 text-xs text-foreground"
           htmlFor="graph-control-show-edge-labels"
         >
           <Checkbox

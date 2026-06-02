@@ -1,4 +1,6 @@
 import { tmpdir } from 'node:os';
+import { SYSTEM_PROMPT_STDLIB } from '@shared/stdlib-registry';
+import { buildSystemPromptAppend } from '@shared/system-prompt';
 import type { OpToolDescriptor } from '../../ops';
 import { overlayModelOptions } from '../model-registry';
 import type {
@@ -570,6 +572,8 @@ function buildSchemaOnlyInstructions(): string {
     'Do not read files, write files, run shell commands, browse, or mutate a repository.',
     'You may use file contents explicitly attached inside the user message as context.',
     'Treat the current Contexture IR in the user message as authoritative.',
+    '',
+    buildSystemPromptAppend({ stdlibRegistry: SYSTEM_PROMPT_STDLIB }),
   ].join('\n');
 }
 

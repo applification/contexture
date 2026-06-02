@@ -89,6 +89,46 @@ describe('buildGraph', () => {
     });
   });
 
+  it('marks stdlib refs as stdlib shadow nodes and field hover metadata', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'User',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    };
+
+    const { nodes, edges } = buildGraph({ schema });
+    const user = nodes.find((node) => node.id === 'User');
+    const email = nodes.find((node) => node.id === 'common.Email');
+
+    expect(email?.data).toMatchObject({
+      typeName: 'common.Email',
+      imported: true,
+      stdlib: true,
+    });
+    expect(user?.data.fields[0]).toMatchObject({
+      name: 'email',
+      summary: '→ common.Email',
+      refTarget: 'common.Email',
+      stdlibTarget: {
+        name: 'common.Email',
+        description: 'Email address.',
+        kind: 'raw',
+      },
+    });
+    expect(edges[0]).toMatchObject({
+      id: 'User.email->common.Email',
+      data: {
+        crossBoundary: true,
+        stdlib: true,
+      },
+    });
+  });
+
   it('passes local ref target kind into object field rows', () => {
     const schema: Schema = {
       version: '1',

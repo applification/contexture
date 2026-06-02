@@ -472,6 +472,46 @@ describe('TypeNode', () => {
     );
   });
 
+  it('renders stdlib refs as inline affordances with hover details', () => {
+    const data: TypeNodeData = {
+      typeName: 'User',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'email',
+          summary: '→ common.Email',
+          optional: false,
+          nullable: false,
+          refTarget: 'common.Email',
+          stdlibTarget: {
+            name: 'common.Email',
+            description: 'Email address.',
+            kind: 'raw',
+          },
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field-stdlib-affordance')).toHaveTextContent(
+      'common.Email',
+    );
+    expect(screen.getByTestId('type-node-field')).toHaveAccessibleName(
+      'email, common.Email stdlib type',
+    );
+    expect(screen.getByTestId('type-node-field-stdlib-summary')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--chart-2) 65%, var(--reference))',
+      fontWeight: '400',
+      fontFamily: 'var(--font-mono)',
+    });
+
+    fireEvent.focus(screen.getByTestId('type-node-field'));
+
+    expect(screen.getByText('Email address.')).toBeInTheDocument();
+    expect(screen.getByText('Stdlib raw')).toBeInTheDocument();
+  });
+
   it('renders discriminated union refs as relationship refs with a muted suffix', () => {
     const data: TypeNodeData = {
       typeName: 'Artwork',

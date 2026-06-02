@@ -669,6 +669,7 @@ describe('CodexProviderRuntime', () => {
       sandbox: string;
       environments: unknown[];
       config: { web_search?: unknown; tools?: { view_image?: unknown } };
+      developerInstructions: string;
     };
     expect(params.cwd.length).toBeGreaterThan(0);
     expect(params.approvalPolicy).toEqual({
@@ -686,6 +687,12 @@ describe('CodexProviderRuntime', () => {
       web_search: 'disabled',
       tools: { view_image: false },
     });
+    expect(params.developerInstructions).toContain('## Stdlib-first modeling');
+    expect(params.developerInstructions).toContain('common.URL');
+    expect(params.developerInstructions).toContain('common.ISODate');
+    expect(params.developerInstructions).toContain(
+      '{ kind: "ref", typeName: "namespace.Type" }` with the namespace prefix',
+    );
     expect(params.dynamicTools).toEqual([
       expect.objectContaining({ namespace: 'contexture', name: 'add_type' }),
     ]);

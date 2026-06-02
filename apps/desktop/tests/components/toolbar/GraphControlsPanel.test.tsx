@@ -13,17 +13,20 @@ describe('GraphControlsPanel', () => {
     vi.useRealTimers();
   });
 
-  it('toggles expanded enum nodes and edge-label visibility', () => {
+  it('toggles expanded enum nodes, stdlib nodes, and edge-label visibility', () => {
     render(<GraphControlsPanel onClose={vi.fn()} />);
 
     expect(screen.getByRole('checkbox', { name: 'Show enum nodes' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Show stdlib nodes' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Edge labels' })).toBeChecked();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show enum nodes' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show stdlib nodes' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Edge labels' }));
 
     expect(useGraphLayoutStore.getState().graphLayout).toMatchObject({
       showEnums: true,
+      showStdlib: true,
       showEdgeLabels: false,
     });
   });
@@ -33,6 +36,7 @@ describe('GraphControlsPanel', () => {
     useGraphLayoutStore.getState().setGraphLayout({
       layoutMode: 'organic',
       showEnums: false,
+      showStdlib: true,
       showEdgeLabels: false,
       nodeSpacing: 240,
     });
