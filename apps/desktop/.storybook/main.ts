@@ -13,6 +13,7 @@ const config: StorybookConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@renderer': resolve(__dirname, '../src/renderer/src'),
+      '@shared': resolve(__dirname, '../src/shared'),
       '@': resolve(__dirname, '../src/renderer/src'),
     };
     return config;

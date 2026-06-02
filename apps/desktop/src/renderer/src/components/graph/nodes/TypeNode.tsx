@@ -165,7 +165,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     [data.kind, data.table],
   );
   const selectionAccent = useMemo(
-    () => (data.table ? 'var(--graph-node-table-accent)' : headerColorFor(data.kind)),
+    () => (data.table ? 'var(--graph-node-selected)' : headerColorFor(data.kind)),
     [data.kind, data.table],
   );
   const nodeKindLabel = data.table
@@ -201,10 +201,11 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         WebkitBackdropFilter: 'blur(8px)',
         borderWidth,
         borderStyle,
-        borderColor: headerHighlighted ? 'var(--graph-node-selected)' : borderColor,
-        boxShadow: headerHighlighted
-          ? `${baseNodeShadow}, 0 0 0 2px var(--graph-node-selected)`
-          : baseNodeShadow,
+        borderColor:
+          headerHighlighted && !isSelected
+            ? 'color-mix(in oklch, var(--graph-node-selected) 38%, var(--graph-node-border))'
+            : borderColor,
+        boxShadow: baseNodeShadow,
         background:
           isSelected || isPreviewPrimary ? 'var(--graph-node-selected-bg)' : 'transparent',
         outline: isSyncHighlighted
@@ -260,8 +261,13 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           padding: '6px 10px',
           fontSize: 12,
           fontWeight: 600,
-          color: 'var(--graph-node-header-text)',
+          color: data.table
+            ? 'var(--graph-node-table-header-text)'
+            : 'var(--graph-node-header-text)',
           background: headerColor,
+          boxShadow: data.table
+            ? 'inset 0 -1px 0 color-mix(in oklch, var(--border) 75%, transparent)'
+            : undefined,
           letterSpacing: '0.01em',
           display: 'flex',
           alignItems: 'center',
@@ -277,7 +283,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             data-testid="type-node-table-icon"
             size={14}
             strokeWidth={2.2}
-            style={{ flex: '0 0 auto', opacity: 0.92 }}
+            style={{ flex: '0 0 auto', color: 'var(--graph-node-table-accent)' }}
           />
         ) : null}
         <span
@@ -323,7 +329,12 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
           </span>
         )}
         {data.table ? (
-          <NodeKindLabel data-testid="type-node-table-label">table</NodeKindLabel>
+          <NodeKindLabel
+            data-testid="type-node-table-label"
+            style={{ color: 'var(--graph-node-table-accent)', opacity: 1 }}
+          >
+            table
+          </NodeKindLabel>
         ) : (
           <NodeKindLabel>{nodeKindLabel}</NodeKindLabel>
         )}
@@ -540,29 +551,27 @@ function FieldRowButton({
         cursor: 'pointer',
         textAlign: 'left',
         background: selected
-          ? `color-mix(in oklch, ${selectionAccent} 22%, var(--graph-node-body-bg))`
+          ? `color-mix(in oklch, ${selectionAccent} 12%, var(--graph-node-body-bg))`
           : groupSelected
-            ? `color-mix(in oklch, ${selectionAccent} 10%, var(--graph-node-body-bg))`
+            ? `color-mix(in oklch, ${selectionAccent} 5%, var(--graph-node-body-bg))`
             : highlighted
-              ? `color-mix(in oklch, ${selectionAccent} 11%, var(--graph-node-body-bg))`
+              ? `color-mix(in oklch, ${selectionAccent} 6%, var(--graph-node-body-bg))`
               : groupHighlighted
-                ? `color-mix(in oklch, ${selectionAccent} 7%, var(--graph-node-body-bg))`
+                ? `color-mix(in oklch, ${selectionAccent} 3%, var(--graph-node-body-bg))`
                 : searchFocused
                   ? 'var(--graph-node-selected-bg)'
                   : hasValidationIssues
                     ? 'color-mix(in oklch, var(--destructive) 10%, transparent)'
                     : undefined,
         boxShadow: selected
-          ? `inset 4px 0 0 ${selectionAccent}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
-          : groupSelected
-            ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 76%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
-            : highlighted
-              ? `inset 3px 0 0 color-mix(in oklch, ${selectionAccent} 68%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
-              : searchFocused
-                ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
-                : hasValidationIssues
-                  ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
-                  : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
+          ? `inset 2px 0 0 ${selectionAccent}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
+          : groupSelected || highlighted
+            ? 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+            : searchFocused
+              ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+              : hasValidationIssues
+                ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
       }}
     >
       <span
@@ -603,7 +612,7 @@ function FieldRowButton({
                   : field.enumTarget
                     ? 'var(--muted-foreground)'
                     : field.refTarget
-                      ? 'var(--graph-edge-property)'
+                      ? 'var(--graph-edge-ref)'
                       : 'var(--muted-foreground)',
           fontFamily: field.enumTarget
             ? 'var(--font-mono)'

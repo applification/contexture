@@ -30,6 +30,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type React from 'react';
+import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import type { Op } from '../../store/ops';
 import { Badge } from '../ui/badge';
@@ -114,10 +115,14 @@ export function FieldDetail({
     <div className="flex h-full min-h-0 flex-col" data-testid="field-detail">
       <header
         className="flex min-h-20 shrink-0 items-start justify-between gap-3 border-b bg-muted/20 px-3 py-3"
+        style={inspectorHeaderStyle(fieldKindColor(field.type))}
         data-testid="field-detail-header"
       >
         <div className="min-w-0 space-y-2">
-          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div
+            className="truncate text-[11px] font-medium uppercase tracking-wide"
+            style={{ color: fieldKindColor(field.type) }}
+          >
             {parentKindLabel} / {typeName}
           </div>
           <div className="flex min-w-0 items-center gap-2">
@@ -139,7 +144,11 @@ export function FieldDetail({
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+            <Badge
+              variant="outline"
+              className="h-5 rounded-md px-1.5 text-[11px]"
+              style={toneSurfaceStyle(fieldKindColor(field.type), 14, 50)}
+            >
               {fieldTypeSummary(field.type)}
             </Badge>
             <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[11px]">
@@ -156,7 +165,11 @@ export function FieldDetail({
               </Badge>
             )}
             {primaryIndex && (
-              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+              <Badge
+                variant="outline"
+                className="h-5 rounded-md px-1.5 text-[11px]"
+                style={toneSurfaceStyle('var(--inspector-index)', 14, 50)}
+              >
                 indexed
               </Badge>
             )}
@@ -1276,6 +1289,41 @@ function parseDefaultInput(value: string, fieldType: FieldType): unknown {
     case 'ref':
       return value;
   }
+}
+
+function fieldKindColor(fieldType: FieldType): string {
+  switch (fieldType.kind) {
+    case 'string':
+      return 'var(--inspector-field-string)';
+    case 'number':
+      return 'var(--inspector-field-number)';
+    case 'boolean':
+      return 'var(--inspector-field-boolean)';
+    case 'date':
+      return 'var(--inspector-field-date)';
+    case 'literal':
+      return 'var(--inspector-field-literal)';
+    case 'ref':
+      return 'var(--inspector-field-ref)';
+    case 'array':
+      return 'var(--inspector-field-array)';
+  }
+}
+
+function inspectorHeaderStyle(color: string): CSSProperties {
+  return {
+    background: 'var(--background)',
+    borderColor: `color-mix(in oklch, ${color} 34%, var(--border))`,
+    boxShadow: `inset 0 -2px 0 color-mix(in oklch, ${color} 24%, transparent)`,
+  };
+}
+
+function toneSurfaceStyle(color: string, background = 12, border = 44): CSSProperties {
+  return {
+    background: `color-mix(in oklch, ${color} ${background}%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} ${border}%, var(--border))`,
+    color: `color-mix(in oklch, ${color} 78%, var(--foreground))`,
+  };
 }
 
 function nextFieldIndexName(indexes: readonly IndexDef[], fieldName: string): string {

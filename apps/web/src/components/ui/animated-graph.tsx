@@ -65,7 +65,7 @@ export function AnimatedGraph() {
 
       const nodes = nodesRef.current;
       const primary = style.getPropertyValue('--primary').trim();
-      const accent = style.getPropertyValue('--accent').trim();
+      const reference = style.getPropertyValue('--reference').trim();
 
       if (advance) {
         for (const node of nodes) {
@@ -89,7 +89,7 @@ export function AnimatedGraph() {
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? accent : primary;
+            ctx.strokeStyle = nodes[i].isAccent || nodes[j].isAccent ? reference : primary;
             ctx.lineWidth = 1.5;
             ctx.stroke();
           }
@@ -97,7 +97,7 @@ export function AnimatedGraph() {
       }
 
       for (const node of nodes) {
-        const color = node.isAccent ? accent : primary;
+        const color = node.isAccent ? reference : primary;
 
         ctx.globalAlpha = 0.15;
         ctx.beginPath();

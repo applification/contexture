@@ -31,7 +31,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
@@ -127,10 +127,14 @@ export function TypeDetail({
     <div className="space-y-4 p-3 pt-0">
       <header
         className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        style={inspectorHeaderStyle(inspectorTypeColor(type))}
         data-testid="type-detail-header"
       >
         <div className="min-w-0">
-          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div
+            className="truncate text-[11px] font-medium uppercase tracking-wide"
+            style={{ color: inspectorTypeColor(type) }}
+          >
             {isTable ? 'table' : type.kind}
           </div>
           <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
@@ -220,10 +224,14 @@ function TableTypeDetail({
     <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
       <header
         className="flex min-h-20 shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        style={inspectorHeaderStyle('var(--inspector-type-table)')}
         data-testid="type-detail-header"
       >
         <div className="min-w-0">
-          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div
+            className="truncate text-[11px] font-medium uppercase tracking-wide"
+            style={{ color: 'var(--inspector-type-table)' }}
+          >
             table
           </div>
           <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
@@ -234,14 +242,14 @@ function TableTypeDetail({
               <ButtonGroup aria-label="Table inspector mode">
                 <TabsTrigger
                   value="shape"
-                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
                 >
                   <SlidersHorizontal aria-hidden="true" className="size-3.5" />
                   Shape
                 </TabsTrigger>
                 <TabsTrigger
                   value="try"
-                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
                 >
                   <Play aria-hidden="true" className="size-3.5" />
                   Try
@@ -419,7 +427,8 @@ function TableModelingAdvisoryStrip({ hints }: { hints: readonly ModelingHint[] 
   return (
     <section
       aria-label="Model shape"
-      className="rounded-md border border-border/70 bg-muted/15 px-3 py-2 text-xs"
+      className="rounded-md border px-3 py-2 text-xs"
+      style={toneSurfaceStyle('var(--inspector-advisory)', 16, 58)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
@@ -627,8 +636,8 @@ function ObjectBody({
                     }
                   />
                 </TableCell>
-                <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
-                  {summariseKind(f.type.kind)}
+                <TableCell className="px-2 py-1.5 text-right">
+                  <FieldKindPill fieldType={f.type} />
                 </TableCell>
                 {showAdviceColumn && (
                   <TableCell className="w-14 px-1 py-1.5 text-center">
@@ -736,11 +745,12 @@ function FieldAdvicePopover({
           variant="ghost"
           size="icon"
           aria-label={`Modeling advice for ${fieldName}`}
-          className="relative h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary"
+          className="relative h-7 w-7 border border-transparent text-muted-foreground hover:text-primary data-[state=open]:text-primary"
+          style={toneSurfaceStyle('var(--inspector-advisory)', 12, 0)}
         >
           <LightbulbIcon />
           {secondary.length > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground">
+            <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent px-1 text-[9px] leading-none text-accent-foreground">
               {hints.length}
             </span>
           )}
@@ -792,10 +802,11 @@ function FieldIndexPopover({
           size="icon"
           aria-label={triggerLabel}
           className={cn(
-            'h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary',
+            'h-7 w-7 border border-transparent text-muted-foreground hover:text-primary data-[state=open]:text-primary',
             !isIndexed &&
               'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
           )}
+          style={isIndexed ? toneSurfaceStyle('var(--inspector-index)', 14, 0) : undefined}
         >
           {isIndexed ? (
             <Hash aria-hidden="true" className="size-3.5" />
@@ -811,7 +822,11 @@ function FieldIndexPopover({
               <div className="font-medium text-foreground">Indexed field</div>
               <div className="space-y-1.5">
                 {insight.memberships.map((membership) => (
-                  <div key={membership.indexName} className="rounded-md border px-2 py-1.5">
+                  <div
+                    key={membership.indexName}
+                    className="rounded-md border px-2 py-1.5"
+                    style={toneSurfaceStyle('var(--inspector-index)', 14, 50)}
+                  >
                     <div className="font-mono text-[11px] text-foreground">
                       {membership.indexName}
                     </div>
@@ -949,8 +964,11 @@ function ConvexSection({
             <p className="text-xs text-muted-foreground">Add a field before creating an index.</p>
           )}
           {suggestions.length > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-2 py-1.5">
-              <p className="min-w-0 text-[11px] text-muted-foreground">
+            <div
+              className="flex items-center justify-between gap-3 rounded-md border px-2 py-1.5"
+              style={toneSurfaceStyle('var(--inspector-index)', 16, 56)}
+            >
+              <p className="min-w-0 text-[11px] font-medium text-foreground">
                 {suggestions.length}{' '}
                 {suggestions.length === 1 ? 'suggested index' : 'suggested indexes'}
               </p>
@@ -1030,6 +1048,7 @@ function SuggestedIndexesPopover({
               <div
                 key={suggestion.name}
                 className="flex items-start justify-between gap-3 rounded-md border px-2 py-1.5"
+                style={toneSurfaceStyle('var(--inspector-index)', 10, 38)}
               >
                 <div className="min-w-0">
                   <div className="truncate font-mono text-[11px] text-foreground">
@@ -1112,6 +1131,7 @@ function IndexRow({
     <TableRow
       data-testid="convex-index-row"
       data-validation-issues={hasValidationIssues || undefined}
+      className={hasValidationIssues ? 'bg-destructive/10' : undefined}
     >
       <TableCell className="w-32 px-2 py-1.5 align-top">
         <Input
@@ -1202,11 +1222,17 @@ function IndexFieldChip({
   const onlyField = total === 1;
 
   return (
-    <span className="inline-flex min-h-7 max-w-full items-center gap-1 rounded-md border border-primary/35 bg-primary/10 px-1.5 text-xs text-foreground">
+    <span
+      className="inline-flex min-h-7 max-w-full items-center gap-1 rounded-md border px-1.5 text-xs text-foreground"
+      style={toneSurfaceStyle('var(--inspector-index)', 14, 48)}
+    >
       <span className="sr-only">
         {fieldName}, field {displayPosition} of {total} in index {indexName}
       </span>
-      <span className="rounded bg-primary/15 px-1 font-mono text-[10px] text-primary">
+      <span
+        className="rounded px-1 font-mono text-[10px]"
+        style={toneSurfaceStyle('var(--inspector-index)', 24, 0)}
+      >
         {displayPosition}
       </span>
       <span className="max-w-32 truncate font-medium">{fieldName}</span>
@@ -1835,6 +1861,67 @@ function discriminatorLiteralValue(typeName: string): string {
     .replace(/[^A-Za-z0-9]+/gu, '-')
     .replace(/^-+|-+$/gu, '')
     .toLowerCase();
+}
+
+function FieldKindPill({ fieldType }: { fieldType: FieldType }): React.JSX.Element {
+  const color = fieldKindColor(fieldType);
+  return (
+    <span
+      className="inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium leading-none"
+      style={toneSurfaceStyle(color, 13, 46)}
+    >
+      {summariseKind(fieldType.kind)}
+    </span>
+  );
+}
+
+function inspectorTypeColor(type: TypeDef): string {
+  if (type.kind === 'object' && type.table === true) return 'var(--inspector-type-table)';
+  switch (type.kind) {
+    case 'object':
+      return 'var(--inspector-type-object)';
+    case 'enum':
+      return 'var(--inspector-type-enum)';
+    case 'discriminatedUnion':
+      return 'var(--inspector-type-union)';
+    case 'raw':
+      return 'var(--inspector-type-raw)';
+  }
+}
+
+function fieldKindColor(fieldType: FieldType): string {
+  switch (fieldType.kind) {
+    case 'string':
+      return 'var(--inspector-field-string)';
+    case 'number':
+      return 'var(--inspector-field-number)';
+    case 'boolean':
+      return 'var(--inspector-field-boolean)';
+    case 'date':
+      return 'var(--inspector-field-date)';
+    case 'literal':
+      return 'var(--inspector-field-literal)';
+    case 'ref':
+      return 'var(--inspector-field-ref)';
+    case 'array':
+      return 'var(--inspector-field-array)';
+  }
+}
+
+function inspectorHeaderStyle(color: string): CSSProperties {
+  return {
+    background: 'var(--background)',
+    borderColor: `color-mix(in oklch, ${color} 34%, var(--border))`,
+    boxShadow: `inset 0 -2px 0 color-mix(in oklch, ${color} 24%, transparent)`,
+  };
+}
+
+function toneSurfaceStyle(color: string, background = 12, border = 44): CSSProperties {
+  return {
+    background: `color-mix(in oklch, ${color} ${background}%, transparent)`,
+    borderColor: `color-mix(in oklch, ${color} ${border}%, var(--border))`,
+    color: `color-mix(in oklch, ${color} 78%, var(--foreground))`,
+  };
 }
 
 function summariseKind(k: string): string {
