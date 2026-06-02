@@ -9,7 +9,7 @@ import { ChatPanel } from '@renderer/components/chat/ChatPanel';
 import { useAgentTurnsStore } from '@renderer/store/agent-turns';
 import { useDocumentStore } from '@renderer/store/document';
 import { useUndoStore } from '@renderer/store/undo';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function makeChat(overrides: Partial<SchemaAgentChatState> = {}): SchemaAgentChatState {
@@ -184,6 +184,38 @@ describe('ChatPanel', () => {
       ),
     );
     expect(screen.queryByText('Undo turn')).not.toBeInTheDocument();
+  });
+
+  it('docks the latest agent turn summary with the composer instead of the transcript', () => {
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    useAgentTurnsStore.getState().begin({
+      before: { version: '1', types: [] },
+      userMessage: 'add a Plot type',
+      provider: 'codex',
+      model: 'gpt-5.4',
+    });
+    useAgentTurnsStore.getState().recordToolResult({
+      id: '1',
+      op: { kind: 'add_type', type: { kind: 'object', name: 'Plot', fields: [] } },
+      result: { schema: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] } },
+    });
+    useAgentTurnsStore.getState().finish({
+      status: 'committed',
+      after: { version: '1', types: [{ kind: 'object', name: 'Plot', fields: [] }] },
+    });
+
+    render(<ChatPanel chat={makeChat()} />);
+
+    const composer = within(screen.getByTestId('chat-composer'));
+    expect(composer.getByTestId('agent-turn-summary')).toHaveTextContent(
+      'Agent applied 1 model change',
+    );
+    expect(
+      within(screen.getByTestId('chat-transcript')).queryByTestId('agent-turn-summary'),
+    ).not.toBeInTheDocument();
   });
 
   it('hides legacy inline tool-call messages from the transcript', () => {
