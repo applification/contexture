@@ -21,7 +21,8 @@ import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { ValidationError } from '@renderer/services/validation';
 import { STDLIB_TYPE_OPTIONS, type StdlibTypeOption } from '@shared/stdlib-registry';
-import { ChevronsUpDown, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronsUpDown, Trash2 } from 'lucide-react';
+import type React from 'react';
 import { useState } from 'react';
 import type { Op } from '../../store/ops';
 import { Button } from '../ui/button';
@@ -55,6 +56,7 @@ export interface FieldDetailProps {
   tableIndexes?: readonly IndexDef[];
   onCreateRefTarget?: () => string | undefined;
   onCreateAndSelectRefTarget?: (selectTarget: (typeName: string) => void) => void;
+  onBackToType?: () => void;
 }
 
 export function FieldDetail({
@@ -68,6 +70,7 @@ export function FieldDetail({
   tableIndexes,
   onCreateRefTarget,
   onCreateAndSelectRefTarget,
+  onBackToType,
 }: FieldDetailProps) {
   const update = (patch: Partial<FieldDef>) =>
     dispatch({ kind: 'update_field', typeName, fieldName: field.name, patch });
@@ -85,124 +88,171 @@ export function FieldDetail({
   };
 
   return (
-    <div className="space-y-4 p-3 pt-0" data-testid="field-detail">
+    <div className="flex h-full min-h-0 flex-col" data-testid="field-detail">
       <header
-        className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        className="flex min-h-20 shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-3"
         data-testid="field-detail-header"
       >
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-1">
           <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {parentKindLabel}
           </div>
           <div className="truncate text-lg font-semibold leading-tight text-foreground">
             {typeName}
           </div>
-          <h2 className="truncate text-sm font-medium leading-snug text-muted-foreground">
-            {field.name}
-          </h2>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete field ${field.name}`}
-            onClick={() => dispatch({ kind: 'remove_field', typeName, fieldName: field.name })}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          <div className="flex min-w-0 items-center gap-2">
+            {onBackToType && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onBackToType}
+                className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                aria-label="Back to table fields"
+              >
+                <ArrowLeft aria-hidden="true" className="size-3.5" />
+                Fields
+              </Button>
+            )}
+            <h2 className="truncate text-sm font-medium leading-snug text-muted-foreground">
+              {field.name}
+            </h2>
+          </div>
         </div>
       </header>
 
-      <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-4">
+          <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
 
-      <div className="space-y-1">
-        <Label htmlFor="field-name">Name</Label>
-        <Input
-          id="field-name"
-          defaultValue={field.name}
-          onBlur={(ev) => {
-            const next = ev.target.value.trim();
-            if (next && next !== field.name) update({ name: next });
-          }}
-        />
-      </div>
+          <FieldSection title="Basics">
+            <div className="space-y-1">
+              <Label htmlFor="field-name">Name</Label>
+              <Input
+                id="field-name"
+                defaultValue={field.name}
+                onBlur={(ev) => {
+                  const next = ev.target.value.trim();
+                  if (next && next !== field.name) update({ name: next });
+                }}
+              />
+            </div>
+            <FieldTypeBody
+              sourceType={typeName}
+              sourceField={field.name}
+              fieldType={field.type}
+              onChange={(nextType) => update({ type: nextType })}
+              availableTypeNames={availableTypeNames}
+              onCreateRefTarget={onCreateRefTarget}
+              onCreateAndSelectRefTarget={onCreateAndSelectRefTarget}
+            />
+            <div className="grid gap-2 sm:grid-cols-3">
+              <CheckboxOption
+                id="field-optional"
+                label="Optional"
+                description="May be omitted"
+                checked={field.optional === true}
+                onCheckedChange={(v) => update({ optional: v === true })}
+              />
+              <CheckboxOption
+                id="field-nullable"
+                label="Nullable"
+                description="Allows null"
+                checked={field.nullable === true}
+                onCheckedChange={(v) => update({ nullable: v === true })}
+              />
+              <CheckboxOption
+                id="field-server-derived"
+                label="Server derived"
+                description="Computed by backend"
+                checked={field.serverDerived === true}
+                onCheckedChange={(v) => update({ serverDerived: v === true ? true : undefined })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="field-description">Description</Label>
+              <Textarea
+                id="field-description"
+                defaultValue={field.description ?? ''}
+                rows={2}
+                onBlur={(ev) => {
+                  const next = ev.target.value;
+                  if (next !== (field.description ?? '')) {
+                    update({ description: next || undefined });
+                  }
+                }}
+              />
+            </div>
+          </FieldSection>
 
-      <div className="space-y-1">
-        <Label htmlFor="field-default">Default value</Label>
-        <Input
-          id="field-default"
-          defaultValue={defaultInputValue(field.default)}
-          onBlur={(ev) => {
-            const next = parseDefaultInput(ev.target.value, field.type);
-            if (!Object.is(next, field.default)) update({ default: next });
-          }}
-        />
-      </div>
+          <FieldSection title="Behavior">
+            <div className="space-y-1">
+              <Label htmlFor="field-default">Default value</Label>
+              <Input
+                id="field-default"
+                defaultValue={defaultInputValue(field.default)}
+                onBlur={(ev) => {
+                  const next = parseDefaultInput(ev.target.value, field.type);
+                  if (!Object.is(next, field.default)) update({ default: next });
+                }}
+              />
+            </div>
+          </FieldSection>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <CheckboxOption
-          id="field-optional"
-          label="Optional"
-          description="May be omitted"
-          checked={field.optional === true}
-          onCheckedChange={(v) => update({ optional: v === true })}
-        />
-        <CheckboxOption
-          id="field-nullable"
-          label="Nullable"
-          description="Allows null"
-          checked={field.nullable === true}
-          onCheckedChange={(v) => update({ nullable: v === true })}
-        />
-        <CheckboxOption
-          id="field-server-derived"
-          label="Server derived"
-          description="Computed by backend"
-          checked={field.serverDerived === true}
-          onCheckedChange={(v) => update({ serverDerived: v === true ? true : undefined })}
-        />
-      </div>
+          <FieldSection title="Output & generation">
+            {tableIndexes && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-xs">
+                <span className="font-medium">Index</span>
+                {hasSingleFieldIndex ? (
+                  <span className="text-muted-foreground">Indexed</span>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7"
+                    onClick={addIndex}
+                  >
+                    Add index
+                  </Button>
+                )}
+              </div>
+            )}
+            <FieldSampleDataSection field={field} update={update} />
+            <ModelShapeHints hints={modelingHints} />
+          </FieldSection>
 
-      {tableIndexes && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-xs">
-          <span className="font-medium">Index</span>
-          {hasSingleFieldIndex ? (
-            <span className="text-muted-foreground">Indexed</span>
-          ) : (
-            <Button type="button" variant="outline" size="sm" className="h-7" onClick={addIndex}>
-              Add index
-            </Button>
-          )}
+          <FieldSection title="Danger zone">
+            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/25 px-3 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="font-medium text-foreground">Delete field</div>
+                <p className="mt-0.5 text-muted-foreground">Remove this field from {typeName}.</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={`Delete field ${field.name}`}
+                onClick={() => dispatch({ kind: 'remove_field', typeName, fieldName: field.name })}
+                className="h-7 shrink-0 px-2 text-xs text-destructive hover:text-destructive"
+              >
+                <Trash2 aria-hidden="true" />
+                Delete
+              </Button>
+            </div>
+          </FieldSection>
         </div>
-      )}
-
-      <div className="space-y-1">
-        <Label htmlFor="field-description">Description</Label>
-        <Textarea
-          id="field-description"
-          defaultValue={field.description ?? ''}
-          rows={2}
-          onBlur={(ev) => {
-            const next = ev.target.value;
-            if (next !== (field.description ?? '')) update({ description: next || undefined });
-          }}
-        />
       </div>
-
-      <FieldTypeBody
-        sourceType={typeName}
-        sourceField={field.name}
-        fieldType={field.type}
-        onChange={(nextType) => update({ type: nextType })}
-        availableTypeNames={availableTypeNames}
-        onCreateRefTarget={onCreateRefTarget}
-        onCreateAndSelectRefTarget={onCreateAndSelectRefTarget}
-      />
-      <FieldSampleDataSection field={field} update={update} />
-      <ModelShapeHints hints={modelingHints} />
     </div>
+  );
+}
+
+function FieldSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2" aria-label={title}>
+      <h3 className="text-xs font-semibold text-foreground">{title}</h3>
+      <div className="space-y-3">{children}</div>
+    </section>
   );
 }
 

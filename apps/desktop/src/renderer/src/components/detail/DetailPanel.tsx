@@ -137,6 +137,11 @@ export function DetailPanel({
         onCreateAndSelectRefTarget={(selectTarget) =>
           createReferencedObjectTypeAndSelect(field.name, selectTarget)
         }
+        onBackToType={() => {
+          onClearSelectedField?.();
+          useGraphSelectionStore.getState().selectField(null);
+          useGraphSelectionStore.getState().focus(type.name);
+        }}
         validationErrors={validationErrorsForField(validationErrors, typeIndex, fieldIndex)}
         validationRepairForIssue={repairForIssue}
         availableTypeNames={schema.types

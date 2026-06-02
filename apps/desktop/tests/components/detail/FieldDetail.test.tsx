@@ -18,6 +18,7 @@ function setup(
   availableTypeNames: readonly string[] = [],
   onCreateRefTarget?: () => string | undefined,
   tableIndexes?: readonly IndexDef[],
+  onBackToType?: () => void,
 ) {
   const dispatch = vi.fn<(op: Op) => void>();
   render(
@@ -29,6 +30,7 @@ function setup(
       availableTypeNames={availableTypeNames}
       onCreateRefTarget={onCreateRefTarget}
       tableIndexes={tableIndexes}
+      onBackToType={onBackToType}
     />,
   );
   return { dispatch };
@@ -44,16 +46,37 @@ describe('FieldDetail', () => {
   afterEach(cleanup);
 
   it('renders the selected field title as a panel header', () => {
-    setup({ name: 'showPrice', type: { kind: 'boolean' } });
+    setup({ name: 'showPrice', type: { kind: 'boolean' } }, [], [], undefined, undefined, vi.fn());
 
     const header = screen.getByTestId('field-detail-header');
     expect(header).toContainElement(screen.getByRole('heading', { name: 'showPrice' }));
     expect(header).toHaveTextContent('Plot');
     expect(header).toHaveTextContent('object');
+    expect(screen.getByRole('button', { name: 'Back to table fields' })).toHaveTextContent(
+      'Fields',
+    );
     expect(screen.getByText('Plot')).toHaveClass('text-lg');
     expect(screen.getByRole('heading', { name: 'showPrice' })).toHaveClass('text-sm');
     expect(header).toHaveClass('border-b');
     expect(header).toHaveClass('bg-muted/20');
+    expect(screen.getByRole('region', { name: 'Basics' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Behavior' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Output & generation' })).toBeInTheDocument();
+  });
+
+  it('calls the back handler from the field sub-view header', () => {
+    const onBackToType = vi.fn();
+    setup(
+      { name: 'showPrice', type: { kind: 'boolean' } },
+      [],
+      [],
+      undefined,
+      undefined,
+      onBackToType,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to table fields' }));
+    expect(onBackToType).toHaveBeenCalledOnce();
   });
 
   it('string: min/max/regex/format controls; blur dispatches update_field', () => {

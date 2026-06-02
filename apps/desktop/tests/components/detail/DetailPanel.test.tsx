@@ -116,6 +116,25 @@ describe('DetailPanel', () => {
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
   });
 
+  it('returns from field detail to the selected type when Back to table fields is clicked', () => {
+    seed(plotSchema);
+    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'name' });
+    const onClearSelectedField = vi.fn();
+
+    render(
+      <DetailPanel
+        selection={{ typeName: 'Plot', fieldName: 'name' }}
+        onClearSelectedField={onClearSelectedField}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back to table fields' }));
+
+    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
+    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Plot' });
+    expect(onClearSelectedField).toHaveBeenCalledOnce();
+  });
+
   it('derives model shape guidance for the selected type from the schema', () => {
     seed(artworkSchema);
     render(<DetailPanel selection={{ typeName: 'ArtworkMedia' }} />);
