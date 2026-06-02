@@ -20,8 +20,17 @@ import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
 import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
-import { ChevronDown, ChevronUp, Play, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  Play,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
@@ -45,7 +54,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
-import { ModelShapeHints } from './ModelShapeHints';
+import { HintBody, ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
 
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
@@ -194,6 +203,14 @@ function TableTypeDetail({
   reserved: boolean;
 }) {
   const defaultMode = recordsCount > 0 ? 'try' : 'shape';
+  const { tableHints, fieldHintsByName } = useMemo(
+    () => splitTableModelingHints(modelingHints),
+    [modelingHints],
+  );
+  const fieldHintCount = Array.from(fieldHintsByName.values()).reduce(
+    (sum, hints) => sum + hints.length,
+    0,
+  );
 
   return (
     <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
@@ -250,8 +267,14 @@ function TableTypeDetail({
           />
           <NameField type={type} dispatch={dispatch} reserved={reserved} />
           <DescriptionField type={type} dispatch={dispatch} />
-          <ModelShapeHints hints={modelingHints} />
-          <ObjectBody type={type} dispatch={dispatch} quietControls />
+          <TableModelingAdvisoryStrip hints={tableHints} />
+          <ObjectBody
+            type={type}
+            dispatch={dispatch}
+            quietControls
+            fieldHintsByName={fieldHintsByName}
+            fieldHintCount={fieldHintCount}
+          />
           <Collapsible
             defaultOpen
             className="rounded-md border border-border/70 data-[state=open]:bg-muted/20"
@@ -353,6 +376,51 @@ function SampleDataSection({
   );
 }
 
+function splitTableModelingHints(hints: readonly ModelingHint[]): {
+  tableHints: ModelingHint[];
+  fieldHintsByName: Map<string, ModelingHint[]>;
+} {
+  const tableHints: ModelingHint[] = [];
+  const fieldHintsByName = new Map<string, ModelingHint[]>();
+
+  for (const hint of hints) {
+    if (!hint.fieldName) {
+      tableHints.push(hint);
+      continue;
+    }
+    const existing = fieldHintsByName.get(hint.fieldName) ?? [];
+    existing.push(hint);
+    fieldHintsByName.set(hint.fieldName, existing);
+  }
+
+  return { tableHints, fieldHintsByName };
+}
+
+function TableModelingAdvisoryStrip({ hints }: { hints: readonly ModelingHint[] }) {
+  if (hints.length === 0) return null;
+  const [primary, ...secondary] = hints;
+  if (!primary) return null;
+
+  return (
+    <section
+      aria-label="Model shape"
+      className="rounded-md border border-border/70 bg-muted/15 px-3 py-2 text-xs"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="font-medium text-foreground">{primary.title}</div>
+          <p className="text-muted-foreground">{primary.message}</p>
+        </div>
+        {secondary.length > 0 && (
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            +{secondary.length} more
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function NameField({ type, dispatch, reserved }: TypeDetailProps & { reserved: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -413,10 +481,14 @@ function ObjectBody({
   type,
   dispatch,
   quietControls = false,
+  fieldHintsByName,
+  fieldHintCount = 0,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
   quietControls?: boolean;
+  fieldHintsByName?: ReadonlyMap<string, readonly ModelingHint[]>;
+  fieldHintCount?: number;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
   const addField = () => {
@@ -460,10 +532,18 @@ function ObjectBody({
     );
   }
   const isTable = type.table === true;
+  const showAdviceColumn = Boolean(fieldHintsByName && fieldHintsByName.size > 0);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <Label>Fields</Label>
+        <div className="flex items-center gap-2">
+          <Label>Fields</Label>
+          {fieldHintCount > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              {fieldHintCount} {fieldHintCount === 1 ? 'advisory' : 'advisories'}
+            </span>
+          )}
+        </div>
         <Button type="button" variant="ghost" size="sm" onClick={addField} className="h-7 text-xs">
           <Plus aria-hidden="true" />
           Add field
@@ -475,6 +555,11 @@ function ObjectBody({
             <TableHead className="h-7 px-2">Name</TableHead>
             <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
             <TableHead className="h-7 px-2 text-right">Type</TableHead>
+            {showAdviceColumn && (
+              <TableHead className="h-7 w-14 px-1 text-center">
+                <span className="sr-only">Advice</span>
+              </TableHead>
+            )}
             <TableHead className="h-7 w-28 px-1 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -483,6 +568,7 @@ function ObjectBody({
         <TableBody>
           {type.fields.map((f, fieldIndex) => {
             const reserved = isTable && isConvexReservedName(f.name);
+            const fieldHints = fieldHintsByName?.get(f.name) ?? [];
             return (
               <TableRow
                 key={f.name}
@@ -526,6 +612,11 @@ function ObjectBody({
                 <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
                   {summariseKind(f.type.kind)}
                 </TableCell>
+                {showAdviceColumn && (
+                  <TableCell className="w-14 px-1 py-1.5 text-center">
+                    <FieldAdvicePopover fieldName={f.name} hints={fieldHints} />
+                  </TableCell>
+                )}
                 <TableCell className="w-28 px-1 py-1.5 text-right">
                   <div
                     className={cn(
@@ -595,6 +686,56 @@ function ObjectBody({
       </Table>
     </div>
   );
+}
+
+function FieldAdvicePopover({
+  fieldName,
+  hints,
+}: {
+  fieldName: string;
+  hints: readonly ModelingHint[];
+}) {
+  if (hints.length === 0) return <span aria-hidden="true" className="inline-block h-7 w-7" />;
+
+  const [primary, ...secondary] = hints;
+  if (!primary) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Modeling advice for ${fieldName}`}
+          className="relative h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary"
+        >
+          <LightbulbIcon />
+          {secondary.length > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground">
+              {hints.length}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="left" className="w-80 p-3 text-xs">
+        <div className="space-y-3">
+          <HintBody hint={primary} />
+          {secondary.length > 0 && (
+            <div className="space-y-2 border-t border-border/70 pt-2">
+              {secondary.map((hint) => (
+                <HintBody key={hint.id} hint={hint} compact />
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LightbulbIcon(): React.JSX.Element {
+  return <Lightbulb aria-hidden="true" className="size-3.5" />;
 }
 
 // TODO(#119): gate on output config mode once Contexture supports multiple emit targets.

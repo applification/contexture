@@ -294,6 +294,29 @@ describe('TypeDetail', () => {
       expect(screen.getByRole('button', { name: /add index/i })).toBeInTheDocument();
     });
 
+    it('shows field-level modeling advice from the field row popover', () => {
+      setup({ ...base, table: true }, [
+        {
+          id: 'v1:query_handle:Post:title',
+          kind: 'query_handle',
+          signals: ['query_pressure'],
+          path: 'types.0.fields.1',
+          typeName: 'Post',
+          fieldName: 'title',
+          title: 'Query handle',
+          message: 'This field looks useful for filtering, sorting, indexing, or search.',
+          rationale: 'A top-level query handle can preserve common queries.',
+          fieldNames: ['title'],
+        },
+      ]);
+
+      expect(screen.getByText('1 advisory')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Modeling advice for title' }));
+
+      expect(screen.getByText('Query handle')).toBeInTheDocument();
+      expect(screen.getByText(/useful for filtering/i)).toBeInTheDocument();
+    });
+
     it('shows and edits the emitted Convex table name when table:true', () => {
       const { dispatch } = setup({ ...base, table: true, tableName: 'posts' });
       const input = screen.getByLabelText('Emitted table name') as HTMLInputElement;
