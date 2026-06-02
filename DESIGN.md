@@ -10,72 +10,81 @@
 - **Voice:** Precise, confident, approachable, builder-oriented. Never academic, never dismissive.
 - **Logo:** Three connected nodes in a triangle. Always title-case: "Contexture".
 - **Default theme:** Dark — the graph canvas renders best on dark backgrounds.
+- **Theme family:** Catppuccin Latte for light mode and Catppuccin Mocha for dark mode.
 
 ## Color Tokens
 
-All colors use OKLCH for perceptual uniformity. The palette is built around deep indigo (intelligence, depth) with electric cyan as an accent (data, interactivity). All neutrals carry a subtle cool tint at hue 270.
+The shared palette is aligned to official Catppuccin values: Latte in light mode, Mocha in dark mode. The system uses Catppuccin's cool lavender neutrals for structure, Mauve for primary actions and object identity, Lavender for selection, references, and soft Convex table chrome, neutral Overlay/Subtext values for index/query structure, Green for success/union ownership, Yellow/Peach for enums and warnings, and Red/Maroon for destructive or invalid states.
 
 ### Core Palette
 
 | Token                    | Light Mode                | Dark Mode                 | Usage                              |
 | ------------------------ | ------------------------- | ------------------------- | ---------------------------------- |
-| `--background`           | `oklch(0.98 0.005 270)`   | `oklch(0.14 0.02 270)`    | Page background                    |
-| `--foreground`           | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Primary text                       |
-| `--card`                 | `oklch(1 0 0)`            | `oklch(0.18 0.02 270)`    | Card / surface background          |
-| `--card-foreground`      | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Card text                          |
-| `--popover`              | `oklch(1 0 0)`            | `oklch(0.18 0.02 270)`    | Popover / dropdown background      |
-| `--popover-foreground`   | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Popover text                       |
-| `--primary`              | `oklch(0.45 0.15 270)`    | `oklch(0.65 0.12 280)`    | Primary actions, brand indigo      |
-| `--primary-foreground`   | `oklch(1 0 0)`            | `oklch(1 0 0)`            | Text on primary                    |
-| `--secondary`            | `oklch(0.95 0.01 270)`    | `oklch(0.2 0.02 270)`     | Secondary surfaces                 |
-| `--secondary-foreground` | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Text on secondary                  |
-| `--muted`                | `oklch(0.95 0.01 270)`    | `oklch(0.2 0.02 270)`     | Muted backgrounds                  |
-| `--muted-foreground`     | `oklch(0.5 0.03 270)`     | `oklch(0.6 0.02 270)`     | Subdued text, labels, descriptions |
-| `--accent`               | `oklch(0.93 0.025 270)`   | `oklch(0.24 0.025 270)`   | Subtle hover/focus fill for shadcn chrome |
-| `--accent-foreground`    | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Text on accent surfaces            |
-| `--border`               | `oklch(0.9 0.01 270)`     | `oklch(0.25 0.02 270)`    | Borders and dividers               |
-| `--input`                | `oklch(0.9 0.01 270)`     | `oklch(0.25 0.02 270)`    | Input field borders                |
-| `--ring`                 | `oklch(0.45 0.15 270)`    | `oklch(0.65 0.12 280)`    | Focus ring                         |
+| `--background`           | `#eff1f5`                 | `#1e1e2e`                 | Page background (Latte Base / Mocha Base) |
+| `--foreground`           | `#4c4f69`                 | `#cdd6f4`                 | Primary text (Latte Text / Mocha Text) |
+| `--card`                 | `#f9fafc`                 | `#313244`                 | Card / surface background          |
+| `--card-foreground`      | `#4c4f69`                 | `#cdd6f4`                 | Card text                          |
+| `--popover`              | `#f9fafc`                 | `#313244`                 | Popover / dropdown background      |
+| `--popover-foreground`   | `#4c4f69`                 | `#cdd6f4`                 | Popover text                       |
+| `--primary`              | `#8839ef`                 | `#cba6f7`                 | Primary actions, object identity (Mauve) |
+| `--primary-foreground`   | `#eff1f5`                 | `#11111b`                 | Text on primary                    |
+| `--secondary`            | `#e6e9ef`                 | `#313244`                 | Secondary surfaces                 |
+| `--secondary-foreground` | `#4c4f69`                 | `#cdd6f4`                 | Text on secondary                  |
+| `--muted`                | `#e6e9ef`                 | `#313244`                 | Muted backgrounds                  |
+| `--muted-foreground`     | `#5c5f77`                 | `#bac2de`                 | Subdued text, labels, descriptions |
+| `--accent`               | `#e6e9ef`                 | `#45475a`                 | Subtle hover/focus fill for shadcn chrome |
+| `--accent-foreground`    | `#4c4f69`                 | `#cdd6f4`                 | Text on accent surfaces            |
+| `--reference`            | `#1e66f5`                 | `#89b4fa`                 | Reference, selection, graph accent |
+| `--reference-text`       | `#1a5fd7`                 | `#89b4fa`                 | Accessible reference text and icons |
+| `--reference-foreground` | `#eff1f5`                 | `#11111b`                 | Text on reference surfaces         |
+| `--border`               | `#ccd0da`                 | `#45475a`                 | Borders and dividers               |
+| `--input`                | `#ccd0da`                 | `#45475a`                 | Input field borders                |
+| `--ring`                 | `#7287fd`                 | `#89b4fa`                 | Focus ring                         |
 
 ### Semantic Colors
 
 | Token                       | Light Mode                | Dark Mode                 | Usage           |
 | --------------------------- | ------------------------- | ------------------------- | --------------- |
-| `--destructive`             | `oklch(0.55 0.2 25)`      | `oklch(0.6 0.2 25)`       | Errors, danger  |
-| `--destructive-foreground`  | `oklch(1 0 0)`            | `oklch(1 0 0)`            | Text on danger  |
-| `--success`                 | `oklch(0.6 0.2 145)`      | `oklch(0.65 0.2 145)`     | Success states  |
-| `--success-foreground`      | `oklch(1 0 0)`            | `oklch(1 0 0)`            | Text on success |
-| `--warning`                 | `oklch(0.7 0.15 75)`      | `oklch(0.7 0.15 75)`      | Warning states  |
-| `--warning-foreground`      | `oklch(0.13 0.03 270)`    | `oklch(0.93 0.01 270)`    | Text on warning |
+| `--destructive`             | `#d20f39`                 | `#f38ba8`                 | Errors, danger (Red) |
+| `--destructive-foreground`  | `#eff1f5`                 | `#11111b`                 | Text on danger  |
+| `--success`                 | `#40a02b`                 | `#a6e3a1`                 | Success states (Green) |
+| `--success-foreground`      | `#eff1f5`                 | `#11111b`                 | Text on success |
+| `--warning`                 | `#df8e1d`                 | `#f9e2af`                 | Warning states (Yellow) |
+| `--warning-foreground`      | `#4c4f69`                 | `#11111b`                 | Text on warning |
 
 ### Chart Colors (Desktop App)
 
 | Token       | Light Mode              | Dark Mode               |
 | ----------- | ----------------------- | ----------------------- |
-| `--chart-1` | `oklch(0.55 0.15 270)`  | `oklch(0.65 0.12 280)`  |
-| `--chart-2` | `oklch(0.75 0.15 195)`  | `oklch(0.75 0.15 195)`  |
-| `--chart-3` | `oklch(0.80 0.16 80)`   | `oklch(0.80 0.16 80)`   |
-| `--chart-4` | `oklch(0.55 0.17 155)`  | `oklch(0.55 0.17 155)`  |
-| `--chart-5` | `oklch(0.60 0.22 15)`   | `oklch(0.65 0.20 15)`   |
+| `--chart-1` | `#8839ef`              | `#cba6f7`              |
+| `--chart-2` | `#04a5e5`              | `#74c7ec`              |
+| `--chart-3` | `#df8e1d`              | `#f9e2af`              |
+| `--chart-4` | `#40a02b`              | `#a6e3a1`              |
+| `--chart-5` | `#fe640b`              | `#fab387`              |
 
 ### Graph-Specific Tokens (Desktop App)
 
 | Token                       | Light Mode                       | Dark Mode                        | Usage                        |
 | --------------------------- | -------------------------------- | -------------------------------- | ---------------------------- |
-| `--graph-bg`                | `oklch(0.95 0.01 270)`           | `oklch(0.18 0.02 270)`           | Canvas background            |
-| `--graph-node-class`        | `oklch(0.45 0.15 270)`           | `oklch(0.65 0.12 280)`           | Class node color             |
-| `--graph-node-header-bg`    | `oklch(0.45 0.15 270 / 0.9)`     | `oklch(0.45 0.15 270 / 0.9)`     | Node header background       |
-| `--graph-node-table-header-bg` | `oklch(0.42 0.12 205 / 0.92)` | `oklch(0.42 0.12 205 / 0.92)` | Convex table node header     |
-| `--graph-node-header-text`  | `oklch(1 0 0)`                   | `oklch(1 0 0)`                   | Node header text             |
-| `--graph-node-body-bg`      | `oklch(0.95 0.01 270 / 0.85)`    | `oklch(0.18 0.02 270 / 0.92)`    | Node body background         |
-| `--graph-node-border`       | `oklch(0.45 0.15 270 / 0.25)`    | `oklch(0.25 0.02 270)`           | Node default border          |
-| `--graph-node-table-accent` | `oklch(0.66 0.13 195)`           | `oklch(0.68 0.11 195)`           | Convex table node rail       |
-| `--graph-node-selected`     | `oklch(0.75 0.15 195)`           | `oklch(0.75 0.15 195)`           | Selected node border (cyan)  |
-| `--graph-node-selected-bg`  | `oklch(0.75 0.15 195 / 0.1)`     | `oklch(0.75 0.15 195 / 0.1)`     | Selected node fill           |
-| `--graph-node-adjacent`     | `oklch(0.75 0.15 195 / 0.45)`    | `oklch(0.75 0.15 195 / 0.45)`    | Adjacent node border         |
-| `--graph-edge-property`     | `oklch(0.65 0.12 280)`           | `oklch(0.65 0.08 280)`           | Object property edges        |
-| `--graph-edge-disjoint`     | `oklch(0.60 0.12 15)`            | `oklch(0.65 0.12 15)`            | Disjoint-with edges          |
-| `--graph-edge-subclass`     | `oklch(0.50 0.02 270)`           | `oklch(0.65 0.015 270)`          | SubClassOf edges             |
+| `--graph-bg`                | `#e6e9ef`                       | `#181825`                       | Canvas background            |
+| `--graph-node-class`        | `#8839ef`                       | `#cba6f7`                       | Class/object node color (Mauve) |
+| `--graph-node-header-bg`    | `#8839ef`                       | `#cba6f7`                       | Object node header background |
+| `--graph-node-table-header-bg` | soft Lavender Surface mix        | soft Lavender Surface mix        | Table header tinted surface |
+| `--graph-node-header-text`  | `#eff1f5`                       | `#11111b`                       | Node header text             |
+| `--graph-node-body-bg`      | `color-mix(#eff1f5, white)`     | `color-mix(#313244, #1e1e2e)`   | Node body background         |
+| `--graph-node-border`       | `color-mix(#8839ef, #bcc0cc)`   | `#45475a`                       | Node default border          |
+| `--graph-node-table-accent` | muted Lavender mix               | muted Lavender mix               | Convex table marker |
+| `--graph-node-selected`     | `#7287fd`                       | `#b4befe`                       | Selected node border         |
+| `--graph-node-selected-bg`  | `color-mix(#7287fd, transparent)` | `color-mix(#b4befe, transparent)` | Selected node fill           |
+| `--graph-node-adjacent`     | `color-mix(#7287fd, #bcc0cc)`   | `color-mix(#b4befe, #45475a)`   | Adjacent node border         |
+| `--graph-edge-property`     | `#8839ef`                       | `#cba6f7`                       | Object property edges        |
+| `--graph-edge-ref`          | muted Lavender mix               | `#89b4fa`                       | Reference relationship edges |
+| `--graph-edge-disjoint`     | `#d20f39`                       | `#f38ba8`                       | Disjoint-with edges          |
+| `--graph-edge-subclass`     | `#6c6f85`                       | `#9399b2`                       | SubClassOf edges             |
+| `--inspector-type-enum`     | `#df8e1d`                       | `#f9e2af`                       | Enum type marker             |
+| `--inspector-type-union`    | `#40a02b`                       | `#a6e3a1`                       | Discriminated union marker   |
+| `--inspector-index`         | `#6c6f85`                       | `#9399b2`                       | Index and suggested query structure |
+| `--inspector-advisory`      | `#7287fd`                       | `#b4befe`                       | Modeling advice, non-warning hints |
 
 ## Typography
 
@@ -162,7 +171,7 @@ Ghost:      text-muted-foreground rounded-lg hover:text-accent-foreground hover:
 Destructive: bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity
 ```
 
-In shadcn primitives, `--accent` is the routine hover/focus surface, so keep it subtle. Electric cyan remains available through graph-specific tokens such as `--graph-node-selected` and through brand/web contexts where it is used deliberately.
+In shadcn primitives, `--accent` is the routine hover/focus surface, so keep it subtle. Catppuccin color should be applied as sparse annotation on top of Base/Mantle/Surface/Overlay structure, not as competing full-surface fills. Selection and reference emphasis use Lavender through graph-specific tokens such as `--graph-node-selected` and `--graph-edge-ref`.
 
 ### Card Patterns
 
@@ -174,7 +183,7 @@ Subtle:     rounded-xl border border-border/60 bg-card/30 p-8
 ### Badge / Pill Patterns
 
 ```
-Accent:     text-xs font-medium px-3 py-1 rounded-full border border-accent/20 bg-accent/5 text-accent
+Reference:  text-xs font-medium px-3 py-1 rounded-full border border-reference/20 bg-reference/5 text-reference-text
 Neutral:    text-xs font-medium px-3 py-1 rounded-full border border-border/60 text-muted-foreground
 Success:    text-xs font-medium px-3 py-1 rounded-full bg-success/10 text-success border border-success/20
 Warning:    text-xs font-medium px-3 py-1 rounded-full bg-warning/10 text-warning border border-warning/20
@@ -183,10 +192,12 @@ Warning:    text-xs font-medium px-3 py-1 rounded-full bg-warning/10 text-warnin
 ### Graph Node Pattern
 
 Class nodes use inline styles for React Flow compatibility:
-- **Header:** Indigo background (`--graph-node-header-bg`), white text, 12px bold, ellipsis overflow
+- **Header:** Mauve background (`--graph-node-header-bg`), high-contrast text, 12px bold, ellipsis overflow
+- **Table marker:** Muted Lavender icon/label and soft Lavender header surface (`--graph-node-table-accent`); avoid cyan/teal table fills and inset rails
 - **Body:** Semi-transparent background (`--graph-node-body-bg`), lists datatype properties
-- **Selection:** Cyan border (`--graph-node-selected`), tinted background
-- **Adjacent:** Dimmed cyan border, no background tint
+- **Selection:** Lavender border (`--graph-node-selected`), restrained tinted background; avoid stacking hover halos, table rails, and row rails
+- **Edges:** Lavender relationship lines (`--graph-edge-ref`)
+- **Adjacent:** Dimmed node-selection border, no background tint
 - **Dimmed:** `opacity: 0.2` when another node is selected and this node is not adjacent
 - **Min/max width:** 160px — 220px
 - **Border radius:** 8px with `backdrop-filter: blur(8px)`

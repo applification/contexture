@@ -62,7 +62,7 @@ function LogoMark({ className }: { className?: string }) {
       />
       <circle cx="16" cy="8" r="3.5" fill="var(--primary)" />
       <circle cx="8" cy="24" r="3.5" fill="var(--primary)" />
-      <circle cx="24" cy="24" r="3.5" fill="var(--accent)" />
+      <circle cx="24" cy="24" r="3.5" fill="var(--reference)" />
     </svg>
   );
 }
@@ -118,15 +118,15 @@ function HeroSideGraph() {
       <defs>
         <linearGradient id="hero-side-graph-left" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="var(--border)" stopOpacity="0" />
-          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.22" />
-          <stop offset="0.74" stopColor="var(--accent)" stopOpacity="0.26" />
-          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.12" />
+          <stop offset="0.74" stopColor="var(--reference)" stopOpacity="0.18" />
+          <stop offset="1" stopColor="var(--reference)" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="hero-side-graph-right" x1="1" x2="0" y1="0" y2="0">
           <stop offset="0" stopColor="var(--border)" stopOpacity="0" />
-          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.22" />
-          <stop offset="0.74" stopColor="var(--accent)" stopOpacity="0.26" />
-          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+          <stop offset="0.28" stopColor="var(--primary)" stopOpacity="0.12" />
+          <stop offset="0.74" stopColor="var(--reference)" stopOpacity="0.18" />
+          <stop offset="1" stopColor="var(--reference)" stopOpacity="0" />
         </linearGradient>
         <filter id="hero-side-graph-soften" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="0.35" />
@@ -148,7 +148,7 @@ function HeroSideGraph() {
             cy={cy}
             r="4"
             fill={`var(--${tone})`}
-            opacity={tone === 'accent' ? '0.36' : '0.26'}
+            opacity={tone === 'accent' ? '0.22' : '0.16'}
           />
         ))}
       </g>
@@ -514,7 +514,7 @@ function ConvexGeneratedPreview() {
     <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/70 text-left screenshot-glow">
       <div className="flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3">
         <div>
-          <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
+          <div className="font-mono text-xs text-reference-text">convex/schema.ts</div>
           <div className="text-[11px] text-muted-foreground">Read-only generated output</div>
         </div>
         <MotionStatusBadge
@@ -548,7 +548,7 @@ function ConvexGeneratedPreview() {
         </code>
       </pre>
       <div className="border-t border-border/60 bg-background/50 px-4 py-3">
-        <div className="font-mono text-xs text-primary dark:text-accent">convex/validators.ts</div>
+        <div className="font-mono text-xs text-reference-text">convex/validators.ts</div>
         <p className="mt-1 text-xs text-muted-foreground break-words">
           Reusable validators emit beside the schema for functions, forms, and app boundaries.
         </p>
@@ -569,7 +569,7 @@ function AgentTurnReviewDemo() {
     <div className="mx-auto max-w-3xl overflow-hidden rounded-md border border-border/70 bg-card/70 text-left text-xs shadow-sm screenshot-glow">
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="size-7 rounded-md bg-accent/10 text-accent flex items-center justify-center">
+          <div className="size-7 rounded-md bg-reference/10 text-reference-text flex items-center justify-center">
             <Bot className="size-3.5" />
           </div>
           <div className="min-w-0">
@@ -606,7 +606,7 @@ function AgentTurnReviewDemo() {
                   <Check className="size-3" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-mono text-[11px] leading-4 text-primary dark:text-accent">
+                  <div className="font-mono text-[11px] leading-4 text-reference-text">
                     {step.tool}
                   </div>
                   <div className="text-[11px] leading-4 text-muted-foreground">{step.label}</div>
@@ -661,7 +661,7 @@ function AgentTurnReviewDemo() {
               </MotionItem>
             ))}
           </MotionList>
-          <div className="mt-2.5 rounded-md border border-primary/15 bg-primary/5 px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
+          <div className="mt-2.5 rounded-md border border-reference/15 bg-reference/5 px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
             Validation blocks unsafe ops before generated files are emitted.
           </div>
         </div>
@@ -678,7 +678,7 @@ function TrustedLoopSection() {
     >
       <div className="relative max-w-5xl mx-auto">
         <div className="mb-10 max-w-2xl">
-          <p className="text-sm text-primary dark:text-accent font-medium mb-4 tracking-widest uppercase">
+          <p className="text-sm text-reference-text font-medium mb-4 tracking-widest uppercase">
             The trusted loop
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
@@ -691,18 +691,14 @@ function TrustedLoopSection() {
         </div>
 
         <MotionList className="relative grid gap-3 sm:grid-cols-5">
-          <div
-            aria-hidden="true"
-            className="trusted-loop-trace pointer-events-none hidden sm:block"
-          />
           {trustedLoopSteps.map((step, index) => (
             <MotionItem
               key={step.title}
-              className="relative z-10 rounded-xl border border-border/60 bg-card/50 p-5 transition-colors hover:border-primary/30"
+              className="relative z-10 rounded-xl border border-border/60 bg-card/50 p-5 transition-colors hover:border-reference/25"
             >
               <div className="mb-4 flex items-center justify-between">
-                <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <step.icon className="size-5 text-primary" />
+                <div className="size-10 rounded-lg bg-accent flex items-center justify-center">
+                  <step.icon className="size-5 text-reference-text" />
                 </div>
                 <span className="font-mono text-xs text-muted-foreground">
                   {String(index + 1).padStart(2, '0')}
@@ -730,7 +726,7 @@ function ReconcileDemo() {
     <div className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5 screenshot-glow">
       <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-4">
         <div>
-          <div className="font-mono text-xs text-primary dark:text-accent">convex/schema.ts</div>
+          <div className="font-mono text-xs text-reference-text">convex/schema.ts</div>
           <div className="text-xs text-muted-foreground">
             Generated file changed outside Contexture
           </div>
@@ -748,7 +744,7 @@ function ReconcileDemo() {
             key={action}
             className="flex items-start gap-3 rounded-lg border border-border/50 bg-background/60 px-3 py-2.5 text-sm"
           >
-            <div className="mt-0.5 size-5 rounded-full bg-accent/10 text-accent flex items-center justify-center shrink-0 text-[10px] font-semibold">
+            <div className="mt-0.5 size-5 rounded-full bg-reference/10 text-reference-text flex items-center justify-center shrink-0 text-[10px] font-semibold">
               {index + 1}
             </div>
             <span className="text-muted-foreground">{action}</span>
@@ -825,13 +821,13 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center pt-28 sm:pt-44 pb-12 sm:pb-16">
-          <p className="animate-fade-in-up text-sm text-primary dark:text-accent font-medium mb-6 tracking-widest uppercase">
+          <p className="animate-fade-in-up text-sm text-reference-text font-medium mb-6 tracking-widest uppercase">
             Convex model editor + MCP server
           </p>
           <h1 className="animate-fade-in-up-delay-1 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6">
             A source-of-truth Convex model your app and agents can share.
           </h1>
-          <p className="animate-fade-in-up-delay-2 text-lg text-primary dark:text-accent font-medium mb-3">
+          <p className="animate-fade-in-up-delay-2 text-lg text-muted-foreground font-medium mb-3">
             Visual editing, generated Convex schema and validators, and MCP tools from one IR.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
@@ -922,10 +918,10 @@ export default function Home() {
               <div
                 key={feature.title}
                 data-testid="feature-card"
-                className="group rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-primary/30 hover:bg-card/80 transition-all duration-200"
+                className="group rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-reference/25 hover:bg-card/80 transition-all duration-200"
               >
-                <div className="size-11 rounded-lg bg-primary/10 group-hover:bg-primary/15 flex items-center justify-center mb-5 transition-colors">
-                  <feature.icon className="size-5 text-primary" />
+                <div className="size-11 rounded-lg bg-accent group-hover:bg-reference/10 flex items-center justify-center mb-5 transition-colors">
+                  <feature.icon className="size-5 text-reference-text" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
@@ -965,7 +961,7 @@ export default function Home() {
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-10 sm:mb-16">
-            <div className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent font-medium mb-6 px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+            <div className="inline-flex items-center gap-2 text-sm text-reference-text font-medium mb-6 px-4 py-1.5 rounded-full border border-reference/20 bg-reference/5">
               <Brain className="size-4" />
               MCP-native by design
             </div>
@@ -999,24 +995,24 @@ export default function Home() {
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                    <Zap className="size-4 text-accent" />
+                  <div className="size-8 rounded-lg bg-reference/10 flex items-center justify-center shrink-0">
+                    <Zap className="size-4 text-reference-text" />
                   </div>
                   <span className="min-w-0 text-muted-foreground">
                     Convex schema, validators, Zod, JSON Schema, structured output, MCP, and forms
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                    <Shield className="size-4 text-accent" />
+                  <div className="size-8 rounded-lg bg-reference/10 flex items-center justify-center shrink-0">
+                    <Shield className="size-4 text-reference-text" />
                   </div>
                   <span className="min-w-0 text-muted-foreground">
                     Manifest-backed drift checks for every emitted target
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <div className="size-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                    <Brain className="size-4 text-accent" />
+                  <div className="size-8 rounded-lg bg-reference/10 flex items-center justify-center shrink-0">
+                    <Brain className="size-4 text-reference-text" />
                   </div>
                   <span className="min-w-0 text-muted-foreground">
                     MCP tools for agents that need to inspect, mutate, emit, and validate
@@ -1032,7 +1028,7 @@ export default function Home() {
       <section className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30">
         <div className="relative max-w-5xl mx-auto grid min-w-0 gap-8 sm:grid-cols-5 sm:gap-12 items-center">
           <div className="min-w-0 sm:col-span-3 space-y-6">
-            <div className="inline-flex items-center gap-2 text-sm text-primary dark:text-accent font-medium px-4 py-1.5 rounded-full border border-accent/20 bg-accent/5">
+            <div className="inline-flex items-center gap-2 text-sm text-reference-text font-medium px-4 py-1.5 rounded-full border border-reference/20 bg-reference/5">
               <GitPullRequestArrow className="size-4" />
               Reconcile as review
             </div>
@@ -1082,8 +1078,8 @@ export default function Home() {
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-8">
-            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
+            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-reference/30 transition-colors">
+              <div className="text-reference-text text-sm font-medium uppercase tracking-wider mb-4">
                 Convex app schemas
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1092,8 +1088,8 @@ export default function Home() {
                 part of normal git flow.
               </p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
+            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-reference/30 transition-colors">
+              <div className="text-reference-text text-sm font-medium uppercase tracking-wider mb-4">
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1101,8 +1097,8 @@ export default function Home() {
                 your app imports. Prompt surfaces and app surfaces stay aligned.
               </p>
             </div>
-            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-accent/30 transition-colors">
-              <div className="text-primary dark:text-accent text-sm font-medium uppercase tracking-wider mb-4">
+            <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-reference/30 transition-colors">
+              <div className="text-reference-text text-sm font-medium uppercase tracking-wider mb-4">
                 Agent workflows
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1120,7 +1116,7 @@ export default function Home() {
         className="relative py-16 sm:py-32 px-4 sm:px-8 border-t border-border/30"
       >
         <div className="relative max-w-3xl mx-auto text-center">
-          <p className="text-sm text-primary dark:text-accent font-medium mb-4 tracking-widest uppercase">
+          <p className="text-sm text-reference-text font-medium mb-4 tracking-widest uppercase">
             Open source & free
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">

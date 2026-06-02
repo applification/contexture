@@ -25,7 +25,7 @@ function LogoMark({
   const primary =
     variant === 'mono-light' ? '#000' : variant === 'mono-dark' ? '#fff' : 'var(--primary)';
   const accent =
-    variant === 'mono-light' ? '#000' : variant === 'mono-dark' ? '#fff' : 'var(--accent)';
+    variant === 'mono-light' ? '#000' : variant === 'mono-dark' ? '#fff' : 'var(--reference)';
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <line
@@ -161,7 +161,7 @@ export default function BrandPage() {
       <div className="max-w-5xl mx-auto px-8 pt-32 pb-20">
         {/* Hero */}
         <header className="pb-16 border-b border-border/30">
-          <p className="text-sm text-accent font-medium tracking-widest uppercase mb-4">
+          <p className="text-sm text-reference-text font-medium tracking-widest uppercase mb-4">
             Brand Guidelines
           </p>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">
@@ -195,15 +195,15 @@ export default function BrandPage() {
 
           <div className="grid sm:grid-cols-3 gap-6 mb-10">
             {/* Full color on dark */}
-            <div className="rounded-xl border border-border/60 bg-[oklch(0.14_0.02_270)] p-10 flex flex-col items-center gap-6">
+            <div className="rounded-xl border border-border/60 bg-[oklch(0.24_0.03_284)] p-10 flex flex-col items-center gap-6">
               <LogoMark className="size-16" variant="color" />
               <div className="flex items-center gap-2">
                 <LogoMark className="size-6" variant="color" />
-                <span className="text-lg font-semibold text-[oklch(0.93_0.01_270)]">
+                <span className="text-lg font-semibold text-[oklch(0.88_0.04_272)]">
                   Contexture
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">Full color — dark background</span>
+              <span className="text-xs text-[#bac2de]">Full color — dark background</span>
             </div>
             {/* Mono on light */}
             <div className="rounded-xl border border-border/60 bg-white p-10 flex flex-col items-center gap-6">
@@ -250,43 +250,38 @@ export default function BrandPage() {
         {/* -------------------------------------------------------- */}
         <Section id="colors" title="Color Palette">
           <p className="text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-            All colors use OKLCH for perceptual uniformity. The palette is built around deep indigo
-            (intelligence, depth) with electric cyan as an accent (data, interactivity).
+            The palette follows Catppuccin: Latte in light mode, Mocha in dark mode. Mauve carries
+            object identity and primary actions; Blue carries references, selection, and focus.
           </p>
 
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Primary &amp; Accent
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-12">
-            <Swatch name="Deep Indigo" value="oklch(0.45 0.15 270)" token="--primary (light)" />
-            <Swatch name="Soft Violet" value="oklch(0.65 0.12 280)" token="--primary (dark)" dark />
-            <Swatch name="Electric Cyan" value="oklch(0.75 0.15 195)" token="--accent" />
-            <Swatch name="Ring / Focus" value="oklch(0.45 0.15 270)" token="--ring (light)" />
+            <Swatch name="Latte Mauve" value="#8839ef" token="--primary (light)" />
+            <Swatch name="Mocha Mauve" value="#cba6f7" token="--primary (dark)" dark />
+            <Swatch name="Latte Blue" value="#1e66f5" token="--reference (light)" />
+            <Swatch name="Blue Focus" value="#1e66f5" token="--ring (light)" />
           </div>
 
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Semantic
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-12">
-            <Swatch name="Success" value="oklch(0.6 0.2 145)" token="--success" />
-            <Swatch name="Warning" value="oklch(0.7 0.15 75)" token="--warning" />
-            <Swatch name="Destructive" value="oklch(0.55 0.2 25)" token="--destructive" />
-            <Swatch name="Muted" value="oklch(0.5 0.03 270)" token="--muted-foreground" />
+            <Swatch name="Green" value="#40a02b" token="--success" />
+            <Swatch name="Yellow" value="#df8e1d" token="--warning" />
+            <Swatch name="Red" value="#d20f39" token="--destructive" />
+            <Swatch name="Subtext" value="#5c5f77" token="--muted-foreground" />
           </div>
 
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
             Backgrounds &amp; Surfaces
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-12">
-            <Swatch name="Background (light)" value="oklch(0.98 0.005 270)" token="--background" />
-            <Swatch
-              name="Background (dark)"
-              value="oklch(0.14 0.02 270)"
-              token="--background"
-              dark
-            />
-            <Swatch name="Card (light)" value="oklch(1 0 0)" token="--card" />
-            <Swatch name="Card (dark)" value="oklch(0.18 0.02 270)" token="--card" dark />
+            <Swatch name="Latte Base" value="#eff1f5" token="--background" />
+            <Swatch name="Mocha Base" value="#1e1e2e" token="--background" dark />
+            <Swatch name="Latte Surface" value="#f9fafc" token="--card" />
+            <Swatch name="Mocha Surface" value="#313244" token="--card" dark />
           </div>
 
           <div className="rounded-xl border border-border/60 bg-card/30 p-8">
@@ -294,10 +289,9 @@ export default function BrandPage() {
               Neutrals
             </h3>
             <p className="text-sm text-muted-foreground">
-              All neutral grays carry a subtle cool tint at 270 hue angle (indigo family). This
-              creates a cohesive feel without being obviously tinted. Dark mode is the{' '}
-              <strong className="text-foreground">default</strong> theme — the graph canvas renders
-              best on dark backgrounds.
+              Neutrals use Catppuccin&apos;s cool lavender-tinted Base, Mantle, Surface, Overlay,
+              and Text ladder. Dark mode is the <strong className="text-foreground">default</strong>{' '}
+              theme; the graph canvas renders best on dark backgrounds.
             </p>
           </div>
         </Section>
@@ -370,7 +364,9 @@ export default function BrandPage() {
 
           <div className="grid sm:grid-cols-2 gap-6 mb-10">
             <div className="rounded-xl border border-border/60 bg-card/30 p-8">
-              <h3 className="text-sm font-medium text-accent uppercase tracking-wider mb-4">Do</h3>
+              <h3 className="text-sm font-medium text-reference-text uppercase tracking-wider mb-4">
+                Do
+              </h3>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>
                   <strong className="text-foreground">Precise</strong> — Use correct terminology
@@ -508,7 +504,7 @@ export default function BrandPage() {
                 Terminal block
               </div>
               <p className="text-muted-foreground">$ contexture emit --schema allotment</p>
-              <p className="text-accent">Wrote allotment.schema.ts (12 types)</p>
+              <p className="text-reference-text">Wrote allotment.schema.ts (12 types)</p>
             </div>
           </div>
 
@@ -516,7 +512,7 @@ export default function BrandPage() {
             Badges &amp; pills
           </h3>
           <div className="flex flex-wrap gap-3 mb-10">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-accent/20 bg-accent/5 text-accent">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full border border-reference/20 bg-reference/5 text-reference-text">
               Agent-safe by design
             </span>
             <span className="inline-flex items-center text-xs font-medium px-3 py-1 rounded-full border border-border/60 text-muted-foreground">

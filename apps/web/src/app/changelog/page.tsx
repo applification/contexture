@@ -43,7 +43,7 @@ function LogoMark({ className }: { className?: string }) {
       />
       <circle cx="16" cy="8" r="3.5" fill="var(--primary)" />
       <circle cx="8" cy="24" r="3.5" fill="var(--primary)" />
-      <circle cx="24" cy="24" r="3.5" fill="var(--accent)" />
+      <circle cx="24" cy="24" r="3.5" fill="var(--reference)" />
     </svg>
   );
 }
@@ -90,7 +90,7 @@ export default async function ChangelogPage() {
       <div className="max-w-5xl mx-auto px-8 pt-32 pb-20">
         {/* Hero */}
         <header className="pb-16 border-b border-border/30">
-          <p className="text-sm text-accent font-medium tracking-widest uppercase mb-4">
+          <p className="text-sm text-reference-text font-medium tracking-widest uppercase mb-4">
             Release History
           </p>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">Changelog</h1>
@@ -162,7 +162,7 @@ export default async function ChangelogPage() {
                           return (
                             <a
                               href={href}
-                              className="text-accent break-words [overflow-wrap:anywhere] hover:underline"
+                              className="text-reference-text break-words [overflow-wrap:anywhere] hover:underline"
                               target={href?.startsWith('http') ? '_blank' : undefined}
                               rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
                               title={href}

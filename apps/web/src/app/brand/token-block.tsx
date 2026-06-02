@@ -13,16 +13,24 @@ import {
 const tokens = `/* Contexture Design Tokens — CSS Custom Properties */
 
 /* Primary */
---primary:            oklch(0.45 0.15 270);   /* light */
---primary:            oklch(0.65 0.12 280);   /* dark  */
---primary-foreground: oklch(1 0 0);
+--primary:            #8839ef;  /* Latte Mauve */
+--primary:            #cba6f7;  /* Mocha Mauve */
+--primary-foreground: #eff1f5;  /* light */
+--primary-foreground: #11111b;  /* dark  */
 
-/* Accent */
---accent:             oklch(0.75 0.15 195);   /* both  */
+/* Reference */
+--reference:          #1e66f5;  /* Latte Blue */
+--reference:          #89b4fa;  /* Mocha Blue */
+--reference-text:     #1a5fd7;  /* Latte accessible Blue text */
+--reference-text:     #89b4fa;  /* Mocha Blue text */
+
+/* Accent chrome */
+--accent:             #e6e9ef;  /* Latte Mantle */
+--accent:             #45475a;  /* Mocha Surface 1 */
 
 /* Backgrounds */
---background:         oklch(0.98 0.005 270);  /* light */
---background:         oklch(0.14 0.02 270);   /* dark  */
+--background:         #eff1f5;  /* Latte Base */
+--background:         #1e1e2e;  /* Mocha Base */
 
 /* Typography */
 --font-sans: Geist Sans (variable, 100-900)

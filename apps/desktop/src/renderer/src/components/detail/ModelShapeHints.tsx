@@ -88,9 +88,9 @@ function toneForHint(kind: ModelingHint['kind']): CSSProperties {
   switch (kind) {
     case 'possible_entity':
       return {
-        background: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-        borderColor: 'color-mix(in oklch, var(--primary) 46%, transparent)',
-        color: 'var(--primary)',
+        background: 'color-mix(in oklch, var(--inspector-advisory) 16%, transparent)',
+        borderColor: 'color-mix(in oklch, var(--inspector-advisory) 46%, transparent)',
+        color: 'var(--inspector-advisory)',
       };
     case 'query_handle':
       return {

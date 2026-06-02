@@ -7,69 +7,76 @@
 @source "../../**/*.{ts,tsx}";
 
 :root {
-  /* Contexture Brand Colors — Light mode */
-  --background: oklch(0.98 0.005 270);
-  --foreground: oklch(0.13 0.03 270);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.13 0.03 270);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0.03 270);
-  --primary: oklch(0.45 0.15 270);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.01 270);
-  --secondary-foreground: oklch(0.13 0.03 270);
-  --muted: oklch(0.95 0.01 270);
-  --muted-foreground: oklch(0.5 0.03 270);
-  --accent: oklch(0.75 0.15 195);
-  --accent-foreground: oklch(0.13 0.03 270);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9 0.01 270);
-  --input: oklch(0.9 0.01 270);
-  --ring: oklch(0.45 0.15 270);
-  --success: oklch(0.6 0.2 145);
-  --warning: oklch(0.7 0.15 75);
-  --syntax-function: oklch(0.45 0.14 255);
-  --syntax-identifier: oklch(0.35 0.08 270);
-  --syntax-keyword: oklch(0.48 0.16 285);
-  --syntax-module: oklch(0.42 0.13 195);
-  --syntax-plain: oklch(0.32 0.04 270);
-  --syntax-property: oklch(0.36 0.12 210);
-  --syntax-punctuation: oklch(0.48 0.03 270);
-  --syntax-string: oklch(0.43 0.14 145);
+  /* Catppuccin Latte */
+  --background: #eff1f5;
+  --foreground: #4c4f69;
+  --card: #f9fafc;
+  --card-foreground: #4c4f69;
+  --popover: #f9fafc;
+  --popover-foreground: #4c4f69;
+  --primary: #8839ef;
+  --primary-foreground: #eff1f5;
+  --secondary: #e6e9ef;
+  --secondary-foreground: #4c4f69;
+  --muted: #e6e9ef;
+  --muted-foreground: #5c5f77;
+  --accent: #e6e9ef;
+  --accent-foreground: #4c4f69;
+  --reference: #7287fd;
+  --reference-text: color-mix(in oklch, #7287fd 74%, #4c4f69);
+  --reference-foreground: #eff1f5;
+  --destructive: #d20f39;
+  --destructive-foreground: #eff1f5;
+  --border: #ccd0da;
+  --input: #ccd0da;
+  --ring: #7287fd;
+  --success: #40a02b;
+  --warning: #df8e1d;
+  --syntax-function: #1e66f5;
+  --syntax-identifier: #4c4f69;
+  --syntax-keyword: #8839ef;
+  --syntax-module: #209fb5;
+  --syntax-plain: #5c5f77;
+  --syntax-property: #04a5e5;
+  --syntax-punctuation: #7c7f93;
+  --syntax-string: #40a02b;
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: oklch(0.14 0.02 270);
-  --foreground: oklch(0.93 0.01 270);
-  --card: oklch(0.18 0.02 270);
-  --card-foreground: oklch(0.93 0.01 270);
-  --popover: oklch(0.18 0.02 270);
-  --popover-foreground: oklch(0.93 0.01 270);
-  --primary: oklch(0.5 0.14 280);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.2 0.02 270);
-  --secondary-foreground: oklch(0.93 0.01 270);
-  --muted: oklch(0.2 0.02 270);
-  --muted-foreground: oklch(0.6 0.02 270);
-  --accent: oklch(0.75 0.15 195);
-  --accent-foreground: oklch(0.93 0.01 270);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.25 0.02 270);
-  --input: oklch(0.25 0.02 270);
-  --ring: oklch(0.65 0.12 280);
-  --success: oklch(0.65 0.2 145);
-  --warning: oklch(0.7 0.15 75);
-  --syntax-function: oklch(0.76 0.12 245);
-  --syntax-identifier: oklch(0.84 0.03 270);
-  --syntax-keyword: oklch(0.78 0.12 295);
-  --syntax-module: oklch(0.78 0.13 195);
-  --syntax-plain: oklch(0.72 0.02 270);
-  --syntax-property: oklch(0.76 0.12 205);
-  --syntax-punctuation: oklch(0.6 0.02 270);
-  --syntax-string: oklch(0.78 0.14 145);
+  /* Catppuccin Mocha */
+  --background: #1e1e2e;
+  --foreground: #cdd6f4;
+  --card: #313244;
+  --card-foreground: #cdd6f4;
+  --popover: #313244;
+  --popover-foreground: #cdd6f4;
+  --primary: #cba6f7;
+  --primary-foreground: #11111b;
+  --secondary: #313244;
+  --secondary-foreground: #cdd6f4;
+  --muted: #313244;
+  --muted-foreground: #bac2de;
+  --accent: #45475a;
+  --accent-foreground: #cdd6f4;
+  --reference: #89b4fa;
+  --reference-text: #89b4fa;
+  --reference-foreground: #11111b;
+  --destructive: #f38ba8;
+  --destructive-foreground: #11111b;
+  --border: #45475a;
+  --input: #45475a;
+  --ring: #89b4fa;
+  --success: #a6e3a1;
+  --warning: #f9e2af;
+  --syntax-function: #89b4fa;
+  --syntax-identifier: #cdd6f4;
+  --syntax-keyword: #cba6f7;
+  --syntax-module: #94e2d5;
+  --syntax-plain: #bac2de;
+  --syntax-property: #74c7ec;
+  --syntax-punctuation: #9399b2;
+  --syntax-string: #a6e3a1;
 }
 
 @theme inline {
@@ -89,6 +96,9 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-reference: var(--reference);
+  --color-reference-text: var(--reference-text);
+  --color-reference-foreground: var(--reference-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -144,23 +154,12 @@ body {
   }
   44%,
   74% {
-    background-color: color-mix(in oklch, var(--accent) 14%, transparent);
+    background-color: color-mix(in oklch, var(--reference) 14%, transparent);
     color: var(--foreground);
   }
   100% {
     background-color: transparent;
     color: inherit;
-  }
-}
-
-@keyframes trusted-loop-trace {
-  from {
-    transform: scaleX(0);
-    opacity: 0.4;
-  }
-  to {
-    transform: scaleX(1);
-    opacity: 1;
   }
 }
 
@@ -200,22 +199,6 @@ body {
   color: var(--syntax-string);
 }
 
-.trusted-loop-trace {
-  position: absolute;
-  top: 1.25rem;
-  left: 9%;
-  right: 9%;
-  height: 1px;
-  transform-origin: left center;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklch, var(--accent) 60%, transparent),
-    transparent
-  );
-  animation: trusted-loop-trace 0.8s ease-out 0.2s both;
-}
-
 
 /* Screenshot showcase treatment */
 .screenshot-glow {
@@ -226,14 +209,14 @@ body {
   .screenshot-glow {
     box-shadow:
       0 0 60px color-mix(in oklch, var(--primary) 15%, transparent),
-      0 0 120px color-mix(in oklch, var(--accent) 8%, transparent),
+      0 0 120px color-mix(in oklch, var(--reference) 8%, transparent),
       0 25px 50px rgba(0, 0, 0, 0.5);
   }
 
   .screenshot-glow:hover {
     box-shadow:
       0 0 80px color-mix(in oklch, var(--primary) 20%, transparent),
-      0 0 160px color-mix(in oklch, var(--accent) 12%, transparent),
+      0 0 160px color-mix(in oklch, var(--reference) 12%, transparent),
       0 25px 50px rgba(0, 0, 0, 0.5);
   }
 }
@@ -247,8 +230,7 @@ body {
     animation: none;
   }
 
-  .generated-line-highlight,
-  .trusted-loop-trace {
+  .generated-line-highlight {
     animation: none;
   }
 }

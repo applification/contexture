@@ -20,7 +20,8 @@ Next.js web app.
 
 Core Contexture design posture:
 - Contexture is precise, confident, approachable, and builder-oriented.
-- The default visual mode is dark, with deep indigo foundations and electric cyan accents.
+- The default visual mode is dark, using Catppuccin Mocha foundations with Latte as the light-mode counterpart.
+- Prefer Catppuccin semantic roles from `DESIGN.md`: Mauve for primary/object identity, Lavender for selection, references, and soft Convex table chrome, neutral Overlay/Subtext for index/query structure, Green for success/union ownership, Yellow/Peach for enums and warnings, and Red/Maroon for destructive or invalid states.
 - The interface should feel like a serious builder tool: dense enough for repeated work, calm
   enough to scan, and never decorative at the expense of comprehension.
 - Prefer existing shadcn/ui primitives, Tailwind v4 tokens, Geist typography, and Lucide icons.
@@ -34,7 +35,7 @@ Primary review concerns:
 - Accessibility: semantic HTML, keyboard paths, visible focus, target sizes, form labels,
   ARIA only when useful, color contrast, reduced motion, heading order, alt text, icon
   labelling, screen-reader affordances, and text that remains readable at small viewports.
-- Design-system fit: OKLCH token usage, theme support, consistent spacing, radius, typography,
+- Design-system fit: Catppuccin token usage, theme support, consistent spacing, radius, typography,
   icon sizing, component variants, card/badge/button patterns, and graph-specific visual rules.
 - Brand: correct Contexture naming, "Where schemas take shape." when tagline is needed,
   precise-but-approachable copy, no academic hedging, no dismissive language, and public web

@@ -163,9 +163,9 @@ describe('TypeNode', () => {
     expect(fields[0].dataset.selectedField).toBeUndefined();
     expect(fields[1].dataset.selectedField).toBe('true');
     expect(fields[1]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 22%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 12%, var(--graph-node-body-bg))',
     });
-    expect(fields[1].getAttribute('style')).toContain('inset 4px 0 0 var(--graph-node-header-bg)');
+    expect(fields[1].getAttribute('style')).toContain('inset 2px 0 0 var(--graph-node-header-bg)');
     expect(fields[1].getAttribute('style')).toContain(
       'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
     );
@@ -175,7 +175,7 @@ describe('TypeNode', () => {
     });
   });
 
-  it('uses the table accent for selected table field rows', () => {
+  it('uses selection color, not table color, for selected table field rows', () => {
     const data: TypeNodeData = {
       typeName: 'Posts',
       kind: 'object',
@@ -188,8 +188,7 @@ describe('TypeNode', () => {
     render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
 
     expect(screen.getByTestId('type-node-field')).toHaveStyle({
-      background:
-        'color-mix(in oklch, var(--graph-node-table-accent) 22%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-selected) 12%, var(--graph-node-body-bg))',
     });
   });
 
@@ -209,24 +208,20 @@ describe('TypeNode', () => {
 
     const fields = screen.getAllByTestId('type-node-field');
     expect(fields[0]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 5%, var(--graph-node-body-bg))',
     });
     expect(fields[1]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 10%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 5%, var(--graph-node-body-bg))',
     });
     expect(screen.getByText('name')).toHaveStyle({
       color: 'color-mix(in oklch, var(--graph-node-header-bg) 46%, var(--foreground))',
       fontWeight: '400',
     });
-    expect(fields[0].getAttribute('style')).toContain(
-      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
-    );
-    expect(fields[1].getAttribute('style')).toContain(
-      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-header-bg) 76%, transparent)',
-    );
+    expect(fields[0].getAttribute('style')).not.toContain('inset 3px 0 0');
+    expect(fields[1].getAttribute('style')).not.toContain('inset 3px 0 0');
   });
 
-  it('uses table-accent field rails when the parent table is selected', () => {
+  it('uses quiet selection tint when the parent table is selected', () => {
     const data: TypeNodeData = {
       typeName: 'Posts',
       kind: 'object',
@@ -238,9 +233,12 @@ describe('TypeNode', () => {
 
     render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('type-node-field').getAttribute('style')).toContain(
-      'inset 3px 0 0 color-mix(in oklch, var(--graph-node-table-accent) 76%, transparent)',
-    );
+    const field = screen.getByTestId('type-node-field');
+    expect(field).toHaveStyle({
+      background: 'color-mix(in oklch, var(--graph-node-selected) 5%, var(--graph-node-body-bg))',
+    });
+    expect(field.getAttribute('style')).not.toContain('var(--graph-node-table-accent)');
+    expect(field.getAttribute('style')).not.toContain('inset 3px 0 0');
   });
 
   it('uses a lighter selected-color treatment for field hover', () => {
@@ -259,7 +257,7 @@ describe('TypeNode', () => {
     fireEvent.mouseEnter(field);
 
     expect(field).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 11%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 6%, var(--graph-node-body-bg))',
     });
     expect(screen.getByText('name')).toHaveStyle({
       color: 'color-mix(in oklch, var(--graph-node-header-bg) 38%, var(--foreground))',
@@ -289,11 +287,11 @@ describe('TypeNode', () => {
     act(() => fireEvent.mouseOver(header));
     expect(header).toHaveStyle({ background: 'var(--graph-node-header-bg)' });
     expect(container.querySelector('[data-testid="type-node"]')?.getAttribute('style')).toContain(
-      '0 0 0 2px var(--graph-node-selected)',
+      'border-color: var(--graph-node-selected)',
     );
     expect(header.getAttribute('style')).not.toContain('inset 0 -2px');
     expect(screen.getAllByTestId('type-node-field')[1]).toHaveStyle({
-      background: 'color-mix(in oklch, var(--graph-node-header-bg) 7%, var(--graph-node-body-bg))',
+      background: 'color-mix(in oklch, var(--graph-node-header-bg) 3%, var(--graph-node-body-bg))',
     });
 
     fireEvent.click(header);
@@ -496,7 +494,7 @@ describe('TypeNode', () => {
       '→ ArtworkSourceReference· union',
     );
     expect(screen.getByTestId('type-node-field-ref-summary')).toHaveStyle({
-      color: 'var(--graph-edge-property)',
+      color: 'var(--graph-edge-ref)',
     });
     expect(screen.getByText('· union')).toHaveStyle({
       color: 'var(--muted-foreground)',

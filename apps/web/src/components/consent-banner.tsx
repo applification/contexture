@@ -55,7 +55,7 @@ export function ConsentBanner() {
         <button
           type="button"
           onClick={accept}
-          className="flex-1 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:opacity-90 transition-opacity"
+          className="flex-1 rounded-lg bg-foreground text-background px-3 py-1.5 text-sm font-medium hover:opacity-90 transition-opacity"
         >
           Accept
         </button>
