@@ -291,7 +291,12 @@ export function ReconcileModal(): React.JSX.Element {
       return;
     }
     void window.contexture?.reconcile
-      .writeGeneratedTarget({ irPath: filePath, targetPath, contents: currentEmit.source })
+      .acceptGeneratedTarget({
+        irPath: filePath,
+        targetPath,
+        contents: currentEmit.source,
+        schema,
+      })
       .then(async () => {
         await window.contexture?.drift.check();
         close();
@@ -300,7 +305,7 @@ export function ReconcileModal(): React.JSX.Element {
         const message = err instanceof Error ? err.message : String(err);
         setError(`Failed to overwrite file: ${message}`);
       });
-  }, [filePath, targetPath, targetKind, currentEmit, close, setError]);
+  }, [filePath, targetPath, targetKind, currentEmit, schema, close, setError]);
 
   const handleOpenInChat = useCallback(() => {
     const irJson = JSON.stringify(schema, null, 2);
