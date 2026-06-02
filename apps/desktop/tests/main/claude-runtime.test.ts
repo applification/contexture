@@ -107,6 +107,89 @@ describe('ClaudeProviderRuntime', () => {
     );
   });
 
+  it('falls back to the current Claude model IDs when SDK discovery is unavailable', async () => {
+    const runtime = new ClaudeProviderRuntime({
+      execFile: supportedExec(),
+      queryFn: vi.fn(() => {
+        throw new Error('model discovery unavailable');
+      }) as unknown as NonNullable<ClaudeProviderRuntimeOptions['queryFn']>,
+      skillsPluginPath: null,
+    });
+
+    await expect(runtime.listModels()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'claude-opus-4-8',
+          label: 'Claude Opus 4.8',
+          optionDescriptors: expect.arrayContaining([
+            expect.objectContaining({ id: 'contextWindow', type: 'select' }),
+          ]),
+        }),
+        expect.objectContaining({ id: 'claude-sonnet-4-6' }),
+        expect.objectContaining({ id: 'claude-haiku-4-5' }),
+      ]),
+    );
+  });
+
+  it('keeps the 200K/1M context selector for discovered Opus 4.8 models', async () => {
+    const runtime = new ClaudeProviderRuntime({
+      execFile: supportedExec(),
+      queryFn: interruptibleQuery(
+        [],
+        [
+          {
+            value: 'claude-opus-4-8',
+            displayName: 'Claude Opus 4.8',
+            description: '1M context',
+            supportsEffort: true,
+            supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+            supportsFastMode: true,
+          },
+        ],
+      ),
+      skillsPluginPath: null,
+    });
+
+    await expect(runtime.listModels()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'claude-opus-4-8',
+        optionDescriptors: expect.arrayContaining([
+          expect.objectContaining({ id: 'contextWindow', type: 'select' }),
+        ]),
+      }),
+    ]);
+  });
+
+  it('does not expose a context selector for Claude Code default aliases', async () => {
+    const runtime = new ClaudeProviderRuntime({
+      execFile: supportedExec(),
+      queryFn: interruptibleQuery(
+        [],
+        [
+          {
+            value: 'default',
+            displayName: 'Default (recommended)',
+            description: 'Opus 4.8 · Best for complex tasks',
+            supportsEffort: true,
+            supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+            supportsFastMode: true,
+          },
+        ],
+      ),
+      skillsPluginPath: null,
+    });
+
+    await expect(runtime.listModels()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'default',
+        label: 'Default (Opus 4.8)',
+        optionDescriptors: expect.not.arrayContaining([
+          expect.objectContaining({ id: 'contextWindow' }),
+        ]),
+      }),
+    ]);
+  });
+
   it('maps Claude Agent SDK messages to provider events and persists session refs', async () => {
     const queryFn = interruptibleQuery([
       { type: 'system', subtype: 'init', session_id: 'session-1' },
@@ -197,6 +280,38 @@ describe('ClaudeProviderRuntime', () => {
           effort: 'xhigh',
           thinking: { type: 'disabled' },
           settings: { fastMode: true, fastModePerSessionOptIn: true },
+        }),
+      }),
+    );
+  });
+
+  it('does not append context suffixes to Claude Code default aliases', async () => {
+    const queryFn = interruptibleQuery([{ type: 'result', subtype: 'success', is_error: false }]);
+    const runtime = new ClaudeProviderRuntime({
+      execFile: supportedExec(),
+      queryFn,
+      skillsPluginPath: null,
+    });
+    const thread = await runtime.startThread({ schema: { version: '1', types: [] } });
+
+    for await (const _event of runtime.sendTurn({
+      thread,
+      schema: { version: '1', types: [] },
+      message: 'hello',
+      model: 'default',
+      options: {
+        contextWindow: '1m',
+        reasoningEffort: 'high',
+      },
+    })) {
+      // drain
+    }
+
+    expect(queryFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          model: 'default',
+          effort: 'high',
         }),
       }),
     );

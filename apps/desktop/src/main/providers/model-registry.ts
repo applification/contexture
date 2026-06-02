@@ -46,24 +46,24 @@ const THINKING: ModelOptionDescriptor = {
 
 export const CLAUDE_FALLBACK_MODELS: ModelInfo[] = [
   {
-    id: 'default',
-    label: 'Default',
+    id: 'claude-opus-4-8',
+    label: 'Claude Opus 4.8',
     optionDescriptors: [reasoning(LOW_MED_HIGH_MAX_ULTRA), FAST_MODE, contextWindow()],
   },
   {
-    id: 'haiku',
-    label: 'Haiku',
-    optionDescriptors: [THINKING],
-  },
-  {
-    id: 'sonnet',
-    label: 'Sonnet',
+    id: 'claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
     optionDescriptors: [reasoning(LOW_MED_HIGH_ULTRA), contextWindow()],
   },
   {
-    id: 'opus',
-    label: 'Opus',
-    optionDescriptors: [reasoning(LOW_MED_HIGH_MAX_ULTRA), FAST_MODE, contextWindow()],
+    id: 'claude-haiku-4-5',
+    label: 'Claude Haiku 4.5',
+    optionDescriptors: [THINKING],
+  },
+  {
+    id: 'default',
+    label: 'Default',
+    optionDescriptors: [reasoning(LOW_MED_HIGH_MAX_ULTRA), FAST_MODE],
   },
 ];
 
@@ -165,6 +165,9 @@ function knownClaudeModelOptions(
 ): ModelOptionDescriptor[] {
   const key = `${id} ${displayName} ${description}`.toLowerCase();
   const isOneMillion = key.includes('1m') || key.includes('1m context');
+  if (displayName === 'Default (recommended)') {
+    return [reasoning(LOW_MED_HIGH_MAX_ULTRA), FAST_MODE];
+  }
   if (key.includes('haiku')) return [THINKING];
   if (key.includes('sonnet')) {
     return [reasoning(LOW_MED_HIGH_ULTRA), contextWindow(isOneMillion ? '1m' : undefined)];
@@ -176,9 +179,6 @@ function knownClaudeModelOptions(
     const descriptors: ModelOptionDescriptor[] = [effort, FAST_MODE];
     if (!key.includes('4.5')) descriptors.push(contextWindow(isOneMillion ? '1m' : undefined));
     return descriptors;
-  }
-  if (displayName === 'Default (recommended)') {
-    return [reasoning(LOW_MED_HIGH_MAX_ULTRA), FAST_MODE, contextWindow()];
   }
   return [];
 }
