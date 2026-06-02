@@ -135,6 +135,35 @@ describe('DetailPanel', () => {
     expect(onClearSelectedField).toHaveBeenCalledOnce();
   });
 
+  it('keeps field detail focused on the field after it is renamed', async () => {
+    const user = userEvent.setup();
+    const onSelectField = vi.fn();
+    seed(plotSchema);
+    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'name' });
+
+    render(
+      <DetailPanel
+        selection={{ typeName: 'Plot', fieldName: 'name' }}
+        onSelectField={onSelectField}
+      />,
+    );
+
+    const input = screen.getByLabelText('Name');
+    await user.clear(input);
+    await user.type(input, 'title');
+    fireEvent.blur(input);
+
+    expect(useGraphSelectionStore.getState().state.selectedField).toEqual({
+      typeName: 'Plot',
+      fieldName: 'title',
+    });
+    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({
+      nodeId: 'Plot',
+      fieldName: 'title',
+    });
+    expect(onSelectField).toHaveBeenCalledWith('Plot', 'title');
+  });
+
   it('derives model shape guidance for the selected type from the schema', () => {
     seed(artworkSchema);
     render(<DetailPanel selection={{ typeName: 'ArtworkMedia' }} />);

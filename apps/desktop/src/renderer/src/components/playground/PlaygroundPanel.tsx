@@ -3,6 +3,7 @@ import {
   buildPlaygroundContract,
   emptyEntityValue,
   type PlaygroundArrayControl,
+  type PlaygroundArrayElementControl,
   type PlaygroundControl,
   type PlaygroundEntity,
   type PlaygroundRefControl,
@@ -59,15 +60,16 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   const insertRecords = usePlaygroundStore((state) => state.insertRecords);
   const deleteRecord = usePlaygroundStore((state) => state.deleteRecord);
   const clearType = usePlaygroundStore((state) => state.clearType);
-  const pruneTypes = usePlaygroundStore((state) => state.pruneTypes);
+  const setScope = usePlaygroundStore((state) => state.setScope);
+  const scopeId = useMemo(() => schemaScopeId(schema), [schema]);
 
   useEffect(() => {
     const typeNames = contract.entities.map((entity) => entity.typeName);
-    pruneTypes(typeNames);
+    setScope(scopeId, typeNames);
     if (typeNames.length > 0 && (!selectedTypeName || !typeNames.includes(selectedTypeName))) {
       selectType(typeNames[0] ?? null);
     }
-  }, [contract.entities, pruneTypes, selectType, selectedTypeName]);
+  }, [contract.entities, scopeId, selectType, selectedTypeName, setScope]);
 
   const selectedEntity =
     contract.entities.find((entity) => entity.typeName === selectedTypeName) ??
@@ -270,11 +272,15 @@ export function ScopedPlaygroundWorkbench({
   const insertRecords = usePlaygroundStore((state) => state.insertRecords);
   const deleteRecord = usePlaygroundStore((state) => state.deleteRecord);
   const clearType = usePlaygroundStore((state) => state.clearType);
-  const pruneTypes = usePlaygroundStore((state) => state.pruneTypes);
+  const setScope = usePlaygroundStore((state) => state.setScope);
+  const scopeId = useMemo(() => schemaScopeId(schema), [schema]);
 
   useEffect(() => {
-    pruneTypes(contract.entities.map((entity) => entity.typeName));
-  }, [contract.entities, pruneTypes]);
+    setScope(
+      scopeId,
+      contract.entities.map((entity) => entity.typeName),
+    );
+  }, [contract.entities, scopeId, setScope]);
 
   const entity = contract.entities.find((candidate) => candidate.typeName === typeName) ?? null;
   if (!entity) return null;
@@ -1357,6 +1363,8 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
   switch (control.kind) {
     case 'text': {
       let stringSchema = z.string();
+      if (control.required && !control.serverDerived && control.constraints.min === undefined)
+        stringSchema = stringSchema.min(1, 'Required.');
       if (control.constraints.min !== undefined)
         stringSchema = stringSchema.min(control.constraints.min);
       if (control.constraints.max !== undefined)
@@ -1387,7 +1395,7 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
       schema = z.boolean();
       break;
     case 'date':
-      schema = z.string();
+      schema = requiredStringSchema(control);
       break;
     case 'literal':
       schema = z.literal(control.constraints.literalValue);
@@ -1399,20 +1407,40 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
           : z.string();
       break;
     case 'ref':
-      schema = z.string();
+      schema = requiredStringSchema(control);
       break;
     case 'array':
-      schema = z.string().refine((value) => {
-        try {
-          const parsed = JSON.parse(value || '[]');
-          if (!Array.isArray(parsed)) return false;
-          if (control.min !== undefined && parsed.length < control.min) return false;
-          if (control.max !== undefined && parsed.length > control.max) return false;
-          return true;
-        } catch {
-          return false;
+      schema = z.string().superRefine((value, ctx) => {
+        const parsed = parseJsonArray(value);
+        if (!parsed.ok) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a valid JSON array.' });
+          return;
         }
-      }, 'Enter a valid JSON array.');
+        if (control.min !== undefined && parsed.value.length < control.min) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Enter at least ${control.min} items.`,
+          });
+          return;
+        }
+        if (control.max !== undefined && parsed.value.length > control.max) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Enter at most ${control.max} items.`,
+          });
+          return;
+        }
+        const elementSchema = zodSchemaForArrayElement(control.element);
+        for (const [index, item] of parsed.value.entries()) {
+          if (!elementSchema.safeParse(item).success) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Item ${index + 1} does not match the array element type.`,
+            });
+            return;
+          }
+        }
+      });
       break;
     case 'object':
       schema = zodSchemaForControls(control.fields);
@@ -1428,8 +1456,70 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
   return schema;
 }
 
+function requiredStringSchema(control: PlaygroundControl): z.ZodString {
+  return control.required && !control.serverDerived ? z.string().min(1, 'Required.') : z.string();
+}
+
+function zodSchemaForArrayElement(element: PlaygroundArrayElementControl): z.ZodType {
+  switch (element.kind) {
+    case 'text': {
+      let stringSchema = z.string();
+      if (element.constraints.min !== undefined)
+        stringSchema = stringSchema.min(element.constraints.min);
+      if (element.constraints.max !== undefined)
+        stringSchema = stringSchema.max(element.constraints.max);
+      if (element.constraints.regex)
+        stringSchema = stringSchema.regex(new RegExp(element.constraints.regex));
+      if (element.constraints.format === 'email') stringSchema = stringSchema.email();
+      if (element.constraints.format === 'url') stringSchema = stringSchema.url();
+      if (element.constraints.format === 'uuid') stringSchema = stringSchema.uuid();
+      if (element.constraints.format === 'datetime') stringSchema = stringSchema.datetime();
+      return stringSchema;
+    }
+    case 'number': {
+      let numberSchema = z.number();
+      if (element.constraints.int) numberSchema = numberSchema.int();
+      if (element.constraints.min !== undefined)
+        numberSchema = numberSchema.min(element.constraints.min);
+      if (element.constraints.max !== undefined)
+        numberSchema = numberSchema.max(element.constraints.max);
+      return numberSchema;
+    }
+    case 'boolean':
+      return z.boolean();
+    case 'date':
+    case 'ref':
+      return z.string().min(1);
+    case 'literal':
+      return z.literal(element.constraints.literalValue);
+    case 'enum':
+      return element.options.length > 0
+        ? z.enum(element.options.map((option) => option.value) as [string, ...string[]])
+        : z.string();
+    case 'array':
+      return z.array(zodSchemaForArrayElement(element.element));
+    case 'object':
+      return zodSchemaForControls(element.fields);
+    case 'unsupported':
+      return z.unknown();
+  }
+}
+
+function parseJsonArray(value: string): { ok: true; value: unknown[] } | { ok: false } {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function emptyStringToUndefined(schema: z.ZodType): z.ZodType {
   return z.preprocess((value) => (value === '' ? undefined : value), schema);
+}
+
+function schemaScopeId(schema: Schema): string {
+  return `schema:${JSON.stringify(schema)}`;
 }
 
 function recordLabel(entity: PlaygroundEntity, record: PlaygroundRecord): string {
