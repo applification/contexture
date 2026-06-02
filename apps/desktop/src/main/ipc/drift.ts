@@ -10,6 +10,7 @@
  * `drift:check` is a one-shot manual re-check (window focus trigger).
  */
 
+import { STDLIB_RUNTIME_MODULES } from '@shared/stdlib-registry';
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
@@ -39,6 +40,7 @@ export function registerDriftIpc(mainWindow: BrowserWindow): void {
           files: problems,
         }),
       onResolved: () => mainWindow.webContents.send('drift:resolved'),
+      emitDeps: { stdlibRuntime: STDLIB_RUNTIME_MODULES },
     });
     activeWatcher.start();
     return { ok: true };

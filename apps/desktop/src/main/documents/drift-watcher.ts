@@ -21,8 +21,8 @@ import { type FSWatcher, promises as fsPromises, watch } from 'node:fs';
 import {
   bundlePathsFor,
   classifyGeneratedBundleDrift,
+  type EmitPipelineDeps,
   type GeneratedDriftClassification,
-  generatedTargetsFor,
   load,
 } from '@contexture/core';
 
@@ -95,6 +95,7 @@ export interface DriftWatcherOptions {
   onResolved: () => void;
   debounceMs?: number;
   readFile?: (path: string) => Promise<string>;
+  emitDeps?: EmitPipelineDeps;
 }
 
 export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
@@ -105,9 +106,9 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
     onResolved,
     debounceMs = 300,
     readFile = (p) => fsPromises.readFile(p, 'utf-8'),
+    emitDeps,
   } = opts;
   const emittedJsonPath = bundlePathsFor(irPath).emitted;
-  const allowedPaths = generatedTargetsFor(irPath).map((entry) => entry.path);
 
   let watchers: FSWatcher[] = [];
   let watchedPaths: string[] = [];
@@ -116,7 +117,7 @@ export function createDriftWatcher(opts: DriftWatcherOptions): DriftWatcher {
   let stopped = false;
 
   async function doCheck(): Promise<void> {
-    const results = await detectCurrentDrift(irPath, emittedJsonPath, readFile, allowedPaths);
+    const results = await detectCurrentDrift(irPath, emittedJsonPath, readFile, emitDeps);
     if (stopped || results.length === 0) return;
 
     const problems = results.flatMap((result): DriftProblem[] => {
@@ -247,15 +248,12 @@ async function detectCurrentDrift(
   irPath: string,
   emittedJsonPath: string,
   readFile: (path: string) => Promise<string>,
-  allowedPaths: readonly string[],
+  emitDeps?: EmitPipelineDeps,
 ): Promise<Array<{ path: string; status: DriftResult['status'] | GeneratedDriftClassification }>> {
   try {
     const { schema } = load(await readFile(irPath));
-    const allowed = new Set(allowedPaths);
-    return (await classifyGeneratedBundleDrift(schema, irPath, { readFile })).filter((result) =>
-      allowed.has(result.path),
-    );
+    return classifyGeneratedBundleDrift(schema, irPath, { readFile }, emitDeps);
   } catch {
-    return detectDrift(emittedJsonPath, readFile, { allowedPaths });
+    return detectDrift(emittedJsonPath, readFile);
   }
 }

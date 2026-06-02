@@ -6,6 +6,19 @@ const baseSchema: Schema = {
   types: [{ kind: 'object', name: 'Post', fields: [] }],
 };
 
+const commonRuntimeSchema: Schema = {
+  version: '1',
+  metadata: { name: 'Common stdlib runtime' },
+  types: [
+    {
+      kind: 'raw',
+      name: 'Email',
+      zod: 'z.string().email()',
+      jsonSchema: { type: 'string', format: 'email' },
+    },
+  ],
+};
+
 describe('runEmitPipeline output config', () => {
   it('keeps existing generated outputs enabled when outputs config is omitted', () => {
     const { emitted } = runEmitPipeline(
@@ -53,6 +66,43 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/index.ts',
     ]);
     expect(Object.keys(manifest.files)).toEqual(['app.schema.ts', 'index.ts']);
+  });
+
+  it('emits configured targets into monorepo output directories', () => {
+    const schema: Schema = {
+      ...baseSchema,
+      outputs: {
+        zod: { dir: 'packages/domain/src/generated' },
+        jsonSchema: { dir: 'packages/domain/schema' },
+        schemaIndex: { dir: 'packages/domain/src/indexes' },
+        convex: { dir: 'apps/api/convex' },
+        aiPipeline: {
+          formValidators: { enabled: true, dir: 'apps/web/src/forms' },
+          mcpDefinitions: { enabled: true, dir: 'packages/domain/mcp' },
+        },
+      },
+    };
+
+    const { emitted, manifest } = runEmitPipeline(schema, '/repo/app.contexture.json');
+    const byPath = new Map(emitted.map((file) => [file.path, file.content]));
+
+    expect(emitted.map((file) => file.path)).toEqual([
+      '/repo/apps/api/convex/schema.ts',
+      '/repo/apps/api/convex/validators.ts',
+      '/repo/packages/domain/src/generated/app.schema.ts',
+      '/repo/packages/domain/schema/app.schema.json',
+      '/repo/packages/domain/src/indexes/index.ts',
+      '/repo/packages/domain/mcp/mcp-definitions.json',
+      '/repo/apps/web/src/forms/form-validators.ts',
+    ]);
+    expect(byPath.get('/repo/packages/domain/src/indexes/index.ts')).toContain(
+      "export * from '../generated/app.schema';",
+    );
+    expect(byPath.get('/repo/apps/web/src/forms/form-validators.ts')).toContain(
+      "import { Post } from '../../../../packages/domain/src/generated/app.schema';",
+    );
+    expect(manifest.files).toHaveProperty('apps/api/convex/schema.ts');
+    expect(manifest.files).toHaveProperty('packages/domain/src/generated/app.schema.ts');
   });
 
   it('uses stable source labels and manifest keys across checkout roots', () => {
@@ -150,5 +200,64 @@ describe('runEmitPipeline output config', () => {
     expect(manifest.files).toHaveProperty('.contexture/structured-output-schemas.json');
     expect(manifest.files).toHaveProperty('.contexture/mcp-definitions.json');
     expect(manifest.files).toHaveProperty('form-validators.ts');
+  });
+
+  it('vendors only referenced stdlib runtime modules into the generated bundle', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'User',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    };
+
+    const { emitted, manifest } = runEmitPipeline(schema, '/repo/app.contexture.json', {
+      stdlibRuntime: [
+        { namespace: 'common', schema: commonRuntimeSchema },
+        { namespace: 'money', schema: { version: '1', types: [] } },
+      ],
+    });
+    const byPath = new Map(emitted.map((file) => [file.path, file.content]));
+
+    expect(byPath.get('/repo/schema/app.schema.ts')).toContain(
+      "import { Email } from './contexture-runtime/common';",
+    );
+    expect(byPath.get('/repo/schema/contexture-runtime/common.ts')).toContain(
+      'export const Email = z.string().email();',
+    );
+    expect(byPath.has('/repo/schema/contexture-runtime/money.ts')).toBe(false);
+    expect(manifest.files).toHaveProperty('schema/contexture-runtime/common.ts');
+    expect(manifest.files).not.toHaveProperty('schema/contexture-runtime/money.ts');
+  });
+
+  it('respects a configured stdlib runtime output directory', () => {
+    const schema: Schema = {
+      version: '1',
+      outputs: {
+        zod: { dir: 'packages/domain/src/generated' },
+        stdlibRuntime: { dir: 'packages/domain/src/runtime' },
+      },
+      types: [
+        {
+          kind: 'object',
+          name: 'User',
+          fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+        },
+      ],
+    };
+
+    const { emitted, manifest } = runEmitPipeline(schema, '/repo/app.contexture.json', {
+      stdlibRuntime: [{ namespace: 'common', schema: commonRuntimeSchema }],
+    });
+    const byPath = new Map(emitted.map((file) => [file.path, file.content]));
+
+    expect(byPath.get('/repo/packages/domain/src/generated/app.schema.ts')).toContain(
+      "import { Email } from '../runtime/common';",
+    );
+    expect(byPath.has('/repo/packages/domain/src/runtime/common.ts')).toBe(true);
+    expect(manifest.files).toHaveProperty('packages/domain/src/runtime/common.ts');
   });
 });

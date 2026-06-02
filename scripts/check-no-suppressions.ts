@@ -12,6 +12,7 @@ const ignoredDirectories = new Set([
   'dist',
   'node_modules',
   'out',
+  'storybook-static',
 ]);
 const ignoredFiles = new Set(['env.d.ts']);
 

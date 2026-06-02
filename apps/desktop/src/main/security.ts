@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, parse, resolve } from 'node:path';
+import type { Schema } from '@contexture/core';
 import { assertContextureIrPath, generatedTargetsFor } from '@contexture/core/paths';
 
 const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'mailto:']);
@@ -13,13 +14,19 @@ export function isSafeExternalUrl(rawUrl: string): boolean {
   }
 }
 
-export function assertGeneratedTargetForIr(irPath: string, targetPath: string): string {
+export function assertGeneratedTargetForIr(
+  irPath: string,
+  targetPath: string,
+  schema?: Schema,
+): string {
   if (!isAbsolute(irPath) || !isAbsolute(targetPath)) {
     throw new Error('Contexture generated target paths must be absolute.');
   }
 
   const target = resolve(targetPath);
-  const allowed = new Set(generatedTargetsFor(resolve(irPath)).map((entry) => resolve(entry.path)));
+  const allowed = new Set(
+    generatedTargetsFor(resolve(irPath), schema).map((entry) => resolve(entry.path)),
+  );
 
   if (!allowed.has(target)) {
     throw new Error('Target is not a generated Contexture artifact for this IR.');

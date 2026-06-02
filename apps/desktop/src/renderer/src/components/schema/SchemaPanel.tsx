@@ -29,10 +29,16 @@ import {
   type GeneratedTargetLanguage,
   generatedTargetDisplayPath,
   generatedTargetMetadata,
+  generatedTargetOutputDir,
   generatedTargetPath,
   previewableGeneratedTargets,
 } from '@contexture/core/generated-targets';
-import type { GeneratedTargetKind } from '@contexture/core/paths';
+import type { Schema } from '@contexture/core/ir';
+import {
+  bundlePathsFor,
+  type GeneratedTargetKind,
+  manifestKeyForGeneratedPath,
+} from '@contexture/core/paths';
 import {
   AArrowDown,
   AArrowUp,
@@ -42,11 +48,14 @@ import {
   FileBracesCorner,
   FileCode,
   PlugZap,
+  RotateCcw,
   Settings2,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../ui/empty';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import {
   Select,
@@ -62,16 +71,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { getHighlighter, SHIKI_THEMES } from './shiki-highlighter';
 
-export type SchemaOutputType = GeneratedTargetKind;
+export type SchemaOutputType = GeneratedTargetKind | 'stdlib-runtime';
 
 export interface SchemaPanelAdditionalSource {
-  type: Exclude<SchemaOutputType, 'zod' | 'json-schema' | 'schema-index' | 'convex'>;
+  type: Exclude<GeneratedTargetKind, 'zod' | 'json-schema' | 'schema-index' | 'convex'>;
   source: string;
   enabled?: boolean;
 }
 
 export interface SchemaPanelSource {
-  type: SchemaOutputType;
+  type: GeneratedTargetKind;
   source: string;
   enabled?: boolean;
 }
@@ -104,9 +113,13 @@ export interface SchemaPanelProps {
    */
   additionalSources?: SchemaPanelAdditionalSource[];
   /** Enable an optional output target from the output configuration popover. */
-  onEnableOutput?: (type: SchemaOutputType) => void;
+  onEnableOutput?: (type: GeneratedTargetKind) => void;
+  /** Configure a generated target's IR-relative output directory. */
+  onOutputDirChange?: (type: SchemaOutputType, dir: string | null) => void;
   /** Absolute path of the active `.contexture.json`; absent for unsaved documents. */
   documentFilePath?: string | null;
+  /** Current IR schema, used to resolve configured generated output paths. */
+  schema?: Schema;
   /** Open the selected generated file in an external editor. */
   onOpenGeneratedFile?: (path: string) => void;
   /** Prompt the app save flow when agent setup needs a stable IR path. */
@@ -173,6 +186,7 @@ interface OutputOption {
   help: string;
   language: GeneratedTargetLanguage;
   fileName: string;
+  dir: string | null;
   enabled: boolean;
 }
 
@@ -193,11 +207,13 @@ export function SchemaPanel({
   schemaFileName = 'schema.ts',
   additionalSources = [],
   onEnableOutput,
+  onOutputDirChange,
   documentFilePath = null,
+  schema,
   onOpenGeneratedFile,
   onRequestSave,
 }: SchemaPanelProps): React.JSX.Element {
-  const [activeOutput, setActiveOutput] = useState<SchemaOutputType>('convex');
+  const [activeOutput, setActiveOutput] = useState<GeneratedTargetKind>('convex');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [fontSizeIndex, setFontSizeIndex] = useState<number>(DEFAULT_FONT_SIZE_INDEX);
   const [copied, setCopied] = useState(false);
@@ -251,17 +267,36 @@ export function SchemaPanel({
           help: metadata.help,
           language: metadata.language,
           fileName: generatedTargetDisplayPath(type, baseName),
+          dir: schema ? generatedTargetOutputDir(schema, type) : null,
           enabled,
         };
       });
-  }, [additionalSources, convexSource, jsonSource, schemaFileName, sources, zodSource]);
+  }, [additionalSources, convexSource, jsonSource, schema, schemaFileName, sources, zodSource]);
+
+  const configOptions = useMemo<OutputOption[]>(
+    () => [
+      ...outputOptions,
+      {
+        type: 'stdlib-runtime',
+        source: '',
+        group: 'supporting',
+        label: 'Stdlib runtime',
+        help: 'Generated runtime modules for stdlib types referenced by this schema.',
+        language: 'typescript',
+        fileName: 'contexture-runtime/*.ts',
+        dir: schema?.outputs?.stdlibRuntime?.dir ?? null,
+        enabled: true,
+      },
+    ],
+    [outputOptions, schema?.outputs?.stdlibRuntime?.dir],
+  );
 
   const enabledOutputOptions = useMemo(
-    () => outputOptions.filter((output) => output.enabled),
-    [outputOptions],
-  );
-  const disabledOutputOptions = useMemo(
-    () => outputOptions.filter((output) => !output.enabled),
+    () =>
+      outputOptions.filter(
+        (output): output is OutputOption & { type: GeneratedTargetKind } =>
+          output.enabled && output.type !== 'stdlib-runtime',
+      ),
     [outputOptions],
   );
 
@@ -278,8 +313,12 @@ export function SchemaPanel({
   const activeSource = selectedOutput?.source ?? '';
   const selectedOutputPath =
     selectedOutput && documentFilePath
-      ? generatedTargetPath(selectedOutput.type, documentFilePath)
+      ? safePreviewTargetPath(selectedOutput, documentFilePath, schema)
       : null;
+  const selectedOutputDisplayPath =
+    selectedOutput && documentFilePath && selectedOutputPath
+      ? manifestKeyForGeneratedPath(documentFilePath, selectedOutputPath)
+      : (selectedOutput?.fileName ?? 'schema.ts');
 
   // Re-highlight whenever the active source or output type changes.
   useEffect(() => {
@@ -413,16 +452,17 @@ export function SchemaPanel({
                     setHighlightedHtml(null);
                   }}
                 />
-                {disabledOutputOptions.length > 0 ? (
-                  <OutputConfigPopover
-                    disabledOptions={disabledOutputOptions}
-                    onEnableOutput={(type) => {
-                      setActiveOutput(type);
-                      setHighlightedHtml(null);
-                      onEnableOutput?.(type);
-                    }}
-                  />
-                ) : null}
+                <OutputConfigPopover
+                  options={configOptions}
+                  documentFilePath={documentFilePath}
+                  schema={schema}
+                  onEnableOutput={(type) => {
+                    setActiveOutput(type);
+                    setHighlightedHtml(null);
+                    onEnableOutput?.(type);
+                  }}
+                  onOutputDirChange={onOutputDirChange}
+                />
                 <AgentSetupPopover
                   documentFilePath={documentFilePath}
                   copied={agentCopied}
@@ -432,7 +472,7 @@ export function SchemaPanel({
                 />
               </div>
               <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
-                {selectedOutput?.fileName ?? 'schema.ts'}
+                {selectedOutputDisplayPath}
               </div>
               <div
                 className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80"
@@ -513,19 +553,40 @@ export function SchemaPanel({
   );
 }
 
+function safeGeneratedTargetPath(
+  type: GeneratedTargetKind,
+  documentFilePath: string,
+  schema?: Schema,
+): string | null {
+  try {
+    return generatedTargetPath(type, documentFilePath, schema);
+  } catch {
+    return null;
+  }
+}
+
+function safePreviewTargetPath(
+  output: OutputOption,
+  documentFilePath: string,
+  schema?: Schema,
+): string | null {
+  if (output.type === 'stdlib-runtime') return null;
+  return safeGeneratedTargetPath(output.type, documentFilePath, schema);
+}
+
 function OutputSelect({
   activeOutput,
   enabledOptions,
   onValueChange,
 }: {
-  activeOutput: SchemaOutputType;
+  activeOutput: GeneratedTargetKind;
   enabledOptions: OutputOption[];
-  onValueChange: (type: SchemaOutputType) => void;
+  onValueChange: (type: GeneratedTargetKind) => void;
 }): React.JSX.Element {
   return (
     <Select
       value={activeOutput}
-      onValueChange={(value) => onValueChange(value as SchemaOutputType)}
+      onValueChange={(value) => onValueChange(value as GeneratedTargetKind)}
     >
       <SelectTrigger
         className="h-7 min-w-0 flex-1 border-border/70 bg-background/80 px-2 py-1 text-xs"
@@ -563,11 +624,17 @@ function OutputSelect({
 }
 
 function OutputConfigPopover({
-  disabledOptions,
+  options,
+  documentFilePath,
+  schema,
   onEnableOutput,
+  onOutputDirChange,
 }: {
-  disabledOptions: OutputOption[];
-  onEnableOutput?: (type: SchemaOutputType) => void;
+  options: OutputOption[];
+  documentFilePath: string | null;
+  schema?: Schema;
+  onEnableOutput?: (type: GeneratedTargetKind) => void;
+  onOutputDirChange?: (type: SchemaOutputType, dir: string | null) => void;
 }): React.JSX.Element {
   return (
     <Popover>
@@ -593,16 +660,17 @@ function OutputConfigPopover({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <PopoverContent className="w-72 p-2" align="end">
+      <PopoverContent className="w-[420px] p-2" align="end">
         <div className="mb-2 px-1">
           <div className="text-xs font-semibold text-foreground">Generated outputs</div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Convex files are primary generated outputs. Enable supporting targets as needed.
+            Set IR-relative folders for each generated target. Empty folders use Contexture's
+            default layout.
           </p>
         </div>
-        <div className="space-y-1">
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
           {OUTPUT_GROUPS.map(({ group, label }) => {
-            const groupOutputs = disabledOptions.filter((output) => output.group === group);
+            const groupOutputs = options.filter((output) => output.group === group);
             if (groupOutputs.length === 0) return null;
             return (
               <div key={group} data-testid={`schema-group-${group}`}>
@@ -610,23 +678,14 @@ function OutputConfigPopover({
                   {label}
                 </div>
                 {groupOutputs.map((output) => (
-                  <button
+                  <OutputConfigRow
                     key={output.type}
-                    type="button"
-                    className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() => onEnableOutput?.(output.type)}
-                    data-testid={`schema-output-${output.type}`}
-                  >
-                    <span className="mt-0.5 text-muted-foreground">+</span>
-                    <span className="min-w-0">
-                      <span className="block font-medium text-foreground">
-                        Enable {output.label}
-                      </span>
-                      <span className="block text-[11px] leading-snug text-muted-foreground">
-                        {output.help}
-                      </span>
-                    </span>
-                  </button>
+                    output={output}
+                    documentFilePath={documentFilePath}
+                    schema={schema}
+                    onEnableOutput={onEnableOutput}
+                    onOutputDirChange={onOutputDirChange}
+                  />
                 ))}
               </div>
             );
@@ -635,6 +694,168 @@ function OutputConfigPopover({
       </PopoverContent>
     </Popover>
   );
+}
+
+function OutputConfigRow({
+  output,
+  documentFilePath,
+  schema,
+  onEnableOutput,
+  onOutputDirChange,
+}: {
+  output: OutputOption;
+  documentFilePath: string | null;
+  schema?: Schema;
+  onEnableOutput?: (type: GeneratedTargetKind) => void;
+  onOutputDirChange?: (type: SchemaOutputType, dir: string | null) => void;
+}): React.JSX.Element {
+  const inputId = `output-dir-${output.type}`;
+  const defaultDir = defaultOutputDirFor(output.type, documentFilePath, output.fileName, schema);
+  const [draft, setDraft] = useState(output.dir ?? '');
+
+  useEffect(() => {
+    setDraft(output.dir ?? '');
+  }, [output.dir]);
+
+  const validation = validateOutputDirDraft(draft);
+  const canApply = validation === null && draft.trim() !== (output.dir ?? '');
+
+  const applyDraft = (): void => {
+    if (!canApply) return;
+    const normalized = normalizeOutputDirDraft(draft);
+    onOutputDirChange?.(output.type, normalized === '' ? null : normalized);
+  };
+
+  return (
+    <div
+      className="rounded-md border border-border/70 bg-background/80 px-2 py-2"
+      data-testid={`schema-output-${output.type}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-xs font-medium text-foreground">{output.label}</span>
+            {!output.enabled ? (
+              <span className="rounded border border-border px-1 py-0.5 text-[10px] text-muted-foreground">
+                Off
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{output.help}</p>
+        </div>
+        {!output.enabled ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-7 shrink-0 px-2 text-xs"
+            onClick={() => {
+              if (output.type !== 'stdlib-runtime') onEnableOutput?.(output.type);
+            }}
+            data-testid={`schema-enable-${output.type}`}
+          >
+            Enable
+          </Button>
+        ) : null}
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={inputId} className="text-[11px] text-muted-foreground">
+            Output folder
+          </Label>
+          {output.dir ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={() => onOutputDirChange?.(output.type, null)}
+              aria-label={`Reset ${output.label} output folder`}
+              title={`Reset ${output.label} output folder`}
+              data-testid={`schema-output-dir-reset-${output.type}`}
+            >
+              <RotateCcw className="size-3" />
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex gap-1.5">
+          <Input
+            id={inputId}
+            value={draft}
+            placeholder={defaultDir}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={applyDraft}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') applyDraft();
+            }}
+            className="h-8 font-mono text-xs"
+            aria-invalid={validation !== null}
+            data-testid={`schema-output-dir-${output.type}`}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 px-2 text-xs"
+            disabled={!canApply}
+            onClick={applyDraft}
+            data-testid={`schema-output-dir-apply-${output.type}`}
+          >
+            Apply
+          </Button>
+        </div>
+        <p
+          className={`text-[10px] leading-snug ${
+            validation ? 'text-destructive' : 'text-muted-foreground'
+          }`}
+          data-testid={`schema-output-dir-help-${output.type}`}
+        >
+          {validation ?? `Default: ${defaultDir}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function defaultOutputDirFor(
+  type: SchemaOutputType,
+  documentFilePath: string | null,
+  fallbackPath: string,
+  schema?: Schema,
+): string {
+  if (documentFilePath) {
+    if (type === 'stdlib-runtime') {
+      return dirname(
+        manifestKeyForGeneratedPath(
+          documentFilePath,
+          bundlePathsFor(documentFilePath, schema).stdlibRuntimeDir,
+        ),
+      );
+    }
+    const path = safeGeneratedTargetPath(type, documentFilePath, schema);
+    if (path) return dirname(manifestKeyForGeneratedPath(documentFilePath, path));
+  }
+  return dirname(fallbackPath);
+}
+
+function validateOutputDirDraft(value: string): string | null {
+  const normalized = normalizeOutputDirDraft(value);
+  if (normalized === '') return null;
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+    return 'Use a relative folder path.';
+  }
+  if (normalized === '..' || normalized.startsWith('../')) {
+    return 'Folder must stay within the directory containing the IR.';
+  }
+  return null;
+}
+
+function normalizeOutputDirDraft(value: string): string {
+  return value.trim().replaceAll('\\', '/').replace(/\/+/g, '/').replace(/^\.\//, '');
+}
+
+function dirname(path: string): string {
+  const slash = path.lastIndexOf('/');
+  if (slash <= 0) return slash === 0 ? '/' : '.';
+  return path.slice(0, slash);
 }
 
 function AgentSetupPopover({

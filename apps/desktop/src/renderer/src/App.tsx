@@ -24,6 +24,7 @@ import {
   enableGeneratedTarget,
   isGeneratedTargetEnabled,
   previewableGeneratedTargets,
+  setGeneratedTargetOutputDir,
 } from '@contexture/core/generated-targets';
 import type { Schema } from '@contexture/core/ir';
 import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
@@ -59,7 +60,11 @@ import { TYPE_NODE_EVENT, TYPE_NODE_OBJECT_EVENT } from './components/graph/node
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
-import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
+import {
+  type SchemaOutputType,
+  SchemaPanel,
+  type SchemaPanelSource,
+} from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
 import { StdlibPanel } from './components/stdlib/StdlibPanel';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
@@ -433,6 +438,32 @@ export default function App(): React.JSX.Element {
     [schema],
   );
 
+  const updateSchemaOutputDir = useCallback(
+    (type: SchemaOutputType, dir: string | null): void => {
+      if (type === 'stdlib-runtime') {
+        const nextConfig = { ...(schema.outputs?.stdlibRuntime ?? {}) };
+        if (dir === null) delete nextConfig.dir;
+        else nextConfig.dir = dir;
+        useUndoStore.getState().apply({
+          kind: 'replace_schema',
+          schema: {
+            ...schema,
+            outputs: {
+              ...(schema.outputs ?? {}),
+              stdlibRuntime: nextConfig,
+            },
+          },
+        });
+        return;
+      }
+      useUndoStore.getState().apply({
+        kind: 'replace_schema',
+        schema: setGeneratedTargetOutputDir(schema, type, dir),
+      });
+    },
+    [schema],
+  );
+
   const openGeneratedFile = useCallback((path: string): void => {
     void window.contexture?.shell.openInEditor(path);
   }, []);
@@ -570,10 +601,12 @@ export default function App(): React.JSX.Element {
                   error={schemaEmissions.error}
                   onCopy={copyToClipboard}
                   onEnableOutput={enableSchemaOutput}
+                  onOutputDirChange={updateSchemaOutputDir}
                   documentFilePath={filePath}
                   onOpenGeneratedFile={openGeneratedFile}
                   onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
+                  schema={schema}
                 />
               </div>
               <div

@@ -189,6 +189,7 @@ const MetadataSchema = z.object({
 
 const OutputTargetConfigSchema = z.object({
   enabled: z.boolean().optional(),
+  dir: z.string().min(1).optional(),
 });
 
 export type OutputTargetConfig = z.infer<typeof OutputTargetConfigSchema>;
@@ -207,6 +208,7 @@ const OutputsConfigSchema = z.object({
   jsonSchema: OutputTargetConfigSchema.optional(),
   schemaIndex: OutputTargetConfigSchema.optional(),
   convex: OutputTargetConfigSchema.optional(),
+  stdlibRuntime: OutputTargetConfigSchema.optional(),
   aiPipeline: AiPipelineOutputsSchema.optional(),
 });
 

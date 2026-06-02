@@ -70,7 +70,7 @@ describe('App schema outputs', () => {
       expect(screen.getByTestId('schema-output-config')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByTestId('schema-output-config'));
-    fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
+    fireEvent.click(screen.getByTestId('schema-enable-ai-tool-schemas'));
 
     await waitFor(() => {
       expect(useUndoStore.getState().schema.outputs?.aiPipeline?.toolSchemas?.enabled).toBe(true);
@@ -100,5 +100,34 @@ describe('App schema outputs', () => {
       );
     });
     expect(screen.getByTestId('schema-code').textContent ?? '').not.toContain('<unsaved>');
+  });
+
+  it('lets users set a generated output folder from the Schema panel', async () => {
+    useDocumentStore.getState().setFilePath('/repo/garden.contexture.json');
+    useUndoStore.getState().apply({
+      kind: 'replace_schema',
+      schema: {
+        version: '1',
+        types: [{ kind: 'object', name: 'Lead', fields: [] }],
+      },
+    });
+
+    render(<App />);
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('schema-output-config'));
+    await user.type(screen.getByTestId('schema-output-dir-zod'), 'packages/domain/src/generated');
+    fireEvent.click(screen.getByTestId('schema-output-dir-apply-zod'));
+
+    await waitFor(() => {
+      expect(useUndoStore.getState().schema.outputs?.zod?.dir).toBe(
+        'packages/domain/src/generated',
+      );
+    });
+    await user.click(screen.getByTestId('schema-output-selector'));
+    fireEvent.click(await screen.findByTestId('schema-output-zod'));
+    expect(screen.getByTestId('schema-filename')).toHaveTextContent(
+      'packages/domain/src/generated/garden.schema.ts',
+    );
   });
 });

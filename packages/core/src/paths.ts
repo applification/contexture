@@ -1,3 +1,5 @@
+import type { Schema } from './ir';
+
 export const IR_SUFFIX = '.contexture.json';
 export const SCHEMA_TS_SUFFIX = '.schema.ts';
 export const SCHEMA_JSON_SUFFIX = '.schema.json';
@@ -11,6 +13,7 @@ export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
 export const FORM_VALIDATORS_FILE = 'form-validators.ts';
 export const CONVEX_VALIDATORS_FILE = 'validators.ts';
 export const SCHEMA_DIR = 'schema';
+export const STDLIB_RUNTIME_DIR = 'contexture-runtime';
 
 export interface BundlePaths {
   ir: string;
@@ -27,6 +30,7 @@ export interface BundlePaths {
   structuredOutputSchemas: string;
   mcpDefinitions: string;
   formValidators: string;
+  stdlibRuntimeDir: string;
 }
 
 export type GeneratedTargetKind =
@@ -39,6 +43,8 @@ export type GeneratedTargetKind =
   | 'structured-output-schemas'
   | 'mcp-definitions'
   | 'form-validators';
+
+type OutputDirTargetKind = GeneratedTargetKind | 'stdlib-runtime';
 
 export interface GeneratedTarget {
   kind: GeneratedTargetKind;
@@ -70,33 +76,52 @@ export function assertContextureIrPath(path: string): string {
   return normalized;
 }
 
-export function bundlePathsFor(irPath: string): BundlePaths {
+export function bundlePathsFor(irPath: string, schema?: Schema): BundlePaths {
   const resolvedIrPath = assertContextureIrPath(irPath);
   const baseName = baseNameFor(resolvedIrPath);
   const ctxDir = contextureDirFor(resolvedIrPath);
   const irDir = dirname(resolvedIrPath);
   const layout = bundleLayoutFor(irDir);
-  const schemaBase = `${layout.schemaDir}/${baseName}`;
+  const schemaDir = outputDirFor(schema, 'zod', layout.schemaDir, irDir);
+  const jsonSchemaDir = outputDirFor(schema, 'json-schema', layout.schemaDir, irDir);
+  const schemaIndexDir = outputDirFor(schema, 'schema-index', layout.schemaDir, irDir);
+  const convexDir = outputDirFor(schema, 'convex', `${layout.projectDir}/convex`, irDir);
+  const aiToolSchemasDir = outputDirFor(schema, 'ai-tool-schemas', ctxDir, irDir);
+  const structuredOutputSchemasDir = outputDirFor(
+    schema,
+    'structured-output-schemas',
+    ctxDir,
+    irDir,
+  );
+  const mcpDefinitionsDir = outputDirFor(schema, 'mcp-definitions', ctxDir, irDir);
+  const formValidatorsDir = outputDirFor(schema, 'form-validators', layout.schemaDir, irDir);
+  const stdlibRuntimeDir = outputDirFor(
+    schema,
+    'stdlib-runtime',
+    `${schemaDir}/${STDLIB_RUNTIME_DIR}`,
+    irDir,
+  );
   return {
     ir: resolvedIrPath,
     layout: `${ctxDir}/${LAYOUT_FILE}`,
     chat: `${ctxDir}/${CHAT_FILE}`,
     emitted: `${ctxDir}/${EMITTED_FILE}`,
     changeLog: `${ctxDir}/${CHANGE_LOG_FILE}`,
-    schemaTs: `${schemaBase}${SCHEMA_TS_SUFFIX}`,
-    schemaJson: `${schemaBase}${SCHEMA_JSON_SUFFIX}`,
-    schemaIndex: `${layout.schemaDir}/index.ts`,
-    convex: `${layout.projectDir}/convex/schema.ts`,
-    convexValidators: `${layout.projectDir}/convex/${CONVEX_VALIDATORS_FILE}`,
-    aiToolSchemas: `${ctxDir}/${AI_TOOL_SCHEMAS_FILE}`,
-    structuredOutputSchemas: `${ctxDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
-    mcpDefinitions: `${ctxDir}/${MCP_DEFINITIONS_FILE}`,
-    formValidators: `${layout.schemaDir}/${FORM_VALIDATORS_FILE}`,
+    schemaTs: `${schemaDir}/${baseName}${SCHEMA_TS_SUFFIX}`,
+    schemaJson: `${jsonSchemaDir}/${baseName}${SCHEMA_JSON_SUFFIX}`,
+    schemaIndex: `${schemaIndexDir}/index.ts`,
+    convex: `${convexDir}/schema.ts`,
+    convexValidators: `${convexDir}/${CONVEX_VALIDATORS_FILE}`,
+    aiToolSchemas: `${aiToolSchemasDir}/${AI_TOOL_SCHEMAS_FILE}`,
+    structuredOutputSchemas: `${structuredOutputSchemasDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
+    mcpDefinitions: `${mcpDefinitionsDir}/${MCP_DEFINITIONS_FILE}`,
+    formValidators: `${formValidatorsDir}/${FORM_VALIDATORS_FILE}`,
+    stdlibRuntimeDir,
   };
 }
 
-export function generatedTargetsFor(irPath: string): GeneratedTarget[] {
-  const paths = bundlePathsFor(irPath);
+export function generatedTargetsFor(irPath: string, schema?: Schema): GeneratedTarget[] {
+  const paths = bundlePathsFor(irPath, schema);
   return [
     { kind: 'zod', path: paths.schemaTs },
     { kind: 'json-schema', path: paths.schemaJson },
@@ -118,9 +143,13 @@ export function manifestKeyForGeneratedPath(irPath: string, generatedPath: strin
   return relativePath(projectDirFor(irPath), normalizeContexturePath(generatedPath));
 }
 
-export function resolveManifestGeneratedPath(irPath: string, manifestKey: string): string {
+export function resolveManifestGeneratedPath(
+  irPath: string,
+  manifestKey: string,
+  schema?: Schema,
+): string {
   const normalizedKey = normalizeContexturePath(manifestKey);
-  const targets = generatedTargetsFor(irPath);
+  const targets = generatedTargetsFor(irPath, schema);
   const byCurrentKey = new Map(
     targets.map((target) => [manifestKeyForGeneratedPath(irPath, target.path), target.path]),
   );
@@ -142,9 +171,20 @@ export function resolveManifestGeneratedPath(irPath: string, manifestKey: string
   return joinPath(projectDirFor(irPath), normalizedKey);
 }
 
-export function generatedTargetForPath(irPath: string, targetPath: string): GeneratedTarget | null {
+export function generatedTargetForPath(
+  irPath: string,
+  targetPath: string,
+  schema?: Schema,
+): GeneratedTarget | null {
   const target = normalizeContexturePath(targetPath);
-  return generatedTargetsFor(irPath).find((candidate) => candidate.path === target) ?? null;
+  return generatedTargetsFor(irPath, schema).find((candidate) => candidate.path === target) ?? null;
+}
+
+export function moduleSpecifierBetween(fromFile: string, toFile: string): string {
+  const fromDir = dirname(normalizeContexturePath(fromFile));
+  const target = stripTypescriptExtension(normalizeContexturePath(toFile));
+  const relative = relativePath(fromDir, target);
+  return relative.startsWith('.') ? relative : `./${relative}`;
 }
 
 function normalizeContexturePath(path: string): string {
@@ -226,4 +266,53 @@ function dirname(path: string): string {
 function leafName(path: string): string {
   const slash = path.lastIndexOf('/');
   return slash === -1 ? path : path.slice(slash + 1);
+}
+
+function outputDirFor(
+  schema: Schema | undefined,
+  kind: OutputDirTargetKind,
+  defaultDir: string,
+  irDir: string,
+): string {
+  const configured = outputDirConfigFor(schema, kind);
+  if (!configured) return defaultDir;
+  if (isAbsolutePath(configured)) {
+    throw new Error(`Contexture output dir for ${kind} must be relative to the IR file.`);
+  }
+
+  const normalized = normalizeContexturePath(configured);
+  if (normalized === '..' || normalized.startsWith('../')) {
+    throw new Error(`Contexture output dir for ${kind} must stay within the IR directory.`);
+  }
+
+  return joinPath(irDir, normalized);
+}
+
+function outputDirConfigFor(schema: Schema | undefined, kind: OutputDirTargetKind): string | null {
+  if (!schema?.outputs) return null;
+  switch (kind) {
+    case 'zod':
+      return schema.outputs.zod?.dir ?? null;
+    case 'json-schema':
+      return schema.outputs.jsonSchema?.dir ?? null;
+    case 'schema-index':
+      return schema.outputs.schemaIndex?.dir ?? null;
+    case 'convex':
+    case 'convex-validators':
+      return schema.outputs.convex?.dir ?? null;
+    case 'stdlib-runtime':
+      return schema.outputs.stdlibRuntime?.dir ?? null;
+    case 'ai-tool-schemas':
+      return schema.outputs.aiPipeline?.toolSchemas?.dir ?? null;
+    case 'structured-output-schemas':
+      return schema.outputs.aiPipeline?.structuredOutputs?.dir ?? null;
+    case 'mcp-definitions':
+      return schema.outputs.aiPipeline?.mcpDefinitions?.dir ?? null;
+    case 'form-validators':
+      return schema.outputs.aiPipeline?.formValidators?.dir ?? null;
+  }
+}
+
+function stripTypescriptExtension(path: string): string {
+  return path.endsWith('.ts') ? path.slice(0, -'.ts'.length) : path;
 }

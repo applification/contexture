@@ -9,12 +9,14 @@ import { load } from './load';
 import { createOpTools } from './op-tools';
 import { OpSchema } from './ops';
 import { assertContextureIrPath, bundlePathsFor } from './paths';
+import type { EmitPipelineDeps } from './pipeline';
 import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
 const VERSION = '0.0.0';
 
 export interface ContextureMcpServerOptions {
   stdlib?: StdlibCatalog;
+  emitDeps?: EmitPipelineDeps;
 }
 
 const IrPathInput = {
@@ -204,7 +206,12 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       },
     },
     async ({ irPath, op }) => {
-      const structuredContent = await applyContextureOp(irPath, op, options.stdlib);
+      const structuredContent = await applyContextureOp(
+        irPath,
+        op,
+        options.stdlib,
+        options.emitDeps,
+      );
       return jsonToolResult(structuredContent);
     },
   );
@@ -224,7 +231,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       },
     },
     async ({ irPath }) => {
-      const structuredContent = await emitContextureBundle(irPath);
+      const structuredContent = await emitContextureBundle(irPath, options.emitDeps);
       return jsonToolResult(structuredContent);
     },
   );
@@ -244,7 +251,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       },
     },
     async ({ irPath }) => {
-      const structuredContent = await checkContextureDrift(irPath);
+      const structuredContent = await checkContextureDrift(irPath, options.emitDeps);
       return jsonToolResult(structuredContent);
     },
   );
@@ -285,7 +292,12 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
         },
       },
       async (args) => {
-        const structuredContent = await applyTypedContextureOp(tool.name, args, options.stdlib);
+        const structuredContent = await applyTypedContextureOp(
+          tool.name,
+          args,
+          options.stdlib,
+          options.emitDeps,
+        );
         return jsonToolResult(structuredContent);
       },
     );
@@ -327,6 +339,7 @@ async function applyContextureOp(
   irPath: string,
   op: Record<string, unknown>,
   catalog?: StdlibCatalog,
+  emitDeps?: EmitPipelineDeps,
 ): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
   const opKind = typeof op.kind === 'string' ? op.kind : 'unknown';
   const path = assertContextureIrPath(irPath);
@@ -342,9 +355,11 @@ async function applyContextureOp(
 
   let result: Awaited<ReturnType<ReturnType<typeof createFileBackedForward>>>;
   try {
-    result = await createFileBackedForward(path, { stdlib: catalog, changeSource: 'mcp' })(
-      parsed.data,
-    );
+    result = await createFileBackedForward(path, {
+      stdlib: catalog,
+      emitDeps,
+      changeSource: 'mcp',
+    })(parsed.data);
   } catch (err) {
     return {
       path,
@@ -375,6 +390,7 @@ function formatZodIssues(error: ZodError): string {
 
 async function emitContextureBundle(
   irPath: string,
+  emitDeps?: EmitPipelineDeps,
 ): Promise<z.infer<z.ZodObject<typeof EmitContextureOutput>>> {
   const path = assertContextureIrPath(irPath);
   const { schema } = await readContextureFile(path);
@@ -382,6 +398,7 @@ async function emitContextureBundle(
     irPath: path,
     schema,
     fs: nodeFileBackedFs,
+    emitDeps,
     driftPreflight: false,
   });
   return {
@@ -393,10 +410,11 @@ async function emitContextureBundle(
 
 async function checkContextureDrift(
   irPath: string,
+  emitDeps?: EmitPipelineDeps,
 ): Promise<z.infer<z.ZodObject<typeof CheckContextureDriftOutput>>> {
   const path = assertContextureIrPath(irPath);
   const { schema } = await readContextureFile(path);
-  const files = await checkGeneratedBundle(schema, path, nodeFileBackedFs);
+  const files = await checkGeneratedBundle(schema, path, nodeFileBackedFs, emitDeps);
 
   const drift = files.filter((file) => file.status !== 'clean');
   return {
@@ -429,7 +447,7 @@ function buildInspectSummary(
   schema: Schema,
   irPath: string,
 ): z.infer<z.ZodObject<typeof InspectOutput>> {
-  const paths = bundlePathsFor(irPath);
+  const paths = bundlePathsFor(irPath, schema);
   const preferredMutationTools = createOpTools(async () => ({ error: 'inspect only' })).map(
     (tool) => tool.name,
   );
@@ -522,6 +540,7 @@ async function applyTypedContextureOp(
   opKind: string,
   args: Record<string, unknown>,
   catalog?: StdlibCatalog,
+  emitDeps?: EmitPipelineDeps,
 ): Promise<z.infer<z.ZodObject<typeof ApplyContextureOpOutput>>> {
   const irPath = typeof args.irPath === 'string' ? args.irPath : '';
   let path: string;
@@ -538,9 +557,9 @@ async function applyTypedContextureOp(
 
   const { irPath: _irPath, ...toolArgs } = args;
   const tools = new Map(
-    createOpTools(createFileBackedForward(path, { stdlib: catalog, changeSource: 'mcp' })).map(
-      (tool) => [tool.name, tool],
-    ),
+    createOpTools(
+      createFileBackedForward(path, { stdlib: catalog, emitDeps, changeSource: 'mcp' }),
+    ).map((tool) => [tool.name, tool]),
   );
   const tool = tools.get(opKind);
   if (!tool) return { path, applied: false, opKind, error: `unknown op tool: ${opKind}` };

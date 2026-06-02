@@ -7,7 +7,13 @@ import { emit as emitSchemaIndex } from './emit-schema-index';
 import { emitStructuredOutputSchemas } from './emit-structured-output-schemas';
 import { emit as emitZod } from './emit-zod';
 import type { Schema } from './ir';
-import { type BundlePaths, baseNameFor, bundlePathsFor, type GeneratedTargetKind } from './paths';
+import {
+  type BundlePaths,
+  baseNameFor,
+  bundlePathsFor,
+  type GeneratedTargetKind,
+  moduleSpecifierBetween,
+} from './paths';
 
 export type GeneratedTargetGroup = 'convex' | 'supporting' | 'agent';
 export type GeneratedTargetLanguage = 'typescript' | 'json';
@@ -24,6 +30,12 @@ export interface GeneratedTargetMetadata {
 
 export interface GeneratedTargetEmitOptions {
   stdlibNamespaces?: readonly string[];
+  stdlibModuleForNamespace?: (namespace: string) => string | null | undefined;
+}
+
+export interface StdlibRuntimeModule {
+  namespace: string;
+  schema: Schema;
 }
 
 export interface EmitPipelineDeps {
@@ -33,13 +45,19 @@ export interface EmitPipelineDeps {
     sourcePath?: string,
     options?: GeneratedTargetEmitOptions,
   ) => unknown;
-  emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
+  emitSchemaIndex?: (baseName: string, sourcePath?: string, schemaModule?: string) => string;
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
   emitConvexValidators?: (schema: Schema, sourcePath?: string) => string;
   emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitStructuredOutputSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitMcpDefinitions?: (schema: Schema, sourcePath?: string) => unknown;
-  emitFormValidators?: (schema: Schema, baseName: string, sourcePath?: string) => string;
+  emitFormValidators?: (
+    schema: Schema,
+    baseName: string,
+    sourcePath?: string,
+    schemaModule?: string,
+  ) => string;
+  stdlibRuntime?: readonly StdlibRuntimeModule[];
 }
 
 interface GeneratedTargetDescriptor extends GeneratedTargetMetadata {
@@ -49,6 +67,7 @@ interface GeneratedTargetDescriptor extends GeneratedTargetMetadata {
   emit: (
     schema: Schema,
     irPath: string,
+    paths: BundlePaths,
     deps: EmitPipelineDeps,
     options?: GeneratedTargetEmitOptions,
   ) => string;
@@ -114,7 +133,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.convex,
     enabled: (schema) => coreOutputEnabled(schema, 'convex'),
     enable: (schema) => enableCoreOutput(schema, 'convex'),
-    emit: (schema, irPath, deps) => (deps.emitConvex ?? emitConvexSchema)(schema, irPath),
+    emit: (schema, irPath, _paths, deps) => (deps.emitConvex ?? emitConvexSchema)(schema, irPath),
   },
   {
     kind: 'convex-validators',
@@ -127,7 +146,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.convexValidators,
     enabled: (schema) => coreOutputEnabled(schema, 'convex'),
     enable: (schema) => enableCoreOutput(schema, 'convex'),
-    emit: (schema, irPath, deps) =>
+    emit: (schema, irPath, _paths, deps) =>
       (deps.emitConvexValidators ?? emitConvexValidators)(schema, irPath),
   },
   {
@@ -141,7 +160,8 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.schemaTs,
     enabled: (schema) => coreOutputEnabled(schema, 'zod'),
     enable: (schema) => enableCoreOutput(schema, 'zod'),
-    emit: (schema, irPath, deps, options) => (deps.emitZod ?? emitZod)(schema, irPath, options),
+    emit: (schema, irPath, _paths, deps, options) =>
+      (deps.emitZod ?? emitZod)(schema, irPath, options),
   },
   {
     kind: 'json-schema',
@@ -154,7 +174,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.schemaJson,
     enabled: (schema) => coreOutputEnabled(schema, 'jsonSchema'),
     enable: (schema) => enableCoreOutput(schema, 'jsonSchema'),
-    emit: (schema, irPath, deps, options) =>
+    emit: (schema, irPath, _paths, deps, options) =>
       json((deps.emitJsonSchema ?? defaultEmitJsonSchema)(schema, irPath, options)),
   },
   {
@@ -168,8 +188,12 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.schemaIndex,
     enabled: (schema) => coreOutputEnabled(schema, 'schemaIndex'),
     enable: (schema) => enableCoreOutput(schema, 'schemaIndex'),
-    emit: (_schema, irPath, deps) =>
-      (deps.emitSchemaIndex ?? emitSchemaIndex)(baseNameFor(irPath), irPath),
+    emit: (_schema, irPath, paths, deps) =>
+      (deps.emitSchemaIndex ?? emitSchemaIndex)(
+        baseNameFor(irPath),
+        irPath,
+        moduleSpecifierBetween(paths.schemaIndex, paths.schemaTs),
+      ),
   },
   {
     kind: 'ai-tool-schemas',
@@ -182,7 +206,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.aiToolSchemas,
     enabled: (schema) => aiOutputEnabled(schema, 'toolSchemas'),
     enable: (schema) => enableAiOutput(schema, 'toolSchemas'),
-    emit: (schema, irPath, deps) =>
+    emit: (schema, irPath, _paths, deps) =>
       json((deps.emitAiToolSchemas ?? emitAiToolSchemas)(schema, irPath)),
   },
   {
@@ -196,7 +220,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.structuredOutputSchemas,
     enabled: (schema) => aiOutputEnabled(schema, 'structuredOutputs'),
     enable: (schema) => enableAiOutput(schema, 'structuredOutputs'),
-    emit: (schema, irPath, deps) =>
+    emit: (schema, irPath, _paths, deps) =>
       json((deps.emitStructuredOutputSchemas ?? emitStructuredOutputSchemas)(schema, irPath)),
   },
   {
@@ -210,7 +234,7 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.mcpDefinitions,
     enabled: (schema) => aiOutputEnabled(schema, 'mcpDefinitions'),
     enable: (schema) => enableAiOutput(schema, 'mcpDefinitions'),
-    emit: (schema, irPath, deps) =>
+    emit: (schema, irPath, _paths, deps) =>
       json((deps.emitMcpDefinitions ?? emitMcpDefinitions)(schema, irPath)),
   },
   {
@@ -224,8 +248,13 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     path: (paths) => paths.formValidators,
     enabled: (schema) => aiOutputEnabled(schema, 'formValidators'),
     enable: (schema) => enableAiOutput(schema, 'formValidators'),
-    emit: (schema, irPath, deps) =>
-      (deps.emitFormValidators ?? emitFormValidators)(schema, baseNameFor(irPath), irPath),
+    emit: (schema, irPath, paths, deps) =>
+      (deps.emitFormValidators ?? emitFormValidators)(
+        schema,
+        baseNameFor(irPath),
+        irPath,
+        moduleSpecifierBetween(paths.formValidators, paths.schemaTs),
+      ),
   },
 ] as const;
 
@@ -241,9 +270,13 @@ export function generatedTargetMetadata(kind: GeneratedTargetKind): GeneratedTar
   return target;
 }
 
-export function generatedTargetPath(kind: GeneratedTargetKind, irPath: string): string {
+export function generatedTargetPath(
+  kind: GeneratedTargetKind,
+  irPath: string,
+  schema?: Schema,
+): string {
   const target = requireGeneratedTargetDescriptor(kind);
-  return target.path(bundlePathsFor(irPath));
+  return target.path(bundlePathsFor(irPath, schema));
 }
 
 export function generatedTargetDisplayPath(kind: GeneratedTargetKind, baseName = 'schema'): string {
@@ -258,6 +291,112 @@ export function enableGeneratedTarget(schema: Schema, kind: GeneratedTargetKind)
   return requireGeneratedTargetDescriptor(kind).enable(schema);
 }
 
+export function generatedTargetOutputDir(schema: Schema, kind: GeneratedTargetKind): string | null {
+  switch (kind) {
+    case 'zod':
+      return schema.outputs?.zod?.dir ?? null;
+    case 'json-schema':
+      return schema.outputs?.jsonSchema?.dir ?? null;
+    case 'schema-index':
+      return schema.outputs?.schemaIndex?.dir ?? null;
+    case 'convex':
+    case 'convex-validators':
+      return schema.outputs?.convex?.dir ?? null;
+    case 'ai-tool-schemas':
+      return schema.outputs?.aiPipeline?.toolSchemas?.dir ?? null;
+    case 'structured-output-schemas':
+      return schema.outputs?.aiPipeline?.structuredOutputs?.dir ?? null;
+    case 'mcp-definitions':
+      return schema.outputs?.aiPipeline?.mcpDefinitions?.dir ?? null;
+    case 'form-validators':
+      return schema.outputs?.aiPipeline?.formValidators?.dir ?? null;
+  }
+}
+
+export function setGeneratedTargetOutputDir(
+  schema: Schema,
+  kind: GeneratedTargetKind,
+  dir: string | null,
+): Schema {
+  const nextConfig = (config: { enabled?: boolean; dir?: string } | undefined) => {
+    const next = { ...(config ?? {}) };
+    if (dir === null) delete next.dir;
+    else next.dir = dir;
+    return next;
+  };
+
+  switch (kind) {
+    case 'zod':
+      return {
+        ...schema,
+        outputs: { ...(schema.outputs ?? {}), zod: nextConfig(schema.outputs?.zod) },
+      };
+    case 'json-schema':
+      return {
+        ...schema,
+        outputs: { ...(schema.outputs ?? {}), jsonSchema: nextConfig(schema.outputs?.jsonSchema) },
+      };
+    case 'schema-index':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          schemaIndex: nextConfig(schema.outputs?.schemaIndex),
+        },
+      };
+    case 'convex':
+    case 'convex-validators':
+      return {
+        ...schema,
+        outputs: { ...(schema.outputs ?? {}), convex: nextConfig(schema.outputs?.convex) },
+      };
+    case 'ai-tool-schemas':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          aiPipeline: {
+            ...(schema.outputs?.aiPipeline ?? {}),
+            toolSchemas: nextConfig(schema.outputs?.aiPipeline?.toolSchemas),
+          },
+        },
+      };
+    case 'structured-output-schemas':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          aiPipeline: {
+            ...(schema.outputs?.aiPipeline ?? {}),
+            structuredOutputs: nextConfig(schema.outputs?.aiPipeline?.structuredOutputs),
+          },
+        },
+      };
+    case 'mcp-definitions':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          aiPipeline: {
+            ...(schema.outputs?.aiPipeline ?? {}),
+            mcpDefinitions: nextConfig(schema.outputs?.aiPipeline?.mcpDefinitions),
+          },
+        },
+      };
+    case 'form-validators':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          aiPipeline: {
+            ...(schema.outputs?.aiPipeline ?? {}),
+            formValidators: nextConfig(schema.outputs?.aiPipeline?.formValidators),
+          },
+        },
+      };
+  }
+}
+
 export function emitGeneratedTarget(
   schema: Schema,
   kind: GeneratedTargetKind,
@@ -265,7 +404,13 @@ export function emitGeneratedTarget(
   deps: EmitPipelineDeps = {},
   options: GeneratedTargetEmitOptions = {},
 ): string {
-  return requireGeneratedTargetDescriptor(kind).emit(schema, irPath, deps, options);
+  return requireGeneratedTargetDescriptor(kind).emit(
+    schema,
+    irPath,
+    bundlePathsFor(irPath, schema),
+    deps,
+    options,
+  );
 }
 
 export function previewableGeneratedTargets(): GeneratedTargetMetadata[] {
@@ -273,7 +418,7 @@ export function previewableGeneratedTargets(): GeneratedTargetMetadata[] {
 }
 
 export function enabledGeneratedTargets(schema: Schema, irPath: string) {
-  const paths = bundlePathsFor(irPath);
+  const paths = bundlePathsFor(irPath, schema);
   return GENERATED_TARGETS.filter((target) => target.enabled(schema)).map((target) => ({
     kind: target.kind,
     path: target.path(paths),

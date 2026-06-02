@@ -5,11 +5,13 @@ import {
   type EmittedManifest,
   hashContent,
   IRSchema,
+  load as loadIR,
   manifestKeyForGeneratedPath,
   type Schema,
   save as saveIR,
   writeGeneratedBundle,
 } from '@contexture/core';
+import { STDLIB_RUNTIME_MODULES } from '@shared/stdlib-registry';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { nodeFsAdapter } from '../documents/node-fs-adapter';
@@ -61,7 +63,11 @@ export async function readGeneratedTarget(input: unknown): Promise<string | null
     GeneratedTargetInputSchema,
     input,
   );
-  const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  const target = assertGeneratedTargetForIr(
+    parsed.irPath,
+    parsed.targetPath,
+    await readOptionalSchema(parsed.irPath),
+  );
   try {
     return await readFile(target, 'utf8');
   } catch {
@@ -75,7 +81,11 @@ export async function writeGeneratedTarget(input: unknown): Promise<void> {
     WriteGeneratedTargetInputSchema,
     input,
   );
-  const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  const target = assertGeneratedTargetForIr(
+    parsed.irPath,
+    parsed.targetPath,
+    await readOptionalSchema(parsed.irPath),
+  );
   const manifestPath = bundlePathsFor(parsed.irPath).emitted;
   await writeGeneratedTargetContents(parsed.irPath, target, manifestPath, parsed.contents);
 }
@@ -86,7 +96,7 @@ export async function acceptGeneratedTarget(input: unknown): Promise<void> {
     AcceptGeneratedTargetInputSchema,
     input,
   );
-  const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  const target = assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath, parsed.schema);
   const manifestPath = bundlePathsFor(parsed.irPath).emitted;
   const previousTarget = await readOptionalFile(target);
   const previousManifest = await readOptionalFile(manifestPath);
@@ -98,6 +108,7 @@ export async function acceptGeneratedTarget(input: unknown): Promise<void> {
       irPath: parsed.irPath,
       schema: parsed.schema,
       fs: nodeFsAdapter,
+      emitDeps: { stdlibRuntime: STDLIB_RUNTIME_MODULES },
     });
   } catch (err) {
     await restoreOptionalFile(target, previousTarget);
@@ -115,11 +126,24 @@ export async function validateConvexGeneratedTarget(
     GeneratedTargetInputSchema,
     input,
   );
-  assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath);
+  const schema = await readSchema(parsed.irPath);
+  assertGeneratedTargetForIr(parsed.irPath, parsed.targetPath, schema);
   return validateReconciledConvexProject(
-    { irPath: parsed.irPath, targetPath: parsed.targetPath },
+    { irPath: parsed.irPath, targetPath: parsed.targetPath, schema },
     deps,
   );
+}
+
+async function readSchema(irPath: string): Promise<Schema> {
+  return loadIR(await readFile(irPath, 'utf8')).schema;
+}
+
+async function readOptionalSchema(irPath: string): Promise<Schema | undefined> {
+  try {
+    return await readSchema(irPath);
+  } catch {
+    return undefined;
+  }
 }
 
 async function writeGeneratedTargetContents(

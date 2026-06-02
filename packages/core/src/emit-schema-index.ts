@@ -13,6 +13,10 @@ function header(sourcePath?: string): string {
   return sourcePath ? `${base} Source: ${sourcePath}\n` : `${base}\n`;
 }
 
-export function emit(baseName: string, sourcePath?: string): string {
-  return `${header(sourcePath)}export * from './${baseName}.schema';\n`;
+export function emit(
+  baseName: string,
+  sourcePath?: string,
+  schemaModule = `./${baseName}.schema`,
+): string {
+  return `${header(sourcePath)}export * from '${schemaModule}';\n`;
 }

@@ -78,7 +78,7 @@ export function buildGeneratedBundle(
   irPath: string,
   emitDeps?: EmitPipelineDeps,
 ): GeneratedBundleBuild {
-  const paths = bundlePathsFor(irPath);
+  const paths = bundlePathsFor(irPath, schema);
   const { emitted, manifest } = runEmitPipeline(schema, irPath, emitDeps);
   return {
     paths,
@@ -117,6 +117,7 @@ export async function checkGeneratedBundle(
 export async function checkGeneratedManifestDrift(
   irPath: string,
   fs: Pick<GeneratedBundleFs, 'readFile'>,
+  schema?: Schema,
 ): Promise<GeneratedFileCheck[]> {
   const paths = bundlePathsFor(irPath);
   const manifest = await readGeneratedManifest(paths.emitted, fs);
@@ -126,7 +127,7 @@ export async function checkGeneratedManifestDrift(
 
   const checks: GeneratedFileCheck[] = [];
   for (const [manifestKey, expectedHash] of Object.entries(manifest.files ?? {})) {
-    const path = resolveManifestGeneratedPath(irPath, manifestKey);
+    const path = resolveManifestGeneratedPath(irPath, manifestKey, schema);
     let content: string | undefined;
     try {
       content = await fs.readFile(path);
@@ -152,7 +153,7 @@ export async function classifyGeneratedBundleDrift(
   const manifest = await readGeneratedManifest(bundle.paths.emitted, fs);
   const manifestFiles = Object.fromEntries(
     Object.entries(manifest?.files ?? {}).map(([manifestKey, hash]) => [
-      resolveManifestGeneratedPath(irPath, manifestKey),
+      resolveManifestGeneratedPath(irPath, manifestKey, schema),
       hash,
     ]),
   );
@@ -233,7 +234,7 @@ export async function writeGeneratedBundle(
   } = input;
 
   if (driftPreflight) {
-    const drift = (await checkGeneratedManifestDrift(irPath, fs)).filter(
+    const drift = (await checkGeneratedManifestDrift(irPath, fs, schema)).filter(
       (check) => check.status !== 'clean' && check.status !== 'missing',
     );
     if (drift.length > 0) throw new GeneratedBundleDriftError(drift);

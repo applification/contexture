@@ -329,8 +329,72 @@ describe('SchemaPanel', () => {
       fireEvent.click(screen.getByTestId('schema-output-config'));
       expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Tool schemas');
       expect(screen.getByTestId('schema-group-agent')).toHaveTextContent('Form validators');
-      fireEvent.click(screen.getByTestId('schema-output-ai-tool-schemas'));
+      fireEvent.click(screen.getByTestId('schema-enable-ai-tool-schemas'));
       expect(onEnableOutput).toHaveBeenCalledWith('ai-tool-schemas');
+    });
+
+    it('lets users configure a relative output folder for a target', async () => {
+      const user = userEvent.setup();
+      const onOutputDirChange = vi.fn();
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          documentFilePath="/repo/garden.contexture.json"
+          onOutputDirChange={onOutputDirChange}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('schema-output-config'));
+      await user.clear(screen.getByTestId('schema-output-dir-zod'));
+      await user.type(screen.getByTestId('schema-output-dir-zod'), 'packages/domain/src/generated');
+      fireEvent.click(screen.getByTestId('schema-output-dir-apply-zod'));
+
+      expect(onOutputDirChange).toHaveBeenCalledWith('zod', 'packages/domain/src/generated');
+    });
+
+    it('lets users configure the stdlib runtime output folder', async () => {
+      const user = userEvent.setup();
+      const onOutputDirChange = vi.fn();
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          documentFilePath="/repo/garden.contexture.json"
+          onOutputDirChange={onOutputDirChange}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('schema-output-config'));
+      expect(screen.getByTestId('schema-output-stdlib-runtime')).toHaveTextContent(
+        'Stdlib runtime',
+      );
+      await user.clear(screen.getByTestId('schema-output-dir-stdlib-runtime'));
+      await user.type(screen.getByTestId('schema-output-dir-stdlib-runtime'), 'src/runtime');
+      fireEvent.click(screen.getByTestId('schema-output-dir-apply-stdlib-runtime'));
+
+      expect(onOutputDirChange).toHaveBeenCalledWith('stdlib-runtime', 'src/runtime');
+    });
+
+    it('rejects output folders that escape the IR directory', async () => {
+      const user = userEvent.setup();
+      const onOutputDirChange = vi.fn();
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          documentFilePath="/repo/garden.contexture.json"
+          onOutputDirChange={onOutputDirChange}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId('schema-output-config'));
+      await user.type(screen.getByTestId('schema-output-dir-zod'), '../outside');
+
+      expect(screen.getByTestId('schema-output-dir-help-zod')).toHaveTextContent(
+        /must stay within/i,
+      );
+      expect(screen.getByTestId('schema-output-dir-apply-zod')).toBeDisabled();
     });
 
     it('describes disabled optional outputs in the configuration popover', () => {
@@ -393,11 +457,18 @@ describe('SchemaPanel', () => {
           additionalSources={[{ type: 'mcp-definitions', source: '{\n  "servers": []\n}\n' }]}
           documentFilePath="/repo/garden.contexture.json"
           onOpenGeneratedFile={onOpenGeneratedFile}
+          schema={{
+            version: '1',
+            outputs: { zod: { dir: 'packages/domain/src/generated' } },
+            types: [{ kind: 'object', name: 'Garden', fields: [] }],
+          }}
         />,
       );
 
       fireEvent.click(screen.getByTestId('schema-open-generated'));
-      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith('/repo/schema/garden.schema.ts');
+      expect(onOpenGeneratedFile).toHaveBeenLastCalledWith(
+        '/repo/packages/domain/src/generated/garden.schema.ts',
+      );
       screen.getByTestId('schema-copy').focus();
       await user.tab();
       expect(screen.getByTestId('schema-open-generated')).toHaveFocus();
