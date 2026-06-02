@@ -67,6 +67,20 @@ export function DetailPanel({
       useGraphSelectionStore.getState().click(op.typeName, 'replace');
       useGraphSelectionStore.getState().focus(op.typeName);
     }
+    if (
+      op.kind === 'update_field' &&
+      op.typeName === selection.typeName &&
+      op.fieldName === selection.fieldName &&
+      typeof op.patch.name === 'string' &&
+      op.patch.name.length > 0 &&
+      op.patch.name !== selection.fieldName
+    ) {
+      useGraphSelectionStore
+        .getState()
+        .selectField({ typeName: op.typeName, fieldName: op.patch.name });
+      useGraphSelectionStore.getState().focus({ nodeId: op.typeName, fieldName: op.patch.name });
+      onSelectField?.(op.typeName, op.patch.name);
+    }
   };
   const dispatchBatch = (ops: readonly Op[]): boolean => {
     const undo = useUndoStore.getState();

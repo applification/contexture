@@ -595,7 +595,7 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
       schema = z.string();
       break;
     case 'array':
-      schema = z.array(z.unknown());
+      schema = z.array(zodSchemaForArrayElement(control.element));
       break;
     case 'object':
       schema = z.object(
@@ -614,6 +614,57 @@ function zodSchemaForControl(control: PlaygroundControl): z.ZodType {
   if (control.nullable) schema = schema.nullable();
   if (!control.required) schema = schema.optional();
   return schema;
+}
+
+function zodSchemaForArrayElement(element: PlaygroundArrayElementControl): z.ZodType {
+  switch (element.kind) {
+    case 'text': {
+      let stringSchema = z.string();
+      if (element.constraints.min !== undefined)
+        stringSchema = stringSchema.min(element.constraints.min);
+      if (element.constraints.max !== undefined)
+        stringSchema = stringSchema.max(element.constraints.max);
+      if (element.constraints.regex)
+        stringSchema = stringSchema.regex(new RegExp(element.constraints.regex));
+      if (element.constraints.format === 'email') stringSchema = stringSchema.email();
+      if (element.constraints.format === 'url') stringSchema = stringSchema.url();
+      if (element.constraints.format === 'uuid') stringSchema = stringSchema.uuid();
+      if (element.constraints.format === 'datetime') stringSchema = stringSchema.datetime();
+      return stringSchema;
+    }
+    case 'number': {
+      let numberSchema = z.number();
+      if (element.constraints.int) numberSchema = numberSchema.int();
+      if (element.constraints.min !== undefined)
+        numberSchema = numberSchema.min(element.constraints.min);
+      if (element.constraints.max !== undefined)
+        numberSchema = numberSchema.max(element.constraints.max);
+      return numberSchema;
+    }
+    case 'boolean':
+      return z.boolean();
+    case 'date':
+    case 'ref':
+      return z.string().min(1);
+    case 'literal':
+      return z.literal(element.constraints.literalValue);
+    case 'enum':
+      return element.options.length > 0
+        ? z.enum(element.options.map((option) => option.value) as [string, ...string[]])
+        : z.string();
+    case 'array':
+      return z.array(zodSchemaForArrayElement(element.element));
+    case 'object':
+      return z.object(
+        Object.fromEntries(
+          element.fields
+            .filter((field) => !field.serverDerived && field.kind !== 'unsupported')
+            .map((field) => [field.fieldName, zodSchemaForControl(field)]),
+        ),
+      );
+    case 'unsupported':
+      return z.unknown();
+  }
 }
 
 function orderEntitiesForRefs(entities: readonly PlaygroundEntity[]): PlaygroundEntity[] {

@@ -12,7 +12,10 @@ interface PlaygroundStoreShape {
   selectedTypeName: string | null;
   selectedRecordId: string | null;
   recordsByType: Record<string, PlaygroundRecord[]>;
+  activeScopeId: string;
+  recordsByScope: Record<string, Record<string, PlaygroundRecord[]>>;
 
+  setScope(scopeId: string, typeNames?: readonly string[]): void;
   selectType(typeName: string | null): void;
   selectRecord(typeName: string, recordId: string | null): void;
   upsertRecord(typeName: string, recordId: string | null, value: Record<string, unknown>): string;
@@ -30,6 +33,36 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
   selectedTypeName: null,
   selectedRecordId: null,
   recordsByType: {},
+  activeScopeId: 'default',
+  recordsByScope: { default: {} },
+
+  setScope: (scopeId, typeNames) => {
+    const currentScopeId = get().activeScopeId;
+    set((state) => {
+      const recordsByScope = {
+        ...state.recordsByScope,
+        [currentScopeId]: state.recordsByType,
+      };
+      let recordsByType = recordsByScope[scopeId] ?? {};
+      if (typeNames) {
+        recordsByType = pruneRecordsByType(recordsByType, typeNames);
+      }
+      recordsByScope[scopeId] = recordsByType;
+      const selectedTypeName =
+        state.selectedTypeName && (!typeNames || typeNames.includes(state.selectedTypeName))
+          ? state.selectedTypeName
+          : null;
+      return {
+        activeScopeId: scopeId,
+        recordsByScope,
+        recordsByType,
+        selectedTypeName,
+        selectedRecordId: selectedTypeName
+          ? selectedRecordIdFor(recordsByType[selectedTypeName] ?? [], state.selectedRecordId)
+          : null,
+      };
+    });
+  },
 
   selectType: (typeName) => {
     const records = typeName ? (get().recordsByType[typeName] ?? []) : [];
@@ -61,6 +94,10 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
 
     set((state) => ({
       recordsByType: { ...state.recordsByType, [typeName]: nextRecords },
+      recordsByScope: {
+        ...state.recordsByScope,
+        [state.activeScopeId]: { ...state.recordsByType, [typeName]: nextRecords },
+      },
       selectedTypeName: typeName,
       selectedRecordId: id,
     }));
@@ -91,6 +128,7 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
       const selectedTypeName = state.selectedTypeName ?? Object.keys(nextRecordsByType)[0] ?? null;
       return {
         recordsByType,
+        recordsByScope: { ...state.recordsByScope, [state.activeScopeId]: recordsByType },
         selectedTypeName,
         selectedRecordId: selectedTypeName
           ? (recordsByType[selectedTypeName]?.[0]?.id ?? null)
@@ -104,6 +142,10 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
     const nextRecords = records.filter((record) => record.id !== recordId);
     set((state) => ({
       recordsByType: { ...state.recordsByType, [typeName]: nextRecords },
+      recordsByScope: {
+        ...state.recordsByScope,
+        [state.activeScopeId]: { ...state.recordsByType, [typeName]: nextRecords },
+      },
       selectedTypeName: typeName,
       selectedRecordId:
         state.selectedRecordId === recordId ? (nextRecords[0]?.id ?? null) : state.selectedRecordId,
@@ -113,28 +155,58 @@ export const usePlaygroundStore = create<PlaygroundStoreShape>((set, get) => ({
   clearType: (typeName) => {
     set((state) => ({
       recordsByType: { ...state.recordsByType, [typeName]: [] },
+      recordsByScope: {
+        ...state.recordsByScope,
+        [state.activeScopeId]: { ...state.recordsByType, [typeName]: [] },
+      },
       selectedRecordId: state.selectedTypeName === typeName ? null : state.selectedRecordId,
     }));
   },
 
-  clearAll: () => set({ recordsByType: {}, selectedRecordId: null }),
+  clearAll: () =>
+    set((state) => ({
+      recordsByType: {},
+      recordsByScope: { ...state.recordsByScope, [state.activeScopeId]: {} },
+      selectedRecordId: null,
+    })),
 
   pruneTypes: (typeNames) => {
-    const allowed = new Set(typeNames);
     set((state) => {
-      const recordsByType: Record<string, PlaygroundRecord[]> = {};
-      for (const [typeName, records] of Object.entries(state.recordsByType)) {
-        if (allowed.has(typeName)) recordsByType[typeName] = records;
-      }
+      const recordsByType = pruneRecordsByType(state.recordsByType, typeNames);
       const selectedTypeName =
-        state.selectedTypeName && allowed.has(state.selectedTypeName)
+        state.selectedTypeName && typeNames.includes(state.selectedTypeName)
           ? state.selectedTypeName
           : null;
       return {
         recordsByType,
+        recordsByScope: { ...state.recordsByScope, [state.activeScopeId]: recordsByType },
         selectedTypeName,
-        selectedRecordId: selectedTypeName ? state.selectedRecordId : null,
+        selectedRecordId: selectedTypeName
+          ? selectedRecordIdFor(recordsByType[selectedTypeName] ?? [], state.selectedRecordId)
+          : null,
       };
     });
   },
 }));
+
+function selectedRecordIdFor(
+  records: readonly PlaygroundRecord[],
+  currentRecordId: string | null,
+): string | null {
+  if (currentRecordId && records.some((record) => record.id === currentRecordId)) {
+    return currentRecordId;
+  }
+  return records[0]?.id ?? null;
+}
+
+function pruneRecordsByType(
+  recordsByType: Record<string, PlaygroundRecord[]>,
+  typeNames: readonly string[],
+): Record<string, PlaygroundRecord[]> {
+  const allowed = new Set(typeNames);
+  const next: Record<string, PlaygroundRecord[]> = {};
+  for (const [typeName, records] of Object.entries(recordsByType)) {
+    if (allowed.has(typeName)) next[typeName] = records;
+  }
+  return next;
+}
