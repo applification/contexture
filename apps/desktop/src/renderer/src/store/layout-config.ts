@@ -8,12 +8,14 @@
 import { create } from 'zustand';
 
 export interface GraphLayout {
+  layoutMode: 'organic' | 'layered';
   nodeSpacing: number;
   showEnums: boolean;
   showEdgeLabels: boolean;
 }
 
 export const DEFAULT_LAYOUT: GraphLayout = {
+  layoutMode: 'layered',
   nodeSpacing: 180,
   showEnums: false,
   showEdgeLabels: true,
