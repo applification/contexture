@@ -18,9 +18,11 @@ import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
+import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
 import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
@@ -39,6 +41,7 @@ import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
@@ -46,6 +49,7 @@ import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
 export const FOCUS_TYPE_NAME_EVENT = 'contexture:focus-type-name';
 const AUTO_SAMPLE_DATA = '__auto__';
+const EMPTY_TABLE_RECORDS: readonly unknown[] = [];
 
 function isConvexReservedName(name: string): boolean {
   return name.startsWith('_');
@@ -87,6 +91,25 @@ export function TypeDetail({
 }: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
+  const recordsByType = usePlaygroundStore((state) => state.recordsByType);
+  const tableRecords = isTable
+    ? (recordsByType[type.name] ?? EMPTY_TABLE_RECORDS)
+    : EMPTY_TABLE_RECORDS;
+
+  if (isTable && type.kind === 'object') {
+    return (
+      <TableTypeDetail
+        type={type}
+        schema={schema}
+        dispatch={dispatch}
+        modelingHints={modelingHints}
+        validationErrors={validationErrors}
+        validationRepairForIssue={validationRepairForIssue}
+        recordsCount={tableRecords.length}
+        reserved={nameReserved}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 p-3 pt-0">
@@ -131,7 +154,6 @@ export function TypeDetail({
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
       <SampleDataSection type={type} dispatch={dispatch} />
-      {isTable && schema && <ScopedPlaygroundWorkbench schema={schema} typeName={type.name} />}
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
       )}
@@ -150,12 +172,125 @@ export function TypeDetail({
   );
 }
 
-function SampleDataSection({ type, dispatch }: TypeDetailProps) {
+function TableTypeDetail({
+  type,
+  schema,
+  dispatch,
+  modelingHints,
+  validationErrors,
+  validationRepairForIssue,
+  recordsCount,
+  reserved,
+}: {
+  type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
+  dispatch: (op: Op) => void;
+  modelingHints: readonly ModelingHint[];
+  validationErrors: readonly ValidationError[];
+  validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  recordsCount: number;
+  reserved: boolean;
+}) {
+  const defaultMode = recordsCount > 0 ? 'try' : 'shape';
+
+  return (
+    <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
+      <header
+        className="flex min-h-20 shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        data-testid="type-detail-header"
+      >
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            table
+          </div>
+          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+            {type.name}
+          </h2>
+          <div className="mt-2">
+            <TabsList className="h-8 bg-background p-0.5">
+              <TabsTrigger value="shape" className="h-7 px-3 text-xs">
+                Shape
+              </TabsTrigger>
+              <TabsTrigger value="try" className="h-7 px-3 text-xs">
+                Try
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete type ${type.name}`}
+          onClick={() => dispatch({ kind: 'delete_type', name: type.name })}
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </header>
+
+      <TabsContent value="shape" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-4">
+          <ValidationIssues
+            errors={validationErrors}
+            onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
+            repairForIssue={validationRepairForIssue}
+          />
+          <NameField type={type} dispatch={dispatch} reserved={reserved} />
+          <DescriptionField type={type} dispatch={dispatch} />
+          <ModelShapeHints hints={modelingHints} />
+          <ObjectBody type={type} dispatch={dispatch} quietControls />
+          <details className="group border-t pt-3">
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Advanced schema output
+            </summary>
+            <div className="mt-3">
+              <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
+            </div>
+          </details>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="try" className="m-0 min-h-0 flex-1 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col">
+          <ValidationIssues
+            errors={validationErrors}
+            onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
+            repairForIssue={validationRepairForIssue}
+          />
+          <details className="shrink-0 border-b bg-muted/10 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Generation settings
+            </summary>
+            <div className="mt-2">
+              <SampleDataSection type={type} dispatch={dispatch} compact />
+            </div>
+          </details>
+          {schema ? (
+            <ScopedPlaygroundWorkbench schema={schema} typeName={type.name} className="flex-1" />
+          ) : (
+            <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground">
+              Sample records need a schema context.
+            </div>
+          )}
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function SampleDataSection({
+  type,
+  dispatch,
+  compact = false,
+}: Pick<TypeDetailProps, 'type' | 'dispatch'> & { compact?: boolean }) {
   const modules = listFixtureModules();
   const category = type.sampleData?.category ?? AUTO_SAMPLE_DATA;
 
   return (
-    <section className="space-y-2 rounded-md border border-border px-3 py-2">
+    <section
+      className={compact ? 'space-y-2' : 'space-y-2 rounded-md border border-border px-3 py-2'}
+    >
       <Label htmlFor="type-sample-data-category" className="text-xs">
         Sample data
       </Label>
@@ -251,9 +386,11 @@ function DescriptionField({ type, dispatch }: TypeDetailProps) {
 function ObjectBody({
   type,
   dispatch,
+  quietControls = false,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
+  quietControls?: boolean;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
   const addField = () => {
@@ -326,7 +463,7 @@ function ObjectBody({
                 data-testid="object-field-summary"
                 data-reserved={reserved || undefined}
                 title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
-                className={reserved ? 'text-destructive' : undefined}
+                className={cn('group', reserved && 'text-destructive')}
               >
                 <TableCell className="px-2 py-1.5 font-medium">
                   <Input
@@ -364,7 +501,13 @@ function ObjectBody({
                   {summariseKind(f.type.kind)}
                 </TableCell>
                 <TableCell className="w-28 px-1 py-1.5 text-right">
-                  <div className="inline-flex items-center gap-0.5">
+                  <div
+                    className={cn(
+                      'inline-flex items-center gap-0.5 transition-opacity',
+                      quietControls &&
+                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                    )}
+                  >
                     <Button
                       type="button"
                       variant="ghost"

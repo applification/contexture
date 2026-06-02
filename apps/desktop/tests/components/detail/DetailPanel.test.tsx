@@ -14,6 +14,7 @@ import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function seed(schema: Schema) {
@@ -93,15 +94,19 @@ describe('DetailPanel', () => {
     expect(header).toHaveTextContent('object');
   });
 
-  it('shows the scoped sample-record workbench when a table type is selected', () => {
+  it('shows the scoped sample-record workbench when a table type is selected', async () => {
+    const user = userEvent.setup();
     seed(artworkSchema);
     render(<DetailPanel selection={{ typeName: 'Artwork' }} />);
 
+    expect(screen.getByRole('tab', { name: 'Shape' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Try' }));
+
     const workbench = screen.getByRole('region', { name: 'Artwork sample records' });
-    expect(within(workbench).getByRole('button', { name: 'New record' })).toBeInTheDocument();
     expect(
-      within(workbench).getByRole('button', { name: 'Seed current entity' }),
+      within(workbench).getByRole('button', { name: 'Generate 5 records' }),
     ).toBeInTheDocument();
+    expect(within(workbench).getByRole('button', { name: 'Add manually' })).toBeInTheDocument();
     expect(within(workbench).getByText('No sample records yet')).toBeInTheDocument();
   });
 

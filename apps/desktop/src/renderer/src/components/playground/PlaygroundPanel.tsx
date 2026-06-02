@@ -9,7 +9,17 @@ import {
 } from '@contexture/core/playground-contract';
 import { generatePlaygroundFixtures } from '@contexture/core/playground-fixtures';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Database, FileJson2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react';
+import {
+  Check,
+  Database,
+  FileJson2,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 import type { RefObject } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controller, type FieldValues, useForm } from 'react-hook-form';
@@ -19,6 +29,13 @@ import { type PlaygroundRecord, usePlaygroundStore } from '@/store/playground';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../ui/field';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -298,10 +315,7 @@ export function ScopedPlaygroundWorkbench({
   return (
     <section
       ref={panelRef}
-      className={cn(
-        'flex h-[min(44rem,calc(100vh-8rem))] min-h-[30rem] flex-col overflow-hidden rounded-md border bg-background',
-        className,
-      )}
+      className={cn('flex min-h-[24rem] flex-col overflow-hidden bg-background', className)}
       aria-label={`${entity.typeName} sample records`}
     >
       <EntityToolbar
@@ -485,6 +499,67 @@ function EntityToolbar({
   onClear: () => void;
   scoped?: boolean;
 }): React.JSX.Element {
+  if (scoped) {
+    return (
+      <div className="flex min-h-14 items-center justify-between gap-3 border-b px-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-semibold">{entity.typeName}</h3>
+            <Badge variant="secondary" className="shrink-0">
+              {entity.tableName}
+            </Badge>
+          </div>
+          <p className="truncate text-xs text-muted-foreground">
+            {records.length} sample {records.length === 1 ? 'record' : 'records'}
+          </p>
+        </div>
+        {records.length === 0 ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button type="button" size="sm" className="h-8" onClick={onSeedCurrent}>
+              <Sparkles aria-hidden="true" />
+              Generate 5 records
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8" onClick={onNew}>
+              <Plus aria-hidden="true" />
+              Add manually
+            </Button>
+          </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button type="button" size="sm" className="h-8" onClick={onNew}>
+              <Plus aria-hidden="true" />
+              Add record
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="Record actions"
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onSeedCurrent}>
+                  <Sparkles aria-hidden="true" />
+                  Generate 5 more
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onClear} className="text-destructive">
+                  <RotateCcw aria-hidden="true" />
+                  Clear records
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-14 items-center justify-between gap-3 border-b px-3">
       <div className="min-w-0">
