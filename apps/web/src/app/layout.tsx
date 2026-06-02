@@ -21,7 +21,7 @@ const themeInitScript = `
 export const metadata: Metadata = {
   title: 'Contexture — Convex models for apps and agents.',
   description:
-    'Contexture is the desktop control plane for Convex app models. Design one source-of-truth IR, then emit convex/schema.ts, validators, and agent-ready supporting contracts.',
+    'Contexture is the desktop control plane for Convex app models. Design one source-of-truth IR, test it in the playground, then emit Convex files and agent-ready contracts.',
   keywords: [
     'Convex model control plane',
     'Convex domain model',
@@ -44,15 +44,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Contexture — Convex models for apps and agents.',
     description:
-      'Design one source-of-truth Convex model and emit the schema, validators, and supporting contracts your app and agents need.',
+      'Design one source-of-truth Convex model, test it in the playground, and emit the generated contracts your app and agents need.',
     type: 'website',
     siteName: 'Contexture',
     images: [
       {
-        url: '/images/misprint-graph-overview.png',
+        url: '/images/desktop-graph-schema.png',
         width: 1600,
-        height: 1200,
-        alt: 'Contexture desktop app showing a graph of connected Convex domain types',
+        height: 1100,
+        alt: 'Contexture desktop app showing the allotment model graph with generated schema output open',
       },
     ],
   },
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Contexture — Convex models for apps and agents.',
     description: 'A source-of-truth Convex model your app and agents can share.',
-    images: ['/images/misprint-graph-overview.png'],
+    images: ['/images/desktop-graph-schema.png'],
   },
 };
 

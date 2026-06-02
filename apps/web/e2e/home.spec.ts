@@ -40,7 +40,7 @@ test.describe('Home page', () => {
   test('feature cards render the Convex-first feature set', async ({ page }) => {
     await page.goto('/');
     const cards = page.locator('[data-testid="feature-card"]');
-    await expect(cards).toHaveCount(7);
+    await expect(cards).toHaveCount(8);
   });
 
   test('trusted loop section explains the product workflow', async ({ page }) => {
@@ -50,7 +50,9 @@ test.describe('Home page', () => {
     await expect(trustedLoop.locator('h2')).toContainText('From model change to drift clean');
     await expect(trustedLoop.getByRole('heading', { name: 'Model', exact: true })).toBeVisible();
     await expect(trustedLoop.getByRole('heading', { name: 'Emit', exact: true })).toBeVisible();
+    await expect(trustedLoop.getByRole('heading', { name: 'Test', exact: true })).toBeVisible();
     await expect(trustedLoop.getByRole('heading', { name: 'Verify', exact: true })).toBeVisible();
+    await expect(trustedLoop.getByRole('heading', { name: 'Reuse', exact: true })).toBeVisible();
     await expect(
       trustedLoop.getByRole('heading', { name: 'Supervise', exact: true }),
     ).toBeVisible();

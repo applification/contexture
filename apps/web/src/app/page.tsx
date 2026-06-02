@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BookOpen,
   Bot,
   Brain,
   Check,
@@ -7,6 +8,7 @@ import {
   Database,
   Download,
   FileCode2,
+  FlaskConical,
   GitGraph,
   GitPullRequestArrow,
   ListChecks,
@@ -165,9 +167,15 @@ const features = [
   },
   {
     icon: Database,
-    title: 'Convex schema and validators',
+    title: 'Generated outputs preview',
     description:
-      'Preview and emit `convex/schema.ts` and `convex/validators.ts` from table types, refs, and indexes before the files land in git.',
+      'Preview and emit Convex schema, validators, Zod, JSON Schema, structured-output schemas, MCP definitions, and form validators from the same IR.',
+  },
+  {
+    icon: FlaskConical,
+    title: 'Playground records',
+    description:
+      'Seed realistic sample rows, add records, and test how table fields, refs, enums, and stdlib values feel before the model reaches application code.',
   },
   {
     icon: PlugZap,
@@ -176,10 +184,10 @@ const features = [
       'Give Codex, Claude, and other MCP clients tools to inspect models, apply constrained ops, emit targets, validate, and check drift.',
   },
   {
-    icon: FileCode2,
-    title: 'Supporting contracts',
+    icon: ListChecks,
+    title: 'Semantic validation',
     description:
-      'Keep Zod, JSON Schema, schema indexes, structured-output schemas, MCP definitions, and form validators aligned with the Convex model.',
+      'Catch invalid refs, duplicate names, unsupported field shapes, and generated-output errors inside the desktop app and MCP workflow.',
   },
   {
     icon: Bot,
@@ -194,10 +202,10 @@ const features = [
       'Generated files carry a manifest so you can prove the repo still matches the model before a change ships.',
   },
   {
-    icon: Database,
-    title: 'Stdlib for real domains',
+    icon: BookOpen,
+    title: 'Searchable stdlib',
     description:
-      'Reach for curated primitives like Email, ISODate, LatLng, Handle, money, contact, identity, and place types instead of rebuilding basics.',
+      'Browse curated common, identity, contact, money, and place types with examples and live usage, then reuse them in fields instead of rebuilding basics.',
   },
 ];
 
@@ -230,13 +238,26 @@ const trustedLoopSteps = [
   {
     icon: FileCode2,
     title: 'Emit',
-    description: 'Preview and write `convex/schema.ts` and `convex/validators.ts` from the IR.',
+    description:
+      'Preview and write Convex files plus optional Zod, JSON Schema, structured output, MCP, and form targets.',
+  },
+  {
+    icon: FlaskConical,
+    title: 'Test',
+    description:
+      'Use the playground to seed records and exercise table shapes, refs, enums, and stdlib-backed fields.',
   },
   {
     icon: Shield,
     title: 'Verify',
     description:
       'Use the generated manifest to prove every emitted target still matches the model.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Reuse',
+    description:
+      'Pull domain primitives from the searchable stdlib and keep external type usage visible.',
   },
   {
     icon: Bot,
@@ -249,6 +270,24 @@ const trustedLoopSteps = [
     title: 'Reconcile',
     description:
       'When generated files change outside Contexture, choose whether IR or disk should win.',
+  },
+];
+
+const trustedLoopGroups = [
+  {
+    title: 'Shape the model',
+    description: 'Human-facing tools for getting the model right before files change.',
+    steps: trustedLoopSteps.filter((step) => ['Model', 'Test', 'Reuse'].includes(step.title)),
+  },
+  {
+    title: 'Generate with proof',
+    description: 'Generated artifacts stay visible, repeatable, and checked against the manifest.',
+    steps: trustedLoopSteps.filter((step) => ['Emit', 'Verify', 'Reconcile'].includes(step.title)),
+  },
+  {
+    title: 'Supervise agents',
+    description: 'Coding agents work through constrained ops instead of editing generated files.',
+    steps: trustedLoopSteps.filter((step) => step.title === 'Supervise'),
   },
 ];
 
@@ -511,8 +550,8 @@ const highlightedConvexLineIds = new Set([
 
 function ConvexGeneratedPreview() {
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/70 text-left screenshot-glow">
-      <div className="flex items-center justify-between border-b border-border/60 bg-background/70 px-4 py-3">
+    <div className="w-full min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card text-left screenshot-glow">
+      <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 py-3">
         <div>
           <div className="font-mono text-xs text-reference-text">convex/schema.ts</div>
           <div className="text-[11px] text-muted-foreground">Read-only generated output</div>
@@ -547,7 +586,7 @@ function ConvexGeneratedPreview() {
           ))}
         </code>
       </pre>
-      <div className="border-t border-border/60 bg-background/50 px-4 py-3">
+      <div className="border-t border-border/60 bg-background px-4 py-3">
         <div className="font-mono text-xs text-reference-text">convex/validators.ts</div>
         <p className="mt-1 text-xs text-muted-foreground break-words">
           Reusable validators emit beside the schema for functions, forms, and app boundaries.
@@ -690,22 +729,41 @@ function TrustedLoopSection() {
           </p>
         </div>
 
-        <MotionList className="relative grid gap-3 sm:grid-cols-5">
-          {trustedLoopSteps.map((step, index) => (
+        <MotionList className="grid gap-4 lg:grid-cols-[1fr_1fr_0.78fr]">
+          {trustedLoopGroups.map((group) => (
             <MotionItem
-              key={step.title}
-              className="relative z-10 rounded-xl border border-border/60 bg-card/50 p-5 transition-colors hover:border-reference/25"
+              key={group.title}
+              className="rounded-xl border border-border/60 bg-card/50 p-5 transition-colors hover:border-reference/25"
             >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="size-10 rounded-lg bg-accent flex items-center justify-center">
-                  <step.icon className="size-5 text-reference-text" />
-                </div>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
+              <div className="mb-4">
+                <h3 className="text-base font-semibold">{group.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {group.description}
+                </p>
               </div>
-              <h3 className="mb-2 text-base font-semibold">{step.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{step.description}</p>
+              <div className="space-y-2">
+                {group.steps.map((step, index) => (
+                  <div
+                    key={step.title}
+                    className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-lg border border-border/60 bg-background/60 p-3"
+                  >
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-accent">
+                      <step.icon className="size-4 text-reference-text" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold">{step.title}</h3>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {step.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </MotionItem>
           ))}
         </MotionList>
@@ -828,7 +886,8 @@ export default function Home() {
             A source-of-truth Convex model your app and agents can share.
           </h1>
           <p className="animate-fade-in-up-delay-2 text-lg text-muted-foreground font-medium mb-3">
-            Visual editing, generated Convex schema and validators, and MCP tools from one IR.
+            Visual editing, generated outputs, playground records, stdlib types, and MCP tools from
+            one IR.
           </p>
           <p className="animate-fade-in-up-delay-2 text-base text-muted-foreground max-w-xl mx-auto mb-12 leading-relaxed">
             Contexture is a desktop control plane for Convex app models. Design tables, refs, and
@@ -876,9 +935,9 @@ export default function Home() {
           >
             <div style={{ transform: 'rotateX(2deg)', transformOrigin: 'bottom center' }}>
               <ThemeImage
-                srcLight="/images/misprint-graph-overview-light.png"
-                srcDark="/images/misprint-graph-overview.png"
-                alt="Contexture desktop app showing a graph of connected domain types with the Codex chat panel open"
+                srcLight="/images/desktop-graph-schema-light.png"
+                srcDark="/images/desktop-graph-schema.png"
+                alt="Contexture desktop app showing the allotment model graph with generated schema output open"
                 width={1600}
                 height={1200}
                 className="w-full h-auto"
@@ -908,8 +967,8 @@ export default function Home() {
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
               Contexture gives humans a clear desktop surface and gives agents a narrow protocol.
-              Both paths update the same IR, regenerate Convex schema and validators, and leave
-              drift checks as evidence.
+              Both paths update the same IR, test the model in the playground, regenerate outputs,
+              and leave drift checks as evidence.
             </p>
           </div>
 
@@ -931,27 +990,63 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Current desktop states: selected object properties + enum hover affordance */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <ThemeImage
-                srcLight="/images/misprint-properties-light.png"
-                srcDark="/images/misprint-properties.png"
-                alt="Contexture desktop app with a selected Convex model object and the properties panel showing fields, optional flags, and model-shape hints"
-                width={1600}
-                height={1200}
-                className="w-full h-auto"
-              />
+          {/* Current desktop states: focused crops of properties, playground, and stdlib */}
+          <div className="space-y-6">
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-card/50 screenshot-glow transition-shadow duration-500">
+              <div className="border-b border-border/60 px-4 py-3">
+                <h3 className="text-sm font-semibold">Properties and validation</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Table metadata, stdlib-backed fields, indexes, and validation issues stay beside
+                  the graph.
+                </p>
+              </div>
+              <div className="relative h-[380px] overflow-hidden sm:h-[540px]">
+                <ThemeImage
+                  srcLight="/images/desktop-properties-light.png"
+                  srcDark="/images/desktop-properties.png"
+                  alt="Contexture desktop app with a selected Grower table and its properties panel open"
+                  width={1600}
+                  height={1100}
+                  className="absolute inset-0 h-full w-full origin-right scale-[1.85] object-cover object-[100%_50%] sm:scale-[1.65]"
+                />
+              </div>
             </div>
-            <div className="rounded-xl overflow-hidden border border-border/60 screenshot-glow transition-shadow duration-500">
-              <ThemeImage
-                srcLight="/images/misprint-enum-hover-light.png"
-                srcDark="/images/misprint-enum-hover.png"
-                alt="Contexture graph editor showing an enum hover card for ArtworkState with values and description"
-                width={1600}
-                height={1200}
-                className="w-full h-auto"
-              />
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-card/50 screenshot-glow transition-shadow duration-500">
+              <div className="border-b border-border/60 px-4 py-3">
+                <h3 className="text-sm font-semibold">Playground records</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Seed and inspect sample records for each table before the model reaches app code.
+                </p>
+              </div>
+              <div className="relative h-[380px] overflow-hidden sm:h-[540px]">
+                <ThemeImage
+                  srcLight="/images/desktop-playground-light.png"
+                  srcDark="/images/desktop-playground.png"
+                  alt="Contexture desktop app showing the Playground panel with seeded sample records"
+                  width={1600}
+                  height={1100}
+                  className="absolute inset-0 h-full w-full origin-right scale-[1.85] object-cover object-[100%_48%] sm:scale-[1.65]"
+                />
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border/60 bg-card/50 screenshot-glow transition-shadow duration-500">
+              <div className="border-b border-border/60 px-4 py-3">
+                <h3 className="text-sm font-semibold">Searchable stdlib</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Curated common, identity, contact, money, and place primitives include examples
+                  and live usage.
+                </p>
+              </div>
+              <div className="relative h-[380px] overflow-hidden sm:h-[540px]">
+                <ThemeImage
+                  srcLight="/images/desktop-stdlib-light.png"
+                  srcDark="/images/desktop-stdlib.png"
+                  alt="Contexture desktop app showing the searchable stdlib panel filtered to place types"
+                  width={1600}
+                  height={1100}
+                  className="absolute inset-0 h-full w-full origin-right scale-[1.8] object-cover object-[100%_42%] sm:scale-[1.58]"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -990,8 +1085,9 @@ export default function Home() {
               </h3>
               <p className="text-muted-foreground leading-relaxed">
                 The desktop app previews generated outputs beside the model graph, so Convex table
-                and index changes are concrete before they become commits. Optional supporting
-                outputs let each project choose only the contracts it needs.
+                and index changes are concrete before they become commits. Optional outputs let each
+                project choose the contracts it needs: Zod, JSON Schema, structured output, MCP
+                definitions, and form validators.
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
@@ -1015,7 +1111,7 @@ export default function Home() {
                     <Brain className="size-4 text-reference-text" />
                   </div>
                   <span className="min-w-0 text-muted-foreground">
-                    MCP tools for agents that need to inspect, mutate, emit, and validate
+                    Playground records and semantic validation before generated files are written
                   </span>
                 </div>
               </div>
@@ -1093,8 +1189,8 @@ export default function Home() {
                 Structured output
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Generate JSON Schema and structured-output definitions from the same Convex model
-                your app imports. Prompt surfaces and app surfaces stay aligned.
+                Generate Zod, JSON Schema, structured-output definitions, MCP definitions, and form
+                validators from the same Convex model your app imports.
               </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-card/50 p-6 sm:p-8 hover:border-reference/30 transition-colors">
@@ -1124,8 +1220,8 @@ export default function Home() {
           </h2>
           <p className="text-muted-foreground mb-10">
             Free and open source. Build visually, wire the MCP server into your coding tools, and
-            ship generated Convex schema and validators from the desktop app for macOS, Windows, and
-            Linux.
+            test model shapes in the playground, and ship generated Convex files from the desktop
+            app for macOS, Windows, and Linux.
           </p>
           <DownloadButton
             location="footer_cta"
