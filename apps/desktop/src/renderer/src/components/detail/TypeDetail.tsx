@@ -14,7 +14,7 @@
  */
 
 import { listFixtureModules } from '@contexture/core/fixture-generators';
-import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
+import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
@@ -23,6 +23,7 @@ import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'luci
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
+import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import {
@@ -61,6 +62,7 @@ function selectFieldFromValidationIssue(type: TypeDef, error: ValidationError): 
 
 export interface TypeDetailProps {
   type: TypeDef;
+  schema?: Schema;
   /** Dispatch an op. In production this is `useUndoStore.getState().apply`. */
   dispatch: (op: Op) => void;
   /** Dispatch a multi-op user action as one undoable edit. */
@@ -74,6 +76,7 @@ export interface TypeDetailProps {
 
 export function TypeDetail({
   type,
+  schema,
   dispatch,
   dispatchBatch,
   modelingHints = [],
@@ -128,6 +131,7 @@ export function TypeDetail({
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
       <SampleDataSection type={type} dispatch={dispatch} />
+      {isTable && schema && <ScopedPlaygroundWorkbench schema={schema} typeName={type.name} />}
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
       )}

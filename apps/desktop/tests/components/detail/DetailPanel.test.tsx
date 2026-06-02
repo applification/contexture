@@ -93,6 +93,18 @@ describe('DetailPanel', () => {
     expect(header).toHaveTextContent('object');
   });
 
+  it('shows the scoped sample-record workbench when a table type is selected', () => {
+    seed(artworkSchema);
+    render(<DetailPanel selection={{ typeName: 'Artwork' }} />);
+
+    const workbench = screen.getByRole('region', { name: 'Artwork sample records' });
+    expect(within(workbench).getByRole('button', { name: 'New record' })).toBeInTheDocument();
+    expect(
+      within(workbench).getByRole('button', { name: 'Seed current entity' }),
+    ).toBeInTheDocument();
+    expect(within(workbench).getByText('No sample records yet')).toBeInTheDocument();
+  });
+
   it('renders FieldDetail when a type + field are selected', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot', fieldName: 'name' }} />);

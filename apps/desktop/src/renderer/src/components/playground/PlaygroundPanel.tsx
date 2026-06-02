@@ -233,6 +233,131 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   );
 }
 
+export function ScopedPlaygroundWorkbench({
+  schema,
+  typeName,
+  className,
+}: {
+  schema: Schema;
+  typeName: string;
+  className?: string;
+}): React.JSX.Element | null {
+  const [panelRef, isCompact] = useCompactPanel(680);
+  const [formOpen, setFormOpen] = useState(false);
+  const [seedNotice, setSeedNotice] = useState<string | null>(null);
+  const contract = useMemo(() => buildPlaygroundContract(schema), [schema]);
+  const selectedRecordId = usePlaygroundStore((state) => state.selectedRecordId);
+  const recordsByType = usePlaygroundStore((state) => state.recordsByType);
+  const selectRecord = usePlaygroundStore((state) => state.selectRecord);
+  const upsertRecord = usePlaygroundStore((state) => state.upsertRecord);
+  const insertRecords = usePlaygroundStore((state) => state.insertRecords);
+  const deleteRecord = usePlaygroundStore((state) => state.deleteRecord);
+  const clearType = usePlaygroundStore((state) => state.clearType);
+  const pruneTypes = usePlaygroundStore((state) => state.pruneTypes);
+
+  useEffect(() => {
+    pruneTypes(contract.entities.map((entity) => entity.typeName));
+  }, [contract.entities, pruneTypes]);
+
+  const entity = contract.entities.find((candidate) => candidate.typeName === typeName) ?? null;
+  if (!entity) return null;
+
+  const records = recordsByType[entity.typeName] ?? [];
+  const selectedRecord = records.find((record) => record.id === selectedRecordId) ?? null;
+  const formRecord = formOpen ? selectedRecord : null;
+
+  const openNewRecord = () => {
+    selectRecord(entity.typeName, null);
+    setFormOpen(true);
+  };
+
+  const openExistingRecord = (recordId: string) => {
+    selectRecord(entity.typeName, recordId);
+    setFormOpen(true);
+  };
+
+  const seedRecords = () => {
+    const result = generatePlaygroundFixtures(schema, {
+      seed: `table-workbench:${entity.typeName}:${Date.now()}`,
+      count: 5,
+      typeNames: [entity.typeName],
+      existingRecordsByType: recordsByType,
+    });
+    insertRecords(result.recordsByType);
+    const generatedCount = Object.values(result.recordsByType).reduce(
+      (sum, list) => sum + list.length,
+      0,
+    );
+    setSeedNotice(
+      result.warnings.length > 0
+        ? `Seeded ${generatedCount} records with ${result.warnings.length} warnings.`
+        : `Seeded ${generatedCount} records.`,
+    );
+  };
+
+  return (
+    <section
+      ref={panelRef}
+      className={cn(
+        'flex h-[min(44rem,calc(100vh-8rem))] min-h-[30rem] flex-col overflow-hidden rounded-md border bg-background',
+        className,
+      )}
+      aria-label={`${entity.typeName} sample records`}
+    >
+      <EntityToolbar
+        entity={entity}
+        records={records}
+        onNew={openNewRecord}
+        onSeedCurrent={seedRecords}
+        onSeedAll={seedRecords}
+        onClear={() => clearType(entity.typeName)}
+        scoped
+      />
+      {seedNotice && <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />}
+      <div
+        className={cn(
+          'relative grid min-h-0 flex-1 bg-muted/10',
+          formOpen && !isCompact ? 'grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)]' : 'grid-cols-1',
+        )}
+      >
+        <div className="min-h-0">
+          <RecordTable
+            entity={entity}
+            records={records}
+            selectedRecordId={selectedRecordId}
+            recordsByType={recordsByType}
+            entities={contract.entities}
+            onSelect={openExistingRecord}
+            compact={isCompact}
+          />
+        </div>
+        {formOpen && (
+          <InlineRecordEditor
+            entity={entity}
+            record={formRecord}
+            recordsByType={recordsByType}
+            entities={contract.entities}
+            onClose={() => setFormOpen(false)}
+            onSubmit={(value) => {
+              upsertRecord(entity.typeName, formRecord?.id ?? null, value);
+              setFormOpen(false);
+            }}
+            onDelete={
+              formRecord
+                ? () => {
+                    deleteRecord(entity.typeName, formRecord.id);
+                    setFormOpen(false);
+                  }
+                : undefined
+            }
+            compact={isCompact}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function useCompactPanel(threshold = 760): readonly [RefObject<HTMLDivElement | null>, boolean] {
   const ref = useRef<HTMLDivElement>(null);
   const [isCompact, setIsCompact] = useState(false);
@@ -350,6 +475,7 @@ function EntityToolbar({
   onSeedCurrent,
   onSeedAll,
   onClear,
+  scoped = false,
 }: {
   entity: PlaygroundEntity;
   records: PlaygroundRecord[];
@@ -357,6 +483,7 @@ function EntityToolbar({
   onSeedCurrent: () => void;
   onSeedAll: () => void;
   onClear: () => void;
+  scoped?: boolean;
 }): React.JSX.Element {
   return (
     <div className="flex min-h-14 items-center justify-between gap-3 border-b px-3">
@@ -372,7 +499,14 @@ function EntityToolbar({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button type="button" variant="ghost" size="icon" title="New record" onClick={onNew}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          title="New record"
+          aria-label="New record"
+          onClick={onNew}
+        >
           <Plus aria-hidden="true" />
         </Button>
         <Button
@@ -380,19 +514,30 @@ function EntityToolbar({
           variant="ghost"
           size="icon"
           title="Seed current entity"
+          aria-label="Seed current entity"
           onClick={onSeedCurrent}
         >
           <Sparkles aria-hidden="true" />
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={onSeedAll}>
-          <Sparkles aria-hidden="true" />
-          All
-        </Button>
+        {!scoped && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            aria-label="Seed all entities"
+            onClick={onSeedAll}
+          >
+            <Sparkles aria-hidden="true" />
+            All
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
           size="icon"
           title="Clear records"
+          aria-label="Clear records"
           onClick={onClear}
           disabled={records.length === 0}
         >
@@ -400,6 +545,65 @@ function EntityToolbar({
         </Button>
       </div>
     </div>
+  );
+}
+
+function InlineRecordEditor({
+  entity,
+  record,
+  recordsByType,
+  entities,
+  onSubmit,
+  onDelete,
+  onClose,
+  compact,
+}: {
+  entity: PlaygroundEntity;
+  record: PlaygroundRecord | null;
+  recordsByType: Record<string, PlaygroundRecord[]>;
+  entities: PlaygroundEntity[];
+  onSubmit: (value: Record<string, unknown>) => void;
+  onDelete?: () => void;
+  onClose: () => void;
+  compact: boolean;
+}): React.JSX.Element {
+  return (
+    <aside
+      className={cn(
+        'flex min-h-0 flex-col border-l bg-background',
+        compact && 'absolute inset-0 z-20 border-l-0',
+      )}
+    >
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-sm font-semibold">
+              {record ? `Edit ${entity.typeName}` : `New ${entity.typeName}`}
+            </h3>
+            <Badge variant="secondary" className="shrink-0">
+              {entity.tableName}
+            </Badge>
+          </div>
+          <p className="truncate text-xs text-muted-foreground">
+            {record ? recordLabel(entity, record) : 'Create a sample record'}
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="icon" aria-label="Close form" onClick={onClose}>
+          <X aria-hidden="true" />
+        </Button>
+      </header>
+      <div className="min-h-0 flex-1">
+        <PlaygroundRecordForm
+          key={`${entity.typeName}:${record?.id ?? 'new'}`}
+          entity={entity}
+          record={record}
+          recordsByType={recordsByType}
+          entities={entities}
+          onSubmit={onSubmit}
+          onDelete={onDelete}
+        />
+      </div>
+    </aside>
   );
 }
 
@@ -413,7 +617,14 @@ function SeedNotice({
   return (
     <div className="flex items-center justify-between gap-2 border-b bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
       <span className="min-w-0 truncate">{message}</span>
-      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={onDismiss}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        aria-label="Dismiss seed notice"
+        onClick={onDismiss}
+      >
         <X aria-hidden="true" className="size-3" />
       </Button>
     </div>
@@ -522,7 +733,14 @@ function PlaygroundFormOverlay({
             {record ? recordLabel(entity, record) : 'Create a sample record'}
           </p>
         </div>
-        <Button type="button" variant="ghost" size="icon" title="Close form" onClick={onClose}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          title="Close form"
+          aria-label="Close form"
+          onClick={onClose}
+        >
           <X aria-hidden="true" />
         </Button>
       </header>
@@ -861,6 +1079,14 @@ function RecordTable({
                 <TableRow
                   key={record.id}
                   onClick={() => onSelect(record.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    onSelect(record.id);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Edit ${recordLabel(entity, record)}`}
                   className={cn(
                     'cursor-pointer',
                     selectedRecordId === record.id && 'bg-primary/10 hover:bg-primary/10',
