@@ -23,6 +23,7 @@ import { useGraphSelectionStore } from '@renderer/store/selection';
 import {
   ChevronDown,
   ChevronUp,
+  Hash,
   Lightbulb,
   Play,
   Plus,
@@ -211,6 +212,9 @@ function TableTypeDetail({
     (sum, hints) => sum + hints.length,
     0,
   );
+  const fieldIndexInsights = useMemo(() => fieldIndexInsightsForType(type), [type]);
+  const indexCount = type.indexes?.length ?? 0;
+  const suggestionCount = suggestedIndexes(type).length;
 
   return (
     <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
@@ -274,6 +278,7 @@ function TableTypeDetail({
             quietControls
             fieldHintsByName={fieldHintsByName}
             fieldHintCount={fieldHintCount}
+            fieldIndexInsights={fieldIndexInsights}
           />
           <Collapsible
             defaultOpen
@@ -287,6 +292,16 @@ function TableTypeDetail({
                 className="group h-8 w-full justify-start px-2 text-xs"
               >
                 Advanced schema output
+                {(indexCount > 0 || suggestionCount > 0) && (
+                  <span className="ml-1 truncate text-muted-foreground">
+                    · {indexCount} {indexCount === 1 ? 'index' : 'indexes'}
+                    {suggestionCount > 0
+                      ? ` · ${suggestionCount} ${
+                          suggestionCount === 1 ? 'suggestion' : 'suggestions'
+                        }`
+                      : ''}
+                  </span>
+                )}
                 <ChevronDown
                   aria-hidden="true"
                   className="ml-auto size-3.5 transition-transform group-data-[state=open]:rotate-180"
@@ -483,12 +498,14 @@ function ObjectBody({
   quietControls = false,
   fieldHintsByName,
   fieldHintCount = 0,
+  fieldIndexInsights,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
   quietControls?: boolean;
   fieldHintsByName?: ReadonlyMap<string, readonly ModelingHint[]>;
   fieldHintCount?: number;
+  fieldIndexInsights?: ReadonlyMap<string, FieldIndexInsight>;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
   const addField = () => {
@@ -560,7 +577,7 @@ function ObjectBody({
                 <span className="sr-only">Advice</span>
               </TableHead>
             )}
-            <TableHead className="h-7 w-28 px-1 text-right">
+            <TableHead className="h-7 w-36 px-1 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
@@ -569,6 +586,7 @@ function ObjectBody({
           {type.fields.map((f, fieldIndex) => {
             const reserved = isTable && isConvexReservedName(f.name);
             const fieldHints = fieldHintsByName?.get(f.name) ?? [];
+            const fieldIndexInsight = fieldIndexInsights?.get(f.name);
             return (
               <TableRow
                 key={f.name}
@@ -617,66 +635,76 @@ function ObjectBody({
                     <FieldAdvicePopover fieldName={f.name} hints={fieldHints} />
                   </TableCell>
                 )}
-                <TableCell className="w-28 px-1 py-1.5 text-right">
-                  <div
-                    className={cn(
-                      'inline-flex items-center gap-0.5 transition-opacity',
-                      quietControls &&
-                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                <TableCell className="w-36 px-1 py-1.5 text-right">
+                  <div className="inline-flex items-center justify-end gap-0.5">
+                    {fieldIndexInsight && (
+                      <FieldIndexPopover
+                        typeName={type.name}
+                        fieldName={f.name}
+                        insight={fieldIndexInsight}
+                        dispatch={dispatch}
+                      />
                     )}
-                  >
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Edit field ${f.name}`}
-                      onClick={() =>
-                        useGraphSelectionStore
-                          .getState()
-                          .selectField({ typeName: type.name, fieldName: f.name })
-                      }
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    <div
+                      className={cn(
+                        'inline-flex items-center gap-0.5 transition-opacity',
+                        quietControls &&
+                          'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                      )}
                     >
-                      <SlidersHorizontal aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move field ${f.name} earlier`}
-                      disabled={fieldIndex === 0}
-                      onClick={() => moveField(fieldIndex, fieldIndex - 1)}
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronUp aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move field ${f.name} later`}
-                      disabled={fieldIndex === type.fields.length - 1}
-                      onClick={() => moveField(fieldIndex, fieldIndex + 1)}
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronDown aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete field ${f.name}`}
-                      onClick={() =>
-                        dispatch({
-                          kind: 'remove_field',
-                          typeName: type.name,
-                          fieldName: f.name,
-                        })
-                      }
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Edit field ${f.name}`}
+                        onClick={() =>
+                          useGraphSelectionStore
+                            .getState()
+                            .selectField({ typeName: type.name, fieldName: f.name })
+                        }
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <SlidersHorizontal aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move field ${f.name} earlier`}
+                        disabled={fieldIndex === 0}
+                        onClick={() => moveField(fieldIndex, fieldIndex - 1)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronUp aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move field ${f.name} later`}
+                        disabled={fieldIndex === type.fields.length - 1}
+                        onClick={() => moveField(fieldIndex, fieldIndex + 1)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronDown aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete field ${f.name}`}
+                        onClick={() =>
+                          dispatch({
+                            kind: 'remove_field',
+                            typeName: type.name,
+                            fieldName: f.name,
+                          })
+                        }
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>
@@ -736,6 +764,99 @@ function FieldAdvicePopover({
 
 function LightbulbIcon(): React.JSX.Element {
   return <Lightbulb aria-hidden="true" className="size-3.5" />;
+}
+
+function FieldIndexPopover({
+  typeName,
+  fieldName,
+  insight,
+  dispatch,
+}: {
+  typeName: string;
+  fieldName: string;
+  insight: FieldIndexInsight;
+  dispatch: (op: Op) => void;
+}) {
+  const isIndexed = insight.memberships.length > 0;
+  const suggestion = insight.suggestion;
+  if (!isIndexed && !suggestion) return null;
+
+  const triggerLabel = isIndexed ? `Index details for ${fieldName}` : `Add index for ${fieldName}`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={triggerLabel}
+          className={cn(
+            'h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary',
+            !isIndexed &&
+              'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
+          )}
+        >
+          {isIndexed ? (
+            <Hash aria-hidden="true" className="size-3.5" />
+          ) : (
+            <Plus aria-hidden="true" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="left" className="w-72 p-3 text-xs">
+        <div className="space-y-3">
+          {isIndexed && (
+            <div className="space-y-2">
+              <div className="font-medium text-foreground">Indexed field</div>
+              <div className="space-y-1.5">
+                {insight.memberships.map((membership) => (
+                  <div key={membership.indexName} className="rounded-md border px-2 py-1.5">
+                    <div className="font-mono text-[11px] text-foreground">
+                      {membership.indexName}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {membership.total === 1
+                        ? 'Single-field index'
+                        : `Position ${membership.position + 1} of ${membership.total}: ${membership.fields.join(
+                            ' -> ',
+                          )}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {suggestion && (
+            <div className={cn('space-y-2', isIndexed && 'border-t border-border/70 pt-2')}>
+              <div>
+                <div className="font-medium text-foreground">Suggested index</div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Useful for lookups, filtering, or sorting on this field.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  dispatch({
+                    kind: 'add_index',
+                    typeName,
+                    index: { name: suggestion.name, fields: suggestion.fields },
+                  })
+                }
+                className="h-7 px-2 text-xs"
+              >
+                <Plus aria-hidden="true" />
+                Add {suggestion.name}
+              </Button>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // TODO(#119): gate on output config mode once Contexture supports multiple emit targets.
@@ -828,31 +949,16 @@ function ConvexSection({
             <p className="text-xs text-muted-foreground">Add a field before creating an index.</p>
           )}
           {suggestions.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">
-                Suggested from refs and likely lookup fields.
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-2 py-1.5">
+              <p className="min-w-0 text-[11px] text-muted-foreground">
+                {suggestions.length}{' '}
+                {suggestions.length === 1 ? 'suggested index' : 'suggested indexes'}
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((suggestion) => (
-                  <Button
-                    key={suggestion.name}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      dispatch({
-                        kind: 'add_index',
-                        typeName: type.name,
-                        index: { name: suggestion.name, fields: suggestion.fields },
-                      })
-                    }
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Plus aria-hidden="true" />
-                    {suggestion.name}
-                  </Button>
-                ))}
-              </div>
+              <SuggestedIndexesPopover
+                typeName={type.name}
+                suggestions={suggestions}
+                dispatch={dispatch}
+              />
             </div>
           )}
           {indexes.length === 0 ? (
@@ -890,6 +996,72 @@ function ConvexSection({
         </div>
       )}
     </div>
+  );
+}
+
+function SuggestedIndexesPopover({
+  typeName,
+  suggestions,
+  dispatch,
+}: {
+  typeName: string;
+  suggestions: readonly SuggestedIndex[];
+  dispatch: (op: Op) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs">
+          Review
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-3 text-xs">
+        <div className="space-y-3">
+          <div>
+            <div className="font-medium text-foreground">Suggested indexes</div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Suggested from refs and likely lookup fields.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {suggestions.map((suggestion) => (
+              <div
+                key={suggestion.name}
+                className="flex items-start justify-between gap-3 rounded-md border px-2 py-1.5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[11px] text-foreground">
+                    {suggestion.name}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {suggestionReason(suggestion)}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    dispatch({
+                      kind: 'add_index',
+                      typeName,
+                      index: { name: suggestion.name, fields: suggestion.fields },
+                    });
+                    setOpen(false);
+                  }}
+                  className="h-7 shrink-0 px-2 text-xs"
+                >
+                  <Plus aria-hidden="true" />
+                  Add
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -1159,6 +1331,51 @@ interface SuggestedIndex {
   fields: string[];
 }
 
+interface FieldIndexMembership {
+  indexName: string;
+  fields: string[];
+  position: number;
+  total: number;
+}
+
+interface FieldIndexInsight {
+  memberships: FieldIndexMembership[];
+  suggestion?: SuggestedIndex;
+}
+
+function fieldIndexInsightsForType(
+  type: Extract<TypeDef, { kind: 'object' }>,
+): Map<string, FieldIndexInsight> {
+  const insights = new Map<string, FieldIndexInsight>();
+  const ensureInsight = (fieldName: string) => {
+    const existing = insights.get(fieldName);
+    if (existing) return existing;
+    const insight: FieldIndexInsight = { memberships: [] };
+    insights.set(fieldName, insight);
+    return insight;
+  };
+
+  for (const index of type.indexes ?? []) {
+    index.fields.forEach((fieldName, position) => {
+      ensureInsight(fieldName).memberships.push({
+        indexName: index.name,
+        fields: index.fields,
+        position,
+        total: index.fields.length,
+      });
+    });
+  }
+
+  for (const suggestion of suggestedIndexes(type)) {
+    const [fieldName] = suggestion.fields;
+    if (fieldName && suggestion.fields.length === 1) {
+      ensureInsight(fieldName).suggestion = suggestion;
+    }
+  }
+
+  return insights;
+}
+
 function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): SuggestedIndex[] {
   if (type.table !== true) return [];
   const existing = type.indexes ?? [];
@@ -1173,6 +1390,13 @@ function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): Suggested
   }
 
   return suggestions;
+}
+
+function suggestionReason(suggestion: SuggestedIndex): string {
+  if (suggestion.fields.length === 1) {
+    return `Lookup and filter by ${suggestion.fields[0]}.`;
+  }
+  return `Compound query prefix: ${suggestion.fields.join(' -> ')}.`;
 }
 
 function isIndexSuggestionField(field: FieldDef): boolean {

@@ -521,12 +521,16 @@ describe('TypeDetail', () => {
         ],
       });
 
-      expect(screen.getByText('Suggested from refs and likely lookup fields.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'by_author' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'by_status' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'by_body' })).not.toBeInTheDocument();
+      expect(screen.getByText('2 suggested indexes')).toBeInTheDocument();
+      expect(screen.getByText(/Advanced schema output/)).toHaveTextContent('2 suggestions');
 
-      fireEvent.click(screen.getByRole('button', { name: 'by_author' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+      expect(screen.getByText('Suggested from refs and likely lookup fields.')).toBeInTheDocument();
+      expect(screen.getByText('by_author')).toBeInTheDocument();
+      expect(screen.getByText('by_status')).toBeInTheDocument();
+      expect(screen.queryByText('by_body')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
       expect(dispatch).toHaveBeenCalledWith({
         kind: 'add_index',
         typeName: 'Post',
