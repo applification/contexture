@@ -1214,7 +1214,7 @@ function formatRecordValue(
   recordsByType: Record<string, PlaygroundRecord[]>,
   entities: readonly PlaygroundEntity[],
 ): string {
-  if (value === undefined || value === null || value === '') return '—';
+  if (value === undefined || value === null || value === '') return '-';
   if (control.kind === 'boolean') return value === true ? 'Yes' : 'No';
   if (control.kind === 'ref' && typeof value === 'string') {
     const targetEntity = entities.find((entity) => entity.typeName === control.targetTypeName);
