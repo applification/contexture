@@ -552,119 +552,121 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               )}
             </div>
           )}
-          <div className="flex items-center gap-1.5 px-2 pb-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  disabled={!canCompose}
-                  className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Add context"
-                  aria-label="Add context"
-                  data-testid="chat-add-context"
-                >
-                  <Plus className="size-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-48">
-                <DropdownMenuItem
-                  onSelect={() => void handleAttachFiles('photos')}
-                  data-testid="chat-add-photos"
-                >
-                  <Image className="size-4" />
-                  Add photos
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => void handleAttachFiles('files')}
-                  data-testid="chat-add-files"
-                >
-                  <File className="size-4" />
-                  Add files
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Select value={modelSelectValue} onValueChange={setModel}>
-              <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Model</SelectLabel>
-                  {modelsLoading ? (
-                    <SelectItem value="models-loading" disabled>
-                      Loading models
-                    </SelectItem>
-                  ) : providerModels.length > 0 ? (
-                    providerModels.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.label}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="models-unavailable" disabled>
-                      Models unavailable
-                    </SelectItem>
-                  )}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            {modelOptionDescriptors.map((descriptor) =>
-              descriptor.type === 'select' ? (
-                <Select
-                  key={descriptor.id}
-                  value={resolveSelectValue(
-                    descriptor.options,
-                    readStringOption(modelOptionValues, descriptor.id),
-                  )}
-                  onValueChange={(value) => {
-                    chat.setModelOption(descriptor.id, value);
-                  }}
-                >
-                  <SelectTrigger
-                    aria-label={descriptor.label}
-                    title={descriptor.label}
-                    className={cn(
-                      'h-7 shrink-0 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5',
-                      descriptor.id === 'contextWindow' ? 'w-16' : 'w-20',
-                    )}
-                    data-testid={
-                      isEffortDescriptor(descriptor)
-                        ? 'chat-effort-select'
-                        : `chat-model-option-${descriptor.id}`
-                    }
+          <div className="flex items-end gap-1.5 px-2 pb-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={!canCompose}
+                    className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Add context"
+                    aria-label="Add context"
+                    data-testid="chat-add-context"
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>{descriptor.label}</SelectLabel>
-                      {descriptor.options.map((option) => (
+                    <Plus className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="w-48">
+                  <DropdownMenuItem
+                    onSelect={() => void handleAttachFiles('photos')}
+                    data-testid="chat-add-photos"
+                  >
+                    <Image className="size-4" />
+                    Add photos
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => void handleAttachFiles('files')}
+                    data-testid="chat-add-files"
+                  >
+                    <File className="size-4" />
+                    Add files
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Select value={modelSelectValue} onValueChange={setModel}>
+                <SelectTrigger className="w-24 h-7 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Model</SelectLabel>
+                    {modelsLoading ? (
+                      <SelectItem value="models-loading" disabled>
+                        Loading models
+                      </SelectItem>
+                    ) : providerModels.length > 0 ? (
+                      providerModels.map((option) => (
                         <SelectItem key={option.id} value={option.id}>
                           {option.label}
                         </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div
-                  key={descriptor.id}
-                  className="flex h-7 shrink-0 items-center gap-1.5 px-1.5 text-xs text-muted-foreground"
-                  data-testid={`chat-model-option-${descriptor.id}`}
-                >
-                  <Checkbox
-                    aria-label={descriptor.label}
-                    className="size-3.5"
-                    checked={readBooleanOption(modelOptionValues, descriptor.id, descriptor)}
-                    onCheckedChange={(value) => {
-                      chat.setModelOption(descriptor.id, value === true);
+                      ))
+                    ) : (
+                      <SelectItem value="models-unavailable" disabled>
+                        Models unavailable
+                      </SelectItem>
+                    )}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {modelOptionDescriptors.map((descriptor) =>
+                descriptor.type === 'select' ? (
+                  <Select
+                    key={descriptor.id}
+                    value={resolveSelectValue(
+                      descriptor.options,
+                      readStringOption(modelOptionValues, descriptor.id),
+                    )}
+                    onValueChange={(value) => {
+                      chat.setModelOption(descriptor.id, value);
                     }}
-                  />
-                  {descriptor.label}
-                </div>
-              ),
-            )}
-            <div className="ml-auto">
+                  >
+                    <SelectTrigger
+                      aria-label={descriptor.label}
+                      title={descriptor.label}
+                      className={cn(
+                        'h-7 shrink-0 text-xs border-0 bg-transparent shadow-none focus:ring-0 px-1.5',
+                        descriptor.id === 'contextWindow' ? 'w-16' : 'w-20',
+                      )}
+                      data-testid={
+                        isEffortDescriptor(descriptor)
+                          ? 'chat-effort-select'
+                          : `chat-model-option-${descriptor.id}`
+                      }
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>{descriptor.label}</SelectLabel>
+                        {descriptor.options.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    key={descriptor.id}
+                    className="flex h-7 shrink-0 items-center gap-1.5 px-1.5 text-xs text-muted-foreground"
+                    data-testid={`chat-model-option-${descriptor.id}`}
+                  >
+                    <Checkbox
+                      aria-label={descriptor.label}
+                      className="size-3.5"
+                      checked={readBooleanOption(modelOptionValues, descriptor.id, descriptor)}
+                      onCheckedChange={(value) => {
+                        chat.setModelOption(descriptor.id, value === true);
+                      }}
+                    />
+                    {descriptor.label}
+                  </div>
+                ),
+              )}
+            </div>
+            <div className="shrink-0">
               {isStreaming ? (
                 <button
                   type="button"
