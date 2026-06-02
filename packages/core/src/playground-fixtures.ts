@@ -5,6 +5,7 @@ import type { Schema } from './ir';
 import {
   buildPlaygroundContract,
   type PlaygroundArrayElementControl,
+  type PlaygroundContractOptions,
   type PlaygroundControl,
   type PlaygroundEntity,
   type PlaygroundFieldConstraints,
@@ -24,6 +25,7 @@ export interface PlaygroundFixtureOptions {
   countsByType?: Record<string, number>;
   typeNames?: readonly string[];
   existingRecordsByType?: Record<string, Array<{ id: string; value: Record<string, unknown> }>>;
+  externalTypes?: PlaygroundContractOptions['externalTypes'];
 }
 
 export interface PlaygroundFixtureResult {
@@ -43,7 +45,7 @@ export function generatePlaygroundFixtures(
   schema: Schema,
   options: PlaygroundFixtureOptions = {},
 ): PlaygroundFixtureResult {
-  const contract = buildPlaygroundContract(schema);
+  const contract = buildPlaygroundContract(schema, { externalTypes: options.externalTypes });
   const requestedTypeNames = new Set(
     options.typeNames ?? contract.entities.map((entity) => entity.typeName),
   );

@@ -5,6 +5,8 @@
  * converts those namespace-indexed IR sidecars into the small lookup surfaces
  * used by core validation, emitters, and chat prompts.
  */
+
+import type { TypeDef } from '@contexture/core/ir';
 import type { StdlibCatalog } from '@contexture/core/semantic-validation';
 import { IR_BY_NAMESPACE, NAMESPACES, type Namespace } from '@contexture/stdlib/registry';
 import type { StdlibRegistry as SystemPromptStdlibRegistry } from './system-prompt';
@@ -39,6 +41,18 @@ export function buildStdlibRegistry(): StdlibRegistry {
 
 /** Singleton for app runtime; tests build their own via `buildStdlibRegistry`. */
 export const STDLIB_REGISTRY: StdlibRegistry = buildStdlibRegistry();
+
+export function buildStdlibTypeDefinitions(): ReadonlyMap<string, TypeDef> {
+  const types = new Map<string, TypeDef>();
+  for (const ns of NAMESPACES) {
+    for (const type of IR_BY_NAMESPACE[ns].types) {
+      types.set(`${ns}.${type.name}`, type as TypeDef);
+    }
+  }
+  return types;
+}
+
+export const STDLIB_TYPE_DEFINITIONS = buildStdlibTypeDefinitions();
 
 /**
  * Adapter for the system-prompt builder's registry shape, which expects a flat
@@ -97,11 +111,13 @@ function stdlibExample(type: StdlibExampleType): string {
   if (namedExample) return namedExample;
 
   if (type.kind === 'object' && type.fields) {
-    const fields = type.fields
-      .filter((field) => field.optional !== true)
-      .slice(0, 3)
-      .map((field) => `${field.name}: ${exampleForFieldType(field.type.kind)}`);
-    return `{ ${fields.join(', ')} }`;
+    const fields = Object.fromEntries(
+      type.fields
+        .filter((field) => field.optional !== true)
+        .slice(0, 3)
+        .map((field) => [field.name, exampleForFieldType(field.type.kind)]),
+    );
+    return JSON.stringify(fields, null, 2);
   }
   if (type.kind === 'enum') return type.values?.[0]?.value ?? 'value';
   if (type.kind !== 'raw') return type.name;
@@ -138,8 +154,8 @@ function stdlibNamedExample(typeName: string): string | undefined {
   }
 }
 
-function exampleForFieldType(kind: string): string {
-  if (kind === 'number') return '1';
-  if (kind === 'boolean') return 'true';
-  return '"value"';
+function exampleForFieldType(kind: string): string | number | boolean {
+  if (kind === 'number') return 1;
+  if (kind === 'boolean') return true;
+  return 'value';
 }

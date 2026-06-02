@@ -107,13 +107,24 @@ export interface PlaygroundContract {
   enums: Array<{ typeName: string; options: PlaygroundEnumOption[] }>;
 }
 
+export interface PlaygroundContractOptions {
+  externalTypes?: ReadonlyMap<string, TypeDef> | Record<string, TypeDef>;
+}
+
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 type EnumType = Extract<TypeDef, { kind: 'enum' }>;
+type RawType = Extract<TypeDef, { kind: 'raw' }>;
 
 const DISPLAY_FIELD_CANDIDATES = ['name', 'title', 'label', 'slug', 'email', 'key'];
 
-export function buildPlaygroundContract(schema: Schema): PlaygroundContract {
-  const typeByName = new Map(schema.types.map((type) => [type.name, type]));
+export function buildPlaygroundContract(
+  schema: Schema,
+  options: PlaygroundContractOptions = {},
+): PlaygroundContract {
+  const typeByName = new Map([
+    ...externalTypeEntries(options.externalTypes),
+    ...schema.types.map((type) => [type.name, type] as const),
+  ]);
   const entities = schema.types
     .filter((type): type is ObjectType => type.kind === 'object' && type.table === true)
     .map((type) => buildEntity(type, typeByName, [type.name]));
@@ -259,6 +270,7 @@ function refControlShape(
 ): PlaygroundControlShape {
   const target = typeByName.get(typeName);
   if (target?.kind === 'enum') return { kind: 'enum', options: enumOptions(target) };
+  if (target?.kind === 'raw') return rawControlShape(target);
   if (target?.kind === 'object' && target.table === true) {
     return {
       kind: 'ref',
@@ -273,6 +285,56 @@ function refControlShape(
     return buildObjectShape(target, typeByName, [...stack, target.name]);
   }
   return { kind: 'unsupported', reason: `Unknown reference target: ${typeName}` };
+}
+
+function rawControlShape(type: RawType): PlaygroundControlShape {
+  const jsonSchema = type.jsonSchema;
+  const jsonType = typeof jsonSchema.type === 'string' ? jsonSchema.type : null;
+  if (jsonType === 'number' || jsonType === 'integer') {
+    return {
+      kind: 'number',
+      constraints: {
+        min: numericConstraint(jsonSchema.minimum ?? jsonSchema.exclusiveMinimum),
+        max: numericConstraint(jsonSchema.maximum ?? jsonSchema.exclusiveMaximum),
+        int: jsonType === 'integer',
+      },
+    };
+  }
+  if (jsonType === 'boolean') return { kind: 'boolean', constraints: {} };
+  if (jsonType === 'string') {
+    const format = stringFormat(jsonSchema.format);
+    return {
+      kind: format === 'date' ? 'date' : 'text',
+      constraints: {
+        min: numericConstraint(jsonSchema.minLength),
+        max: numericConstraint(jsonSchema.maxLength),
+        regex: typeof jsonSchema.pattern === 'string' ? jsonSchema.pattern : undefined,
+        ...(format && format !== 'date' ? { format } : {}),
+      },
+    };
+  }
+  return { kind: 'unsupported', reason: `Unsupported raw reference target: ${type.name}` };
+}
+
+function externalTypeEntries(
+  externalTypes: PlaygroundContractOptions['externalTypes'],
+): Array<readonly [string, TypeDef]> {
+  if (!externalTypes) return [];
+  return externalTypes instanceof Map
+    ? [...externalTypes.entries()]
+    : Object.entries(externalTypes);
+}
+
+function numericConstraint(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
+function stringFormat(value: unknown): PlaygroundFieldConstraints['format'] | 'date' | undefined {
+  if (value === 'email' || value === 'uuid' || value === 'datetime' || value === 'date') {
+    return value;
+  }
+  if (value === 'uri') return 'url';
+  return undefined;
 }
 
 function buildObjectControl(

@@ -10,6 +10,7 @@ import {
 } from '@contexture/core/playground-contract';
 import { generatePlaygroundFixtures } from '@contexture/core/playground-fixtures';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
   Check,
   Database,
@@ -50,7 +51,10 @@ interface PlaygroundPanelProps {
 export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Element {
   const [panelRef, isCompact] = useCompactPanel();
   const [formOpen, setFormOpen] = useState(false);
-  const contract = useMemo(() => buildPlaygroundContract(schema), [schema]);
+  const contract = useMemo(
+    () => buildPlaygroundContract(schema, { externalTypes: STDLIB_TYPE_DEFINITIONS }),
+    [schema],
+  );
   const selectedTypeName = usePlaygroundStore((state) => state.selectedTypeName);
   const selectedRecordId = usePlaygroundStore((state) => state.selectedRecordId);
   const recordsByType = usePlaygroundStore((state) => state.recordsByType);
@@ -102,6 +106,7 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
       count: 5,
       typeNames: scope === 'current' && selectedEntity ? [selectedEntity.typeName] : undefined,
       existingRecordsByType: recordsByType,
+      externalTypes: STDLIB_TYPE_DEFINITIONS,
     });
     insertRecords(result.recordsByType);
     const generatedCount = Object.values(result.recordsByType).reduce(
@@ -264,7 +269,10 @@ export function ScopedPlaygroundWorkbench({
   const [panelRef, isCompact] = useCompactPanel(680);
   const [formOpen, setFormOpen] = useState(false);
   const [seedNotice, setSeedNotice] = useState<string | null>(null);
-  const contract = useMemo(() => buildPlaygroundContract(schema), [schema]);
+  const contract = useMemo(
+    () => buildPlaygroundContract(schema, { externalTypes: STDLIB_TYPE_DEFINITIONS }),
+    [schema],
+  );
   const selectedRecordId = usePlaygroundStore((state) => state.selectedRecordId);
   const recordsByType = usePlaygroundStore((state) => state.recordsByType);
   const selectRecord = usePlaygroundStore((state) => state.selectRecord);
@@ -305,6 +313,7 @@ export function ScopedPlaygroundWorkbench({
       count: 5,
       typeNames: [entity.typeName],
       existingRecordsByType: recordsByType,
+      externalTypes: STDLIB_TYPE_DEFINITIONS,
     });
     insertRecords(result.recordsByType);
     const generatedCount = Object.values(result.recordsByType).reduce(

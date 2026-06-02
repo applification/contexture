@@ -536,4 +536,34 @@ describe('FieldDetail', () => {
     expect(screen.getAllByText('Query handle').length).toBeGreaterThan(0);
     expect(screen.getByText(/stay denormalized/i)).toBeInTheDocument();
   });
+
+  it('applies a stdlib model advice action to the selected field', () => {
+    const { dispatch } = setup({ name: 'releaseDate', type: { kind: 'string' } }, [
+      {
+        id: 'v1:stdlib_type:Plot:releaseDate:common.ISODate',
+        kind: 'stdlib_type',
+        signals: ['identity_pressure'],
+        path: 'types.0.fields.0',
+        typeName: 'Plot',
+        fieldName: 'releaseDate',
+        title: 'Stdlib type available',
+        message:
+          'releaseDate looks like an ISO date. Use common.ISODate to reuse the shared validator and generated type.',
+        rationale:
+          'Stdlib refs keep common value formats consistent across the model, generated validators, and agent-created changes.',
+        fieldNames: ['releaseDate'],
+        action: { kind: 'use_stdlib_type', typeName: 'common.ISODate' },
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Model advice' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use common.ISODate' }));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'releaseDate',
+      patch: { type: { kind: 'ref', typeName: 'common.ISODate' } },
+    });
+  });
 });

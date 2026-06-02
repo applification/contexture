@@ -80,6 +80,16 @@ describe('buildSystemPromptAppend', () => {
     expect(prompt).toContain('Currency + minor-units amount');
   });
 
+  it('instructs agents to prefer stdlib refs for common value formats', () => {
+    const prompt = buildSystemPromptAppend({ stdlibRegistry: EMPTY_STDLIB });
+    expect(prompt).toContain('## Stdlib-first modeling');
+    expect(prompt).toContain('date, releaseDate, bornOn');
+    expect(prompt).toContain('common.ISODate');
+    expect(prompt).toContain('country, countryCode');
+    expect(prompt).toContain('place.CountryCode');
+    expect(prompt).toContain('{ kind: "ref", typeName: "namespace.Type" }');
+  });
+
   it('is deterministic across stdlib-entry orderings', () => {
     const a: StdlibRegistry = {
       entries: [
