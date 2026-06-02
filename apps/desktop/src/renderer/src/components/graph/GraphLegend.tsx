@@ -67,6 +67,11 @@ const NODE_ITEMS: readonly NodeItem[] = [
     style: 'dashed',
   },
   {
+    label: 'Stdlib',
+    header: 'color-mix(in oklch, var(--chart-2) 72%, var(--graph-node-header-bg))',
+    style: 'dashed',
+  },
+  {
     label: 'Selected',
     header: 'var(--graph-node-selected)',
   },
@@ -74,20 +79,25 @@ const NODE_ITEMS: readonly NodeItem[] = [
 
 export const GraphLegend = memo(function GraphLegend({
   showEnumNodes = false,
+  showStdlibNodes = false,
 }: {
   showEnumNodes?: boolean;
+  showStdlibNodes?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const visibleNodeItems = showStdlibNodes
+    ? NODE_ITEMS
+    : NODE_ITEMS.filter((item) => item.label !== 'Stdlib');
   const nodeItems = showEnumNodes
     ? [
-        ...NODE_ITEMS.slice(0, 2),
+        ...visibleNodeItems.slice(0, 2),
         {
           label: 'Enum',
           header: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
         },
-        ...NODE_ITEMS.slice(2),
+        ...visibleNodeItems.slice(2),
       ]
-    : NODE_ITEMS;
+    : visibleNodeItems;
 
   return (
     <div

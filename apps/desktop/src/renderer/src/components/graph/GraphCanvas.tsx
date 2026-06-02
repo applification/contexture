@@ -186,6 +186,7 @@ function GraphCanvasInner({
 
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const showEnums = graphLayout.showEnums;
+  const showStdlib = graphLayout.showStdlib;
   const [refPreview, setRefPreview] = useState<RefPreview | null>(null);
   const refPreviewClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [focusedField, setFocusedField] = useState<{ nodeId: string; fieldName: string } | null>(
@@ -193,7 +194,10 @@ function GraphCanvasInner({
   );
   const focusedFieldClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { nodes: visibleBuiltNodes, edges: visibleBuiltEdges } = useMemo(() => {
-    const visible = filterGraphView({ nodes: builtNodes, edges: builtEdges }, { showEnums });
+    const visible = filterGraphView(
+      { nodes: builtNodes, edges: builtEdges },
+      { showEnums, showStdlib },
+    );
     const visibleWithFocusedField = focusedField
       ? {
           ...visible,
@@ -234,7 +238,7 @@ function GraphCanvasInner({
           : { ...edge, data: { ...edge.data, previewDimmed: true } };
       }),
     };
-  }, [builtNodes, builtEdges, showEnums, refPreview, focusedField]);
+  }, [builtNodes, builtEdges, showEnums, showStdlib, refPreview, focusedField]);
 
   const [nodes, setNodes] = useState<Node[]>(visibleBuiltNodes);
   const [edges, setEdges] = useState<Edge[]>(visibleBuiltEdges);
@@ -273,10 +277,16 @@ function GraphCanvasInner({
   }, [builtNodes, visibleBuiltNodes, visibleBuiltEdges]);
 
   useEffect(() => {
-    if (showEnums || !selectedNodeId) return;
+    if ((showEnums && showStdlib) || !selectedNodeId) return;
     const selectedNode = builtNodes.find((node) => node.id === selectedNodeId);
-    if (selectedNode?.data.kind === 'enum' && !selectedNode.data.imported) clearNodes();
-  }, [builtNodes, clearNodes, selectedNodeId, showEnums]);
+    if (
+      selectedNode &&
+      ((!showEnums && selectedNode.data.kind === 'enum' && !selectedNode.data.imported) ||
+        (!showStdlib && selectedNode.data.stdlib === true))
+    ) {
+      clearNodes();
+    }
+  }, [builtNodes, clearNodes, selectedNodeId, showEnums, showStdlib]);
 
   // ELK once the nodes have measured DOM dimensions.
   const { runLayout } = useELKLayout();
@@ -600,7 +610,7 @@ function GraphCanvasInner({
             pattern reads as texture not noise on both light and dark. */}
         <Background gap={28} size={0.8} color="var(--graph-dot)" />
         <Controls showInteractive={false} />
-        <GraphLegend showEnumNodes={showEnums} />
+        <GraphLegend showEnumNodes={showEnums} showStdlibNodes={showStdlib} />
       </ReactFlow>
     </div>
   );

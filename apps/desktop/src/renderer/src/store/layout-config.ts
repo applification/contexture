@@ -11,6 +11,7 @@ export interface GraphLayout {
   layoutMode: 'organic' | 'layered';
   nodeSpacing: number;
   showEnums: boolean;
+  showStdlib: boolean;
   showEdgeLabels: boolean;
 }
 
@@ -18,6 +19,7 @@ export const DEFAULT_LAYOUT: GraphLayout = {
   layoutMode: 'layered',
   nodeSpacing: 180,
   showEnums: false,
+  showStdlib: false,
   showEdgeLabels: true,
 };
 

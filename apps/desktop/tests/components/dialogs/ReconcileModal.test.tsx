@@ -97,11 +97,12 @@ describe('ReconcileModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /regenerate from ir/i }));
 
     await waitFor(() =>
-      expect(window.contexture?.reconcile.writeGeneratedTarget).toHaveBeenCalledOnce(),
+      expect(window.contexture?.reconcile.acceptGeneratedTarget).toHaveBeenCalledOnce(),
     );
     const [payload] =
-      vi.mocked(window.contexture?.reconcile.writeGeneratedTarget).mock.calls[0] ?? [];
+      vi.mocked(window.contexture?.reconcile.acceptGeneratedTarget).mock.calls[0] ?? [];
     expect(payload).toMatchObject({ irPath: IR_PATH, targetPath: ZOD_PATH });
+    expect(payload?.schema).toEqual(SCHEMA);
     const contents = payload?.contents ?? '';
     expect(contents).toContain('@contexture-generated');
     expect(contents).toContain('Plot');
@@ -159,7 +160,7 @@ describe('ReconcileModal', () => {
     render(<ReconcileModal />);
     fireEvent.click(screen.getByRole('button', { name: /leave dirty/i }));
 
-    expect(window.contexture?.reconcile.writeGeneratedTarget).not.toHaveBeenCalled();
+    expect(window.contexture?.reconcile.acceptGeneratedTarget).not.toHaveBeenCalled();
     expect(useDriftStore.getState().driftedPaths).toEqual([ZOD_PATH]);
     expect(useReconcileStore.getState().isOpen).toBe(false);
   });
