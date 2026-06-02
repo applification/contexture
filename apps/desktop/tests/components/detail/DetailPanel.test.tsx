@@ -147,9 +147,9 @@ describe('DetailPanel', () => {
     seed(artworkSchema);
     render(<DetailPanel selection={{ typeName: 'Artwork', fieldName: 'sourceSearchText' }} />);
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
-    const guidance = screen.getByRole('region', { name: 'Model shape' });
-    expect(within(guidance).getByText('Query handle')).toBeInTheDocument();
-    expect(within(guidance).getByText(/denormalized/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Model advice' }));
+    expect(screen.getAllByText('Query handle').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/denormalized/i).length).toBeGreaterThan(0);
   });
 
   it('creates a referenced object type from the field target picker', () => {
@@ -308,7 +308,8 @@ describe('DetailPanel', () => {
     expect(onClearSelection).toHaveBeenCalledOnce();
   });
 
-  it('returns to the type selection after deleting the selected field from details', () => {
+  it('returns to the type selection after deleting the selected field from details', async () => {
+    const user = userEvent.setup();
     seed(plotSchema);
     useGraphSelectionStore.getState().click('Plot', 'replace');
     const onClearSelectedField = vi.fn();
@@ -319,7 +320,8 @@ describe('DetailPanel', () => {
         onClearSelectedField={onClearSelectedField}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Delete field name' }));
+    await user.click(screen.getByRole('button', { name: 'Field actions for name' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete field' }));
 
     expect(useUndoStore.getState().schema.types[0]).toMatchObject({
       kind: 'object',
