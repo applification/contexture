@@ -12,8 +12,9 @@
  *   - Message list rendered as user bubbles (right-aligned primary),
  *     tool-use status lines (small monospace chips), and assistant
  *     markdown via `Streamdown`.
- *   - Prompt input as a single rounded card: textarea + Model select +
- *     Effort (thinking budget) select + Send / Stop button.
+ *   - Prompt input as a docked rounded surface: recent agent turn summary
+ *     (when present) + textarea + Model select + Effort (thinking budget)
+ *     select + Send / Stop button.
  *
  * File-backed threads live in localStorage (see `useChatThreads`). Each
  * can carry a provider-owned thread ref; switching threads pushes that
@@ -58,7 +59,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { Badge } from '@/components/ui/badge';
 import { BorderBeam } from '@/components/ui/border-beam';
@@ -77,7 +78,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -420,7 +420,7 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
           onDelete={handleDeleteThread}
         />
       ) : (
-        <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="chat-transcript">
+        <div className="flex-1 overflow-y-auto p-3 pb-2 space-y-3" data-testid="chat-transcript">
           {messages.length === 0 && (
             <Empty className="border-0 p-4">
               <EmptyHeader>
@@ -482,20 +482,28 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
               </button>
             </div>
           )}
-          {recentAgentTurn && (
-            <AgentTurnSummaryCard
-              turn={recentAgentTurn}
-              isWaitingForFinalResponse={isWaitingForFinalResponse}
-            />
-          )}
           <div ref={messagesEndRef} />
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="p-3 border-t border-border">
+      <form
+        onSubmit={handleSubmit}
+        className="p-3 border-t border-border"
+        data-testid="chat-composer"
+      >
+        {recentAgentTurn && (
+          <div className="-mb-px px-2" data-testid="agent-turn-dock">
+            <AgentTurnSummaryCard
+              turn={recentAgentTurn}
+              isWaitingForFinalResponse={isWaitingForFinalResponse}
+              docked
+            />
+          </div>
+        )}
         <div
           className={cn(
-            'rounded-xl border border-input bg-card transition-shadow',
+            'relative rounded-xl border border-input bg-card transition-shadow',
+            recentAgentTurn && 'rounded-t-lg',
             'focus-within:ring-1 focus-within:ring-ring',
             (!isReady || isStreaming) && 'opacity-60',
           )}
@@ -692,9 +700,11 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
 function AgentTurnSummaryCard({
   turn,
   isWaitingForFinalResponse,
+  docked = false,
 }: {
   turn: AgentTurnRecord;
   isWaitingForFinalResponse: boolean;
+  docked?: boolean;
 }): React.JSX.Element {
   const applied = turn.ops.filter((op) => op.status === 'applied').length;
   const rejected = turn.ops.filter((op) => op.status === 'rejected').length;
@@ -719,100 +729,116 @@ function AgentTurnSummaryCard({
     markRolledBack(turn.id);
   }, [canUndoTurn, markRolledBack, turn.id, undo]);
 
+  const [expanded, setExpanded] = useState(false);
+  const detailId = useId();
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'group relative w-full overflow-hidden rounded-lg border border-border/70 bg-card px-3 py-3 text-left text-xs text-muted-foreground shadow-sm transition-colors',
-            'hover:border-primary/30 hover:bg-accent/35 focus:outline-none focus:ring-1 focus:ring-ring',
-          )}
-          data-testid="agent-turn-summary"
-        >
-          {isWaitingForFinalResponse && (
-            <span data-testid="agent-turn-pending-highlight">
-              <BorderBeam duration={6} size={100} />
-            </span>
-          )}
-          <div className="flex items-start gap-2.5">
-            <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
-              <Wrench className="size-3.5" aria-hidden="true" />
+    <div className="w-full" data-testid="agent-turn-pane">
+      <button
+        type="button"
+        className={cn(
+          'relative w-full overflow-hidden border border-border/70 bg-card px-3 py-3 text-left text-xs text-muted-foreground shadow-sm transition-colors',
+          'hover:border-primary/30 hover:bg-accent/35 focus:outline-none focus:ring-1 focus:ring-ring',
+          docked && expanded && 'rounded-t-xl rounded-b-none border-b-border/70',
+          docked && !expanded && 'rounded-t-xl rounded-b-none border-b-input',
+          !docked && expanded && 'rounded-t-lg rounded-b-none',
+          !docked && !expanded && 'rounded-lg',
+        )}
+        data-testid="agent-turn-summary"
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        {isWaitingForFinalResponse && (
+          <span data-testid="agent-turn-pending-highlight">
+            <BorderBeam duration={6} size={100} />
+          </span>
+        )}
+        <div className="flex items-start gap-2.5">
+          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 text-primary">
+            <Wrench className="size-3.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">
+                {turn.summary}
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {turn.status === 'committed' && applied > 0 && (
+                  <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
+                )}
+                {turn.status === 'rolled_back' && (
+                  <RotateCcw className="size-4 text-muted-foreground" aria-hidden="true" />
+                )}
+                <ChevronRight
+                  className={cn(
+                    'size-3.5 text-muted-foreground transition-transform',
+                    expanded && 'rotate-90',
+                  )}
+                  aria-hidden="true"
+                />
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">
-                  {turn.summary}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {turn.status === 'committed' && applied > 0 && (
-                    <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
-                  )}
-                  {turn.status === 'rolled_back' && (
-                    <RotateCcw className="size-4 text-muted-foreground" aria-hidden="true" />
-                  )}
-                  <ChevronRight
-                    className="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
-                  {turnStatusLabel(turn.status)}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                {turnStatusLabel(turn.status)}
+              </Badge>
+              {toolCount > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                  {toolCount} tool {toolCount === 1 ? 'call' : 'calls'}
                 </Badge>
-                {toolCount > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 py-0 text-[11px] font-medium">
-                    {toolCount} tool {toolCount === 1 ? 'call' : 'calls'}
-                  </Badge>
-                )}
-                <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
-                  {applied} applied
+              )}
+              <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                {applied} applied
+              </Badge>
+              {rejected > 0 && (
+                <Badge
+                  variant="outline"
+                  className="h-5 border-destructive/30 px-1.5 py-0 text-[11px] font-medium text-destructive"
+                >
+                  {rejected} rejected
                 </Badge>
-                {rejected > 0 && (
-                  <Badge
-                    variant="outline"
-                    className="h-5 border-destructive/30 px-1.5 py-0 text-[11px] font-medium text-destructive"
-                  >
-                    {rejected} rejected
-                  </Badge>
-                )}
-                {pending > 0 && (
-                  <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
-                    {pending} pending
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-2 grid gap-1.5">
-                {toolSummary && (
-                  <div
-                    className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground"
-                    data-testid="agent-turn-tool-summary"
-                  >
-                    <Wrench className="size-3 shrink-0" aria-hidden="true" />
-                    <span className="truncate font-mono">{toolSummary}</span>
-                  </div>
-                )}
-                {diffRows.length > 0 && (
-                  <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <CheckCircle2 className="size-3 shrink-0 text-success" aria-hidden="true" />
-                    <span className="truncate">{diffRows.slice(0, 2).join(', ')}</span>
-                  </div>
-                )}
-              </div>
+              )}
+              {pending > 0 && (
+                <Badge variant="outline" className="h-5 px-1.5 py-0 text-[11px] font-medium">
+                  {pending} pending
+                </Badge>
+              )}
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              {toolSummary && (
+                <div
+                  className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground"
+                  data-testid="agent-turn-tool-summary"
+                >
+                  <Wrench className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate font-mono">{toolSummary}</span>
+                </div>
+              )}
+              {diffRows.length > 0 && (
+                <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <CheckCircle2 className="size-3 shrink-0 text-success" aria-hidden="true" />
+                  <span className="truncate">{diffRows.slice(0, 2).join(', ')}</span>
+                </div>
+              )}
             </div>
           </div>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        side="top"
-        sideOffset={8}
-        className="w-[min(24rem,calc(100vw-2rem))] p-0"
-      >
-        <AgentTurnDetail turn={turn} canUndo={canUndoTurn} onUndo={handleUndo} />
-      </PopoverContent>
-    </Popover>
+        </div>
+      </button>
+      {expanded && (
+        <section
+          id={detailId}
+          className={cn(
+            'max-h-96 overflow-y-auto border-x border-b border-border/70 bg-card',
+            docked ? 'rounded-b-none' : 'rounded-b-lg',
+          )}
+          aria-label="Agent turn details"
+          data-testid="agent-turn-detail"
+        >
+          <AgentTurnDetail turn={turn} canUndo={canUndoTurn} onUndo={handleUndo} />
+        </section>
+      )}
+    </div>
   );
 }
 
