@@ -294,6 +294,29 @@ describe('TypeDetail', () => {
       expect(screen.getByRole('button', { name: /add index/i })).toBeInTheDocument();
     });
 
+    it('shows field-level modeling advice from the field row popover', () => {
+      setup({ ...base, table: true }, [
+        {
+          id: 'v1:query_handle:Post:title',
+          kind: 'query_handle',
+          signals: ['query_pressure'],
+          path: 'types.0.fields.1',
+          typeName: 'Post',
+          fieldName: 'title',
+          title: 'Query handle',
+          message: 'This field looks useful for filtering, sorting, indexing, or search.',
+          rationale: 'A top-level query handle can preserve common queries.',
+          fieldNames: ['title'],
+        },
+      ]);
+
+      expect(screen.getByText('1 advisory')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Modeling advice for title' }));
+
+      expect(screen.getByText('Query handle')).toBeInTheDocument();
+      expect(screen.getByText(/useful for filtering/i)).toBeInTheDocument();
+    });
+
     it('shows and edits the emitted Convex table name when table:true', () => {
       const { dispatch } = setup({ ...base, table: true, tableName: 'posts' });
       const input = screen.getByLabelText('Emitted table name') as HTMLInputElement;
@@ -498,12 +521,16 @@ describe('TypeDetail', () => {
         ],
       });
 
-      expect(screen.getByText('Suggested from refs and likely lookup fields.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'by_author' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'by_status' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'by_body' })).not.toBeInTheDocument();
+      expect(screen.getByText('2 suggested indexes')).toBeInTheDocument();
+      expect(screen.getByText(/Advanced schema output/)).toHaveTextContent('2 suggestions');
 
-      fireEvent.click(screen.getByRole('button', { name: 'by_author' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+      expect(screen.getByText('Suggested from refs and likely lookup fields.')).toBeInTheDocument();
+      expect(screen.getByText('by_author')).toBeInTheDocument();
+      expect(screen.getByText('by_status')).toBeInTheDocument();
+      expect(screen.queryByText('by_body')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
       expect(dispatch).toHaveBeenCalledWith({
         kind: 'add_index',
         typeName: 'Post',

@@ -14,6 +14,7 @@ import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function seed(schema: Schema) {
@@ -93,10 +94,45 @@ describe('DetailPanel', () => {
     expect(header).toHaveTextContent('object');
   });
 
+  it('shows the scoped sample-record workbench when a table type is selected', async () => {
+    const user = userEvent.setup();
+    seed(artworkSchema);
+    render(<DetailPanel selection={{ typeName: 'Artwork' }} />);
+
+    expect(screen.getByRole('tab', { name: 'Shape' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Try' }));
+
+    const workbench = screen.getByRole('region', { name: 'Artwork sample records' });
+    expect(
+      within(workbench).getByRole('button', { name: 'Generate 5 records' }),
+    ).toBeInTheDocument();
+    expect(within(workbench).getByRole('button', { name: 'Add manually' })).toBeInTheDocument();
+    expect(within(workbench).getByText('No sample records yet')).toBeInTheDocument();
+  });
+
   it('renders FieldDetail when a type + field are selected', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot', fieldName: 'name' }} />);
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
+  });
+
+  it('returns from field detail to the selected type when Back to table fields is clicked', () => {
+    seed(plotSchema);
+    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'name' });
+    const onClearSelectedField = vi.fn();
+
+    render(
+      <DetailPanel
+        selection={{ typeName: 'Plot', fieldName: 'name' }}
+        onClearSelectedField={onClearSelectedField}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back to table fields' }));
+
+    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
+    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Plot' });
+    expect(onClearSelectedField).toHaveBeenCalledOnce();
   });
 
   it('derives model shape guidance for the selected type from the schema', () => {
@@ -111,9 +147,9 @@ describe('DetailPanel', () => {
     seed(artworkSchema);
     render(<DetailPanel selection={{ typeName: 'Artwork', fieldName: 'sourceSearchText' }} />);
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
-    const guidance = screen.getByRole('region', { name: 'Model shape' });
-    expect(within(guidance).getByText('Query handle')).toBeInTheDocument();
-    expect(within(guidance).getByText(/denormalized/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Model advice' }));
+    expect(screen.getAllByText('Query handle').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/denormalized/i).length).toBeGreaterThan(0);
   });
 
   it('creates a referenced object type from the field target picker', () => {
@@ -272,7 +308,8 @@ describe('DetailPanel', () => {
     expect(onClearSelection).toHaveBeenCalledOnce();
   });
 
-  it('returns to the type selection after deleting the selected field from details', () => {
+  it('returns to the type selection after deleting the selected field from details', async () => {
+    const user = userEvent.setup();
     seed(plotSchema);
     useGraphSelectionStore.getState().click('Plot', 'replace');
     const onClearSelectedField = vi.fn();
@@ -283,7 +320,8 @@ describe('DetailPanel', () => {
         onClearSelectedField={onClearSelectedField}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Delete field name' }));
+    await user.click(screen.getByRole('button', { name: 'Field actions for name' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete field' }));
 
     expect(useUndoStore.getState().schema.types[0]).toMatchObject({
       kind: 'object',

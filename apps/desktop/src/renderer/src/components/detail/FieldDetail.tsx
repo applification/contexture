@@ -10,16 +10,32 @@
  * Every edit dispatches `update_field` through the shared op vocabulary;
  * nothing here mutates the store directly.
  */
+
+import {
+  type FixtureValueType,
+  listFixtureGenerators,
+  listFixtureModules,
+} from '@contexture/core/fixture-generators';
 import type { FieldDef, FieldType, IndexDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { ValidationError } from '@renderer/services/validation';
 import { STDLIB_TYPE_OPTIONS, type StdlibTypeOption } from '@shared/stdlib-registry';
-import { ChevronsUpDown, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronsUpDown,
+  Lightbulb,
+  MoreHorizontal,
+  Trash2,
+} from 'lucide-react';
+import type React from 'react';
 import { useState } from 'react';
 import type { Op } from '../../store/ops';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import {
   Command,
   CommandEmpty,
@@ -28,13 +44,23 @@ import {
   CommandItem,
   CommandList,
 } from '../ui/command';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { Field, FieldGroup, FieldLabel } from '../ui/field';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Separator } from '../ui/separator';
 import { Textarea } from '../ui/textarea';
-import { ModelShapeHints } from './ModelShapeHints';
+import { HintBody } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
+
+const AUTO_SAMPLE_DATA = '__auto__';
 
 export interface FieldDetailProps {
   typeName: string;
@@ -47,6 +73,7 @@ export interface FieldDetailProps {
   tableIndexes?: readonly IndexDef[];
   onCreateRefTarget?: () => string | undefined;
   onCreateAndSelectRefTarget?: (selectTarget: (typeName: string) => void) => void;
+  onBackToType?: () => void;
 }
 
 export function FieldDetail({
@@ -60,13 +87,20 @@ export function FieldDetail({
   tableIndexes,
   onCreateRefTarget,
   onCreateAndSelectRefTarget,
+  onBackToType,
 }: FieldDetailProps) {
   const update = (patch: Partial<FieldDef>) =>
     dispatch({ kind: 'update_field', typeName, fieldName: field.name, patch });
   const hasSingleFieldIndex =
     tableIndexes?.some((index) => index.fields.length === 1 && index.fields[0] === field.name) ??
     false;
+  const indexMemberships =
+    tableIndexes
+      ?.filter((index) => index.fields.includes(field.name))
+      .map((index) => ({ index, position: index.fields.indexOf(field.name) })) ?? [];
+  const primaryIndex = indexMemberships[0];
   const parentKindLabel = tableIndexes ? 'table' : 'object';
+  const sampleLabel = sampleDataLabel(field);
   const addIndex = () => {
     if (!tableIndexes || hasSingleFieldIndex) return;
     dispatch({
@@ -77,63 +111,146 @@ export function FieldDetail({
   };
 
   return (
-    <div className="space-y-4 p-3 pt-0" data-testid="field-detail">
+    <div className="flex h-full min-h-0 flex-col" data-testid="field-detail">
       <header
-        className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        className="flex min-h-20 shrink-0 items-start justify-between gap-3 border-b bg-muted/20 px-3 py-3"
         data-testid="field-detail-header"
       >
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-2">
           <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {parentKindLabel}
+            {parentKindLabel} / {typeName}
           </div>
-          <div className="truncate text-lg font-semibold leading-tight text-foreground">
-            {typeName}
+          <div className="flex min-w-0 items-center gap-2">
+            {onBackToType && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onBackToType}
+                className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                aria-label="Back to table fields"
+              >
+                <ArrowLeft aria-hidden="true" className="size-3.5" />
+                Fields
+              </Button>
+            )}
+            <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+              {field.name}
+            </h2>
           </div>
-          <h2 className="truncate text-sm font-medium leading-snug text-muted-foreground">
-            {field.name}
-          </h2>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+              {fieldTypeSummary(field.type)}
+            </Badge>
+            <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[11px]">
+              {field.optional ? 'optional' : 'required'}
+            </Badge>
+            {field.nullable && (
+              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+                nullable
+              </Badge>
+            )}
+            {field.serverDerived && (
+              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+                server derived
+              </Badge>
+            )}
+            {primaryIndex && (
+              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+                indexed
+              </Badge>
+            )}
+            <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+              sample: {sampleLabel}
+            </Badge>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete field ${field.name}`}
-            onClick={() => dispatch({ kind: 'remove_field', typeName, fieldName: field.name })}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Field actions for ${field.name}`}
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <MoreHorizontal aria-hidden="true" className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => dispatch({ kind: 'remove_field', typeName, fieldName: field.name })}
+            >
+              <Trash2 aria-hidden="true" />
+              Delete field
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
-      <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-3">
+          <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
 
-      <div className="space-y-1">
-        <Label htmlFor="field-name">Name</Label>
-        <Input
-          id="field-name"
-          defaultValue={field.name}
-          onBlur={(ev) => {
-            const next = ev.target.value.trim();
-            if (next && next !== field.name) update({ name: next });
-          }}
-        />
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="field-name">Name</FieldLabel>
+              <Input
+                id="field-name"
+                className="h-8 text-xs"
+                defaultValue={field.name}
+                onBlur={(ev) => {
+                  const next = ev.target.value.trim();
+                  if (next && next !== field.name) update({ name: next });
+                }}
+              />
+            </Field>
+            <FieldTypeBody
+              sourceType={typeName}
+              sourceField={field.name}
+              fieldType={field.type}
+              onChange={(nextType) => update({ type: nextType })}
+              availableTypeNames={availableTypeNames}
+              onCreateRefTarget={onCreateRefTarget}
+              onCreateAndSelectRefTarget={onCreateAndSelectRefTarget}
+            />
+          </FieldGroup>
+
+          <Separator />
+
+          <PresenceRow field={field} update={update} />
+          <DescriptionRow field={field} update={update} />
+          <DefaultValueRow field={field} update={update} />
+
+          <Separator />
+
+          {tableIndexes && (
+            <IndexSummaryRow
+              fieldName={field.name}
+              indexes={indexMemberships}
+              hasSingleFieldIndex={hasSingleFieldIndex}
+              onAddIndex={addIndex}
+            />
+          )}
+          <SampleDataRow field={field} update={update} />
+          <ModelAdviceRow hints={modelingHints} />
+        </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="space-y-1">
-        <Label htmlFor="field-default">Default value</Label>
-        <Input
-          id="field-default"
-          defaultValue={defaultInputValue(field.default)}
-          onBlur={(ev) => {
-            const next = parseDefaultInput(ev.target.value, field.type);
-            if (!Object.is(next, field.default)) update({ default: next });
-          }}
-        />
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-3">
+function PresenceRow({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  return (
+    <InspectorRow label="Presence">
+      <div className="flex flex-wrap justify-end gap-2">
         <CheckboxOption
           id="field-optional"
           label="Optional"
@@ -156,44 +273,331 @@ export function FieldDetail({
           onCheckedChange={(v) => update({ serverDerived: v === true ? true : undefined })}
         />
       </div>
+    </InspectorRow>
+  );
+}
 
-      {tableIndexes && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-xs">
-          <span className="font-medium">Index</span>
-          {hasSingleFieldIndex ? (
-            <span className="text-muted-foreground">Indexed</span>
-          ) : (
-            <Button type="button" variant="outline" size="sm" className="h-7" onClick={addIndex}>
+function DescriptionRow({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  const hasDescription = Boolean(field.description);
+  return (
+    <Collapsible defaultOpen={hasDescription}>
+      <InspectorRow label="Description">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={hasDescription ? 'Edit description' : 'Add description'}
+            className="h-7 min-w-0 px-2 text-xs"
+          >
+            <span className="max-w-64 truncate text-muted-foreground">
+              {field.description || 'None'}
+            </span>
+            <span className="text-foreground">{hasDescription ? 'Edit' : 'Add'}</span>
+          </Button>
+        </CollapsibleTrigger>
+      </InspectorRow>
+      <CollapsibleContent className="pt-2">
+        <Textarea
+          id="field-description"
+          aria-label="Description"
+          defaultValue={field.description ?? ''}
+          rows={2}
+          className="text-xs"
+          onBlur={(ev) => {
+            const next = ev.target.value;
+            if (next !== (field.description ?? '')) {
+              update({ description: next || undefined });
+            }
+          }}
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function DefaultValueRow({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  const hasDefault = field.default !== undefined;
+  return (
+    <Collapsible defaultOpen={hasDefault}>
+      <InspectorRow label="Default value">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={hasDefault ? 'Edit default value' : 'Set default value'}
+            className="h-7 min-w-0 px-2 text-xs"
+          >
+            <span className="max-w-64 truncate text-muted-foreground">
+              {hasDefault ? defaultInputValue(field.default) : 'None'}
+            </span>
+            <span className="text-foreground">{hasDefault ? 'Edit' : 'Set'}</span>
+          </Button>
+        </CollapsibleTrigger>
+      </InspectorRow>
+      <CollapsibleContent className="pt-2">
+        <Input
+          id="field-default"
+          aria-label="Default value"
+          className="h-8 text-xs"
+          defaultValue={defaultInputValue(field.default)}
+          onBlur={(ev) => {
+            const next = parseDefaultInput(ev.target.value, field.type);
+            if (!Object.is(next, field.default)) update({ default: next });
+          }}
+        />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function IndexSummaryRow({
+  fieldName,
+  indexes,
+  hasSingleFieldIndex,
+  onAddIndex,
+}: {
+  fieldName: string;
+  indexes: Array<{ index: IndexDef; position: number }>;
+  hasSingleFieldIndex: boolean;
+  onAddIndex: () => void;
+}) {
+  const primary = indexes[0];
+  return (
+    <InspectorRow label="Index">
+      {primary ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
+              <span className="font-mono text-muted-foreground">{primary.index.name}</span>
+              {indexes.length > 1 && (
+                <Badge variant="secondary" className="ml-1 h-5 rounded-md px-1.5 text-[10px]">
+                  {indexes.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 p-3 text-xs">
+            <div className="space-y-2">
+              <div className="font-medium text-foreground">Index usage</div>
+              {indexes.map(({ index, position }) => (
+                <div key={index.name} className="rounded-md border px-2 py-1.5">
+                  <div className="font-mono text-[11px]">{index.name}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {index.fields.length === 1
+                      ? 'Single-field index'
+                      : `Position ${position + 1} of ${index.fields.length}: ${index.fields.join(
+                          ' -> ',
+                        )}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Not indexed</span>
+          {!hasSingleFieldIndex && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              aria-label={`Add index for ${fieldName}`}
+              onClick={onAddIndex}
+            >
               Add index
             </Button>
           )}
         </div>
       )}
+      <span className="sr-only">{fieldName}</span>
+    </InspectorRow>
+  );
+}
 
-      <div className="space-y-1">
-        <Label htmlFor="field-description">Description</Label>
-        <Textarea
-          id="field-description"
-          defaultValue={field.description ?? ''}
-          rows={2}
-          onBlur={(ev) => {
-            const next = ev.target.value;
-            if (next !== (field.description ?? '')) update({ description: next || undefined });
-          }}
-        />
-      </div>
+function SampleDataRow({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  return (
+    <InspectorRow label="Sample data">
+      <FieldSampleDataPicker field={field} update={update} />
+    </InspectorRow>
+  );
+}
 
-      <FieldTypeBody
-        sourceType={typeName}
-        sourceField={field.name}
-        fieldType={field.type}
-        onChange={(nextType) => update({ type: nextType })}
-        availableTypeNames={availableTypeNames}
-        onCreateRefTarget={onCreateRefTarget}
-        onCreateAndSelectRefTarget={onCreateAndSelectRefTarget}
-      />
-      <ModelShapeHints hints={modelingHints} />
+function ModelAdviceRow({ hints }: { hints: readonly ModelingHint[] }) {
+  if (hints.length === 0) return null;
+  const [primary, ...secondary] = hints;
+  if (!primary) return null;
+  return (
+    <InspectorRow label="Model advice">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Model advice"
+            className="h-7 px-2 text-xs"
+          >
+            <Lightbulb aria-hidden="true" className="size-3.5 text-primary" />
+            <span>{primary.title}</span>
+            {secondary.length > 0 && (
+              <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[10px]">
+                {hints.length}
+              </Badge>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" side="left" className="w-80 p-3 text-xs">
+          <div className="space-y-3">
+            <HintBody hint={primary} />
+            {secondary.length > 0 && (
+              <div className="space-y-2 border-t border-border/70 pt-2">
+                {secondary.map((hint) => (
+                  <HintBody key={hint.id} hint={hint} compact />
+                ))}
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </InspectorRow>
+  );
+}
+
+function InspectorRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid min-h-9 grid-cols-[112px_1fr] items-center gap-3 text-xs">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="flex min-w-0 justify-end">{children}</div>
     </div>
+  );
+}
+
+function FieldSampleDataPicker({
+  field,
+  update,
+}: {
+  field: FieldDef;
+  update: (patch: Partial<FieldDef>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const generators = listFixtureGenerators({ valueType: fixtureValueTypeForField(field.type) });
+  const modules = listFixtureModules().filter((module) =>
+    generators.some((generator) => generator.module === module.id),
+  );
+  const selectedGenerator = field.sampleData?.generator ?? AUTO_SAMPLE_DATA;
+  const selected = generators.find((generator) => generator.id === selectedGenerator);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id="field-sample-data-generator"
+          type="button"
+          variant="ghost"
+          aria-expanded={open}
+          className="h-7 min-w-0 px-2 text-xs font-normal"
+        >
+          <span className="max-w-64 truncate text-muted-foreground">
+            {selected ? selected.label : 'Auto'}
+          </span>
+          <ChevronsUpDown aria-hidden="true" className="size-3.5 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="end">
+        <Command>
+          <CommandInput placeholder="Find a generator..." />
+          <CommandList className="max-h-72">
+            <CommandEmpty>No generators found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="auto"
+                onSelect={() => {
+                  update({ sampleData: undefined });
+                  setOpen(false);
+                }}
+              >
+                Auto
+              </CommandItem>
+            </CommandGroup>
+            {modules.map((module) => (
+              <CommandGroup key={module.id} heading={module.label}>
+                {generators
+                  .filter((generator) => generator.module === module.id)
+                  .map((generator) => (
+                    <CommandItem
+                      key={generator.id}
+                      value={`${generator.moduleLabel} ${generator.label} ${generator.id}`}
+                      onSelect={() => {
+                        update({
+                          sampleData: { ...field.sampleData, generator: generator.id },
+                        });
+                        setOpen(false);
+                      }}
+                    >
+                      {generator.label}
+                    </CommandItem>
+                  ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function fixtureValueTypeForField(fieldType: FieldType): FixtureValueType {
+  switch (fieldType.kind) {
+    case 'string':
+    case 'literal':
+    case 'ref':
+      return 'string';
+    case 'number':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'date':
+      return 'date';
+    case 'array':
+      return 'unknown';
+  }
+}
+
+function fieldTypeSummary(fieldType: FieldType): string {
+  if (fieldType.kind === 'array') return `list<${fieldTypeSummary(fieldType.element)}>`;
+  if (fieldType.kind === 'ref') return `ref ${fieldType.typeName}`;
+  return fieldType.kind;
+}
+
+function sampleDataLabel(field: FieldDef): string {
+  const generatorId = field.sampleData?.generator;
+  if (!generatorId) return 'Auto';
+  return (
+    listFixtureGenerators({ valueType: fixtureValueTypeForField(field.type) }).find(
+      (generator) => generator.id === generatorId,
+    )?.label ?? generatorId
   );
 }
 
@@ -329,26 +733,6 @@ function StringBody({
 }) {
   return (
     <div className="space-y-2 text-xs">
-      <Row label="min">
-        <Input
-          type="number"
-          defaultValue={value.min ?? ''}
-          onBlur={(ev) => onChange({ ...value, min: parseOptInt(ev.target.value) })}
-        />
-      </Row>
-      <Row label="max">
-        <Input
-          type="number"
-          defaultValue={value.max ?? ''}
-          onBlur={(ev) => onChange({ ...value, max: parseOptInt(ev.target.value) })}
-        />
-      </Row>
-      <Row label="regex">
-        <Input
-          defaultValue={value.regex ?? ''}
-          onBlur={(ev) => onChange({ ...value, regex: ev.target.value || undefined })}
-        />
-      </Row>
       <Row label="format">
         <Select
           value={value.format ?? 'none'}
@@ -380,6 +764,48 @@ function StringBody({
           </SelectContent>
         </Select>
       </Row>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Label className="space-y-1 text-[11px] text-muted-foreground">
+          <span>min</span>
+          <Input
+            type="number"
+            className="h-8 text-xs"
+            defaultValue={value.min ?? ''}
+            onBlur={(ev) => onChange({ ...value, min: parseOptInt(ev.target.value) })}
+          />
+        </Label>
+        <Label className="space-y-1 text-[11px] text-muted-foreground">
+          <span>max</span>
+          <Input
+            type="number"
+            className="h-8 text-xs"
+            defaultValue={value.max ?? ''}
+            onBlur={(ev) => onChange({ ...value, max: parseOptInt(ev.target.value) })}
+          />
+        </Label>
+      </div>
+      <Collapsible defaultOpen={Boolean(value.regex)}>
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 w-full justify-between px-2 text-xs"
+          >
+            Pattern
+            <ChevronDown aria-hidden="true" className="size-3.5" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-1">
+          <Row label="regex">
+            <Input
+              className="h-8 text-xs"
+              defaultValue={value.regex ?? ''}
+              onBlur={(ev) => onChange({ ...value, regex: ev.target.value || undefined })}
+            />
+          </Row>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -393,20 +819,26 @@ function NumberBody({
 }) {
   return (
     <div className="space-y-2 text-xs">
-      <Row label="min">
-        <Input
-          type="number"
-          defaultValue={value.min ?? ''}
-          onBlur={(ev) => onChange({ ...value, min: parseOptNum(ev.target.value) })}
-        />
-      </Row>
-      <Row label="max">
-        <Input
-          type="number"
-          defaultValue={value.max ?? ''}
-          onBlur={(ev) => onChange({ ...value, max: parseOptNum(ev.target.value) })}
-        />
-      </Row>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Label className="space-y-1 text-[11px] text-muted-foreground">
+          <span>min</span>
+          <Input
+            type="number"
+            className="h-8 text-xs"
+            defaultValue={value.min ?? ''}
+            onBlur={(ev) => onChange({ ...value, min: parseOptNum(ev.target.value) })}
+          />
+        </Label>
+        <Label className="space-y-1 text-[11px] text-muted-foreground">
+          <span>max</span>
+          <Input
+            type="number"
+            className="h-8 text-xs"
+            defaultValue={value.max ?? ''}
+            onBlur={(ev) => onChange({ ...value, max: parseOptNum(ev.target.value) })}
+          />
+        </Label>
+      </div>
       <CheckboxOption
         id="field-int"
         label="Integer"
@@ -767,7 +1199,7 @@ function CheckboxOption({
   return (
     <Label
       htmlFor={checkboxId}
-      className="flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-card/50 p-2 transition-colors hover:border-border hover:bg-muted/30 focus-within:border-ring focus-within:bg-muted/30"
+      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border/70 px-2 text-xs transition-colors hover:border-border hover:bg-muted/30 focus-within:border-ring focus-within:bg-muted/30"
     >
       <Checkbox
         id={checkboxId}
@@ -775,18 +1207,16 @@ function CheckboxOption({
         aria-labelledby={labelId}
         aria-describedby={descriptionId}
         onCheckedChange={onCheckedChange}
+        className="size-3.5"
       />
-      <div className="min-w-0 space-y-0.5">
-        <span id={labelId} className="block text-xs font-medium leading-none">
+      <span className="min-w-0">
+        <span id={labelId} className="block leading-none">
           {label}
         </span>
-        <p
-          id={descriptionId}
-          className="text-[11px] font-normal leading-snug text-muted-foreground"
-        >
+        <p id={descriptionId} className="sr-only">
           {description}
         </p>
-      </div>
+      </span>
     </Label>
   );
 }

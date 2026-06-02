@@ -99,6 +99,12 @@ const FieldDefSchema = z.object({
   optional: z.boolean().optional(),
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
+  sampleData: z
+    .object({
+      category: z.string().min(1).optional(),
+      generator: z.string().min(1).optional(),
+    })
+    .optional(),
 });
 
 // ---- Tool builders ------------------------------------------------------

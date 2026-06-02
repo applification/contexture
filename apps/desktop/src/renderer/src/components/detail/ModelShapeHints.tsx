@@ -49,7 +49,7 @@ export function ModelShapeHints({ hints }: ModelShapeHintsProps) {
   );
 }
 
-function HintBody({ hint, compact = false }: { hint: ModelingHint; compact?: boolean }) {
+export function HintBody({ hint, compact = false }: { hint: ModelingHint; compact?: boolean }) {
   const tone = toneForHint(hint.kind);
   return (
     <div className={compact ? 'space-y-1 border-t border-border/70 pt-2' : 'space-y-2'}>

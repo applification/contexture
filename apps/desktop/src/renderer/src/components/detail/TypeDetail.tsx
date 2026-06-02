@@ -12,17 +12,34 @@
  * direct edits interleave cleanly with chat-driven ops. Edits fire on
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
-import type { FieldDef, FieldType, IndexDef, TypeDef } from '@contexture/core/ir';
+
+import { listFixtureModules } from '@contexture/core/fixture-generators';
+import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
+import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
-import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Hash,
+  Lightbulb,
+  Play,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
+import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
 import { Button } from '../ui/button';
+import { ButtonGroup } from '../ui/button-group';
 import { Checkbox } from '../ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import {
   Command,
   CommandEmpty,
@@ -34,13 +51,17 @@ import {
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
-import { ModelShapeHints } from './ModelShapeHints';
+import { HintBody, ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
 
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
 export const FOCUS_TYPE_NAME_EVENT = 'contexture:focus-type-name';
+const AUTO_SAMPLE_DATA = '__auto__';
+const EMPTY_TABLE_RECORDS: readonly unknown[] = [];
 
 function isConvexReservedName(name: string): boolean {
   return name.startsWith('_');
@@ -57,6 +78,7 @@ function selectFieldFromValidationIssue(type: TypeDef, error: ValidationError): 
 
 export interface TypeDetailProps {
   type: TypeDef;
+  schema?: Schema;
   /** Dispatch an op. In production this is `useUndoStore.getState().apply`. */
   dispatch: (op: Op) => void;
   /** Dispatch a multi-op user action as one undoable edit. */
@@ -70,6 +92,7 @@ export interface TypeDetailProps {
 
 export function TypeDetail({
   type,
+  schema,
   dispatch,
   dispatchBatch,
   modelingHints = [],
@@ -80,6 +103,25 @@ export function TypeDetail({
 }: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
+  const recordsByType = usePlaygroundStore((state) => state.recordsByType);
+  const tableRecords = isTable
+    ? (recordsByType[type.name] ?? EMPTY_TABLE_RECORDS)
+    : EMPTY_TABLE_RECORDS;
+
+  if (isTable && type.kind === 'object') {
+    return (
+      <TableTypeDetail
+        type={type}
+        schema={schema}
+        dispatch={dispatch}
+        modelingHints={modelingHints}
+        validationErrors={validationErrors}
+        validationRepairForIssue={validationRepairForIssue}
+        recordsCount={tableRecords.length}
+        reserved={nameReserved}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 p-3 pt-0">
@@ -123,6 +165,7 @@ export function TypeDetail({
       <ModelShapeHints hints={modelingHints} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
+      <SampleDataSection type={type} dispatch={dispatch} />
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
       )}
@@ -138,6 +181,258 @@ export function TypeDetail({
       )}
       {type.kind === 'raw' && <RawBody type={type} dispatch={dispatch} />}
     </div>
+  );
+}
+
+function TableTypeDetail({
+  type,
+  schema,
+  dispatch,
+  modelingHints,
+  validationErrors,
+  validationRepairForIssue,
+  recordsCount,
+  reserved,
+}: {
+  type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
+  dispatch: (op: Op) => void;
+  modelingHints: readonly ModelingHint[];
+  validationErrors: readonly ValidationError[];
+  validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  recordsCount: number;
+  reserved: boolean;
+}) {
+  const defaultMode = recordsCount > 0 ? 'try' : 'shape';
+  const { tableHints, fieldHintsByName } = useMemo(
+    () => splitTableModelingHints(modelingHints),
+    [modelingHints],
+  );
+  const fieldHintCount = Array.from(fieldHintsByName.values()).reduce(
+    (sum, hints) => sum + hints.length,
+    0,
+  );
+  const fieldIndexInsights = useMemo(() => fieldIndexInsightsForType(type), [type]);
+  const indexCount = type.indexes?.length ?? 0;
+  const suggestionCount = suggestedIndexes(type).length;
+
+  return (
+    <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
+      <header
+        className="flex min-h-20 shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-3"
+        data-testid="type-detail-header"
+      >
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            table
+          </div>
+          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+            {type.name}
+          </h2>
+          <div className="mt-2">
+            <TabsList asChild>
+              <ButtonGroup aria-label="Table inspector mode">
+                <TabsTrigger
+                  value="shape"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                >
+                  <SlidersHorizontal aria-hidden="true" className="size-3.5" />
+                  Shape
+                </TabsTrigger>
+                <TabsTrigger
+                  value="try"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                >
+                  <Play aria-hidden="true" className="size-3.5" />
+                  Try
+                </TabsTrigger>
+              </ButtonGroup>
+            </TabsList>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete type ${type.name}`}
+          onClick={() => dispatch({ kind: 'delete_type', name: type.name })}
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </header>
+
+      <TabsContent value="shape" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-4">
+          <ValidationIssues
+            errors={validationErrors}
+            onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
+            repairForIssue={validationRepairForIssue}
+          />
+          <NameField type={type} dispatch={dispatch} reserved={reserved} />
+          <DescriptionField type={type} dispatch={dispatch} />
+          <TableModelingAdvisoryStrip hints={tableHints} />
+          <ObjectBody
+            type={type}
+            dispatch={dispatch}
+            quietControls
+            fieldHintsByName={fieldHintsByName}
+            fieldHintCount={fieldHintCount}
+            fieldIndexInsights={fieldIndexInsights}
+          />
+          <Collapsible
+            defaultOpen
+            className="rounded-md border border-border/70 data-[state=open]:bg-muted/20"
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="group h-8 w-full justify-start px-2 text-xs"
+              >
+                Advanced schema output
+                {(indexCount > 0 || suggestionCount > 0) && (
+                  <span className="ml-1 truncate text-muted-foreground">
+                    · {indexCount} {indexCount === 1 ? 'index' : 'indexes'}
+                    {suggestionCount > 0
+                      ? ` · ${suggestionCount} ${
+                          suggestionCount === 1 ? 'suggestion' : 'suggestions'
+                        }`
+                      : ''}
+                  </span>
+                )}
+                <ChevronDown
+                  aria-hidden="true"
+                  className="ml-auto size-3.5 transition-transform group-data-[state=open]:rotate-180"
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col items-stretch gap-2 p-2.5 pt-0">
+              <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="try" className="m-0 min-h-0 flex-1 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col">
+          <ValidationIssues
+            errors={validationErrors}
+            onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
+            repairForIssue={validationRepairForIssue}
+          />
+          <details className="shrink-0 border-b bg-muted/10 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Generation settings
+            </summary>
+            <div className="mt-2">
+              <SampleDataSection type={type} dispatch={dispatch} compact />
+            </div>
+          </details>
+          {schema ? (
+            <ScopedPlaygroundWorkbench schema={schema} typeName={type.name} className="flex-1" />
+          ) : (
+            <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground">
+              Sample records need a schema context.
+            </div>
+          )}
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function SampleDataSection({
+  type,
+  dispatch,
+  compact = false,
+}: Pick<TypeDetailProps, 'type' | 'dispatch'> & { compact?: boolean }) {
+  const modules = listFixtureModules();
+  const category = type.sampleData?.category ?? AUTO_SAMPLE_DATA;
+
+  return (
+    <section
+      className={compact ? 'space-y-2' : 'space-y-2 rounded-md border border-border px-3 py-2'}
+    >
+      <Label htmlFor="type-sample-data-category" className="text-xs">
+        Sample data
+      </Label>
+      <div className="space-y-1">
+        <Select
+          value={category}
+          onValueChange={(value) => {
+            const nextCategory = value === AUTO_SAMPLE_DATA ? undefined : value;
+            dispatch({
+              kind: 'update_type',
+              name: type.name,
+              patch: typePatch({
+                sampleData: nextCategory
+                  ? { ...type.sampleData, category: nextCategory }
+                  : undefined,
+              }),
+            });
+          }}
+        >
+          <SelectTrigger id="type-sample-data-category" className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value={AUTO_SAMPLE_DATA}>Auto</SelectItem>
+            {modules.map((module) => (
+              <SelectItem key={module.id} value={module.id}>
+                {module.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </section>
+  );
+}
+
+function splitTableModelingHints(hints: readonly ModelingHint[]): {
+  tableHints: ModelingHint[];
+  fieldHintsByName: Map<string, ModelingHint[]>;
+} {
+  const tableHints: ModelingHint[] = [];
+  const fieldHintsByName = new Map<string, ModelingHint[]>();
+
+  for (const hint of hints) {
+    if (!hint.fieldName) {
+      tableHints.push(hint);
+      continue;
+    }
+    const existing = fieldHintsByName.get(hint.fieldName) ?? [];
+    existing.push(hint);
+    fieldHintsByName.set(hint.fieldName, existing);
+  }
+
+  return { tableHints, fieldHintsByName };
+}
+
+function TableModelingAdvisoryStrip({ hints }: { hints: readonly ModelingHint[] }) {
+  if (hints.length === 0) return null;
+  const [primary, ...secondary] = hints;
+  if (!primary) return null;
+
+  return (
+    <section
+      aria-label="Model shape"
+      className="rounded-md border border-border/70 bg-muted/15 px-3 py-2 text-xs"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="font-medium text-foreground">{primary.title}</div>
+          <p className="text-muted-foreground">{primary.message}</p>
+        </div>
+        {secondary.length > 0 && (
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            +{secondary.length} more
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -200,9 +495,17 @@ function DescriptionField({ type, dispatch }: TypeDetailProps) {
 function ObjectBody({
   type,
   dispatch,
+  quietControls = false,
+  fieldHintsByName,
+  fieldHintCount = 0,
+  fieldIndexInsights,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
+  quietControls?: boolean;
+  fieldHintsByName?: ReadonlyMap<string, readonly ModelingHint[]>;
+  fieldHintCount?: number;
+  fieldIndexInsights?: ReadonlyMap<string, FieldIndexInsight>;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
   const addField = () => {
@@ -246,10 +549,18 @@ function ObjectBody({
     );
   }
   const isTable = type.table === true;
+  const showAdviceColumn = Boolean(fieldHintsByName && fieldHintsByName.size > 0);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <Label>Fields</Label>
+        <div className="flex items-center gap-2">
+          <Label>Fields</Label>
+          {fieldHintCount > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              {fieldHintCount} {fieldHintCount === 1 ? 'advisory' : 'advisories'}
+            </span>
+          )}
+        </div>
         <Button type="button" variant="ghost" size="sm" onClick={addField} className="h-7 text-xs">
           <Plus aria-hidden="true" />
           Add field
@@ -261,7 +572,12 @@ function ObjectBody({
             <TableHead className="h-7 px-2">Name</TableHead>
             <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
             <TableHead className="h-7 px-2 text-right">Type</TableHead>
-            <TableHead className="h-7 w-28 px-1 text-right">
+            {showAdviceColumn && (
+              <TableHead className="h-7 w-14 px-1 text-center">
+                <span className="sr-only">Advice</span>
+              </TableHead>
+            )}
+            <TableHead className="h-7 w-36 px-1 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
@@ -269,13 +585,15 @@ function ObjectBody({
         <TableBody>
           {type.fields.map((f, fieldIndex) => {
             const reserved = isTable && isConvexReservedName(f.name);
+            const fieldHints = fieldHintsByName?.get(f.name) ?? [];
+            const fieldIndexInsight = fieldIndexInsights?.get(f.name);
             return (
               <TableRow
                 key={f.name}
                 data-testid="object-field-summary"
                 data-reserved={reserved || undefined}
                 title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
-                className={reserved ? 'text-destructive' : undefined}
+                className={cn('group', reserved && 'text-destructive')}
               >
                 <TableCell className="px-2 py-1.5 font-medium">
                   <Input
@@ -312,60 +630,81 @@ function ObjectBody({
                 <TableCell className="px-2 py-1.5 text-right text-muted-foreground">
                   {summariseKind(f.type.kind)}
                 </TableCell>
-                <TableCell className="w-28 px-1 py-1.5 text-right">
-                  <div className="inline-flex items-center gap-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Edit field ${f.name}`}
-                      onClick={() =>
-                        useGraphSelectionStore
-                          .getState()
-                          .selectField({ typeName: type.name, fieldName: f.name })
-                      }
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                {showAdviceColumn && (
+                  <TableCell className="w-14 px-1 py-1.5 text-center">
+                    <FieldAdvicePopover fieldName={f.name} hints={fieldHints} />
+                  </TableCell>
+                )}
+                <TableCell className="w-36 px-1 py-1.5 text-right">
+                  <div className="inline-flex items-center justify-end gap-0.5">
+                    {fieldIndexInsight && (
+                      <FieldIndexPopover
+                        typeName={type.name}
+                        fieldName={f.name}
+                        insight={fieldIndexInsight}
+                        dispatch={dispatch}
+                      />
+                    )}
+                    <div
+                      className={cn(
+                        'inline-flex items-center gap-0.5 transition-opacity',
+                        quietControls &&
+                          'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                      )}
                     >
-                      <SlidersHorizontal aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move field ${f.name} earlier`}
-                      disabled={fieldIndex === 0}
-                      onClick={() => moveField(fieldIndex, fieldIndex - 1)}
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronUp aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Move field ${f.name} later`}
-                      disabled={fieldIndex === type.fields.length - 1}
-                      onClick={() => moveField(fieldIndex, fieldIndex + 1)}
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronDown aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete field ${f.name}`}
-                      onClick={() =>
-                        dispatch({
-                          kind: 'remove_field',
-                          typeName: type.name,
-                          fieldName: f.name,
-                        })
-                      }
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Edit field ${f.name}`}
+                        onClick={() =>
+                          useGraphSelectionStore
+                            .getState()
+                            .selectField({ typeName: type.name, fieldName: f.name })
+                        }
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <SlidersHorizontal aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move field ${f.name} earlier`}
+                        disabled={fieldIndex === 0}
+                        onClick={() => moveField(fieldIndex, fieldIndex - 1)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronUp aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move field ${f.name} later`}
+                        disabled={fieldIndex === type.fields.length - 1}
+                        onClick={() => moveField(fieldIndex, fieldIndex + 1)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronDown aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete field ${f.name}`}
+                        onClick={() =>
+                          dispatch({
+                            kind: 'remove_field',
+                            typeName: type.name,
+                            fieldName: f.name,
+                          })
+                        }
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>
@@ -374,6 +713,149 @@ function ObjectBody({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+function FieldAdvicePopover({
+  fieldName,
+  hints,
+}: {
+  fieldName: string;
+  hints: readonly ModelingHint[];
+}) {
+  if (hints.length === 0) return <span aria-hidden="true" className="inline-block h-7 w-7" />;
+
+  const [primary, ...secondary] = hints;
+  if (!primary) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Modeling advice for ${fieldName}`}
+          className="relative h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary"
+        >
+          <LightbulbIcon />
+          {secondary.length > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-primary px-1 text-[9px] leading-none text-primary-foreground">
+              {hints.length}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="left" className="w-80 p-3 text-xs">
+        <div className="space-y-3">
+          <HintBody hint={primary} />
+          {secondary.length > 0 && (
+            <div className="space-y-2 border-t border-border/70 pt-2">
+              {secondary.map((hint) => (
+                <HintBody key={hint.id} hint={hint} compact />
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LightbulbIcon(): React.JSX.Element {
+  return <Lightbulb aria-hidden="true" className="size-3.5" />;
+}
+
+function FieldIndexPopover({
+  typeName,
+  fieldName,
+  insight,
+  dispatch,
+}: {
+  typeName: string;
+  fieldName: string;
+  insight: FieldIndexInsight;
+  dispatch: (op: Op) => void;
+}) {
+  const isIndexed = insight.memberships.length > 0;
+  const suggestion = insight.suggestion;
+  if (!isIndexed && !suggestion) return null;
+
+  const triggerLabel = isIndexed ? `Index details for ${fieldName}` : `Add index for ${fieldName}`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={triggerLabel}
+          className={cn(
+            'h-7 w-7 text-muted-foreground hover:text-primary data-[state=open]:text-primary',
+            !isIndexed &&
+              'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
+          )}
+        >
+          {isIndexed ? (
+            <Hash aria-hidden="true" className="size-3.5" />
+          ) : (
+            <Plus aria-hidden="true" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="left" className="w-72 p-3 text-xs">
+        <div className="space-y-3">
+          {isIndexed && (
+            <div className="space-y-2">
+              <div className="font-medium text-foreground">Indexed field</div>
+              <div className="space-y-1.5">
+                {insight.memberships.map((membership) => (
+                  <div key={membership.indexName} className="rounded-md border px-2 py-1.5">
+                    <div className="font-mono text-[11px] text-foreground">
+                      {membership.indexName}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {membership.total === 1
+                        ? 'Single-field index'
+                        : `Position ${membership.position + 1} of ${membership.total}: ${membership.fields.join(
+                            ' -> ',
+                          )}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {suggestion && (
+            <div className={cn('space-y-2', isIndexed && 'border-t border-border/70 pt-2')}>
+              <div>
+                <div className="font-medium text-foreground">Suggested index</div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Useful for lookups, filtering, or sorting on this field.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  dispatch({
+                    kind: 'add_index',
+                    typeName,
+                    index: { name: suggestion.name, fields: suggestion.fields },
+                  })
+                }
+                className="h-7 px-2 text-xs"
+              >
+                <Plus aria-hidden="true" />
+                Add {suggestion.name}
+              </Button>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -467,31 +949,16 @@ function ConvexSection({
             <p className="text-xs text-muted-foreground">Add a field before creating an index.</p>
           )}
           {suggestions.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">
-                Suggested from refs and likely lookup fields.
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-2 py-1.5">
+              <p className="min-w-0 text-[11px] text-muted-foreground">
+                {suggestions.length}{' '}
+                {suggestions.length === 1 ? 'suggested index' : 'suggested indexes'}
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((suggestion) => (
-                  <Button
-                    key={suggestion.name}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      dispatch({
-                        kind: 'add_index',
-                        typeName: type.name,
-                        index: { name: suggestion.name, fields: suggestion.fields },
-                      })
-                    }
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Plus aria-hidden="true" />
-                    {suggestion.name}
-                  </Button>
-                ))}
-              </div>
+              <SuggestedIndexesPopover
+                typeName={type.name}
+                suggestions={suggestions}
+                dispatch={dispatch}
+              />
             </div>
           )}
           {indexes.length === 0 ? (
@@ -529,6 +996,72 @@ function ConvexSection({
         </div>
       )}
     </div>
+  );
+}
+
+function SuggestedIndexesPopover({
+  typeName,
+  suggestions,
+  dispatch,
+}: {
+  typeName: string;
+  suggestions: readonly SuggestedIndex[];
+  dispatch: (op: Op) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs">
+          Review
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-3 text-xs">
+        <div className="space-y-3">
+          <div>
+            <div className="font-medium text-foreground">Suggested indexes</div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Suggested from refs and likely lookup fields.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {suggestions.map((suggestion) => (
+              <div
+                key={suggestion.name}
+                className="flex items-start justify-between gap-3 rounded-md border px-2 py-1.5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[11px] text-foreground">
+                    {suggestion.name}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {suggestionReason(suggestion)}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    dispatch({
+                      kind: 'add_index',
+                      typeName,
+                      index: { name: suggestion.name, fields: suggestion.fields },
+                    });
+                    setOpen(false);
+                  }}
+                  className="h-7 shrink-0 px-2 text-xs"
+                >
+                  <Plus aria-hidden="true" />
+                  Add
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -798,6 +1331,51 @@ interface SuggestedIndex {
   fields: string[];
 }
 
+interface FieldIndexMembership {
+  indexName: string;
+  fields: string[];
+  position: number;
+  total: number;
+}
+
+interface FieldIndexInsight {
+  memberships: FieldIndexMembership[];
+  suggestion?: SuggestedIndex;
+}
+
+function fieldIndexInsightsForType(
+  type: Extract<TypeDef, { kind: 'object' }>,
+): Map<string, FieldIndexInsight> {
+  const insights = new Map<string, FieldIndexInsight>();
+  const ensureInsight = (fieldName: string) => {
+    const existing = insights.get(fieldName);
+    if (existing) return existing;
+    const insight: FieldIndexInsight = { memberships: [] };
+    insights.set(fieldName, insight);
+    return insight;
+  };
+
+  for (const index of type.indexes ?? []) {
+    index.fields.forEach((fieldName, position) => {
+      ensureInsight(fieldName).memberships.push({
+        indexName: index.name,
+        fields: index.fields,
+        position,
+        total: index.fields.length,
+      });
+    });
+  }
+
+  for (const suggestion of suggestedIndexes(type)) {
+    const [fieldName] = suggestion.fields;
+    if (fieldName && suggestion.fields.length === 1) {
+      ensureInsight(fieldName).suggestion = suggestion;
+    }
+  }
+
+  return insights;
+}
+
 function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): SuggestedIndex[] {
   if (type.table !== true) return [];
   const existing = type.indexes ?? [];
@@ -812,6 +1390,13 @@ function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): Suggested
   }
 
   return suggestions;
+}
+
+function suggestionReason(suggestion: SuggestedIndex): string {
+  if (suggestion.fields.length === 1) {
+    return `Lookup and filter by ${suggestion.fields[0]}.`;
+  }
+  return `Compound query prefix: ${suggestion.fields.join(' -> ')}.`;
 }
 
 function isIndexSuggestionField(field: FieldDef): boolean {

@@ -19,6 +19,7 @@
     "./emit-zod": "./src/emit-zod.ts",
     "./document-bundle": "./src/document-bundle.ts",
     "./file-forward": "./src/file-forward.ts",
+    "./fixture-generators": "./src/fixture-generators.ts",
     "./generated-bundle-writer": "./src/generated-bundle-writer.ts",
     "./generated-targets": "./src/generated-targets.ts",
     "./ir": "./src/ir.ts",
@@ -30,6 +31,8 @@
     "./op-tools": "./src/op-tools.ts",
     "./paths": "./src/paths.ts",
     "./pipeline": "./src/pipeline.ts",
+    "./playground-contract": "./src/playground-contract.ts",
+    "./playground-fixtures": "./src/playground-fixtures.ts",
     "./semantic-validation": "./src/semantic-validation.ts",
     "./validation-repairs": "./src/validation-repairs.ts"
   },
@@ -38,6 +41,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.3.6"
   },
