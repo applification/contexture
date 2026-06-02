@@ -20,16 +20,7 @@ import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
 import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
-import {
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Play,
-  Plus,
-  SlidersHorizontal,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, Play, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
@@ -261,22 +252,25 @@ function TableTypeDetail({
           <DescriptionField type={type} dispatch={dispatch} />
           <ModelShapeHints hints={modelingHints} />
           <ObjectBody type={type} dispatch={dispatch} quietControls />
-          <Collapsible defaultOpen className="border-t pt-3">
+          <Collapsible
+            defaultOpen
+            className="rounded-md border border-border/70 data-[state=open]:bg-muted/20"
+          >
             <CollapsibleTrigger asChild>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="group h-8 w-full justify-between px-2 text-xs"
+                className="group h-8 w-full justify-start px-2 text-xs"
               >
-                <span>Advanced schema output</span>
-                <ChevronRight
+                Advanced schema output
+                <ChevronDown
                   aria-hidden="true"
-                  className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
+                  className="ml-auto size-3.5 transition-transform group-data-[state=open]:rotate-180"
                 />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3">
+            <CollapsibleContent className="flex flex-col items-stretch gap-2 p-2.5 pt-0">
               <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
             </CollapsibleContent>
           </Collapsible>
