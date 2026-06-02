@@ -19,6 +19,7 @@ import { Maximize2, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
 
 interface Props {
   onClose: () => void;
@@ -31,6 +32,11 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
 
   function handleRelayout(): void {
     document.dispatchEvent(new CustomEvent('graph:relayout'));
+  }
+
+  function handleLayoutModeChange(layoutMode: 'organic' | 'layered'): void {
+    setGraphLayout({ layoutMode });
+    setTimeout(() => document.dispatchEvent(new CustomEvent('graph:relayout')), 0);
   }
 
   function handleFit(): void {
@@ -57,6 +63,36 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
           Layout
         </p>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground w-16">Mode</span>
+          <fieldset
+            className="grid h-7 flex-1 grid-cols-2 overflow-hidden rounded-md border border-input bg-background shadow-sm"
+            aria-label="Layout mode"
+          >
+            {(['layered', 'organic'] as const).map((layoutMode) => (
+              <label
+                key={layoutMode}
+                htmlFor={`graph-layout-mode-${layoutMode}`}
+                className={cn(
+                  'flex cursor-pointer items-center justify-center px-2 text-xs font-medium text-muted-foreground transition-colors',
+                  'border-l border-border first:border-l-0 hover:bg-accent hover:text-foreground',
+                  'focus-within:z-10 focus-within:ring-1 focus-within:ring-ring',
+                  graphLayout.layoutMode === layoutMode && 'bg-muted text-foreground',
+                )}
+              >
+                <input
+                  id={`graph-layout-mode-${layoutMode}`}
+                  type="radio"
+                  name="graph-layout-mode"
+                  className="sr-only"
+                  checked={graphLayout.layoutMode === layoutMode}
+                  onChange={() => handleLayoutModeChange(layoutMode)}
+                />
+                {layoutMode === 'layered' ? 'Layered' : 'Organic'}
+              </label>
+            ))}
+          </fieldset>
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground w-16">Spacing</span>
           <Slider

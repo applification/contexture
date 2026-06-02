@@ -12,22 +12,31 @@ export interface ELKLayoutResult {
 }
 
 /**
- * Build ELK layout options that scale with graph size.
- * Small graphs (≤100 nodes) use stress minimization for organic results.
- * Medium graphs (101-300) use stress with reduced iterations.
- * Large graphs (>300) switch to the much faster layered algorithm.
+ * Build ELK layout options that scale with graph size and user intent.
+ * Organic uses stress minimization for a loose map. Layered uses the
+ * Sugiyama pipeline, which is better for crossing reduction in directed
+ * schema relationships.
  */
-function buildLayoutOptions(nodeCount: number, nodeGap: number): Record<string, string> {
-  if (nodeCount > 300) {
-    // Layered (Sugiyama) — O(n log n), handles 1000+ nodes comfortably
+export function buildLayoutOptions(
+  nodeCount: number,
+  nodeGap: number,
+  layout?: Partial<GraphLayout>,
+): Record<string, string> {
+  const layoutMode = layout?.layoutMode ?? 'layered';
+
+  if (layoutMode === 'layered' || nodeCount > 300) {
+    const layerGap = Math.round(nodeGap * 1.6);
     return {
       'elk.algorithm': 'org.eclipse.elk.layered',
-      'elk.layered.spacing.nodeNodeBetweenLayers': String(nodeGap * 1.5),
+      'elk.direction': 'RIGHT',
+      'elk.padding': '[top=50, left=50, bottom=50, right=50]',
       'elk.spacing.nodeNode': String(nodeGap),
+      'elk.edgeRouting': 'SPLINES',
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(layerGap),
+      'elk.layered.layering.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-      'elk.padding': '[top=50, left=50, bottom=50, right=50]',
-      'elk.edgeRouting': 'SPLINES',
+      'elk.layered.thoroughness': '20',
     };
   }
 
@@ -68,7 +77,7 @@ export function useELKLayout() {
 
       const elkGraph = {
         id: 'root',
-        layoutOptions: buildLayoutOptions(layoutChildren.length, nodeGap),
+        layoutOptions: buildLayoutOptions(layoutChildren.length, nodeGap, layout),
         children: layoutChildren,
         edges: edges.map((e) => ({
           id: e.id,
