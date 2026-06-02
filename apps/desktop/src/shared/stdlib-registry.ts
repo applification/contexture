@@ -6,7 +6,8 @@
  * used by core validation, emitters, and chat prompts.
  */
 
-import type { TypeDef } from '@contexture/core/ir';
+import type { StdlibRuntimeModule } from '@contexture/core/generated-targets';
+import type { Schema, TypeDef } from '@contexture/core/ir';
 import type { StdlibCatalog } from '@contexture/core/semantic-validation';
 import { IR_BY_NAMESPACE, NAMESPACES, type Namespace } from '@contexture/stdlib/registry';
 import type { StdlibRegistry as SystemPromptStdlibRegistry } from './system-prompt';
@@ -41,6 +42,13 @@ export function buildStdlibRegistry(): StdlibRegistry {
 
 /** Singleton for app runtime; tests build their own via `buildStdlibRegistry`. */
 export const STDLIB_REGISTRY: StdlibRegistry = buildStdlibRegistry();
+
+export const STDLIB_RUNTIME_MODULES: readonly StdlibRuntimeModule[] = NAMESPACES.map(
+  (namespace) => ({
+    namespace,
+    schema: IR_BY_NAMESPACE[namespace] as Schema,
+  }),
+);
 
 export function buildStdlibTypeDefinitions(): ReadonlyMap<string, TypeDef> {
   const types = new Map<string, TypeDef>();

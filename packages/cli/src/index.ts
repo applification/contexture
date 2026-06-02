@@ -18,6 +18,9 @@ import {
   type TypeDef,
   writeGeneratedBundle,
 } from '@contexture/core';
+import { STDLIB_REGISTRY, STDLIB_RUNTIME_MODULES } from './stdlib-runtime';
+
+const STDLIB_EMIT_DEPS = { stdlibRuntime: STDLIB_RUNTIME_MODULES } as const;
 
 interface CliOptions {
   json: boolean;
@@ -547,7 +550,7 @@ async function run(argv: string[]): Promise<void> {
       });
       return;
     }
-    const errors = checkSemantic(parsed.data).map((issue) => ({
+    const errors = checkSemantic(parsed.data, STDLIB_REGISTRY).map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
@@ -576,6 +579,7 @@ async function run(argv: string[]): Promise<void> {
       irPath: writableIrPath,
       schema,
       fs: nodeFileBackedFs,
+      emitDeps: STDLIB_EMIT_DEPS,
       driftPreflight: false,
     });
     writeResult({ message: `Emitted ${emitted.length} files.`, manifest }, options.json);
@@ -585,7 +589,12 @@ async function run(argv: string[]): Promise<void> {
   if (command === 'check-generated') {
     const writableIrPath = assertContextureIrPath(irPath);
     const schema = await readSchema(writableIrPath);
-    const files = await checkGeneratedBundle(schema, writableIrPath, nodeFileBackedFs);
+    const files = await checkGeneratedBundle(
+      schema,
+      writableIrPath,
+      nodeFileBackedFs,
+      STDLIB_EMIT_DEPS,
+    );
     const drift = files.filter((file) => file.status !== 'clean');
     if (drift.length > 0) {
       process.exitCode = 1;
@@ -636,7 +645,11 @@ async function run(argv: string[]): Promise<void> {
       else process.stderr.write(`${error.error.message}\n`);
       return;
     }
-    const forward = createFileBackedForward(writableIrPath, { changeSource: 'cli' });
+    const forward = createFileBackedForward(writableIrPath, {
+      stdlib: STDLIB_REGISTRY,
+      emitDeps: STDLIB_EMIT_DEPS,
+      changeSource: 'cli',
+    });
     type ForwardResult = Awaited<ReturnType<typeof forward>>;
     let result: ForwardResult;
     try {
@@ -660,7 +673,11 @@ async function run(argv: string[]): Promise<void> {
   }
 
   const writableIrPath = assertContextureIrPath(irPath);
-  const forward = createFileBackedForward(writableIrPath, { changeSource: 'cli' });
+  const forward = createFileBackedForward(writableIrPath, {
+    stdlib: STDLIB_REGISTRY,
+    emitDeps: STDLIB_EMIT_DEPS,
+    changeSource: 'cli',
+  });
   const tools = new Map(createOpTools(forward).map((tool) => [tool.name, tool]));
   const { tool: toolName, input } = commandToToolInput(command, args);
   const tool = tools.get(toolName);

@@ -28,6 +28,7 @@ import {
   detectDocumentMode,
   type FileEntry,
   GeneratedBundleDriftError,
+  type GeneratedTargetEmitOptions,
   type Layout,
   loadChatHistory,
   load as loadIR,
@@ -39,7 +40,7 @@ import {
   writeFilesAtomic,
   writeGeneratedBundle,
 } from '@contexture/core';
-import { STDLIB_NAMESPACES } from '@shared/stdlib-registry';
+import { STDLIB_NAMESPACES, STDLIB_RUNTIME_MODULES } from '@shared/stdlib-registry';
 
 /** Layout + chat now live inside `.contexture/` as implementation sidecars. */
 /** Hash manifest of every @contexture-generated artefact, used for drift detection. */
@@ -106,11 +107,15 @@ export interface DocumentStoreDeps {
   /** Absolute path to the recent-files ledger (typically under userData). */
   recentFilesPath: string;
   /** Override for tests — defaults to the real Zod emitter. */
-  emitZod?: (schema: Schema, sourcePath: string) => string;
+  emitZod?: (schema: Schema, sourcePath: string, options?: GeneratedTargetEmitOptions) => string;
   /** Override for tests — defaults to the real JSON-schema emitter. */
-  emitJsonSchema?: (schema: Schema, sourcePath?: string) => unknown;
+  emitJsonSchema?: (
+    schema: Schema,
+    sourcePath?: string,
+    options?: GeneratedTargetEmitOptions,
+  ) => unknown;
   /** Override for tests — defaults to the real schema-index emitter. */
-  emitSchemaIndex?: (baseName: string, sourcePath?: string) => string;
+  emitSchemaIndex?: (baseName: string, sourcePath?: string, schemaModule?: string) => string;
   /** Override for tests — defaults to the real Convex emitter. */
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
   /** Optional hook for main-process integration (e.g. `app.addRecentDocument`). */
@@ -123,10 +128,16 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
   const {
     fs,
     recentFilesPath,
-    emitZod = (s: Schema, sp: string) =>
-      defaultEmitZod(s, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
-    emitJsonSchema = (s: Schema, sp?: string) =>
-      defaultEmitJsonSchema(s, undefined, sp, { stdlibNamespaces: STDLIB_NAMESPACES }),
+    emitZod = (s: Schema, sp: string, options?: GeneratedTargetEmitOptions) =>
+      defaultEmitZod(s, sp, {
+        ...options,
+        stdlibNamespaces: options?.stdlibNamespaces ?? STDLIB_NAMESPACES,
+      }),
+    emitJsonSchema = (s: Schema, sp?: string, options?: GeneratedTargetEmitOptions) =>
+      defaultEmitJsonSchema(s, undefined, sp, {
+        ...options,
+        stdlibNamespaces: options?.stdlibNamespaces ?? STDLIB_NAMESPACES,
+      }),
     emitSchemaIndex = defaultEmitSchemaIndex,
     emitConvex,
     onRecentFileAdded,
@@ -214,6 +225,7 @@ export function createDocumentStore(deps: DocumentStoreDeps): DocumentStore {
           emitJsonSchema,
           emitSchemaIndex,
           emitConvex,
+          stdlibRuntime: STDLIB_RUNTIME_MODULES,
         },
       });
     } catch (err) {

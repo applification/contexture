@@ -9,6 +9,7 @@ import { type GeneratedBundleFs, writeGeneratedBundle } from './generated-bundle
 import { load } from './load';
 import { type ApplyResult, apply, type Op } from './ops';
 import { assertContextureIrPath } from './paths';
+import type { EmitPipelineDeps } from './pipeline';
 import type { StdlibCatalog } from './semantic-validation';
 
 export interface FileBackedFs extends GeneratedBundleFs {
@@ -46,6 +47,7 @@ export const nodeFileBackedFs: FileBackedFs = {
 export interface FileBackedForwardOptions {
   fs?: FileBackedFs;
   stdlib?: StdlibCatalog;
+  emitDeps?: EmitPipelineDeps;
   changeSource?: ModelChangeSource;
   actor?: string;
 }
@@ -64,7 +66,12 @@ export function createFileBackedForward(
     const result = apply(schema, op, options.stdlib);
     if ('error' in result) return result;
 
-    await writeGeneratedBundle({ irPath: resolvedIrPath, schema: result.schema, fs });
+    await writeGeneratedBundle({
+      irPath: resolvedIrPath,
+      schema: result.schema,
+      fs,
+      emitDeps: options.emitDeps,
+    });
     if (options.changeSource) {
       await appendModelChangeLogEntry({
         irPath: resolvedIrPath,

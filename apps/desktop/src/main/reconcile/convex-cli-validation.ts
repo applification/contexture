@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import type { Schema } from '@contexture/core';
 import { bundlePathsFor, generatedTargetForPath } from '@contexture/core/paths';
 
 const execFileAsync = promisify(execFile);
@@ -37,6 +38,7 @@ export type ExecFileLike = (
 interface ValidateConvexCliInput {
   irPath: string;
   targetPath: string;
+  schema?: Schema;
 }
 
 interface ValidateConvexCliDeps {
@@ -50,12 +52,12 @@ export async function validateReconciledConvexProject(
   input: ValidateConvexCliInput,
   deps: ValidateConvexCliDeps = {},
 ): Promise<ConvexCliValidationResult> {
-  const target = generatedTargetForPath(input.irPath, input.targetPath);
+  const target = generatedTargetForPath(input.irPath, input.targetPath, input.schema);
   if (target?.kind !== 'convex' && target?.kind !== 'convex-validators') {
     return { status: 'skipped', reason: 'Target is not a Convex generated file.' };
   }
 
-  const projectDir = dirname(dirname(bundlePathsFor(input.irPath).convex));
+  const projectDir = dirname(dirname(bundlePathsFor(input.irPath, input.schema).convex));
   const configured = await hasConvexCliValidationConfig(projectDir, deps.env ?? process.env);
   if (!configured.ok) return { status: 'skipped', reason: configured.reason };
 

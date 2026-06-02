@@ -27,6 +27,8 @@ import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
 export interface EmitOptions {
   /** Namespaces (e.g. `'place'`, `'money'`) treated as ambient stdlib. */
   stdlibNamespaces?: readonly string[];
+  /** Override module specifiers for stdlib namespace imports. */
+  stdlibModuleForNamespace?: (namespace: string) => string | null | undefined;
 }
 
 export function emit(schema: Schema, sourcePath: string, options: EmitOptions = {}): string {
@@ -55,6 +57,7 @@ interface EmitContext {
   rawExternal: Map<string, { from: string; name: string }>;
   /** Local types by name, used to order declarations before consumers. */
   types: Map<string, TypeDef>;
+  stdlibModuleForNamespace?: (namespace: string) => string | null | undefined;
 }
 
 function buildContext(schema: Schema, options: EmitOptions): EmitContext {
@@ -106,7 +109,14 @@ function buildContext(schema: Schema, options: EmitOptions): EmitContext {
     }
   });
 
-  return { aliases, imports, usedByAlias, rawExternal, types };
+  return {
+    aliases,
+    imports,
+    usedByAlias,
+    rawExternal,
+    types,
+    stdlibModuleForNamespace: options.stdlibModuleForNamespace,
+  };
 }
 
 function renderExternalImports(ctx: EmitContext): string {
@@ -116,7 +126,7 @@ function renderExternalImports(ctx: EmitContext): string {
     const used = ctx.usedByAlias.get(imp.alias);
     if (!used || used.size === 0) return;
     const names = [...used].sort().join(', ');
-    const module = moduleForImport(imp);
+    const module = moduleForImport(imp, ctx);
     lines.push(`import { ${names} } from '${module}';`);
   });
 
@@ -127,10 +137,12 @@ function renderExternalImports(ctx: EmitContext): string {
   return lines.length ? `${lines.join('\n')}\n` : '';
 }
 
-function moduleForImport(imp: ImportDecl): string {
+function moduleForImport(imp: ImportDecl, ctx: EmitContext): string {
   if (imp.kind === 'stdlib') {
     // `@contexture/common` → `@contexture/runtime/common`
     const ns = imp.path.slice('@contexture/'.length);
+    const localModule = ctx.stdlibModuleForNamespace?.(ns);
+    if (localModule) return localModule;
     return `@contexture/runtime/${ns}`;
   }
   // Relative: emit as `./<alias>.schema` (sibling of the original file).

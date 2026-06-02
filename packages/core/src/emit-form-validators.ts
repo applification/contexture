@@ -13,10 +13,15 @@ function header(sourcePath?: string): string {
   return sourcePath ? `${base} Source: ${sourcePath}\n` : `${base}\n`;
 }
 
-export function emitFormValidators(schema: Schema, baseName: string, sourcePath?: string): string {
+export function emitFormValidators(
+  schema: Schema,
+  baseName: string,
+  sourcePath?: string,
+  schemaModule = `./${baseName}.schema`,
+): string {
   const names = schema.types.map((type) => type.name).sort();
   const imports =
-    names.length > 0 ? `import { ${names.join(', ')} } from './${baseName}.schema';\n` : '';
+    names.length > 0 ? `import { ${names.join(', ')} } from '${schemaModule}';\n` : '';
   const validators = names
     .map((name) => `export const ${name}Validator = createFormValidator(${name});\n`)
     .join('');
