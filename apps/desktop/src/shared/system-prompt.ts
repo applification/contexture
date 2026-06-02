@@ -164,7 +164,7 @@ interface OpSpec {
 }
 
 const OP_CATALOGUE: OpSpec[] = [
-  { name: 'add_type', shape: '{ type: TypeDef }' },
+  { name: 'add_type', shape: '{ payload: TypeDef }' },
   { name: 'update_type', shape: "{ name: string; patch: Partial<Omit<TypeDef, 'kind'|'name'>> }" },
   { name: 'rename_type', shape: '{ from: string; to: string }' },
   { name: 'delete_type', shape: '{ name: string }' },
@@ -187,7 +187,7 @@ const OP_CATALOGUE: OpSpec[] = [
   { name: 'add_variant', shape: '{ typeName: string; variant: string }' },
   { name: 'remove_variant', shape: '{ typeName: string; variant: string }' },
   { name: 'set_discriminator', shape: '{ typeName: string; discriminator: string }' },
-  { name: 'add_import', shape: '{ import: ImportDecl }' },
+  { name: 'add_import', shape: '{ payload: ImportDecl }' },
   { name: 'remove_import', shape: '{ alias: string }' },
   { name: 'remove_import_at', shape: '{ index: number }' },
   { name: 'set_table_flag', shape: '{ typeName: string; table: boolean }' },
