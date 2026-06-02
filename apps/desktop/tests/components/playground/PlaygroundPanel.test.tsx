@@ -21,6 +21,21 @@ const schema: Schema = {
   ],
 };
 
+const stdlibRefSchema: Schema = {
+  version: '1',
+  types: [
+    {
+      kind: 'object',
+      name: 'RecordLabel',
+      table: true,
+      fields: [
+        { name: 'name', type: { kind: 'ref', typeName: 'common.NonEmptyString' } },
+        { name: 'country', type: { kind: 'ref', typeName: 'place.CountryCode' } },
+      ],
+    },
+  ],
+};
+
 describe('PlaygroundPanel', () => {
   beforeEach(() => {
     usePlaygroundStore.setState({
@@ -69,5 +84,16 @@ describe('PlaygroundPanel', () => {
       tagIds: ['primary'],
     });
     expect(screen.getAllByText('Ada Lovelace').length).toBeGreaterThan(0);
+  });
+
+  it('renders stdlib value refs as editable fields instead of unknown reference targets', async () => {
+    const user = userEvent.setup();
+    render(<PlaygroundPanel schema={stdlibRefSchema} />);
+
+    await user.click(screen.getByRole('button', { name: 'New record' }));
+
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Country' })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/Unknown reference target/u)).not.toBeInTheDocument();
   });
 });

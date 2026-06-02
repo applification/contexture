@@ -12,6 +12,7 @@ import type { Schema } from '@contexture/core/ir';
 import { DetailPanel } from '@renderer/components/detail/DetailPanel';
 import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -78,6 +79,8 @@ describe('DetailPanel', () => {
   beforeEach(() => {
     seed({ version: '1', types: [] });
     useGraphSelectionStore.getState().clear();
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('properties');
   });
   afterEach(cleanup);
 
@@ -398,5 +401,35 @@ describe('DetailPanel', () => {
   it('shows an empty state when the selected type no longer exists', () => {
     render(<DetailPanel selection={{ typeName: 'Missing' }} />);
     expect(screen.getByText(/No type named "Missing"/i)).toBeInTheDocument();
+  });
+
+  it('renders read-only details for selected stdlib raw nodes', () => {
+    render(<DetailPanel selection={{ typeName: 'common.URL' }} />);
+
+    expect(screen.getByTestId('external-type-detail')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'common.URL' })).toBeInTheDocument();
+    expect(screen.getByText('Read-only library type')).toBeInTheDocument();
+    expect(screen.getByText(/Absolute URL/i)).toBeInTheDocument();
+    expect(screen.getByText(/"format": "uri"/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No type named/i)).not.toBeInTheDocument();
+  });
+
+  it('links selected stdlib nodes through to the stdlib sidebar', () => {
+    render(<DetailPanel selection={{ typeName: 'common.URL' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'View in Stdlib' }));
+
+    expect(useUIChromeStore.getState().sidebarVisible).toBe(true);
+    expect(useUIChromeStore.getState().sidebarTab).toBe('stdlib');
+  });
+
+  it('renders read-only details for selected stdlib enum nodes', () => {
+    render(<DetailPanel selection={{ typeName: 'place.CountryCode' }} />);
+
+    expect(screen.getByTestId('external-type-detail')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'place.CountryCode' })).toBeInTheDocument();
+    expect(screen.getByText(/ISO 3166-1/i)).toBeInTheDocument();
+    expect(screen.getByText('GB')).toBeInTheDocument();
+    expect(screen.queryByText(/No type named/i)).not.toBeInTheDocument();
   });
 });

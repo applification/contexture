@@ -86,6 +86,12 @@ const fieldBadgeStyle: CSSProperties = {
 
 function toneForHint(kind: ModelingHint['kind']): CSSProperties {
   switch (kind) {
+    case 'stdlib_type':
+      return {
+        background: 'color-mix(in oklch, var(--reference) 14%, transparent)',
+        borderColor: 'color-mix(in oklch, var(--reference) 46%, transparent)',
+        color: 'var(--reference-text)',
+      };
     case 'possible_entity':
       return {
         background: 'color-mix(in oklch, var(--inspector-advisory) 16%, transparent)',
@@ -119,13 +125,15 @@ function compareHints(a: ModelingHint, b: ModelingHint): number {
 
 function hintRank(hint: ModelingHint): number {
   switch (hint.kind) {
-    case 'possible_entity':
+    case 'stdlib_type':
       return 0;
-    case 'query_handle':
+    case 'possible_entity':
       return 1;
-    case 'embedded_collection':
+    case 'query_handle':
       return 2;
-    case 'owned_value_object':
+    case 'embedded_collection':
       return 3;
+    case 'owned_value_object':
+      return 4;
   }
 }

@@ -1,5 +1,6 @@
 import type { SidebarTab } from '@renderer/store/ui-chrome';
 import {
+  BookOpen,
   FileBracesCorner,
   FlaskConical,
   History,
@@ -16,9 +17,10 @@ interface ActivityBarProps {
 const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
   { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },
+  { id: 'changes', icon: <History className="size-4" />, label: 'Changes' },
   { id: 'schema', icon: <FileBracesCorner className="size-4" />, label: 'Schema' },
   { id: 'playground', icon: <FlaskConical className="size-4" />, label: 'Playground' },
-  { id: 'changes', icon: <History className="size-4" />, label: 'Changes' },
+  { id: 'stdlib', icon: <BookOpen className="size-4" />, label: 'Stdlib' },
 ];
 
 export function ActivityBar({ activeTab, onTabChange }: ActivityBarProps): React.JSX.Element {

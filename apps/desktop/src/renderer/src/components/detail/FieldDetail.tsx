@@ -247,7 +247,12 @@ export function FieldDetail({
             />
           )}
           <SampleDataRow field={field} update={update} />
-          <ModelAdviceRow hints={modelingHints} />
+          <ModelAdviceRow
+            hints={modelingHints}
+            onUseStdlibType={(stdlibTypeName) =>
+              update({ type: { kind: 'ref', typeName: stdlibTypeName } })
+            }
+          />
         </div>
       </div>
     </div>
@@ -457,7 +462,13 @@ function SampleDataRow({
   );
 }
 
-function ModelAdviceRow({ hints }: { hints: readonly ModelingHint[] }) {
+function ModelAdviceRow({
+  hints,
+  onUseStdlibType,
+}: {
+  hints: readonly ModelingHint[];
+  onUseStdlibType: (typeName: string) => void;
+}) {
   if (hints.length === 0) return null;
   const [primary, ...secondary] = hints;
   if (!primary) return null;
@@ -484,10 +495,14 @@ function ModelAdviceRow({ hints }: { hints: readonly ModelingHint[] }) {
         <PopoverContent align="end" side="left" className="w-80 p-3 text-xs">
           <div className="space-y-3">
             <HintBody hint={primary} />
+            <HintAction hint={primary} onUseStdlibType={onUseStdlibType} />
             {secondary.length > 0 && (
               <div className="space-y-2 border-t border-border/70 pt-2">
                 {secondary.map((hint) => (
-                  <HintBody key={hint.id} hint={hint} compact />
+                  <div key={hint.id} className="space-y-2">
+                    <HintBody hint={hint} compact />
+                    <HintAction hint={hint} onUseStdlibType={onUseStdlibType} />
+                  </div>
                 ))}
               </div>
             )}
@@ -495,6 +510,28 @@ function ModelAdviceRow({ hints }: { hints: readonly ModelingHint[] }) {
         </PopoverContent>
       </Popover>
     </InspectorRow>
+  );
+}
+
+function HintAction({
+  hint,
+  onUseStdlibType,
+}: {
+  hint: ModelingHint;
+  onUseStdlibType: (typeName: string) => void;
+}) {
+  const action = hint.action;
+  if (action?.kind !== 'use_stdlib_type') return null;
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-7 px-2 text-xs"
+      onClick={() => onUseStdlibType(action.typeName)}
+    >
+      Use {action.typeName}
+    </Button>
   );
 }
 

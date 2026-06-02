@@ -113,4 +113,42 @@ describe('analyzeModelingHints', () => {
       ]),
     );
   });
+
+  it('suggests stdlib refs for primitive fields that match shared value types', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Album',
+          table: true,
+          fields: [
+            { name: 'releaseDate', type: { kind: 'string' } },
+            { name: 'website', type: { kind: 'string' } },
+            { name: 'country', type: { kind: 'string' } },
+          ],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'stdlib_type',
+          fieldName: 'releaseDate',
+          action: { kind: 'use_stdlib_type', typeName: 'common.ISODate' },
+        }),
+        expect.objectContaining({
+          kind: 'stdlib_type',
+          fieldName: 'website',
+          action: { kind: 'use_stdlib_type', typeName: 'common.URL' },
+        }),
+        expect.objectContaining({
+          kind: 'stdlib_type',
+          fieldName: 'country',
+          action: { kind: 'use_stdlib_type', typeName: 'place.CountryCode' },
+        }),
+      ]),
+    );
+  });
 });

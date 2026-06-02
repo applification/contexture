@@ -124,4 +124,60 @@ describe('buildPlaygroundContract', () => {
       ],
     });
   });
+
+  it('resolves qualified external raw and enum references into editable controls', () => {
+    const externalTypes = new Map([
+      [
+        'common.NonEmptyString',
+        {
+          kind: 'raw' as const,
+          name: 'NonEmptyString',
+          zod: 'z.string().min(1)',
+          jsonSchema: { type: 'string', minLength: 1 },
+        },
+      ],
+      [
+        'place.CountryCode',
+        {
+          kind: 'enum' as const,
+          name: 'CountryCode',
+          values: [{ value: 'GB' }, { value: 'US' }],
+        },
+      ],
+    ]);
+    const recordLabelSchema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'RecordLabel',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'ref', typeName: 'common.NonEmptyString' } },
+            { name: 'country', type: { kind: 'ref', typeName: 'place.CountryCode' } },
+          ],
+        },
+      ],
+    };
+
+    const [recordLabel] = buildPlaygroundContract(recordLabelSchema, { externalTypes }).entities;
+
+    expect(recordLabel?.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'text',
+          fieldName: 'name',
+          constraints: expect.objectContaining({ min: 1 }),
+        }),
+        expect.objectContaining({
+          kind: 'enum',
+          fieldName: 'country',
+          options: [
+            { value: 'GB', label: 'GB', description: undefined },
+            { value: 'US', label: 'US', description: undefined },
+          ],
+        }),
+      ]),
+    );
+  });
 });

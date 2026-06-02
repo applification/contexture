@@ -6,7 +6,8 @@ export type ModelingHintKind =
   | 'owned_value_object'
   | 'possible_entity'
   | 'query_handle'
-  | 'embedded_collection';
+  | 'embedded_collection'
+  | 'stdlib_type';
 
 export type ModelingSignal =
   | 'identity_pressure'
@@ -26,7 +27,13 @@ export interface ModelingHint {
   message: string;
   rationale: string;
   fieldNames: string[];
+  action?: ModelingHintAction;
 }
+
+export type ModelingHintAction = {
+  kind: 'use_stdlib_type';
+  typeName: string;
+};
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
@@ -90,6 +97,9 @@ export function analyzeModelingHints(schema: Schema): ModelingHint[] {
       if (isTable && isQueryHandleField(field, type)) {
         hints.push(queryHandleHint(type, field, fieldPath));
       }
+
+      const stdlibHint = stdlibTypeHint(type, field, fieldPath);
+      if (stdlibHint) hints.push(stdlibHint);
     });
   });
 
@@ -183,6 +193,29 @@ function queryHandleHint(type: ObjectType, field: FieldDef, path: string): Model
   };
 }
 
+function stdlibTypeHint(type: ObjectType, field: FieldDef, path: string): ModelingHint | null {
+  if (unwrapRefTarget(field.type)) return null;
+  if (field.type.kind !== 'string' && field.type.kind !== 'number') return null;
+
+  const target = stdlibTargetForField(field);
+  if (!target) return null;
+
+  return {
+    id: hintId('stdlib_type', type.name, field.name, [target.typeName]),
+    kind: 'stdlib_type',
+    signals: ['identity_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Stdlib type available',
+    message: `${field.name} looks like ${target.label}. Use ${target.typeName} to reuse the shared validator and generated type.`,
+    rationale:
+      'Stdlib refs keep common value formats consistent across the model, generated validators, and agent-created changes.',
+    fieldNames: [field.name],
+    action: { kind: 'use_stdlib_type', typeName: target.typeName },
+  };
+}
+
 function collectTypeUsages(objects: ObjectType[]): Map<string, TypeUsage[]> {
   const usages = new Map<string, TypeUsage[]>();
   for (const owner of objects) {
@@ -233,6 +266,66 @@ function isIdentityLikeField(field: FieldDef): boolean {
     );
   }
   return false;
+}
+
+function stdlibTargetForField(field: FieldDef): { typeName: string; label: string } | null {
+  const name = field.name.toLowerCase();
+  const description = field.description?.toLowerCase() ?? '';
+  const haystack = `${name} ${description}`;
+
+  if (field.type.kind === 'string') {
+    if (field.type.format === 'email' || /\bemail\b/u.test(haystack)) {
+      return { typeName: 'common.Email', label: 'an email address' };
+    }
+    if (
+      field.type.format === 'url' ||
+      /\b(url|uri|website|webpage|link|imageurl|avatarurl|coverimage)\b/u.test(haystack)
+    ) {
+      return { typeName: 'common.URL', label: 'a URL' };
+    }
+    if (field.type.format === 'uuid' || /\buuid\b/u.test(haystack)) {
+      return { typeName: 'common.UUID', label: 'a UUID' };
+    }
+    if (/\b(datetime|timestamp|instant|occurredat|createdat|updatedat)\b/u.test(haystack)) {
+      return { typeName: 'common.ISODateTime', label: 'an ISO timestamp' };
+    }
+    if (
+      name.includes('date') ||
+      /\b(iso)?date\b/u.test(haystack) ||
+      /(bornon|releasedon)$/u.test(name)
+    ) {
+      return { typeName: 'common.ISODate', label: 'an ISO date' };
+    }
+    if (/\bslug\b/u.test(haystack)) {
+      return { typeName: 'common.Slug', label: 'a slug' };
+    }
+    if (/\bcountry(code)?\b/u.test(haystack)) {
+      return { typeName: 'place.CountryCode', label: 'a country code' };
+    }
+    if (/\bcurrency(code)?\b/u.test(haystack)) {
+      return { typeName: 'money.CurrencyCode', label: 'a currency code' };
+    }
+    if (/\b(phone|telephone|mobile)\b/u.test(haystack)) {
+      return { typeName: 'contact.PhoneNumber', label: 'a phone number' };
+    }
+    if (/\b(name|title|label)\b/u.test(haystack) && field.type.min === 1) {
+      return { typeName: 'common.NonEmptyString', label: 'non-empty text' };
+    }
+  }
+
+  if (field.type.kind === 'number') {
+    if (/\b(price|amount|cost|total|subtotal|balance|money)\b/u.test(haystack)) {
+      return { typeName: 'money.Money', label: 'a money amount' };
+    }
+    if (field.type.int === true && field.type.min !== undefined && field.type.min >= 1) {
+      return { typeName: 'common.PositiveInt', label: 'a positive integer' };
+    }
+    if (field.type.min !== undefined && field.type.min > 0) {
+      return { typeName: 'common.PositiveNumber', label: 'a positive number' };
+    }
+  }
+
+  return null;
 }
 
 function unwrapRefTarget(type: FieldType): string | undefined {

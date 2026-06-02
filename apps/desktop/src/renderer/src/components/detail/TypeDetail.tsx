@@ -242,14 +242,14 @@ function TableTypeDetail({
               <ButtonGroup aria-label="Table inspector mode">
                 <TabsTrigger
                   value="shape"
-                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  className="h-8 gap-1.5 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
                 >
                   <SlidersHorizontal aria-hidden="true" className="size-3.5" />
                   Shape
                 </TabsTrigger>
                 <TabsTrigger
                   value="try"
-                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  className="h-8 gap-1.5 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
                 >
                   <Play aria-hidden="true" className="size-3.5" />
                   Try

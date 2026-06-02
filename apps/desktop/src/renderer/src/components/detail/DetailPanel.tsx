@@ -15,11 +15,15 @@
  * concern. Splitting them like this keeps the panel test-only on the
  * selection prop surface.
  */
+
+import type { TypeDef } from '@contexture/core/ir';
 import { analyzeModelingHints } from '@contexture/core/modeling-hints';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { repairForValidationError } from '@renderer/services/validation-repairs';
-import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
+import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import { useMemo, useSyncExternalStore } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { Op } from '../../store/ops';
 import { useGraphSelectionStore } from '../../store/selection';
 import { useUIChromeStore } from '../../store/ui-chrome';
@@ -129,6 +133,10 @@ export function DetailPanel({
   const typeIndex = schema.types.findIndex((t) => t.name === selection.typeName);
   const type = schema.types[typeIndex];
   if (!type) {
+    const externalType = STDLIB_TYPE_DEFINITIONS.get(selection.typeName);
+    if (externalType) {
+      return <ExternalTypeDetail qualifiedName={selection.typeName} type={externalType} />;
+    }
     return <EmptyState message={`No type named "${selection.typeName}" in the current schema.`} />;
   }
   const typeValidationErrors = validationErrorsForType(validationErrors, typeIndex);
@@ -248,6 +256,95 @@ export function DetailPanel({
 
 function EmptyState({ message }: { message: string }) {
   return <p className="p-4 text-xs text-muted-foreground">{message}</p>;
+}
+
+function ExternalTypeDetail({
+  qualifiedName,
+  type,
+}: {
+  qualifiedName: string;
+  type: TypeDef;
+}): React.JSX.Element {
+  const openStdlib = (): void => {
+    useUIChromeStore.getState().setSidebarVisible(true);
+    useUIChromeStore.getState().setSidebarTab('stdlib');
+  };
+
+  return (
+    <div className="space-y-4 p-3 pt-0" data-testid="external-type-detail">
+      <header className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            stdlib {type.kind}
+          </div>
+          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+            {qualifiedName}
+          </h2>
+          <div className="mt-1">
+            <Badge variant="secondary">Read-only library type</Badge>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-3 shrink-0"
+          onClick={openStdlib}
+        >
+          View in Stdlib
+        </Button>
+      </header>
+
+      {type.description && (
+        <section className="space-y-1">
+          <h3 className="text-xs font-medium text-muted-foreground">Description</h3>
+          <p className="text-sm text-foreground">{type.description}</p>
+        </section>
+      )}
+
+      {type.kind === 'raw' && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground">Raw schema</h3>
+          <pre className="max-h-56 overflow-auto rounded-md border bg-muted/30 p-2 text-xs">
+            {JSON.stringify(type.jsonSchema, null, 2)}
+          </pre>
+        </section>
+      )}
+
+      {type.kind === 'enum' && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground">Values</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {type.values.slice(0, 80).map((value) => (
+              <Badge key={value.value} variant="outline">
+                {value.value}
+              </Badge>
+            ))}
+            {type.values.length > 80 && (
+              <Badge variant="secondary">+{type.values.length - 80}</Badge>
+            )}
+          </div>
+        </section>
+      )}
+
+      {type.kind === 'object' && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-medium text-muted-foreground">Fields</h3>
+          <div className="space-y-1">
+            {type.fields.map((field) => (
+              <div
+                key={field.name}
+                className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-2 py-1.5 text-xs"
+              >
+                <span className="font-medium">{field.name}</span>
+                <span className="text-muted-foreground">{field.type.kind}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
 }
 
 function validationErrorsForType(

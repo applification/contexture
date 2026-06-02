@@ -49,6 +49,10 @@ export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): st
     '',
     renderOpCatalogue(),
     '',
+    '## Stdlib-first modeling',
+    '',
+    STDLIB_RULES.trim(),
+    '',
     '## Stdlib types',
     '',
     renderStdlib(input.stdlibRegistry),
@@ -127,9 +131,31 @@ Skills are available and auto-load on topic match:
 - \`model-domain\` — use when the user asks to model a new domain from
   scratch. Walks entities, relationships, enums, constraints, stdlib.
 - \`use-stdlib\` — use when a field could reuse a curated stdlib type
-  (Email, URL, UUID, Address, Money, PhoneE164, …).
+  (Email, URL, UUID, ISODate, Money, CountryCode, PhoneNumber, …).
 - \`generate-sample\` — use when the user asks for sample / fixture /
   example data for a type.
+`;
+
+const STDLIB_RULES = `
+Before creating or leaving a primitive field for a common value format, check
+the stdlib list below and prefer a qualified ref when it fits. Use
+\`{ kind: "ref", typeName: "namespace.Type" }\` with the namespace prefix.
+
+Common mappings:
+- email -> \`common.Email\`
+- url, website, link, image URL -> \`common.URL\`
+- uuid -> \`common.UUID\`
+- date, releaseDate, bornOn -> \`common.ISODate\`
+- timestamp, createdAt, updatedAt -> \`common.ISODateTime\`
+- slug -> \`common.Slug\`
+- country, countryCode -> \`place.CountryCode\`
+- amount, price, cost, currency amount -> \`money.Money\`
+- currency, currencyCode -> \`money.CurrencyCode\`
+- phone, telephone, mobile -> \`contact.PhoneNumber\`
+
+Only create a custom raw/object shape when the user needs semantics that the
+stdlib type does not cover. If you intentionally choose a primitive instead of
+a matching stdlib type, explain the reason briefly.
 `;
 
 interface OpSpec {

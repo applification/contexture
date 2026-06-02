@@ -26,7 +26,7 @@ import {
   previewableGeneratedTargets,
 } from '@contexture/core/generated-targets';
 import type { Schema } from '@contexture/core/ir';
-import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
+import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
   Bot,
   Boxes,
@@ -61,6 +61,7 @@ import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
 import { SchemaPanel, type SchemaPanelSource } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
+import { StdlibPanel } from './components/stdlib/StdlibPanel';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UpdateBanner } from './components/UpdateBanner';
@@ -361,6 +362,10 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const detailTypeName = selectedField?.typeName ?? selectedEdge?.data.sourceType ?? selectedNodeId;
+  const selectedStdlibTypeName =
+    typeof selectedNodeId === 'string' && STDLIB_TYPE_DEFINITIONS.has(selectedNodeId)
+      ? selectedNodeId
+      : undefined;
   const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
   const onboardingState = useMemo(
     () => buildOnboardingState(schema, activeTab, filePath, isDirty, driftedPaths.length),
@@ -575,6 +580,9 @@ export default function App(): React.JSX.Element {
                 className={activeTab !== 'playground' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}
               >
                 <PlaygroundPanel schema={schema} />
+              </div>
+              <div className={activeTab !== 'stdlib' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <StdlibPanel schema={schema} focusedTypeName={selectedStdlibTypeName} />
               </div>
               <div className={activeTab !== 'changes' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <ChangesPanel />
