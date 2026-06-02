@@ -138,13 +138,14 @@ function lenientTool(
   toOp: (payload: unknown) => Op,
   validate: (op: Op) => void,
   forward: ForwardOp,
+  aliases: Record<string, ZodTypeAny> = {},
 ): OpToolDescriptor {
   return {
     name,
     description,
-    inputSchema: { payload: z.unknown() },
+    inputSchema: { payload: z.unknown().optional(), ...aliases },
     handler: async (args) => {
-      const op = toOp((args as { payload: unknown }).payload);
+      const op = toOp(unwrapFlexiblePayload(args));
       validate(op);
       return forward(op);
     },
@@ -186,6 +187,40 @@ function unwrapFlexiblePayload(args: Record<string, unknown>): unknown {
   }
   return raw;
 }
+
+function unwrapTypeDefPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  if ('type' in payload && !('kind' in payload)) {
+    return (payload as { type: unknown }).type;
+  }
+  return payload;
+}
+
+function unwrapImportDeclPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  if ('import' in payload && !('kind' in payload)) {
+    return (payload as { import: unknown }).import;
+  }
+  return payload;
+}
+
+const TypeDefAliasSchema = {
+  type: z.unknown().optional(),
+  kind: z.enum(['object', 'enum', 'discriminatedUnion', 'raw']).optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  fields: z.array(z.unknown()).optional(),
+  table: z.boolean().optional(),
+  tableName: z.string().optional(),
+  indexes: z.array(z.unknown()).optional(),
+  values: z.array(z.unknown()).optional(),
+  discriminator: z.string().optional(),
+  variants: z.array(z.unknown()).optional(),
+  zod: z.string().optional(),
+  jsonSchema: z.record(z.string(), z.unknown()).optional(),
+  import: z.unknown().optional(),
+  sampleData: z.unknown().optional(),
+};
 
 // ---- IR meta-schema checks for type-level payloads ---------------------
 
@@ -382,13 +417,18 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
     // --- Type-level (lenient with meta-schema validation) ---
     lenientTool(
       'add_type',
-      'Add a new TypeDef (object | enum | discriminatedUnion | raw).',
+      'Add a new TypeDef (object | enum | discriminatedUnion | raw). Preferred input: { payload: TypeDef }, for example { payload: { kind: "enum", name: "Status", values: [{ value: "active" }] } }. If you are using apply_contexture_op instead, pass the closed-world op as { kind: "add_type", type: TypeDef }.',
       (payload) => ({
         kind: 'add_type',
-        type: payload as Op & { kind: 'add_type' } extends { type: infer T } ? T : never,
+        type: unwrapTypeDefPayload(payload) as Op & { kind: 'add_type' } extends {
+          type: infer T;
+        }
+          ? T
+          : never,
       }),
       (op) => assertTypeDef((op as Extract<Op, { kind: 'add_type' }>).type, 'add_type'),
       forward,
+      TypeDefAliasSchema,
     ),
     flexiblePayloadTool(
       'update_type',
@@ -446,10 +486,11 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
         'a stdlib namespace listed in schema.imports[].',
       (payload) => ({
         kind: 'add_import',
-        import: payload as Extract<Op, { kind: 'add_import' }>['import'],
+        import: unwrapImportDeclPayload(payload) as Extract<Op, { kind: 'add_import' }>['import'],
       }),
       (op) => assertImportDecl((op as Extract<Op, { kind: 'add_import' }>).import, 'add_import'),
       forward,
+      { import: z.unknown().optional(), kind: z.enum(['stdlib', 'relative']).optional() },
     ),
     // --- Full IR escape hatch ---
     {

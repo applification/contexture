@@ -176,6 +176,32 @@ describe('createOpTools', () => {
     });
   });
 
+  it('add_type accepts bare and core-op-style TypeDef envelopes', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const addType = toolNamed(tools, 'add_type');
+    const typeDef = { kind: 'enum', name: 'Season', values: [{ value: 'spring' }] };
+
+    await addType.handler(typeDef);
+    await addType.handler({ type: typeDef });
+    await addType.handler({ payload: { type: typeDef } });
+
+    expect(forwardSpy.mock.calls.map((call) => call[0])).toEqual([
+      { kind: 'add_type', type: typeDef },
+      { kind: 'add_type', type: typeDef },
+      { kind: 'add_type', type: typeDef },
+    ]);
+  });
+
+  it('add_type description distinguishes typed input from apply_contexture_op input', () => {
+    const { tools } = makeTools();
+    const addType = toolNamed(tools, 'add_type');
+
+    expect(addType.description).toContain('{ payload: TypeDef }');
+    expect(addType.description).toContain('apply_contexture_op');
+    expect(addType.description).toContain('{ kind: "add_type", type: TypeDef }');
+  });
+
   it('add_type rejects a payload that fails the IR meta-schema', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
@@ -185,6 +211,21 @@ describe('createOpTools', () => {
       /add_type/i,
     );
     expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
+  it('add_import accepts payload and core-op-style import envelopes', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const addImport = toolNamed(tools, 'add_import');
+    const importDecl = { kind: 'stdlib', path: '@contexture/place', alias: 'place' };
+
+    await addImport.handler({ payload: importDecl });
+    await addImport.handler({ import: importDecl });
+
+    expect(forwardSpy.mock.calls.map((call) => call[0])).toEqual([
+      { kind: 'add_import', import: importDecl },
+      { kind: 'add_import', import: importDecl },
+    ]);
   });
 
   it('update_type rejects patches that try to change identity', async () => {

@@ -56,6 +56,7 @@ describe('Contexture MCP server', () => {
           }),
           expect.objectContaining({
             name: 'apply_contexture_op',
+            description: expect.stringContaining('{ irPath, op }'),
             annotations: expect.objectContaining({
               readOnlyHint: false,
               destructiveHint: true,
@@ -77,6 +78,7 @@ describe('Contexture MCP server', () => {
           }),
           expect.objectContaining({
             name: 'add_field',
+            description: expect.stringContaining('Include irPath with this typed tool call'),
             annotations: expect.objectContaining({
               readOnlyHint: false,
               destructiveHint: true,
@@ -84,6 +86,9 @@ describe('Contexture MCP server', () => {
           }),
           expect.objectContaining({
             name: 'rename_type',
+            description: expect.stringContaining(
+              'do not wrap it in the generic apply_contexture_op',
+            ),
             annotations: expect.objectContaining({
               readOnlyHint: false,
               destructiveHint: true,
@@ -158,6 +163,35 @@ describe('Contexture MCP server', () => {
           preferredMutationTools: expect.arrayContaining(['add_field', 'rename_type', 'add_index']),
         }),
       });
+    });
+  });
+
+  it('typed add_type accepts a core-op-style type envelope', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      types: [],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'add_type',
+        arguments: {
+          irPath,
+          type: { kind: 'enum', name: 'Season', values: [{ value: 'spring' }] },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_type',
+      });
+
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ kind: string; name: string }>;
+      };
+      expect(updatedIr.types).toEqual([expect.objectContaining({ kind: 'enum', name: 'Season' })]);
     });
   });
 

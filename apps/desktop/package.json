@@ -1,6 +1,6 @@
 {
   "name": "@contexture/desktop",
-  "version": "0.15.32",
+  "version": "0.15.33",
   "description": "Convex model editor with generated schema, validators, and agent-safe ops",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/applification/contexture",

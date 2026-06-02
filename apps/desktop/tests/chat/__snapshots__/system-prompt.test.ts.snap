@@ -31,7 +31,7 @@ Skills are available and auto-load on topic match:
 
 ## Op vocabulary
 
-- \`add_type\` { type: TypeDef }
+- \`add_type\` { payload: TypeDef }
 - \`update_type\` { name: string; patch: Partial<Omit<TypeDef, 'kind'|'name'>> }
 - \`rename_type\` { from: string; to: string }
 - \`delete_type\` { name: string }
@@ -45,7 +45,7 @@ Skills are available and auto-load on topic match:
 - \`add_variant\` { typeName: string; variant: string }
 - \`remove_variant\` { typeName: string; variant: string }
 - \`set_discriminator\` { typeName: string; discriminator: string }
-- \`add_import\` { import: ImportDecl }
+- \`add_import\` { payload: ImportDecl }
 - \`remove_import\` { alias: string }
 - \`remove_import_at\` { index: number }
 - \`set_table_flag\` { typeName: string; table: boolean }

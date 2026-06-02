@@ -194,7 +194,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
     {
       title: 'Apply Contexture Op',
       description:
-        'Mutate a .contexture.json file by applying one Contexture closed-world Op, then rewrite generated artifacts.',
+        'Mutate a .contexture.json file by applying one Contexture closed-world Op, then rewrite generated artifacts. Input is { irPath, op }; op must include its kind, for example { kind: "add_type", type: { kind: "enum", name: "Status", values: [{ value: "active" }] } }. For typed tools such as add_type, use their direct input shape instead.',
       inputSchema: ApplyContextureOpInput,
       outputSchema: ApplyContextureOpOutput,
       annotations: {
@@ -275,7 +275,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       tool.name,
       {
         title: `Contexture ${tool.name}`,
-        description: `${tool.description} Mutates the .contexture.json file through the shared Contexture op applier and rewrites generated artifacts.`,
+        description: `${tool.description} Include irPath with this typed tool call. This typed tool receives its direct input shape; do not wrap it in the generic apply_contexture_op { op: ... } envelope. Mutates the .contexture.json file through the shared Contexture op applier and rewrites generated artifacts.`,
         inputSchema: { ...IrPathInput, ...tool.inputSchema },
         outputSchema: ApplyContextureOpOutput,
         annotations: {
@@ -584,7 +584,8 @@ function buildIntegrationGuidance(
     rules: [
       'Treat the .contexture.json IR as the source of truth for domain-model changes.',
       'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
-      'Prefer typed op tools such as add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
+      'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
+      'Typed op tools take irPath plus their direct arguments. The generic apply_contexture_op takes { irPath, op } where op is the closed-world operation with a kind.',
       'After any model mutation, validate, emit generated targets, and check drift before finishing.',
       'Wire generated outputs into the existing app architecture; Contexture does not own arbitrary application code.',
     ],
