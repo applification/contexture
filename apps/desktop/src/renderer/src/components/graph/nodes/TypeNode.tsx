@@ -19,10 +19,11 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { CircleAlert, Table2 } from 'lucide-react';
+import { CircleAlert, Focus, Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { type FieldSelection, useGraphSelectionStore } from '../../../store/selection';
 import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from '../ref-preview-event';
@@ -31,6 +32,7 @@ import type { EnumTargetRow, StdlibTargetRow, TypeNodeData } from '../schema-to-
 export const TYPE_NODE_EVENT = 'contexture:field-select' as const;
 export const TYPE_NODE_OBJECT_EVENT = 'contexture:type-select' as const;
 export const TYPE_NODE_ADD_FIELD_EVENT = 'contexture:type-node-add-field' as const;
+export const TYPE_NODE_TARGET_PROPERTIES_EVENT = 'contexture:type-node-target-properties' as const;
 
 type TypeNodeKind = Node<TypeNodeData, 'type'>;
 
@@ -60,12 +62,20 @@ const enumValueBadgeStyle: CSSProperties = {
   color: 'var(--graph-node-header-text)',
 };
 
+const stdlibAccent = 'color-mix(in oklch, var(--chart-2) 85%, transparent)';
+
+const stdlibValueBadgeStyle: CSSProperties = {
+  background: stdlibAccent,
+  borderColor: stdlibAccent,
+  color: 'var(--graph-node-header-text)',
+};
+
 const enumHoverCardStyle: CSSProperties = {
   borderTop: '2px solid color-mix(in oklch, var(--chart-3) 85%, transparent)',
 };
 
 const stdlibHoverCardStyle: CSSProperties = {
-  borderTop: '2px solid color-mix(in oklch, var(--chart-2) 75%, var(--reference))',
+  borderTop: `2px solid ${stdlibAccent}`,
 };
 
 export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
@@ -448,11 +458,38 @@ function NodeKindLabel({
   );
 }
 
+function openTargetProperties(typeName: string, ev: React.MouseEvent<HTMLButtonElement>): void {
+  ev.preventDefault();
+  ev.stopPropagation();
+  document.dispatchEvent(
+    new CustomEvent(TYPE_NODE_TARGET_PROPERTIES_EVENT, { detail: { typeName } }),
+  );
+}
+
+function TargetPropertiesButton({ typeName }: { typeName: string }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+      aria-label={`Show ${typeName} properties`}
+      title={`Show ${typeName} properties`}
+      onClick={(ev) => openTargetProperties(typeName, ev)}
+    >
+      <Focus className="size-3.5" aria-hidden="true" />
+    </Button>
+  );
+}
+
 function EnumHoverCardContent({ enumTarget }: { enumTarget: EnumTargetRow }) {
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-sm font-semibold text-foreground">{enumTarget.name}</div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 text-sm font-semibold text-foreground">{enumTarget.name}</div>
+          <TargetPropertiesButton typeName={enumTarget.name} />
+        </div>
         <div
           className="text-[10px] font-medium uppercase tracking-wide"
           style={{ color: 'color-mix(in oklch, var(--chart-3) 85%, transparent)' }}
@@ -629,7 +666,7 @@ function FieldRowButton({
                   : field.enumTarget
                     ? 'var(--muted-foreground)'
                     : field.stdlibTarget
-                      ? 'color-mix(in oklch, var(--chart-2) 65%, var(--reference))'
+                      ? stdlibAccent
                       : field.refTarget
                         ? 'var(--graph-edge-ref)'
                         : 'var(--muted-foreground)',
@@ -699,6 +736,9 @@ function FieldRowButton({
         side="right"
         align="start"
         className="w-72 p-3 text-xs"
+        data-testid={
+          field.enumTarget ? 'type-node-field-enum-hover-card' : 'type-node-field-stdlib-hover-card'
+        }
         style={field.enumTarget ? enumHoverCardStyle : stdlibHoverCardStyle}
       >
         {field.enumTarget ? (
@@ -719,10 +759,14 @@ function StdlibHoverCardContent({ stdlibTarget }: { stdlibTarget: StdlibTargetRo
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-sm font-semibold text-foreground">{stdlibTarget.name}</div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 text-sm font-semibold text-foreground">{stdlibTarget.name}</div>
+          <TargetPropertiesButton typeName={stdlibTarget.name} />
+        </div>
         <div
+          data-testid="stdlib-kind-label"
           className="text-[10px] font-medium uppercase tracking-wide"
-          style={{ color: 'color-mix(in oklch, var(--chart-2) 75%, var(--reference))' }}
+          style={{ color: stdlibAccent }}
         >
           Stdlib {stdlibTarget.kind}
         </div>
@@ -740,9 +784,10 @@ function StdlibHoverCardContent({ stdlibTarget }: { stdlibTarget: StdlibTargetRo
               <Badge
                 key={value.value}
                 data-testid="stdlib-value-badge"
-                variant="secondary"
+                variant="default"
                 title={value.description}
-                className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm"
+                className="max-w-full rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
+                style={stdlibValueBadgeStyle}
               >
                 <span className="truncate">{value.value}</span>
               </Badge>
@@ -750,8 +795,9 @@ function StdlibHoverCardContent({ stdlibTarget }: { stdlibTarget: StdlibTargetRo
             {hiddenValueCount > 0 ? (
               <Badge
                 data-testid="stdlib-value-more-badge"
-                variant="outline"
-                className="rounded px-1.5 py-0 text-[10px] font-semibold"
+                variant="default"
+                className="rounded border px-1.5 py-0 text-[10px] font-semibold shadow-sm hover:opacity-90"
+                style={stdlibValueBadgeStyle}
               >
                 +{hiddenValueCount} more
               </Badge>

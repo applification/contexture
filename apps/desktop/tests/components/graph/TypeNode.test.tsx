@@ -12,6 +12,7 @@ import {
   TYPE_NODE_ADD_FIELD_EVENT,
   TYPE_NODE_EVENT,
   TYPE_NODE_OBJECT_EVENT,
+  TYPE_NODE_TARGET_PROPERTIES_EVENT,
   TypeNode,
 } from '@renderer/components/graph/nodes/TypeNode';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
@@ -501,7 +502,7 @@ describe('TypeNode', () => {
       'email, common.Email stdlib type',
     );
     expect(screen.getByTestId('type-node-field-stdlib-summary')).toHaveStyle({
-      color: 'color-mix(in oklch, var(--chart-2) 65%, var(--reference))',
+      color: 'color-mix(in oklch, var(--chart-2) 85%, transparent)',
       fontWeight: '400',
       fontFamily: 'var(--font-mono)',
     });
@@ -509,7 +510,89 @@ describe('TypeNode', () => {
     fireEvent.focus(screen.getByTestId('type-node-field'));
 
     expect(screen.getByText('Email address.')).toBeInTheDocument();
+    expect(screen.getByTestId('type-node-field-stdlib-hover-card').getAttribute('style')).toContain(
+      'border-top: 2px solid color-mix(in oklch, var(--chart-2) 85%, transparent)',
+    );
     expect(screen.getByText('Stdlib raw')).toBeInTheDocument();
+    expect(screen.getByTestId('stdlib-kind-label')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--chart-2) 85%, transparent)',
+    });
+  });
+
+  it('opens stdlib target properties from the hover card action', () => {
+    const data: TypeNodeData = {
+      typeName: 'User',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'email',
+          summary: '→ common.Email',
+          optional: false,
+          nullable: false,
+          refTarget: 'common.Email',
+          stdlibTarget: {
+            name: 'common.Email',
+            description: 'Email address.',
+            kind: 'raw',
+          },
+        },
+      ],
+    };
+    const handler = vi.fn();
+    document.addEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler as EventListener);
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.focus(screen.getByTestId('type-node-field'));
+    fireEvent.click(screen.getByRole('button', { name: 'Show common.Email properties' }));
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      typeName: 'common.Email',
+    });
+    document.removeEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler as EventListener);
+  });
+
+  it('uses blue stdlib hover accents and value badges', () => {
+    vi.useFakeTimers();
+    const data: TypeNodeData = {
+      typeName: 'User',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'country',
+          summary: '→ place.CountryCode',
+          optional: false,
+          nullable: false,
+          refTarget: 'place.CountryCode',
+          stdlibTarget: {
+            name: 'place.CountryCode',
+            description: 'ISO 3166-1 alpha-2 country code.',
+            kind: 'enum',
+            values: [{ value: 'GB', description: 'United Kingdom' }, { value: 'US' }],
+          },
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.pointerEnter(screen.getByTestId('type-node-field'));
+    act(() => vi.advanceTimersByTime(120));
+
+    expect(screen.getByTestId('stdlib-kind-label')).toHaveStyle({
+      color: 'color-mix(in oklch, var(--chart-2) 85%, transparent)',
+    });
+    expect(screen.getByText('GB')).toBeInTheDocument();
+    expect(screen.getByText('GB').closest('[title]')).toHaveAttribute('title', 'United Kingdom');
+    const badges = screen.getAllByTestId('stdlib-value-badge');
+    expect(badges[0]).toHaveStyle({
+      background: 'color-mix(in oklch, var(--chart-2) 85%, transparent)',
+      color: 'var(--graph-node-header-text)',
+    });
+    expect(badges[0].getAttribute('style')).toContain(
+      'border-color: color-mix(in oklch, var(--chart-2) 85%, transparent)',
+    );
   });
 
   it('renders discriminated union refs as relationship refs with a muted suffix', () => {
@@ -568,6 +651,37 @@ describe('TypeNode', () => {
 
     expect(screen.getByText('The growing season.')).toBeInTheDocument();
     expect(screen.getByText('spring')).toBeInTheDocument();
+  });
+
+  it('opens enum target properties from the hover card action', () => {
+    const data: TypeNodeData = {
+      typeName: 'Recipe',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'season',
+          summary: '→ Season',
+          optional: false,
+          nullable: false,
+          refTarget: 'Season',
+          enumTarget: {
+            name: 'Season',
+            values: [{ value: 'spring' }],
+          },
+        },
+      ],
+    };
+    const handler = vi.fn();
+    document.addEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler as EventListener);
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    fireEvent.focus(screen.getByTestId('type-node-field'));
+    fireEvent.click(screen.getByRole('button', { name: 'Show Season properties' }));
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((handler.mock.calls[0][0] as CustomEvent).detail).toEqual({ typeName: 'Season' });
+    document.removeEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler as EventListener);
   });
 
   it('previews ref targets on hover and focus, including enum refs', () => {

@@ -748,7 +748,7 @@ function PlaygroundRecordForm({
       className="flex h-full min-h-0 flex-col"
       onSubmit={form.handleSubmit((value) => onSubmit(normalizeSubmitValue(entity.fields, value)))}
     >
-      <FieldGroup className="min-h-0 flex-1 overflow-y-auto p-3">
+      <FieldGroup className="min-h-0 flex-1 content-start overflow-y-auto p-3">
         {entity.fields.map((control) => (
           <PlaygroundControlField
             key={control.fieldName}

@@ -8,6 +8,7 @@ import { TYPE_EDGE_SELECT_EVENT } from '@renderer/components/graph/edge-select-e
 import {
   TYPE_NODE_ADD_FIELD_EVENT,
   TYPE_NODE_EVENT,
+  TYPE_NODE_TARGET_PROPERTIES_EVENT,
 } from '@renderer/components/graph/nodes/TypeNode';
 import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
 import { useGraphLayoutStore } from '@renderer/store/layout-config';
@@ -182,6 +183,61 @@ describe('App global keyboard', () => {
       nodeId: 'Plot',
       fieldName: 'field1',
     });
+  });
+
+  it('opens hidden enum target properties from a hover-card action', async () => {
+    useUndoStore.getState().apply({
+      kind: 'replace_schema',
+      schema: {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Recipe',
+            fields: [{ name: 'season', type: { kind: 'ref', typeName: 'Season' } }],
+          },
+          { kind: 'enum', name: 'Season', values: [{ value: 'spring' }] },
+        ],
+      },
+    });
+    useGraphLayoutStore.getState().setGraphLayout({ showEnums: false });
+    render(<App />);
+
+    document.dispatchEvent(
+      new CustomEvent(TYPE_NODE_TARGET_PROPERTIES_EVENT, { detail: { typeName: 'Season' } }),
+    );
+
+    expect(await screen.findByLabelText('Name')).toHaveValue('Season');
+    expect(screen.getByLabelText('Enum value spring')).toBeInTheDocument();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Season');
+  });
+
+  it('opens hidden stdlib target properties from a hover-card action', async () => {
+    useUndoStore.getState().apply({
+      kind: 'replace_schema',
+      schema: {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'User',
+            fields: [{ name: 'email', type: { kind: 'ref', typeName: 'common.Email' } }],
+          },
+        ],
+      },
+    });
+    useGraphLayoutStore.getState().setGraphLayout({ showStdlib: false });
+    render(<App />);
+
+    document.dispatchEvent(
+      new CustomEvent(TYPE_NODE_TARGET_PROPERTIES_EVENT, {
+        detail: { typeName: 'common.Email' },
+      }),
+    );
+
+    expect(await screen.findByTestId('external-type-detail')).toHaveTextContent('common.Email');
+    expect(screen.getByRole('heading', { name: 'common.Email' })).toBeInTheDocument();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('common.Email');
   });
 
   it('Cmd+Shift+F adds and opens a field on the selected object', async () => {
