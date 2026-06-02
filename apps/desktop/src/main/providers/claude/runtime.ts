@@ -431,6 +431,7 @@ function claudeModelWithContext(
   model: string,
   options: Record<string, string | boolean> | undefined,
 ): string {
+  if (model === 'default') return model;
   const contextWindow = readStringOption(options, 'contextWindow');
   if (contextWindow === '1m' && !model.toLowerCase().includes('[1m]')) return `${model}[1m]`;
   if (contextWindow === '200k') return model.replace(/\[1m\]/gi, '');
