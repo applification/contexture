@@ -20,14 +20,25 @@ import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
 import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
-import { ChevronDown, ChevronUp, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Play,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
 import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
 import { Button } from '../ui/button';
+import { ButtonGroup } from '../ui/button-group';
 import { Checkbox } from '../ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import {
   Command,
   CommandEmpty,
@@ -207,13 +218,23 @@ function TableTypeDetail({
             {type.name}
           </h2>
           <div className="mt-2">
-            <TabsList className="h-8 bg-background p-0.5">
-              <TabsTrigger value="shape" className="h-7 px-3 text-xs">
-                Shape
-              </TabsTrigger>
-              <TabsTrigger value="try" className="h-7 px-3 text-xs">
-                Try
-              </TabsTrigger>
+            <TabsList asChild>
+              <ButtonGroup aria-label="Table inspector mode">
+                <TabsTrigger
+                  value="shape"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                >
+                  <SlidersHorizontal aria-hidden="true" className="size-3.5" />
+                  Shape
+                </TabsTrigger>
+                <TabsTrigger
+                  value="try"
+                  className="h-8 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                >
+                  <Play aria-hidden="true" className="size-3.5" />
+                  Try
+                </TabsTrigger>
+              </ButtonGroup>
             </TabsList>
           </div>
         </div>
@@ -240,14 +261,25 @@ function TableTypeDetail({
           <DescriptionField type={type} dispatch={dispatch} />
           <ModelShapeHints hints={modelingHints} />
           <ObjectBody type={type} dispatch={dispatch} quietControls />
-          <details className="group border-t pt-3">
-            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-              Advanced schema output
-            </summary>
-            <div className="mt-3">
+          <Collapsible defaultOpen className="border-t pt-3">
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="group h-8 w-full justify-between px-2 text-xs"
+              >
+                <span>Advanced schema output</span>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
               <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
-            </div>
-          </details>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </TabsContent>
 
