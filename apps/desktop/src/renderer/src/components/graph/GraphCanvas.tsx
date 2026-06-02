@@ -62,7 +62,11 @@ import {
   type KeyEvent as InteractionKeyEvent,
 } from './interactions';
 import { GroupNode } from './nodes/GroupNode';
-import { TYPE_NODE_ADD_FIELD_EVENT, TypeNode } from './nodes/TypeNode';
+import {
+  TYPE_NODE_ADD_FIELD_EVENT,
+  TYPE_NODE_TARGET_PROPERTIES_EVENT,
+  TypeNode,
+} from './nodes/TypeNode';
 import { type FieldRefPreview, TYPE_NODE_REF_PREVIEW_EVENT } from './ref-preview-event';
 import {
   type BuildGraphResult,
@@ -166,6 +170,8 @@ function GraphCanvasInner({
   const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
   const focusTarget = useGraphSelectionStore((s) => s.state.focusTarget);
   const consumeFocus = useGraphSelectionStore((s) => s.consumeFocus);
+  const sidebarTab = useUIChromeStore((s) => s.sidebarTab);
+  const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
   const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
   const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
@@ -278,6 +284,7 @@ function GraphCanvasInner({
 
   useEffect(() => {
     if ((showEnums && showStdlib) || !selectedNodeId) return;
+    if (sidebarVisible && sidebarTab === 'properties') return;
     const selectedNode = builtNodes.find((node) => node.id === selectedNodeId);
     if (
       selectedNode &&
@@ -286,7 +293,7 @@ function GraphCanvasInner({
     ) {
       clearNodes();
     }
-  }, [builtNodes, clearNodes, selectedNodeId, showEnums, showStdlib]);
+  }, [builtNodes, clearNodes, selectedNodeId, showEnums, showStdlib, sidebarTab, sidebarVisible]);
 
   // ELK once the nodes have measured DOM dimensions.
   const { runLayout } = useELKLayout();
@@ -530,6 +537,18 @@ function GraphCanvasInner({
     el.addEventListener(TYPE_NODE_ADD_FIELD_EVENT, handler);
     return () => el.removeEventListener(TYPE_NODE_ADD_FIELD_EVENT, handler);
   }, [addFieldFromNode]);
+
+  useEffect(() => {
+    const handler = (ev: Event): void => {
+      const detail = (ev as CustomEvent<{ typeName?: unknown }>).detail;
+      if (typeof detail?.typeName !== 'string') return;
+      click(detail.typeName, 'replace');
+      setSidebarVisible(true);
+      setSidebarTab('properties');
+    };
+    document.addEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler);
+    return () => document.removeEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler);
+  }, [click, setSidebarTab, setSidebarVisible]);
 
   useEffect(() => {
     const el = containerRef.current;

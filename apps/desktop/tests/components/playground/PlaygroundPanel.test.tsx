@@ -96,4 +96,14 @@ describe('PlaygroundPanel', () => {
     expect(screen.getByRole('combobox', { name: 'Country' })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/Unknown reference target/u)).not.toBeInTheDocument();
   });
+
+  it('packs record form fields at the top of the scroll area', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<PlaygroundPanel schema={schema} />);
+
+    await user.click(screen.getByRole('button', { name: 'New record' }));
+
+    expect(container.querySelector('[data-slot="field-group"].content-start')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
 });
