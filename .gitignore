@@ -35,6 +35,8 @@ apps/desktop/build/bin/
 .codex/*
 !.codex/agents/
 !.codex/agents/*.toml
+!.codex/skills/
+!.codex/skills/**
 
 # Claude Code scheduled-task runtime artefacts
 .claude/scheduled_tasks.lock
