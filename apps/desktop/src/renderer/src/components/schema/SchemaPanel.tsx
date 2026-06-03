@@ -155,6 +155,10 @@ const CONTEXTURE_MCP_BIN_PATH =
 
 const CODEX_MCP_INSTALL_COMMAND = `codex mcp add contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
 
+const CONVEX_AI_FILES_INSTALL_COMMAND = 'bunx convex ai-files install';
+
+const CONVEX_AI_FILES_STATUS_COMMAND = 'bunx convex ai-files status';
+
 const CLAUDE_CODE_MCP_INSTALL_COMMAND = `claude mcp add --transport stdio --scope user contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
 
 const CLAUDE_DESKTOP_CONFIG_PATH =
@@ -185,7 +189,7 @@ const CONTEXTURE_MCP_TOOLS = [
   'check_contexture_drift',
 ] as const;
 
-type AgentSetupCopyKey = 'install' | 'prompt' | 'smoke';
+type AgentSetupCopyKey = 'install' | 'convex-ai-files' | 'prompt' | 'smoke';
 
 interface OutputOption {
   type: SchemaOutputType;
@@ -414,6 +418,7 @@ export function SchemaPanel({
         <div className="px-3 pb-3">
           <AgentSetupPopover
             documentFilePath={documentFilePath}
+            convexVersion={convexVersion}
             copied={agentCopied}
             onCopy={handleAgentCopy}
             onRequestSave={onRequestSave}
@@ -437,6 +442,7 @@ export function SchemaPanel({
         <div className="pt-2">
           <AgentSetupPopover
             documentFilePath={documentFilePath}
+            convexVersion={convexVersion}
             copied={agentCopied}
             onCopy={handleAgentCopy}
             onRequestSave={onRequestSave}
@@ -448,6 +454,15 @@ export function SchemaPanel({
 
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
+      <div className="mb-2">
+        <AgentSetupPopover
+          documentFilePath={documentFilePath}
+          convexVersion={convexVersion}
+          copied={agentCopied}
+          onCopy={handleAgentCopy}
+          onRequestSave={onRequestSave}
+        />
+      </div>
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -473,13 +488,6 @@ export function SchemaPanel({
                   }}
                   onOutputDirChange={onOutputDirChange}
                 />
-                <AgentSetupPopover
-                  documentFilePath={documentFilePath}
-                  copied={agentCopied}
-                  onCopy={handleAgentCopy}
-                  onRequestSave={onRequestSave}
-                  compact
-                />
               </div>
               <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
                 {selectedOutputDisplayPath}
@@ -492,11 +500,19 @@ export function SchemaPanel({
               </div>
               {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
                 <div
-                  className="mt-0.5 truncate text-[10px] text-muted-foreground"
+                  className={`mt-0.5 truncate text-[10px] ${
+                    convexVersion.status === 'mismatch' || convexVersion.status === 'target_missing'
+                      ? 'text-warning'
+                      : 'text-muted-foreground'
+                  }`}
                   title={convexVersionTooltip(convexVersion)}
                   data-testid="schema-convex-version"
                 >
-                  {convexVersionLabel(convexVersion)}
+                  {convexVersion.status === 'mismatch'
+                    ? 'Convex version mismatch'
+                    : convexVersion.status === 'target_missing'
+                      ? 'Convex package missing'
+                      : convexVersionLabel(convexVersion)}
                 </div>
               ) : null}
             </div>
@@ -901,67 +917,86 @@ function dirname(path: string): string {
 
 function AgentSetupPopover({
   documentFilePath,
+  convexVersion,
   copied,
   onCopy,
   onRequestSave,
-  compact = false,
 }: {
   documentFilePath: string | null;
+  convexVersion?: SchemaPanelProps['convexVersion'];
   copied: AgentSetupCopyKey | null;
   onCopy: (key: AgentSetupCopyKey, text: string) => void;
   onRequestSave?: () => void;
-  compact?: boolean;
 }): React.JSX.Element {
   const [activeClient, setActiveClient] = useState<AgentClient>('codex');
+  const convexPackageStatus = setupConvexPackageStatus(convexVersion);
   const savedPrompt =
     documentFilePath === null
       ? null
-      : `Use the Contexture MCP server to inspect ${documentFilePath}, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
+      : `Use Convex AI files for Convex implementation choices. Use the Contexture MCP server to inspect ${documentFilePath}, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing. Do not edit @contexture-generated files directly.`;
   const smokeTest =
     documentFilePath === null
       ? 'Ask your agent: "List the contexture MCP tools."'
-      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath}, read the domain brief, and summarize the Convex tables plus unresolved decisions."`;
+      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath}, read the domain brief, check Convex AI files with '${CONVEX_AI_FILES_STATUS_COMMAND}', and summarize the Convex tables plus unresolved decisions."`;
   const copiedLabel =
     copied === 'install'
       ? 'Copied install command'
-      : copied === 'prompt'
-        ? 'Copied saved-document prompt'
-        : copied === 'smoke'
-          ? 'Copied smoke test'
-          : '';
+      : copied === 'convex-ai-files'
+        ? 'Copied Convex AI files command'
+        : copied === 'prompt'
+          ? 'Copied saved-document prompt'
+          : copied === 'smoke'
+            ? 'Copied smoke test'
+            : '';
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant={compact ? 'ghost' : 'secondary'}
-          className={
-            compact
-              ? 'h-7 shrink-0 gap-1.5 px-2 text-xs'
-              : 'h-auto w-full justify-start gap-2 px-2 py-2 text-left'
-          }
-          aria-label="Open Agent setup"
+          variant="secondary"
+          className="h-auto w-full justify-start gap-2 px-2 py-2 text-left"
+          aria-label="Open setup readiness"
           data-testid="agent-setup"
         >
           <PlugZap className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          <span className={compact ? 'sr-only' : 'min-w-0'}>
-            <span className="block text-xs font-semibold">Agent setup</span>
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold">Setup readiness</span>
             <span className="block text-[11px] font-normal text-muted-foreground">
-              {savedPrompt === null ? 'Save for prompt handoff' : 'Saved prompt ready'}
+              {savedPrompt === null ? 'Save to create agent prompt' : 'Prompt ready'}
             </span>
           </span>
-          {compact ? <span className="text-xs">Agent</span> : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-2" align="end" data-testid="agent-setup-content">
+      <PopoverContent className="w-[430px] p-2" align="end" data-testid="agent-setup-content">
         <div className="mb-2 px-1">
           <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
-            Agent setup
+            Setup readiness
           </h3>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Connect Contexture's MCP server to your agent and evolve this Convex model.
+            Connect an agent to inspect, edit, emit, and check drift through Contexture MCP.
           </p>
+        </div>
+
+        <div className="mb-2 space-y-1.5">
+          <SetupReadinessRow
+            label="Convex package"
+            status={convexPackageStatus.status}
+            description={convexPackageStatus.description}
+          />
+          <SetupReadinessRow
+            label="Convex AI files"
+            status="needs_action"
+            description="Install or refresh the Convex-managed AI files for this project."
+            actionLabel="Copy install"
+            onAction={() => onCopy('convex-ai-files', CONVEX_AI_FILES_INSTALL_COMMAND)}
+          />
+          <SetupReadinessRow
+            label="Contexture MCP"
+            status="needs_action"
+            description="Connect Contexture MCP in the agent client you use for this repo."
+            actionLabel="Choose client"
+          />
         </div>
 
         <Tabs
@@ -998,7 +1033,7 @@ function AgentSetupPopover({
 
           <TabsContent value="codex" className="mt-2">
             <AgentCopyRow
-              label="Codex install command"
+              label="Codex MCP command"
               value={CODEX_MCP_INSTALL_COMMAND}
               copied={copied === 'install'}
               onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
@@ -1072,7 +1107,7 @@ function AgentSetupPopover({
             </div>
           ) : (
             <AgentCopyRow
-              label="Saved-document prompt"
+              label="Prompt"
               value={savedPrompt}
               copied={copied === 'prompt'}
               onCopy={() => onCopy('prompt', savedPrompt)}
@@ -1091,20 +1126,105 @@ function AgentSetupPopover({
           />
         </div>
 
-        <ul className="mt-2 flex flex-wrap gap-1 text-[10px]" aria-label="Contexture MCP tools">
-          {CONTEXTURE_MCP_TOOLS.map((tool) => (
-            <li key={tool}>
-              <code className="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-mono text-muted-foreground">
-                {tool}
-              </code>
-            </li>
-          ))}
-        </ul>
+        <details className="mt-2 rounded border border-border/60 bg-background/50 px-2 py-1.5">
+          <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+            Advanced
+          </summary>
+          <ul className="mt-1.5 flex flex-wrap gap-1 text-[10px]" aria-label="Contexture MCP tools">
+            {CONTEXTURE_MCP_TOOLS.map((tool) => (
+              <li key={tool}>
+                <code className="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-mono text-muted-foreground">
+                  {tool}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </details>
         <p className="sr-only" aria-live="polite">
           {copiedLabel}
         </p>
       </PopoverContent>
     </Popover>
+  );
+}
+
+type SetupReadinessStatus = 'ready' | 'needs_action' | 'unknown';
+
+function setupConvexPackageStatus(convexVersion: SchemaPanelProps['convexVersion']): {
+  status: SetupReadinessStatus;
+  description: string;
+} {
+  if (!convexVersion || convexVersion.status === 'idle' || convexVersion.status === 'loading') {
+    return { status: 'unknown', description: 'Checking the project Convex package.' };
+  }
+  if (convexVersion.status === 'ok') {
+    const version = convexVersion.targetVersion ?? convexVersion.emitterVersion ?? 'installed';
+    return { status: 'ready', description: `Installed ${version}.` };
+  }
+  if (convexVersion.status === 'mismatch') {
+    return {
+      status: 'needs_action',
+      description: convexVersion.message ?? 'Target app version differs from the emitter.',
+    };
+  }
+  if (convexVersion.status === 'target_missing') {
+    return {
+      status: 'needs_action',
+      description: convexVersion.message ?? 'Install Convex in the target app.',
+    };
+  }
+  return {
+    status: 'unknown',
+    description: convexVersion.message ?? 'Convex package status could not be checked.',
+  };
+}
+
+function SetupReadinessRow({
+  label,
+  status,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  label: string;
+  status: SetupReadinessStatus;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}): React.JSX.Element {
+  const statusLabel =
+    status === 'ready' ? 'Ready' : status === 'needs_action' ? 'Needs action' : 'Not checked';
+  const indicatorClass =
+    status === 'ready'
+      ? 'border-success/70 bg-success/15'
+      : status === 'needs_action'
+        ? 'border-warning/70 bg-warning/15'
+        : 'border-muted-foreground/40 bg-muted/20';
+
+  return (
+    <div className="flex items-center gap-2 rounded border border-border/70 bg-background/70 px-2 py-1.5">
+      <span className="sr-only">{`${label}: ${statusLabel}. ${description}`}</span>
+      <span className={`size-2.5 shrink-0 rounded-full border ${indicatorClass}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[11px] font-medium text-foreground">{label}</span>
+          <span className="text-[10px] text-muted-foreground">{statusLabel}</span>
+        </div>
+        <p className="truncate text-[10px] text-muted-foreground">{description}</p>
+      </div>
+      {actionLabel && onAction ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-6 shrink-0 px-2 text-[11px]"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </Button>
+      ) : actionLabel ? (
+        <span className="shrink-0 text-[10px] text-muted-foreground">{actionLabel}</span>
+      ) : null}
+    </div>
   );
 }
 

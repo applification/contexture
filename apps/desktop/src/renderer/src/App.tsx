@@ -380,8 +380,16 @@ export default function App(): React.JSX.Element {
       : undefined;
   const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
   const onboardingState = useMemo(
-    () => buildOnboardingState(schema, activeTab, filePath, isDirty, driftedPaths.length),
-    [activeTab, driftedPaths.length, filePath, isDirty, schema],
+    () =>
+      buildOnboardingState(
+        schema,
+        activeTab,
+        filePath,
+        isDirty,
+        driftedPaths.length,
+        convexVersion.status,
+      ),
+    [activeTab, convexVersion.status, driftedPaths.length, filePath, isDirty, schema],
   );
 
   // Emit generated sources for the SchemaPanel. Only runs while the
@@ -808,6 +816,8 @@ interface OnboardingState {
   outputsVisible: boolean;
   hasSavedOutputs: boolean;
   driftClean: boolean;
+  convexVersionChecked: boolean;
+  convexVersionReady: boolean;
 }
 
 function buildOnboardingState(
@@ -816,6 +826,7 @@ function buildOnboardingState(
   filePath: string | null,
   isDirty: boolean,
   driftedCount: number,
+  convexVersionStatus: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed',
 ): OnboardingState {
   const objects = schema.types.filter((type) => type.kind === 'object');
   return {
@@ -828,6 +839,8 @@ function buildOnboardingState(
     outputsVisible: activeTab === 'schema',
     hasSavedOutputs: filePath !== null && !isDirty,
     driftClean: filePath !== null && driftedCount === 0,
+    convexVersionChecked: convexVersionStatus !== 'idle' && convexVersionStatus !== 'loading',
+    convexVersionReady: convexVersionStatus === 'ok',
   };
 }
 
@@ -840,25 +853,58 @@ function OnboardingLoopPanel({
   onSave: () => void;
   onShowAgent: () => void;
 }): React.JSX.Element {
-  const steps = [
-    { label: 'Table', done: state.hasTable },
-    { label: 'Fields', done: state.hasField },
-    { label: 'Ref', done: state.hasRef },
-    { label: 'Index', done: state.hasIndex },
-    { label: 'Outputs', done: state.outputsVisible },
-    { label: 'Saved', done: state.hasSavedOutputs },
-    { label: 'Drift clean', done: state.driftClean },
+  type ReadinessDetail = readonly [label: string, done: boolean];
+  const groups: {
+    label: string;
+    done: boolean;
+    detail: readonly ReadinessDetail[];
+  }[] = [
+    {
+      label: 'Model',
+      done: state.hasTable && state.hasField && state.hasRef && state.hasIndex,
+      detail: [
+        ['Table', state.hasTable],
+        ['Fields', state.hasField],
+        ['Ref', state.hasRef],
+        ['Index', state.hasIndex],
+      ] as const,
+    },
+    {
+      label: 'Generated',
+      done: state.outputsVisible && state.hasSavedOutputs && state.driftClean,
+      detail: [
+        ['Files visible', state.outputsVisible],
+        ['Saved', state.hasSavedOutputs],
+        ['Drift clean', state.driftClean],
+      ] as const,
+    },
+    {
+      label: 'Convex',
+      done: state.convexVersionChecked && state.convexVersionReady,
+      detail: [
+        ['Package checked', state.convexVersionChecked],
+        ['Version match', state.convexVersionReady],
+      ] as const,
+    },
+    {
+      label: 'Agent',
+      done: false,
+      detail: [
+        ['Convex AI files', false],
+        ['Contexture MCP', false],
+      ] as const,
+    },
   ];
 
   return (
     <aside
-      className="border-b border-border bg-background p-3 text-xs"
-      aria-label="First Contexture loop"
+      className="border-b border-border bg-background px-3 py-2.5 text-xs"
+      aria-label="Project readiness"
       data-testid="onboarding-loop"
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">First Convex loop</h2>
+          <h2 className="text-sm font-semibold text-foreground">Project readiness</h2>
           <p className="mt-0.5 text-muted-foreground">
             The IR is the source; generated files can be replaced any time.
           </p>
@@ -866,36 +912,39 @@ function OnboardingLoopPanel({
         <GitCompareArrows className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
 
-      <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        {steps.map((step) => (
-          <li
-            key={step.label}
-            className="flex min-h-8 items-center gap-1.5 rounded border border-border/70 bg-card/70 px-2"
-            aria-label={`${step.label} ${step.done ? 'complete' : 'incomplete'}`}
-          >
-            {step.done ? (
-              <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
-            ) : (
-              <span
-                className="size-3.5 shrink-0 rounded-full border border-muted-foreground/40"
-                aria-hidden="true"
-              />
-            )}
-            <span className={step.done ? 'text-foreground' : 'text-muted-foreground'}>
-              {step.label}
-            </span>
-          </li>
-        ))}
+      <ul className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        {groups.map((group) => {
+          const completeCount = group.detail.filter(([, done]) => done).length;
+          const detailText = group.detail
+            .map(([label, done]) => `${label}: ${done ? 'ready' : 'needs action'}`)
+            .join(', ');
+          return (
+            <li
+              key={group.label}
+              className="flex min-h-8 items-center gap-1.5 rounded border border-border/70 bg-card/60 px-2"
+              aria-label={`${group.label}: ${detailText}`}
+              title={detailText}
+            >
+              {group.done ? (
+                <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+              ) : (
+                <span
+                  className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                  aria-hidden="true"
+                />
+              )}
+              <span className={group.done ? 'text-foreground' : 'text-muted-foreground'}>
+                {group.label}
+              </span>
+              <span className="ml-auto text-[10px] text-muted-foreground/80">
+                {completeCount}/{group.detail.length}
+              </span>
+            </li>
+          );
+        })}
       </ul>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div
-          className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-secondary px-2 text-xs text-secondary-foreground"
-          aria-current="page"
-        >
-          <FileCode2 className="size-3.5" />
-          Generated files visible
-        </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
@@ -914,7 +963,7 @@ function OnboardingLoopPanel({
           onClick={onShowAgent}
         >
           <Bot className="size-3.5" />
-          Supervise agent ops
+          Agent setup
         </Button>
       </div>
     </aside>

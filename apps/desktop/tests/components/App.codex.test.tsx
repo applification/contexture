@@ -96,9 +96,10 @@ describe('App Codex-first copy', () => {
       fields: ['plot'],
     });
     expect(useUIChromeStore.getState().sidebarTab).toBe('schema');
-    expect(screen.getByTestId('onboarding-loop')).toHaveTextContent('Drift clean');
-    expect(screen.getByLabelText('Table complete')).toBeInTheDocument();
-    expect(screen.getByLabelText('Saved incomplete')).toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-loop')).toHaveTextContent('Project readiness');
+    expect(screen.getByLabelText(/Model: Table: ready/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Generated: Files visible: ready/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Saved: needs action/)).toBeInTheDocument();
   });
 
   it('opens the file picker from the start screen', async () => {
