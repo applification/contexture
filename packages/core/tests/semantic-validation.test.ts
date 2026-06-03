@@ -6,7 +6,7 @@ const STDLIB: StdlibCatalog = {
   namespaces: ['common', 'place', 'money'],
   hasType: (ns, name) => {
     const types: Record<string, ReadonlySet<string>> = {
-      common: new Set(['Email', 'URL']),
+      common: new Set(['Email', 'URL', 'ISODateTime']),
       place: new Set(['CountryCode', 'Address']),
       money: new Set(['Money', 'CurrencyCode']),
     };
@@ -418,8 +418,8 @@ describe('checkSemantic — refs', () => {
           table: true,
           fields: [
             { name: 'name', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
           ],
         },
         {
@@ -428,8 +428,8 @@ describe('checkSemantic — refs', () => {
           table: true,
           fields: [
             { name: 'householdId', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
           ],
         },
         {
@@ -438,8 +438,8 @@ describe('checkSemantic — refs', () => {
           table: true,
           fields: [
             { name: 'householdId', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
             { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
             { name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } },
             { name: 'householdRefId', type: { kind: 'ref', typeName: 'Household' } },

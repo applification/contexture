@@ -329,7 +329,7 @@ function checkRelationshipMetadata(
     !ownership &&
     relationship?.crossScope !== true
   ) {
-    const axis = findSharedTenantAxis(owner, target, fieldName, ref.typeName);
+    const axis = findSharedTenantAxis(owner, target, fieldName, ref.typeName, localTypes);
     if (axis) {
       issues.push({
         code: 'relationship_ownership_scope_missing',
@@ -353,11 +353,24 @@ function findSharedTenantAxis(
   target: ObjectType,
   relationshipFieldName: string,
   relationshipTargetTypeName: string,
+  localTypes: ReadonlyMap<string, TypeDef>,
 ): { fieldName: string; targetFieldName: string } | null {
   const strong = owner.fields.find((sourceField) => {
-    if (!isRequiredField(sourceField) || sourceField.name === relationshipFieldName) return false;
+    if (
+      !isRequiredField(sourceField) ||
+      sourceField.name === relationshipFieldName ||
+      isExcludedTenantAxisFieldName(sourceField.name)
+    ) {
+      return false;
+    }
     const targetField = target.fields.find((field) => field.name === sourceField.name);
-    if (!targetField || !isRequiredField(targetField)) return false;
+    if (
+      !targetField ||
+      !isRequiredField(targetField) ||
+      isExcludedTenantAxisFieldName(targetField.name)
+    ) {
+      return false;
+    }
     if (
       sourceField.type.kind !== 'ref' ||
       targetField.type.kind !== 'ref' ||
@@ -365,22 +378,52 @@ function findSharedTenantAxis(
     ) {
       return false;
     }
+    const axisTarget = localTypes.get(sourceField.type.typeName);
+    if (axisTarget?.kind !== 'object' || axisTarget.table !== true) return false;
     return sourceField.type.typeName !== relationshipTargetTypeName;
   });
   if (strong) return { fieldName: strong.name, targetFieldName: strong.name };
 
   const fallback = owner.fields.find((sourceField) => {
-    if (!isRequiredField(sourceField) || sourceField.name === relationshipFieldName) return false;
+    if (
+      !isRequiredField(sourceField) ||
+      sourceField.name === relationshipFieldName ||
+      isExcludedTenantAxisFieldName(sourceField.name)
+    ) {
+      return false;
+    }
     if (!isLikelyTenantAxisName(sourceField.name) || sourceField.type.kind !== 'string') {
       return false;
     }
     const targetField = target.fields.find((field) => field.name === sourceField.name);
     return Boolean(
-      targetField && isRequiredField(targetField) && targetField.type.kind === 'string',
+      targetField &&
+        isRequiredField(targetField) &&
+        !isExcludedTenantAxisFieldName(targetField.name) &&
+        targetField.type.kind === 'string',
     );
   });
   return fallback ? { fieldName: fallback.name, targetFieldName: fallback.name } : null;
 }
+
+function isExcludedTenantAxisFieldName(name: string): boolean {
+  return COMMON_NON_TENANT_AXIS_FIELD_NAMES.has(name);
+}
+
+const COMMON_NON_TENANT_AXIS_FIELD_NAMES = new Set([
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+  'archivedAt',
+  'timestamp',
+  'name',
+  'title',
+  'description',
+  'notes',
+  'slug',
+  'status',
+  'type',
+]);
 
 function isRequiredField(field: ObjectType['fields'][number]): boolean {
   return field.optional !== true && field.nullable !== true;
