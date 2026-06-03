@@ -490,6 +490,7 @@ describe('FieldDetail', () => {
     const { dispatch } = setup({ name: 'createdAt', type: { kind: 'date' } });
     expect(screen.getByText('Derivation')).toBeInTheDocument();
     expect(screen.getByText('Stored directly. No derivation policy.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Mode' })).toBeInTheDocument();
 
     await chooseSelectOption('Mode', 'Computed');
 
@@ -498,7 +499,7 @@ describe('FieldDetail', () => {
       typeName: 'Plot',
       fieldName: 'createdAt',
       patch: {
-        derivation: { kind: 'computed', owner: 'backend' },
+        derivation: { kind: 'computed', owner: 'backend', writableBy: ['backend'] },
         serverDerived: true,
       },
     });
@@ -519,6 +520,83 @@ describe('FieldDetail', () => {
       typeName: 'Plot',
       fieldName: 'createdAt',
       patch: { derivation: undefined, serverDerived: undefined },
+    });
+  });
+
+  it('edits derivation writer boundaries', () => {
+    const { dispatch } = setup({
+      name: 'totalCents',
+      type: { kind: 'number' },
+      derivation: {
+        kind: 'rollup',
+        owner: 'backend',
+        writableBy: ['backend'],
+      },
+      serverDerived: true,
+    });
+
+    expect(screen.getByRole('checkbox', { name: 'Backend' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Agent' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'About Writable by' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Agent' }));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'totalCents',
+      patch: {
+        derivation: {
+          kind: 'rollup',
+          owner: 'backend',
+          writableBy: ['backend', 'agent'],
+        },
+      },
+    });
+  });
+
+  it('keeps at least one derivation writer selected', () => {
+    const { dispatch } = setup({
+      name: 'totalCents',
+      type: { kind: 'number' },
+      derivation: {
+        kind: 'rollup',
+        owner: 'backend',
+        writableBy: ['backend'],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Backend' }));
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('resets derivation writer boundaries when owner changes', async () => {
+    const { dispatch } = setup({
+      name: 'risk',
+      type: { kind: 'string' },
+      derivation: {
+        kind: 'estimate',
+        owner: 'backend',
+        writableBy: ['backend'],
+      },
+      serverDerived: true,
+    });
+
+    await chooseSelectOption('Owner', 'External system');
+
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'risk',
+      patch: {
+        derivation: {
+          kind: 'estimate',
+          owner: 'external',
+          writableBy: ['external'],
+        },
+        serverDerived: undefined,
+      },
     });
   });
 

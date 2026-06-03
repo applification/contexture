@@ -11,7 +11,7 @@
  * nothing here mutates the store directly.
  */
 
-import { derivationKindLabel } from '@contexture/core/derivation';
+import { type DerivationWriter, derivationKindLabel } from '@contexture/core/derivation';
 import {
   type FixtureValueType,
   listFixtureGenerators,
@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronsUpDown,
+  CircleHelp,
   Lightbulb,
   MoreHorizontal,
   Trash2,
@@ -59,10 +60,38 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
 import { Textarea } from '../ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { HintBody } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
 
 const AUTO_SAMPLE_DATA = '__auto__';
+
+const DERIVATION_WRITERS: Array<{
+  value: DerivationWriter;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'backend',
+    label: 'Backend',
+    description: 'Backend code may author this field.',
+  },
+  {
+    value: 'client',
+    label: 'Client',
+    description: 'Client forms or UI may author this field.',
+  },
+  {
+    value: 'agent',
+    label: 'Agent',
+    description: 'AI tool and structured-output schemas may author this field.',
+  },
+  {
+    value: 'external',
+    label: 'External',
+    description: 'External systems may author this field.',
+  },
+];
 
 export interface FieldDetailProps {
   typeName: string;
@@ -311,178 +340,277 @@ function DerivationRow({
   const summary = derivationSummary(derivation);
   return (
     <InspectorRow label="Derivation">
-      <div className="min-w-0 flex-1 space-y-2">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="field-derivation-kind">Mode</FieldLabel>
-            <Select
-              value={mode}
-              onValueChange={(value) => {
-                if (value === 'stored') {
-                  update({ derivation: undefined, serverDerived: undefined });
-                  return;
-                }
-                const kind = value as DerivationPolicy['kind'];
-                update({
-                  derivation: {
-                    ...defaultDerivation(kind),
-                    ...derivation,
-                    kind,
-                  },
-                  serverDerived:
-                    (derivation?.owner ?? defaultDerivation(kind).owner) === 'backend'
-                      ? true
-                      : undefined,
-                });
-              }}
-            >
-              <SelectTrigger id="field-derivation-kind" className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="stored">Stored input</SelectItem>
-                <SelectItem value="computed">Computed</SelectItem>
-                <SelectItem value="cachedHandle">Cached handle</SelectItem>
-                <SelectItem value="snapshot">Snapshot</SelectItem>
-                <SelectItem value="rollup">Rollup</SelectItem>
-                <SelectItem value="estimate">Estimate</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="field-derivation-owner">Owner</FieldLabel>
-            <Select
-              value={derivation?.owner ?? (field.serverDerived ? 'backend' : 'client')}
-              disabled={!derivation}
-              onValueChange={(value) => {
-                if (!derivation) return;
-                const owner = value as NonNullable<DerivationPolicy['owner']>;
-                update({
-                  derivation: { ...derivation, owner },
-                  serverDerived: owner === 'backend' ? true : undefined,
-                });
-              }}
-            >
-              <SelectTrigger id="field-derivation-owner" className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="backend">Backend only</SelectItem>
-                <SelectItem value="client">Client writable</SelectItem>
-                <SelectItem value="external">External system</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-        <p className="text-xs leading-5 text-muted-foreground">{summary}</p>
-        {derivation && (
+      <TooltipProvider delayDuration={250}>
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
-            <Field className="sm:col-span-2">
-              <FieldLabel htmlFor="field-derivation-sources">Sources</FieldLabel>
-              <Input
-                id="field-derivation-sources"
-                className="h-8 text-xs"
-                placeholder="ingredients[].grams, Ingredient.allergens"
-                defaultValue={(derivation.sources ?? []).join(', ')}
-                onBlur={(ev) =>
-                  update({
-                    derivation: {
-                      ...derivation,
-                      sources: parseSourceList(ev.target.value),
-                    },
-                  })
-                }
-              />
-            </Field>
             <Field>
-              <FieldLabel htmlFor="field-derivation-refresh">Refresh</FieldLabel>
+              <FieldLabelWithHelp
+                htmlFor="field-derivation-kind"
+                help="How Contexture should describe this stored value: direct input, computed value, cached handle, snapshot, rollup, or estimate."
+              >
+                Mode
+              </FieldLabelWithHelp>
               <Select
-                value={derivation.refresh ?? 'none'}
-                onValueChange={(value) =>
+                value={mode}
+                onValueChange={(value) => {
+                  if (value === 'stored') {
+                    update({ derivation: undefined, serverDerived: undefined });
+                    return;
+                  }
+                  const kind = value as DerivationPolicy['kind'];
                   update({
                     derivation: {
+                      ...defaultDerivation(kind),
                       ...derivation,
-                      refresh:
-                        value === 'none' ? undefined : (value as DerivationPolicy['refresh']),
+                      kind,
                     },
-                  })
-                }
+                    serverDerived:
+                      (derivation?.owner ?? defaultDerivation(kind).owner) === 'backend'
+                        ? true
+                        : undefined,
+                  });
+                }}
               >
-                <SelectTrigger id="field-derivation-refresh" className="h-8 text-xs">
+                <SelectTrigger id="field-derivation-kind" className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not declared</SelectItem>
-                  <SelectItem value="onWrite">On write</SelectItem>
-                  <SelectItem value="asyncJob">Async job</SelectItem>
-                  <SelectItem value="onRead">On read</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="frozen">Frozen</SelectItem>
-                  <SelectItem value="external">External</SelectItem>
+                  <SelectItem value="stored">Stored input</SelectItem>
+                  <SelectItem value="computed">Computed</SelectItem>
+                  <SelectItem value="cachedHandle">Cached handle</SelectItem>
+                  <SelectItem value="snapshot">Snapshot</SelectItem>
+                  <SelectItem value="rollup">Rollup</SelectItem>
+                  <SelectItem value="estimate">Estimate</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel htmlFor="field-derivation-drift">Drift policy</FieldLabel>
-              <Select
-                value={derivation.driftPolicy ?? 'none'}
-                onValueChange={(value) =>
-                  update({
-                    derivation: {
-                      ...derivation,
-                      driftPolicy:
-                        value === 'none' ? undefined : (value as DerivationPolicy['driftPolicy']),
-                    },
-                  })
-                }
+              <FieldLabelWithHelp
+                htmlFor="field-derivation-owner"
+                help="The boundary that is authoritative for computing or approving this value."
               >
-                <SelectTrigger id="field-derivation-drift" className="h-8 text-xs">
+                Owner
+              </FieldLabelWithHelp>
+              <Select
+                value={derivation?.owner ?? (field.serverDerived ? 'backend' : 'client')}
+                disabled={!derivation}
+                onValueChange={(value) => {
+                  if (!derivation) return;
+                  const owner = value as NonNullable<DerivationPolicy['owner']>;
+                  update({
+                    derivation: { ...derivation, owner, writableBy: defaultWritersForOwner(owner) },
+                    serverDerived: owner === 'backend' ? true : undefined,
+                  });
+                }}
+              >
+                <SelectTrigger id="field-derivation-owner" className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not declared</SelectItem>
-                  <SelectItem value="mustMatch">Must match</SelectItem>
-                  <SelectItem value="eventual">Eventually consistent</SelectItem>
-                  <SelectItem value="allowed">Allowed</SelectItem>
-                  <SelectItem value="warnWhenStale">Warn when stale</SelectItem>
+                  <SelectItem value="backend">Backend only</SelectItem>
+                  <SelectItem value="client">Client writable</SelectItem>
+                  <SelectItem value="external">External system</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="field-derivation-stale">Stale field</FieldLabel>
-              <Input
-                id="field-derivation-stale"
-                className="h-8 text-xs"
-                placeholder="isStale"
-                defaultValue={derivation.staleField ?? ''}
-                onBlur={(ev) =>
-                  update({
-                    derivation: { ...derivation, staleField: ev.target.value.trim() || undefined },
-                  })
-                }
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="field-derivation-confidence">Confidence field</FieldLabel>
-              <Input
-                id="field-derivation-confidence"
-                className="h-8 text-xs"
-                placeholder="confidence"
-                defaultValue={derivation.confidenceField ?? ''}
-                onBlur={(ev) =>
-                  update({
-                    derivation: {
-                      ...derivation,
-                      confidenceField: ev.target.value.trim() || undefined,
-                    },
-                  })
-                }
-              />
             </Field>
           </div>
-        )}
-      </div>
+          <p className="text-xs leading-5 text-muted-foreground">{summary}</p>
+          {derivation && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field className="sm:col-span-2">
+                <FieldLabelWithHelp help="Controls which generated input schemas may author this field. Unchecked boundaries are omitted from their generated inputs.">
+                  Writable by
+                </FieldLabelWithHelp>
+                <div className="flex flex-wrap gap-2">
+                  {DERIVATION_WRITERS.map((writer) => {
+                    const selected = effectiveDerivationWriters(derivation).includes(writer.value);
+                    return (
+                      <CheckboxOption
+                        key={writer.value}
+                        id={`field-derivation-writer-${writer.value}`}
+                        label={writer.label}
+                        description={writer.description}
+                        checked={selected}
+                        onCheckedChange={(checked) => {
+                          const nextDerivation = toggleDerivationWriter(
+                            derivation,
+                            writer.value,
+                            checked === true,
+                          );
+                          if (nextDerivation === derivation) return;
+                          update({ derivation: nextDerivation });
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </Field>
+              <Field className="sm:col-span-2">
+                <FieldLabelWithHelp
+                  htmlFor="field-derivation-sources"
+                  help="Comma-separated field paths that explain or invalidate the value, such as ingredients[].grams or Ingredient.allergens."
+                >
+                  Sources
+                </FieldLabelWithHelp>
+                <Input
+                  id="field-derivation-sources"
+                  className="h-8 text-xs"
+                  placeholder="ingredients[].grams, Ingredient.allergens"
+                  defaultValue={(derivation.sources ?? []).join(', ')}
+                  onBlur={(ev) =>
+                    update({
+                      derivation: {
+                        ...derivation,
+                        sources: parseSourceList(ev.target.value),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field>
+                <FieldLabelWithHelp
+                  htmlFor="field-derivation-refresh"
+                  help="When app code should recompute or refresh the stored value."
+                >
+                  Refresh
+                </FieldLabelWithHelp>
+                <Select
+                  value={derivation.refresh ?? 'none'}
+                  onValueChange={(value) =>
+                    update({
+                      derivation: {
+                        ...derivation,
+                        refresh:
+                          value === 'none' ? undefined : (value as DerivationPolicy['refresh']),
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger id="field-derivation-refresh" className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not declared</SelectItem>
+                    <SelectItem value="onWrite">On write</SelectItem>
+                    <SelectItem value="asyncJob">Async job</SelectItem>
+                    <SelectItem value="onRead">On read</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="frozen">Frozen</SelectItem>
+                    <SelectItem value="external">External</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabelWithHelp
+                  htmlFor="field-derivation-drift"
+                  help="How reviewers and generated guidance should interpret stale or mismatched values."
+                >
+                  Drift policy
+                </FieldLabelWithHelp>
+                <Select
+                  value={derivation.driftPolicy ?? 'none'}
+                  onValueChange={(value) =>
+                    update({
+                      derivation: {
+                        ...derivation,
+                        driftPolicy:
+                          value === 'none' ? undefined : (value as DerivationPolicy['driftPolicy']),
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger id="field-derivation-drift" className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not declared</SelectItem>
+                    <SelectItem value="mustMatch">Must match</SelectItem>
+                    <SelectItem value="eventual">Eventually consistent</SelectItem>
+                    <SelectItem value="allowed">Allowed</SelectItem>
+                    <SelectItem value="warnWhenStale">Warn when stale</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabelWithHelp
+                  htmlFor="field-derivation-stale"
+                  help="Optional boolean field that records whether this derived value may be stale."
+                >
+                  Stale field
+                </FieldLabelWithHelp>
+                <Input
+                  id="field-derivation-stale"
+                  className="h-8 text-xs"
+                  placeholder="isStale"
+                  defaultValue={derivation.staleField ?? ''}
+                  onBlur={(ev) =>
+                    update({
+                      derivation: {
+                        ...derivation,
+                        staleField: ev.target.value.trim() || undefined,
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field>
+                <FieldLabelWithHelp
+                  htmlFor="field-derivation-confidence"
+                  help="Optional numeric or enum field that records confidence, coverage, or certainty for an estimate."
+                >
+                  Confidence field
+                </FieldLabelWithHelp>
+                <Input
+                  id="field-derivation-confidence"
+                  className="h-8 text-xs"
+                  placeholder="confidence"
+                  defaultValue={derivation.confidenceField ?? ''}
+                  onBlur={(ev) =>
+                    update({
+                      derivation: {
+                        ...derivation,
+                        confidenceField: ev.target.value.trim() || undefined,
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </div>
+          )}
+        </div>
+      </TooltipProvider>
     </InspectorRow>
+  );
+}
+
+function FieldLabelWithHelp({
+  htmlFor,
+  help,
+  children,
+}: {
+  htmlFor?: string;
+  help: string;
+  children: React.ReactNode;
+}) {
+  const labelText = typeof children === 'string' ? children : 'field';
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <FieldLabel htmlFor={htmlFor}>{children}</FieldLabel>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            aria-label={`About ${labelText}`}
+          >
+            <CircleHelp className="size-3.5" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-64 text-xs leading-relaxed">
+          {help}
+        </TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -1525,10 +1653,48 @@ function defaultDerivation(kind: DerivationPolicy['kind']): DerivationPolicy {
     case 'cachedHandle':
     case 'rollup':
     case 'estimate':
-      return { kind, owner: 'backend' };
+      return { kind, owner: 'backend', writableBy: ['backend'] };
     case 'snapshot':
-      return { kind, owner: 'backend', refresh: 'frozen', driftPolicy: 'allowed' };
+      return {
+        kind,
+        owner: 'backend',
+        writableBy: ['backend'],
+        refresh: 'frozen',
+        driftPolicy: 'allowed',
+      };
   }
+}
+
+function defaultWritersForOwner(owner: NonNullable<DerivationPolicy['owner']>): DerivationWriter[] {
+  switch (owner) {
+    case 'backend':
+      return ['backend'];
+    case 'client':
+      return ['client', 'agent'];
+    case 'external':
+      return ['external'];
+  }
+}
+
+function effectiveDerivationWriters(derivation: DerivationPolicy): DerivationWriter[] {
+  if (derivation.writableBy) return derivation.writableBy;
+  return defaultWritersForOwner(derivation.owner ?? 'client');
+}
+
+function toggleDerivationWriter(
+  derivation: DerivationPolicy,
+  writer: DerivationWriter,
+  checked: boolean,
+): DerivationPolicy {
+  const current = effectiveDerivationWriters(derivation);
+  const next = checked ? [...new Set([...current, writer])] : current.filter((w) => w !== writer);
+  if (next.length === 0) return derivation;
+  return {
+    ...derivation,
+    writableBy: DERIVATION_WRITERS.map((option) => option.value).filter((value) =>
+      next.includes(value),
+    ),
+  };
 }
 
 function derivationSummary(derivation: DerivationPolicy | undefined): string {
