@@ -312,7 +312,7 @@ function discussReviewItem(item: DomainReviewItem, schema: Schema): void {
     ]
       .filter(Boolean)
       .join('\n'),
-    context: ['## Current IR', '```json', JSON.stringify(schema, null, 2), '```'].join('\n'),
+    context: '',
   });
   useUIChromeStore.getState().setSidebarTab('chat');
   useUIChromeStore.getState().setSidebarVisible(true);

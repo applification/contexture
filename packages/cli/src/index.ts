@@ -789,14 +789,35 @@ async function run(argv: string[]): Promise<void> {
   const tool = tools.get(toolName);
   if (!tool) throw new Error(`Tool "${toolName}" is not registered`);
   const result = await tool.handler(input as Record<string, unknown>);
-  if ('error' in result) {
+  if (isToolError(result)) {
     process.exitCode = 1;
     const error: JsonError = { ok: false, error: { message: result.error, code: 'APPLY_FAILED' } };
     if (options.json) writeJson(error);
     else process.stderr.write(`${result.error}\n`);
     return;
   }
+  if (!isApplySuccess(result)) {
+    throw new Error(`Tool "${toolName}" returned an unexpected result`);
+  }
   writeResult({ message: `${command} applied.`, schema: result.schema }, options.json);
+}
+
+function isToolError(value: unknown): value is { error: string } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error' in value &&
+    typeof (value as { error?: unknown }).error === 'string'
+  );
+}
+
+function isApplySuccess(value: unknown): value is { schema: Schema } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'schema' in value &&
+    IRSchema.safeParse((value as { schema?: unknown }).schema).success
+  );
 }
 
 function formatZodIssues(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {

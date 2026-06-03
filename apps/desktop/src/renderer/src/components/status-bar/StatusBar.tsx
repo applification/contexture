@@ -133,7 +133,7 @@ export function StatusBar(): React.JSX.Element {
   function handleFixInChat(error: ValidationError): void {
     useChatComposerStore.getState().setPendingChatMessage({
       message: validationChatPrompt(error),
-      context: ['## Current IR', '```json', JSON.stringify(schema, null, 2), '```'].join('\n'),
+      context: '',
     });
     useUIChromeStore.getState().setSidebarTab('chat');
     useUIChromeStore.getState().setSidebarVisible(true);

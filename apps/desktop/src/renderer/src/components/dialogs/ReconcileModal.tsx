@@ -313,15 +313,9 @@ export function ReconcileModal(): React.JSX.Element {
   }, [filePath, targetPath, targetKind, currentEmit, schema, close, setError]);
 
   const handleOpenInChat = useCallback(() => {
-    const irJson = JSON.stringify(schema, null, 2);
     const opsJson = JSON.stringify(proposedOps, null, 2);
     const message = [
-      `Help me reconcile a drift in \`${displayName}\`. Context follows.`,
-      '',
-      '## Current IR',
-      '```json',
-      irJson,
-      '```',
+      `Help me reconcile a drift in \`${displayName}\`. Use the current schema inspection tools for the live IR; context follows.`,
       '',
       `## Hand-edited \`${displayName}\``,
       '```',
@@ -354,7 +348,7 @@ export function ReconcileModal(): React.JSX.Element {
     useUIChromeStore.getState().setSidebarTab('chat');
     useUIChromeStore.getState().setSidebarVisible(true);
     close();
-  }, [schema, proposedOps, onDiskSource, displayName, filePath, history, close]);
+  }, [proposedOps, onDiskSource, displayName, filePath, history, close]);
 
   const handleOpenFile = useCallback(() => {
     if (!targetPath) return;

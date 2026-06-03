@@ -701,7 +701,10 @@ async function applyTypedContextureOp(
 
   try {
     const result = await tool.handler(toolArgs);
-    if ('error' in result) return { path, applied: false, opKind, error: result.error };
+    if (isToolError(result)) return { path, applied: false, opKind, error: result.error };
+    if (!isApplySuccess(result)) {
+      return { path, applied: false, opKind, error: `unexpected result from op tool: ${opKind}` };
+    }
     return {
       path,
       applied: true,
@@ -716,6 +719,33 @@ async function applyTypedContextureOp(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+function isToolError(value: unknown): value is { error: string } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error' in value &&
+    typeof (value as { error?: unknown }).error === 'string'
+  );
+}
+
+function isApplySuccess(value: unknown): value is { schema: Schema } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'schema' in value &&
+    isSchemaLike((value as { schema?: unknown }).schema)
+  );
+}
+
+function isSchemaLike(value: unknown): value is Schema {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as { version?: unknown }).version === '1' &&
+    Array.isArray((value as { types?: unknown }).types)
+  );
 }
 
 function buildIntegrationGuidance(

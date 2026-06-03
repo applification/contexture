@@ -77,7 +77,7 @@ describe('StatusBar validation repairs', () => {
     );
   });
 
-  it('opens a validation issue in chat with IR context', () => {
+  it('opens a validation issue in chat without duplicating IR context', () => {
     seed({
       version: '1',
       types: [
@@ -107,7 +107,7 @@ describe('StatusBar validation repairs', () => {
     const pending = useChatComposerStore.getState().pendingChatMessage;
     expect(pending?.message).toContain('Code: operational_timezone_missing');
     expect(pending?.message).toContain('Path: types.0.fields');
-    expect(pending?.context).toContain('"name": "PantryItem"');
+    expect(pending?.context).toBe('');
   });
 
   it('does not offer duplicate enum value repair without index-addressed ops', () => {

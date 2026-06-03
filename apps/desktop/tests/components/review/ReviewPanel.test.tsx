@@ -83,7 +83,7 @@ describe('ReviewPanel', () => {
     expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain(
       'Review this Contexture domain decision: Bounded array scan',
     );
-    expect(useChatComposerStore.getState().pendingChatMessage?.context).toContain('## Current IR');
+    expect(useChatComposerStore.getState().pendingChatMessage?.context).toBe('');
     expect(useUIChromeStore.getState().sidebarTab).toBe('chat');
   });
 });

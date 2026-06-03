@@ -33,13 +33,14 @@ import { type ApplyResult, type Op, OpSchema } from './ops';
  * window's `webContents`.
  */
 export type ForwardOp = (op: Op) => Promise<ApplyResult>;
+export type ToolHandlerResult = ApplyResult | unknown;
 
 export interface OpToolDescriptor {
   name: string;
   description: string;
   /** A Zod *raw shape* as expected by the Agent SDK `tool()` factory. */
   inputSchema: Record<string, ZodTypeAny>;
-  handler: (args: Record<string, unknown>) => Promise<ApplyResult>;
+  handler: (args: Record<string, unknown>) => Promise<ToolHandlerResult>;
 }
 
 // ---- Field-type + field-def schemas (shared across strict ops) ---------

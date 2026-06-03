@@ -571,7 +571,7 @@ function buildSchemaOnlyInstructions(): string {
     'Use only the Contexture schema tools provided by this client.',
     'Do not read files, write files, run shell commands, browse, or mutate a repository.',
     'You may use file contents explicitly attached inside the user message as context.',
-    'Treat the current Contexture IR in the user message as authoritative.',
+    'Inspect the current Contexture schema through the provided read-only schema tools before making or discussing model changes.',
     '',
     buildSystemPromptAppend({ stdlibRegistry: SYSTEM_PROMPT_STDLIB }),
   ].join('\n');
