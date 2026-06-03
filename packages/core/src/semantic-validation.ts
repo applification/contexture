@@ -1194,14 +1194,18 @@ function isLikelyClientSurfaceEnum(
   owner: ObjectType,
   schema: Schema,
 ): boolean {
-  const haystack = `${schema.metadata?.description ?? ''} ${owner.description ?? ''} ${
+  const surfaceText = `${schema.metadata?.description ?? ''} ${owner.description ?? ''} ${
     field.description ?? ''
-  } ${owner.name} ${field.name} ${enumName}`.toLowerCase();
-  return (
-    /\b(client|mobile|web|api|surface|status|equipment|allergen|dietary|profile|cooking)\b/u.test(
-      haystack,
-    ) && /^(.*Status|Equipment|CookingMethod|Allergen|DietaryProfile)$/u.test(enumName)
-  );
+  }`.toLowerCase();
+  const names = `${owner.name} ${field.name} ${enumName}`;
+  const clientSurface = /\b(client|mobile|web|api|surface)\b/u.test(surfaceText);
+  if (
+    clientSurface &&
+    /^(.*Status|Equipment|CookingMethod|Allergen|DietaryProfile)$/u.test(enumName)
+  ) {
+    return true;
+  }
+  return /^(Equipment|CookingMethod|Allergen|DietaryProfile)$/u.test(names);
 }
 
 function hasUpdatedAtField(type: ObjectType): boolean {

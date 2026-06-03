@@ -1031,6 +1031,25 @@ describe('checkSemantic — operational advice', () => {
     ]);
   });
 
+  it('does not warn for ordinary status enums without client-surface context', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'enum', name: 'PostStatus', values: [{ value: 'draft' }, { value: 'live' }] },
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [{ name: 'status', type: { kind: 'ref', typeName: 'PostStatus' } }],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).not.toContain(
+      'operational_enum_evolution',
+    );
+  });
+
   it('warns when collaborative array edits have updatedAt but no conflict token', () => {
     const schema: Schema = {
       version: '1',
