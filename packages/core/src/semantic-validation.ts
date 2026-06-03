@@ -35,9 +35,17 @@ export type SemanticIssueCode =
   | 'duplicate_alias'
   | 'duplicate_type_name'
   | 'duplicate_field_name'
+  | 'object_extends_not_found'
+  | 'object_extends_non_object'
+  | 'object_extends_cycle'
+  | 'object_extends_duplicate_field'
   | 'discriminator_variant_not_found'
   | 'discriminator_variant_not_object'
   | 'discriminator_missing_on_variant'
+  | 'invariant_duplicate_name'
+  | 'invariant_unknown_field'
+  | 'invariant_unknown_array_field'
+  | 'invariant_array_target_not_object'
   | 'enum_empty'
   | 'enum_duplicate_value'
   | 'duplicate_convex_table_name'
@@ -73,6 +81,8 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
     ...checkDuplicateFieldNames(schema),
+    ...checkObjectExtends(schema),
+    ...checkObjectInvariants(schema),
     ...checkDuplicateConvexTableNames(schema),
     ...checkConvexTableShapes(schema),
     ...checkDerivations(schema),
@@ -652,6 +662,213 @@ function checkDuplicateFieldNames(schema: Schema): SemanticIssueDraft[] {
   return issues;
 }
 
+function checkObjectExtends(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const byName = new Map(schema.types.map((type) => [type.name, type]));
+
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object') return;
+    type.extends?.forEach((baseName, baseIndex) => {
+      const base = byName.get(baseName);
+      const path = `types.${typeIndex}.extends.${baseIndex}`;
+      if (!base) {
+        issues.push({
+          code: 'object_extends_not_found',
+          path,
+          message: `Object "${type.name}" extends missing type "${baseName}".`,
+        });
+        return;
+      }
+      if (base.kind !== 'object') {
+        issues.push({
+          code: 'object_extends_non_object',
+          path,
+          message: `Object "${type.name}" can only extend object types; "${baseName}" is a ${base.kind}.`,
+        });
+      }
+    });
+
+    const cycle = findExtendsCycle(type, byName);
+    if (cycle) {
+      issues.push({
+        code: 'object_extends_cycle',
+        path: `types.${typeIndex}.extends`,
+        message: `Object inheritance cycle detected: ${cycle.join(' -> ')}.`,
+      });
+    }
+
+    const inheritedFields = new Set(effectiveFields(type, byName, { includeOwn: false }).keys());
+    type.fields.forEach((field, fieldIndex) => {
+      if (!inheritedFields.has(field.name)) return;
+      issues.push({
+        code: 'object_extends_duplicate_field',
+        path: `types.${typeIndex}.fields.${fieldIndex}.name`,
+        message: `Field "${field.name}" on "${type.name}" is already inherited from an extended object.`,
+        hint: 'Rename the field or remove it from either the child object or its base object.',
+      });
+    });
+  });
+
+  return issues;
+}
+
+function findExtendsCycle(type: ObjectType, byName: ReadonlyMap<string, TypeDef>): string[] | null {
+  const path: string[] = [];
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(current: ObjectType): string[] | null {
+    if (visiting.has(current.name)) {
+      const cycleStart = path.indexOf(current.name);
+      return [...path.slice(Math.max(0, cycleStart)), current.name];
+    }
+    if (visited.has(current.name)) return null;
+    visiting.add(current.name);
+    path.push(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = byName.get(baseName);
+      if (base?.kind !== 'object') continue;
+      const cycle = visit(base);
+      if (cycle) return cycle;
+    }
+    path.pop();
+    visiting.delete(current.name);
+    visited.add(current.name);
+    return null;
+  }
+
+  return visit(type);
+}
+
+function checkObjectInvariants(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const byName = new Map(schema.types.map((type) => [type.name, type]));
+
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object') return;
+    const invariants = type.invariants ?? [];
+    const names = new Set<string>();
+    const fields = effectiveFields(type, byName);
+
+    invariants.forEach((invariant, invariantIndex) => {
+      const path = `types.${typeIndex}.invariants.${invariantIndex}`;
+      if (names.has(invariant.name)) {
+        issues.push({
+          code: 'invariant_duplicate_name',
+          path: `${path}.name`,
+          message: `Duplicate invariant name "${invariant.name}" in "${type.name}".`,
+        });
+      }
+      names.add(invariant.name);
+
+      const checkField = (fieldName: string, propertyPath: string) => {
+        if (fields.has(fieldName)) return;
+        issues.push({
+          code: 'invariant_unknown_field',
+          path: `${path}.${propertyPath}`,
+          message: `Invariant "${invariant.name}" references missing field "${fieldName}" on "${type.name}".`,
+        });
+      };
+
+      switch (invariant.kind) {
+        case 'requiresWhen':
+          checkField(invariant.when.field, 'when.field');
+          invariant.requires?.forEach((fieldName, fieldIndex) => {
+            checkField(fieldName, `requires.${fieldIndex}`);
+          });
+          invariant.forbids?.forEach((fieldName, fieldIndex) => {
+            checkField(fieldName, `forbids.${fieldIndex}`);
+          });
+          break;
+        case 'exactlyOneOf':
+        case 'mutuallyExclusive':
+          invariant.fields.forEach((fieldName, fieldIndex) => {
+            checkField(fieldName, `fields.${fieldIndex}`);
+          });
+          break;
+        case 'fieldPredicate':
+          checkField(invariant.field, 'field');
+          break;
+        case 'uniqueInArray': {
+          const arrayField = fields.get(invariant.arrayField);
+          if (!arrayField) {
+            issues.push({
+              code: 'invariant_unknown_array_field',
+              path: `${path}.arrayField`,
+              message: `Invariant "${invariant.name}" references missing array field "${invariant.arrayField}" on "${type.name}".`,
+            });
+            break;
+          }
+          const elementObject = arrayElementObject(arrayField.type, byName);
+          if (!elementObject) {
+            issues.push({
+              code: 'invariant_array_target_not_object',
+              path: `${path}.arrayField`,
+              message: `Invariant "${invariant.name}" requires "${invariant.arrayField}" to be an array of object values.`,
+              hint: 'Use an array of object refs or move the invariant to the child table/mutation layer.',
+            });
+            break;
+          }
+          const elementFields = effectiveFields(elementObject, byName);
+          if (!elementFields.has(invariant.uniqueField)) {
+            issues.push({
+              code: 'invariant_unknown_field',
+              path: `${path}.uniqueField`,
+              message: `Invariant "${invariant.name}" references missing field "${invariant.uniqueField}" on array element "${elementObject.name}".`,
+            });
+          }
+          if (invariant.where && !elementFields.has(invariant.where.field)) {
+            issues.push({
+              code: 'invariant_unknown_field',
+              path: `${path}.where.field`,
+              message: `Invariant "${invariant.name}" references missing field "${invariant.where.field}" on array element "${elementObject.name}".`,
+            });
+          }
+          break;
+        }
+      }
+    });
+  });
+
+  return issues;
+}
+
+function effectiveFields(
+  type: ObjectType,
+  byName: ReadonlyMap<string, TypeDef>,
+  options: { includeOwn?: boolean } = {},
+): Map<string, ObjectType['fields'][number]> {
+  const includeOwn = options.includeOwn !== false;
+  const fields = new Map<string, ObjectType['fields'][number]>();
+  const seen = new Set<string>();
+
+  function addFrom(current: ObjectType): void {
+    if (seen.has(current.name)) return;
+    seen.add(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = byName.get(baseName);
+      if (base?.kind === 'object') addFrom(base);
+    }
+    if (current !== type || includeOwn) {
+      for (const field of current.fields) fields.set(field.name, field);
+    }
+  }
+
+  addFrom(type);
+  return fields;
+}
+
+function arrayElementObject(
+  type: FieldType,
+  byName: ReadonlyMap<string, TypeDef>,
+): ObjectType | null {
+  if (type.kind !== 'array') return null;
+  const element = type.element;
+  if (element.kind !== 'ref') return null;
+  const target = byName.get(element.typeName);
+  return target?.kind === 'object' ? target : null;
+}
+
 function checkDiscriminatedUnions(schema: Schema): SemanticIssueDraft[] {
   const issues: SemanticIssueDraft[] = [];
   const byName = new Map(schema.types.map((t) => [t.name, t]));
@@ -677,7 +894,7 @@ function checkDiscriminatedUnions(schema: Schema): SemanticIssueDraft[] {
         });
         return;
       }
-      if (!variant.fields.some((f) => f.name === type.discriminator)) {
+      if (!effectiveFields(variant, byName).has(type.discriminator)) {
         issues.push({
           code: 'discriminator_missing_on_variant',
           path,

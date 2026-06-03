@@ -23,8 +23,23 @@
  */
 
 import { type ZodError, z } from 'zod';
-import type { FieldDef, FieldType, ImportDecl, IndexDef, Schema, TypeDef } from './ir';
-import { FieldDefSchema, IndexDefSchema, IRSchema, IRSchemaObject, TypeDefSchema } from './ir';
+import type {
+  FieldDef,
+  FieldType,
+  ImportDecl,
+  IndexDef,
+  ObjectInvariant,
+  Schema,
+  TypeDef,
+} from './ir';
+import {
+  FieldDefSchema,
+  IndexDefSchema,
+  IRSchema,
+  IRSchemaObject,
+  ObjectInvariantSchema,
+  TypeDefSchema,
+} from './ir';
 import {
   checkSemantic,
   newIssues,
@@ -46,6 +61,14 @@ export type Op =
   | { kind: 'add_field'; typeName: string; field: FieldDef; index?: number }
   | { kind: 'update_field'; typeName: string; fieldName: string; patch: Partial<FieldDef> }
   | { kind: 'remove_field'; typeName: string; fieldName: string }
+  | { kind: 'add_invariant'; typeName: string; invariant: ObjectInvariant; index?: number }
+  | {
+      kind: 'update_invariant';
+      typeName: string;
+      name: string;
+      patch: Partial<ObjectInvariant>;
+    }
+  | { kind: 'remove_invariant'; typeName: string; name: string }
   | { kind: 'add_value'; typeName: string; value: string; description?: string }
   | {
       kind: 'update_value';
@@ -112,6 +135,23 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
     kind: z.literal('remove_field'),
     typeName: z.string().min(1),
     fieldName: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('add_invariant'),
+    typeName: z.string().min(1),
+    invariant: ObjectInvariantSchema,
+    index: z.number().int().optional(),
+  }),
+  z.object({
+    kind: z.literal('update_invariant'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
+    patch: z.record(z.string(), z.unknown()),
+  }),
+  z.object({
+    kind: z.literal('remove_invariant'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
   }),
   z.object({
     kind: z.literal('add_value'),
@@ -266,6 +306,12 @@ function applyStructural(schema: Schema, op: Op): ApplyResult {
       return updateField(schema, op.typeName, op.fieldName, op.patch);
     case 'remove_field':
       return removeField(schema, op.typeName, op.fieldName);
+    case 'add_invariant':
+      return addInvariant(schema, op.typeName, op.invariant, op.index);
+    case 'update_invariant':
+      return updateInvariant(schema, op.typeName, op.name, op.patch);
+    case 'remove_invariant':
+      return removeInvariant(schema, op.typeName, op.name);
     case 'add_value':
       return addValue(schema, op.typeName, op.value, op.description);
     case 'update_value':
@@ -343,6 +389,7 @@ function renameType(schema: Schema, from: string, to: string): ApplyResult {
     if (renamed.kind === 'object') {
       return {
         ...renamed,
+        extends: renamed.extends?.map((name) => (name === from ? to : name)),
         fields: renamed.fields.map((f) => ({ ...f, type: renameFieldType(f.type) })),
       };
     }
@@ -423,14 +470,21 @@ function updateField(
     }
     const fields = [...t.fields];
     fields[fi] = { ...field, ...patch };
+    const nextFieldName = patch.name;
+    const invariants =
+      nextFieldName && nextFieldName !== fieldName
+        ? t.invariants?.map((invariant) =>
+            renameInvariantField(invariant, fieldName, nextFieldName),
+          )
+        : t.invariants;
     const indexes =
-      patch.name && patch.name !== fieldName
+      nextFieldName && nextFieldName !== fieldName
         ? t.indexes?.map((index) => ({
             ...index,
-            fields: index.fields.map((name) => (name === fieldName ? (patch.name ?? name) : name)),
+            fields: index.fields.map((name) => (name === fieldName ? nextFieldName : name)),
           }))
         : t.indexes;
-    return { ...t, fields, indexes };
+    return { ...t, fields, indexes, invariants };
   });
 }
 
@@ -448,6 +502,7 @@ function removeField(schema: Schema, typeName: string, fieldName: string): Apply
     return {
       ...t,
       fields: t.fields.filter((f) => f.name !== fieldName),
+      invariants: t.invariants?.map((invariant) => removeInvariantField(invariant, fieldName)),
       indexes: indexes.length > 0 ? indexes : undefined,
     };
   });
@@ -467,6 +522,115 @@ function reorderFields(schema: Schema, typeName: string, order: string[]): Apply
     }
     return { ...t, fields: next };
   });
+}
+
+// ── invariants ──────────────────────────────────────────────────────────
+
+function addInvariant(
+  schema: Schema,
+  typeName: string,
+  invariant: ObjectInvariant,
+  index: number | undefined,
+): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.invariants ?? [];
+    if (existing.some((candidate) => candidate.name === invariant.name)) {
+      return { error: `invariant "${invariant.name}" already exists on "${typeName}"` };
+    }
+    const invariants = [...existing];
+    if (index === undefined) invariants.push(invariant);
+    else invariants.splice(index, 0, invariant);
+    return { ...t, invariants };
+  });
+}
+
+function updateInvariant(
+  schema: Schema,
+  typeName: string,
+  name: string,
+  patch: Partial<ObjectInvariant>,
+): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.invariants ?? [];
+    const idx = existing.findIndex((candidate) => candidate.name === name);
+    if (idx === -1) return { error: `invariant "${name}" not found on "${typeName}"` };
+    const invariant = existing[idx];
+    if (!invariant) return { error: `invariant "${name}" not found on "${typeName}"` };
+    const nextName = patch.name ?? invariant.name;
+    if (nextName !== name && existing.some((candidate) => candidate.name === nextName)) {
+      return { error: `invariant "${nextName}" already exists on "${typeName}"` };
+    }
+    const invariants = [...existing];
+    invariants[idx] = { ...invariant, ...patch } as ObjectInvariant;
+    return { ...t, invariants };
+  });
+}
+
+function removeInvariant(schema: Schema, typeName: string, name: string): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.invariants ?? [];
+    if (!existing.some((candidate) => candidate.name === name)) {
+      return { error: `invariant "${name}" not found on "${typeName}"` };
+    }
+    const invariants = existing.filter((candidate) => candidate.name !== name);
+    if (invariants.length > 0) return { ...t, invariants };
+    const { invariants: _removed, ...rest } = t;
+    return rest;
+  });
+}
+
+function renameInvariantField(
+  invariant: ObjectInvariant,
+  from: string,
+  to: string,
+): ObjectInvariant {
+  switch (invariant.kind) {
+    case 'requiresWhen':
+      return {
+        ...invariant,
+        when: renameConditionField(invariant.when, from, to),
+        requires: invariant.requires?.map((field) => (field === from ? to : field)),
+        forbids: invariant.forbids?.map((field) => (field === from ? to : field)),
+      };
+    case 'exactlyOneOf':
+    case 'mutuallyExclusive':
+      return {
+        ...invariant,
+        fields: invariant.fields.map((field) => (field === from ? to : field)),
+      };
+    case 'fieldPredicate':
+      return { ...invariant, field: invariant.field === from ? to : invariant.field };
+    case 'uniqueInArray':
+      return {
+        ...invariant,
+        arrayField: invariant.arrayField === from ? to : invariant.arrayField,
+      };
+  }
+}
+
+function removeInvariantField(invariant: ObjectInvariant, fieldName: string): ObjectInvariant {
+  switch (invariant.kind) {
+    case 'requiresWhen':
+      return {
+        ...invariant,
+        requires: invariant.requires?.filter((field) => field !== fieldName),
+        forbids: invariant.forbids?.filter((field) => field !== fieldName),
+      };
+    case 'exactlyOneOf':
+    case 'mutuallyExclusive':
+      return { ...invariant, fields: invariant.fields.filter((field) => field !== fieldName) };
+    case 'fieldPredicate':
+    case 'uniqueInArray':
+      return invariant;
+  }
+}
+
+function renameConditionField(
+  condition: { field: string; equals: string | number | boolean },
+  from: string,
+  to: string,
+): { field: string; equals: string | number | boolean } {
+  return condition.field === from ? { ...condition, field: to } : condition;
 }
 
 // ── enum values ──────────────────────────────────────────────────────────

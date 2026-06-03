@@ -134,11 +134,76 @@ export const IndexDefSchema = z.object({
 
 export type IndexDef = z.infer<typeof IndexDefSchema>;
 
+const FieldConditionSchema = z.object({
+  field: z.string().min(1),
+  equals: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+const RequiresWhenInvariantSchema = z.object({
+  kind: z.literal('requiresWhen'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  when: FieldConditionSchema,
+  requires: z.array(z.string().min(1)).optional(),
+  forbids: z.array(z.string().min(1)).optional(),
+});
+
+const ExactlyOneOfInvariantSchema = z.object({
+  kind: z.literal('exactlyOneOf'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  fields: z.array(z.string().min(1)).min(2),
+});
+
+const MutuallyExclusiveInvariantSchema = z.object({
+  kind: z.literal('mutuallyExclusive'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  fields: z.array(z.string().min(1)).min(2),
+});
+
+const FieldPredicateSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('weekday'),
+    value: z.enum(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']),
+  }),
+  z.object({ kind: z.literal('nonEmptyTrimmedString') }),
+]);
+
+const FieldPredicateInvariantSchema = z.object({
+  kind: z.literal('fieldPredicate'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  field: z.string().min(1),
+  predicate: FieldPredicateSchema,
+});
+
+const UniqueInArrayInvariantSchema = z.object({
+  kind: z.literal('uniqueInArray'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  arrayField: z.string().min(1),
+  uniqueField: z.string().min(1),
+  where: FieldConditionSchema.optional(),
+});
+
+export const ObjectInvariantSchema = z.discriminatedUnion('kind', [
+  RequiresWhenInvariantSchema,
+  ExactlyOneOfInvariantSchema,
+  MutuallyExclusiveInvariantSchema,
+  FieldPredicateInvariantSchema,
+  UniqueInArrayInvariantSchema,
+]);
+
+export type ObjectInvariant = z.infer<typeof ObjectInvariantSchema>;
+
 const ObjectTypeDefSchema = z.object({
   kind: z.literal('object'),
   name: z.string().min(1),
   description: z.string().optional(),
+  extends: z.array(z.string().min(1)).optional(),
   fields: z.array(FieldDefSchema),
+  invariants: z.array(ObjectInvariantSchema).optional(),
   table: z.boolean().optional(),
   tableName: z.string().min(1).optional(),
   indexes: z.array(IndexDefSchema).optional(),

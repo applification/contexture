@@ -97,16 +97,21 @@ function emitTypeDef(type: TypeDef, ctx: EmitContext): object {
     case 'object': {
       const properties: Record<string, object> = {};
       const required: string[] = [];
-      for (const field of type.fields) {
+      for (const field of effectiveFields(type, ctx)) {
         if (ctx.options.omitField?.(type, field)) continue;
         properties[field.name] = emitField(field, ctx);
         if (!field.optional) required.push(field.name);
       }
+      const constraints = emitJsonSchemaInvariants(type);
       return {
         type: 'object',
         properties,
         required,
         additionalProperties: false,
+        ...(constraints.length > 0 ? { allOf: constraints } : {}),
+        ...((type.invariants?.length ?? 0) > 0
+          ? { 'x-contexture-invariants': type.invariants }
+          : {}),
       };
     }
     case 'enum':
@@ -119,6 +124,48 @@ function emitTypeDef(type: TypeDef, ctx: EmitContext): object {
     case 'raw':
       return type.jsonSchema as object;
   }
+}
+
+function emitJsonSchemaInvariants(type: Extract<TypeDef, { kind: 'object' }>): object[] {
+  const constraints: object[] = [];
+  for (const invariant of type.invariants ?? []) {
+    switch (invariant.kind) {
+      case 'requiresWhen': {
+        const constraint: Record<string, unknown> = {
+          if: {
+            properties: { [invariant.when.field]: { const: invariant.when.equals } },
+            required: [invariant.when.field],
+          },
+        };
+        constraint[`th${'en'}`] = {
+          ...(invariant.requires?.length ? { required: invariant.requires } : {}),
+          ...(invariant.forbids?.length
+            ? {
+                not: {
+                  anyOf: invariant.forbids.map((field) => ({ required: [field] })),
+                },
+              }
+            : {}),
+        };
+        constraints.push(constraint);
+        break;
+      }
+      case 'exactlyOneOf':
+        constraints.push({ oneOf: invariant.fields.map((field) => ({ required: [field] })) });
+        break;
+      case 'mutuallyExclusive':
+        for (let i = 0; i < invariant.fields.length; i += 1) {
+          for (let j = i + 1; j < invariant.fields.length; j += 1) {
+            constraints.push({ not: { required: [invariant.fields[i], invariant.fields[j]] } });
+          }
+        }
+        break;
+      case 'fieldPredicate':
+      case 'uniqueInArray':
+        break;
+    }
+  }
+  return constraints;
 }
 
 function emitField(field: FieldDef, ctx: EmitContext): object {
@@ -207,4 +254,22 @@ function collectStdlibAliases(t: FieldType, ensure: (alias: string) => void): vo
   } else if (t.kind === 'array') {
     collectStdlibAliases(t.element, ensure);
   }
+}
+
+function effectiveFields(type: Extract<TypeDef, { kind: 'object' }>, ctx: EmitContext): FieldDef[] {
+  const fields = new Map<string, FieldDef>();
+  const seen = new Set<string>();
+
+  function addFrom(current: Extract<TypeDef, { kind: 'object' }>): void {
+    if (seen.has(current.name)) return;
+    seen.add(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = ctx.types.get(baseName);
+      if (base?.kind === 'object') addFrom(base);
+    }
+    for (const field of current.fields) fields.set(field.name, field);
+  }
+
+  addFrom(type);
+  return [...fields.values()];
 }

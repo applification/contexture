@@ -471,6 +471,45 @@ describe('@contexture/cli', () => {
     expect(ir.types[0].fields).toEqual([{ name: 'body', type: { kind: 'string' } }]);
   });
 
+  it('add-invariant adds an object invariant through the typed CLI command', async () => {
+    const { dir, irPath } = await fixtureProject();
+    await runCli(dir, [
+      'add-field',
+      'Post',
+      'email',
+      JSON.stringify({ kind: 'string' }),
+      '--optional',
+    ]);
+    await runCli(dir, [
+      'add-field',
+      'Post',
+      'phone',
+      JSON.stringify({ kind: 'string' }),
+      '--optional',
+    ]);
+
+    const result = await runCli(dir, [
+      'add-invariant',
+      'Post',
+      JSON.stringify({
+        kind: 'exactlyOneOf',
+        name: 'one_contact_method',
+        fields: ['email', 'phone'],
+      }),
+      '--json',
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      message: 'add-invariant applied.',
+    });
+    const ir = JSON.parse(await readFile(irPath, 'utf8'));
+    expect(ir.types[0].invariants).toEqual([
+      { kind: 'exactlyOneOf', name: 'one_contact_method', fields: ['email', 'phone'] },
+    ]);
+  });
+
   it('apply rejects ops with semantic errors', async () => {
     const { dir } = await fixtureProject();
     const op = JSON.stringify({ kind: 'remove_field', typeName: 'Post', fieldName: 'nope' });

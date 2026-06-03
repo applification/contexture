@@ -24,7 +24,7 @@
  */
 
 import { type ZodTypeAny, z } from 'zod';
-import { IRSchema, IRSchemaObject } from './ir';
+import { IRSchema, IRSchemaObject, ObjectInvariantSchema } from './ir';
 import { type ApplyResult, type Op, OpSchema } from './ops';
 
 /**
@@ -250,6 +250,8 @@ const TypeDefAliasSchema = {
   table: z.boolean().optional(),
   tableName: z.string().optional(),
   indexes: z.array(z.unknown()).optional(),
+  extends: z.array(z.string()).optional(),
+  invariants: z.array(z.unknown()).optional(),
   values: z.array(z.unknown()).optional(),
   discriminator: z.string().optional(),
   variants: z.array(z.unknown()).optional(),
@@ -336,6 +338,45 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
       'Remove a field by name.',
       { typeName: z.string().min(1), fieldName: z.string().min(1) },
       ({ typeName, fieldName }) => ({ kind: 'remove_field', typeName, fieldName }),
+      forward,
+    ),
+    strictTool(
+      'add_invariant',
+      'Add an object-level invariant such as requiresWhen, exactlyOneOf, mutuallyExclusive, fieldPredicate, or uniqueInArray.',
+      {
+        typeName: z.string().min(1),
+        invariant: ObjectInvariantSchema,
+        index: z.number().int().optional(),
+      },
+      ({ typeName, invariant, index }) => ({
+        kind: 'add_invariant',
+        typeName,
+        invariant,
+        index,
+      }),
+      forward,
+    ),
+    strictTool(
+      'update_invariant',
+      'Update an object-level invariant by name.',
+      {
+        typeName: z.string().min(1),
+        name: z.string().min(1),
+        patch: z.record(z.string(), z.unknown()),
+      },
+      ({ typeName, name, patch }) => ({
+        kind: 'update_invariant',
+        typeName,
+        name,
+        patch,
+      }),
+      forward,
+    ),
+    strictTool(
+      'remove_invariant',
+      'Remove an object-level invariant by name.',
+      { typeName: z.string().min(1), name: z.string().min(1) },
+      ({ typeName, name }) => ({ kind: 'remove_invariant', typeName, name }),
       forward,
     ),
     strictTool(

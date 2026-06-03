@@ -24,7 +24,7 @@
  * Rule 7 of the semantic validator (`services/validation.ts`) will ultimately
  * sandbox-eval this output to catch emit regressions.
  */
-import type { FieldDef, FieldType, ImportDecl, Schema, TypeDef } from './ir';
+import type { FieldDef, FieldType, ImportDecl, ObjectInvariant, Schema, TypeDef } from './ir';
 
 export interface EmitOptions {
   /** Namespaces (e.g. `'place'`, `'money'`) treated as ambient stdlib. */
@@ -155,9 +155,12 @@ function emitTypeDef(type: TypeDef, ctx: EmitContext): string {
   const infer = `export type ${type.name} = z.infer<typeof ${type.name}>;\n`;
 
   if (type.kind === 'object') {
-    const fields = type.fields.map((f) => `  ${f.name}: ${emitField(f, ctx)},\n`).join('');
+    const fields = effectiveFields(type, ctx)
+      .map((f) => `  ${f.name}: ${emitField(f, ctx)},\n`)
+      .join('');
     const body = fields ? `{\n${fields}}` : `{}`;
-    return `\nexport const ${type.name} = z.object(${body});\n${infer}`;
+    const base = `z.object(${body})`;
+    return `\nexport const ${type.name} = ${emitInvariantRefinements(base, type)};\n${infer}`;
   }
 
   if (type.kind === 'enum') {
@@ -180,6 +183,96 @@ function emitTypeDef(type: TypeDef, ctx: EmitContext): string {
     return `\nexport { ${type.name} };\n${infer}`;
   }
   return `\nexport const ${type.name} = ${type.zod};\n${infer}`;
+}
+
+function emitInvariantRefinements(
+  base: string,
+  type: Extract<TypeDef, { kind: 'object' }>,
+): string {
+  const invariants = type.invariants ?? [];
+  if (invariants.length === 0) return base;
+  const checks = invariants.map((invariant) => emitInvariantCheck(invariant)).join('\n');
+  return `${base}.superRefine((value, ctx) => {\n${checks}\n})`;
+}
+
+function emitInvariantCheck(invariant: ObjectInvariant): string {
+  switch (invariant.kind) {
+    case 'requiresWhen': {
+      const lines: string[] = [];
+      lines.push(
+        `  if (value.${invariant.when.field} === ${renderLiteral(invariant.when.equals)}) {`,
+      );
+      for (const field of invariant.requires ?? []) {
+        lines.push(
+          `    if (value.${field} === undefined || value.${field} === null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${field}'], message: 'Invariant "${invariant.name}" requires "${field}".' });`,
+        );
+      }
+      for (const field of invariant.forbids ?? []) {
+        lines.push(
+          `    if (value.${field} !== undefined && value.${field} !== null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${field}'], message: 'Invariant "${invariant.name}" forbids "${field}".' });`,
+        );
+      }
+      lines.push('  }');
+      return lines.join('\n');
+    }
+    case 'exactlyOneOf': {
+      const fields = invariant.fields.map((field) => `'${field}'`).join(', ');
+      return `  if ([${fields}].filter((field) => (value as Record<string, unknown>)[field] !== undefined && (value as Record<string, unknown>)[field] !== null).length !== 1) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [], message: 'Invariant "${invariant.name}" requires exactly one of: ${invariant.fields.join(', ')}.' });`;
+    }
+    case 'mutuallyExclusive': {
+      const fields = invariant.fields.map((field) => `'${field}'`).join(', ');
+      return `  if ([${fields}].filter((field) => (value as Record<string, unknown>)[field] !== undefined && (value as Record<string, unknown>)[field] !== null).length > 1) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [], message: 'Invariant "${invariant.name}" allows at most one of: ${invariant.fields.join(', ')}.' });`;
+    }
+    case 'fieldPredicate':
+      return emitFieldPredicateCheck(invariant);
+    case 'uniqueInArray':
+      return emitUniqueInArrayCheck(invariant);
+  }
+}
+
+function emitFieldPredicateCheck(
+  invariant: Extract<ObjectInvariant, { kind: 'fieldPredicate' }>,
+): string {
+  if (invariant.predicate.kind === 'nonEmptyTrimmedString') {
+    return `  if (typeof value.${invariant.field} !== 'string' || value.${invariant.field}.trim().length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${invariant.field}'], message: 'Invariant "${invariant.name}" requires a non-empty trimmed string.' });`;
+  }
+  const weekday = weekdayIndex(invariant.predicate.value);
+  return [
+    `  {`,
+    `    const candidate = value.${invariant.field};`,
+    `    const date = candidate instanceof Date ? candidate : new Date(candidate);`,
+    `    if (Number.isNaN(date.getTime()) || date.getUTCDay() !== ${weekday}) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${invariant.field}'], message: 'Invariant "${invariant.name}" requires ${invariant.field} to fall on ${invariant.predicate.value}.' });`,
+    `  }`,
+  ].join('\n');
+}
+
+function emitUniqueInArrayCheck(
+  invariant: Extract<ObjectInvariant, { kind: 'uniqueInArray' }>,
+): string {
+  const lines: string[] = [];
+  const where = invariant.where
+    ? `item?.${invariant.where.field} === ${renderLiteral(invariant.where.equals)}`
+    : 'true';
+  lines.push(`  {`);
+  lines.push(`    const seen = new Set();`);
+  lines.push(`    for (let index = 0; index < value.${invariant.arrayField}.length; index += 1) {`);
+  lines.push(`      const item = value.${invariant.arrayField}[index] as Record<string, unknown>;`);
+  lines.push(`      if (!(${where})) continue;`);
+  lines.push(`      const key = item?.${invariant.uniqueField};`);
+  lines.push(`      if (key === undefined || key === null) continue;`);
+  lines.push(
+    `      if (seen.has(key)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${invariant.arrayField}', index, '${invariant.uniqueField}'], message: 'Invariant "${invariant.name}" requires unique "${invariant.uniqueField}" values.' });`,
+  );
+  lines.push(`      seen.add(key);`);
+  lines.push(`    }`);
+  lines.push(`  }`);
+  return lines.join('\n');
+}
+
+function weekdayIndex(value: string): number {
+  return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(
+    String(value),
+  );
 }
 
 function emitField(field: FieldDef, ctx: EmitContext): string {
@@ -270,6 +363,9 @@ function localDependencyNames(type: TypeDef, ctx: EmitContext): string[] {
   const dependencies = new Set<string>();
 
   if (type.kind === 'object') {
+    for (const baseName of type.extends ?? []) {
+      if (ctx.types.has(baseName)) dependencies.add(baseName);
+    }
     for (const field of type.fields) {
       collectLocalDependenciesForType(field.type, ctx, dependencies);
     }
@@ -283,6 +379,24 @@ function localDependencyNames(type: TypeDef, ctx: EmitContext): string[] {
 
   dependencies.delete(type.name);
   return [...dependencies].sort();
+}
+
+function effectiveFields(type: Extract<TypeDef, { kind: 'object' }>, ctx: EmitContext): FieldDef[] {
+  const fields = new Map<string, FieldDef>();
+  const seen = new Set<string>();
+
+  function addFrom(current: Extract<TypeDef, { kind: 'object' }>): void {
+    if (seen.has(current.name)) return;
+    seen.add(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = ctx.types.get(baseName);
+      if (base?.kind === 'object') addFrom(base);
+    }
+    for (const field of current.fields) fields.set(field.name, field);
+  }
+
+  addFrom(type);
+  return [...fields.values()];
 }
 
 function collectLocalDependenciesForType(

@@ -188,6 +188,15 @@ const OP_CATALOGUE: OpSpec[] = [
     shape: '{ typeName: string; fieldName: string; patch: Partial<FieldDef> }',
   },
   { name: 'remove_field', shape: '{ typeName: string; fieldName: string }' },
+  {
+    name: 'add_invariant',
+    shape: '{ typeName: string; invariant: ObjectInvariant; index?: number }',
+  },
+  {
+    name: 'update_invariant',
+    shape: '{ typeName: string; name: string; patch: Partial<ObjectInvariant> }',
+  },
+  { name: 'remove_invariant', shape: '{ typeName: string; name: string }' },
   { name: 'reorder_fields', shape: '{ typeName: string; order: string[] }' },
   {
     name: 'add_value',
