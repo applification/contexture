@@ -419,6 +419,7 @@ describe('Contexture MCP server', () => {
       expect(result.structuredContent).toMatchObject({
         path: irPath,
         valid: true,
+        mcp: { version: '0.0.0' },
         errors: [],
         warnings: [
           expect.objectContaining({
@@ -427,6 +428,71 @@ describe('Contexture MCP server', () => {
           }),
         ],
       });
+    });
+  });
+
+  it('uses tenant axes, not audit fields, for missing ownership warnings', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+            { name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } },
+            { name: 'householdRefId', type: { kind: 'ref', typeName: 'Household' } },
+          ],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'validate_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        valid: true,
+        errors: [],
+        warnings: [
+          expect.objectContaining({
+            code: 'relationship_ownership_scope_missing',
+            path: 'types.3.fields.3.type.relationship.ownership',
+            message: expect.stringContaining('tenant axis "householdId"'),
+            hint: expect.stringContaining('scopeField: "householdId"'),
+          }),
+        ],
+      });
+      expect(JSON.stringify(result.structuredContent)).not.toContain('scopeField: "createdAt"');
+      expect(JSON.stringify(result.structuredContent)).not.toContain('scopeField: "updatedAt"');
     });
   });
 

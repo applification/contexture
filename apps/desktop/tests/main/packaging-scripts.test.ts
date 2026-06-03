@@ -27,6 +27,7 @@ describe('desktop packaging scripts', () => {
         calls.push(args);
         return { status: 0 };
       },
+      version: '0.15.38',
     });
 
     expect(mkdirCalls).toEqual([['/repo/apps/desktop/build/bin', { recursive: true }]]);
@@ -36,6 +37,8 @@ describe('desktop packaging scripts', () => {
         [
           'build',
           '--compile',
+          '--define',
+          'CONTEXTURE_MCP_VERSION="0.15.38"',
           '--outfile',
           '/repo/apps/desktop/build/bin/contexture-mcp',
           '/repo/packages/cli/src/mcp.ts',
