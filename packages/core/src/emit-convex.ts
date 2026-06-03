@@ -4,7 +4,8 @@
  * Turns the IR into the contents of `convex/schema.ts` and
  * `convex/validators.ts`:
  * table-flagged `ObjectTypeDef`s become `defineTable(...)` entries on
- * `defineSchema`; indexes chain on via `.index("name", [fields])`.
+ * `defineSchema`; indexes chain on via `.index("name", [fields])` and
+ * full-text search indexes via `.searchIndex("name", { searchField, ... })`.
  * Non-table object, enum, and discriminated-union types become reusable
  * exported Convex validators.
  *
@@ -88,7 +89,19 @@ function renderTable(t: ObjectType, ctx: RenderContext): string {
   const indexChain = (t.indexes ?? [])
     .map((i) => `.index("${i.name}", [${i.fields.map((f) => `"${f}"`).join(', ')}])`)
     .join('');
-  return `defineTable({\n${fields}\n  })${indexChain}`;
+  const searchIndexChain = (t.searchIndexes ?? [])
+    .map((index) => `.searchIndex("${index.name}", ${renderSearchIndexConfig(index)})`)
+    .join('');
+  return `defineTable({\n${fields}\n  })${indexChain}${searchIndexChain}`;
+}
+
+function renderSearchIndexConfig(index: NonNullable<ObjectType['searchIndexes']>[number]): string {
+  const entries = [`searchField: "${index.searchField}"`];
+  if ((index.filterFields?.length ?? 0) > 0) {
+    entries.push(`filterFields: [${index.filterFields?.map((field) => `"${field}"`).join(', ')}]`);
+  }
+  if (index.staged !== undefined) entries.push(`staged: ${index.staged ? 'true' : 'false'}`);
+  return `{ ${entries.join(', ')} }`;
 }
 
 function renderFieldDef(f: FieldDef, ctx: RenderContext, options: RenderOptions): string {

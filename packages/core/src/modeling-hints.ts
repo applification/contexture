@@ -10,7 +10,10 @@ export type ModelingHintKind =
   | 'derivation_policy'
   | 'embedded_collection'
   | 'stdlib_type'
-  | 'stringly_ref';
+  | 'stringly_ref'
+  | 'bounded_scan'
+  | 'alias_lookup'
+  | 'merge_semantics';
 
 export type ModelingSignal =
   | 'identity_pressure'
@@ -60,6 +63,8 @@ interface EmbeddedCollectionPressure {
 }
 
 const QUERY_HANDLE_NAME = /(^|_)(kind|state|status|slug|key)$|name$|searchtext$|date$|at$|year$/i;
+const ARRAY_FILTER_FIELD_NAME =
+  /(^|_)(tags?|labels?|categories|cuisines?|cuisineIds|mealTypes?|methods?|cookingMethods?|equipment|dietary|dietarySuitability|allergens?|ingredientIds|aliases)$|Ids$/i;
 
 const COLLABORATIVE_COLLECTION_FIELD_NAMES = new Set([
   'entries',
@@ -128,6 +133,15 @@ export function analyzeModelingHints(schema: Schema): ModelingHint[] {
       if (isTable && isQueryHandleField(field, type)) {
         hints.push(queryHandleHint(type, field, fieldPath));
       }
+
+      const boundedScanHint = fieldBoundedScanHint(type, field, fieldPath);
+      if (boundedScanHint) hints.push(boundedScanHint);
+
+      const aliasHint = fieldAliasLookupHint(type, field, fieldPath);
+      if (aliasHint) hints.push(aliasHint);
+
+      const mergeHint = fieldMergeSemanticsHint(type, field, fieldPath);
+      if (mergeHint) hints.push(mergeHint);
 
       const derivationHint = fieldDerivationHint(type, field, fieldPath);
       if (derivationHint) hints.push(derivationHint);
@@ -377,6 +391,104 @@ function queryHandleHint(type: ObjectType, field: FieldDef, path: string): Model
   };
 }
 
+function fieldBoundedScanHint(
+  type: ObjectType,
+  field: FieldDef,
+  path: string,
+): ModelingHint | null {
+  if (type.table !== true) return null;
+  if (field.type.kind !== 'array') return null;
+  if (!isArrayFilterField(field)) return null;
+
+  const ownerAxis = boundedOwnerAxis(type);
+  if (ownerAxis) {
+    return {
+      id: hintId('bounded_scan', type.name, field.name, [ownerAxis.name]),
+      kind: 'bounded_scan',
+      signals: ['query_pressure'],
+      path,
+      typeName: type.name,
+      fieldName: field.name,
+      title: 'Bounded array scan',
+      message: `${field.name} can be filtered after an indexed ${ownerAxis.name} query, but Convex cannot use a normal index to find matching array elements.`,
+      rationale:
+        'Array-valued filters are acceptable when an owner-scoped query bounds the candidate set; global or cross-scope search needs a lookup table or another query handle.',
+      fieldNames: [field.name, ownerAxis.name],
+    };
+  }
+
+  return {
+    id: hintId('bounded_scan', type.name, field.name, ['unbounded']),
+    kind: 'bounded_scan',
+    signals: ['query_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Unbounded array filter',
+    message: `${field.name} looks like an array filter, but Convex cannot use a normal index to find matching array elements.`,
+    rationale:
+      'Without a tenant, household, or workspace scope field to bound the scan, array filters usually need a normalized lookup table for production-scale queries.',
+    fieldNames: [field.name],
+  };
+}
+
+function fieldAliasLookupHint(
+  type: ObjectType,
+  field: FieldDef,
+  path: string,
+): ModelingHint | null {
+  if (field.name !== 'aliases') return null;
+  if (!isArrayOfStrings(field.type)) return null;
+  const identityFields = type.fields.filter(
+    (candidate) =>
+      candidate.name !== field.name &&
+      (isIdentityLikeField(candidate) || /^(canonicalName|displayName)$/u.test(candidate.name)),
+  );
+
+  return {
+    id: hintId(
+      'alias_lookup',
+      type.name,
+      field.name,
+      identityFields.map((item) => item.name),
+    ),
+    kind: 'alias_lookup',
+    signals: ['identity_pressure', 'query_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Alias lookup scan',
+    message: `${type.name}.${field.name} stores aliases in an array, so alias resolution needs a scan unless the app maintains a normalized lookup table.`,
+    rationale:
+      'Canonical catalog entities often need fast alias resolution from user text. A table such as IngredientAliasLookup or CuisineAliasLookup makes that query indexable.',
+    fieldNames: [field.name, ...identityFields.map((item) => item.name)],
+  };
+}
+
+function fieldMergeSemanticsHint(
+  type: ObjectType,
+  field: FieldDef,
+  path: string,
+): ModelingHint | null {
+  if (field.name !== 'aliases') return null;
+  if (!isArrayOfStrings(field.type)) return null;
+  if (hasMergePointer(type)) return null;
+
+  return {
+    id: hintId('merge_semantics', type.name, field.name),
+    kind: 'merge_semantics',
+    signals: ['identity_pressure', 'relationship_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Merge state missing',
+    message: `${type.name} has aliases but no merged-into pointer, so duplicate enrichment records need a bespoke repoint routine.`,
+    rationale:
+      'A nullable mergedInto ref makes canonicalization explicit in the model even though app code still owns data migration and reference repointing.',
+    fieldNames: [field.name],
+  };
+}
+
 function stdlibTypeHint(type: ObjectType, field: FieldDef, path: string): ModelingHint | null {
   if (unwrapRefTarget(field.type)) return null;
   if (field.type.kind !== 'string' && field.type.kind !== 'number') return null;
@@ -458,6 +570,48 @@ function isStringlyRefField(field: FieldDef): boolean {
     return singularRefName(field.name) !== null;
   }
   return false;
+}
+
+function isArrayFilterField(field: FieldDef): boolean {
+  const description = field.description?.toLowerCase() ?? '';
+  return (
+    ARRAY_FILTER_FIELD_NAME.test(field.name) ||
+    description.includes('filter') ||
+    description.includes('search') ||
+    description.includes('facet')
+  );
+}
+
+function isArrayOfStrings(type: FieldType): boolean {
+  return type.kind === 'array' && type.element.kind === 'string';
+}
+
+function boundedOwnerAxis(type: ObjectType): FieldDef | null {
+  const indexedFieldNames = new Set(
+    (type.indexes ?? [])
+      .filter((index) => index.fields.length > 0)
+      .map((index) => index.fields[0])
+      .filter((field): field is string => Boolean(field)),
+  );
+  return (
+    type.fields.find((field) => indexedFieldNames.has(field.name) && isLikelyOwnerAxis(field)) ??
+    type.fields.find(isLikelyOwnerAxis) ??
+    null
+  );
+}
+
+function isLikelyOwnerAxis(field: FieldDef): boolean {
+  if (!/^(household|tenant|org|organization|workspace|account|team|project)Id$/u.test(field.name)) {
+    return false;
+  }
+  return field.optional !== true && field.nullable !== true;
+}
+
+function hasMergePointer(type: ObjectType): boolean {
+  return type.fields.some((field) => {
+    if (!/^mergedInto[A-Z].*Id$/u.test(field.name)) return false;
+    return field.type.kind === 'ref' || (field.type.kind === 'string' && field.nullable === true);
+  });
 }
 
 function targetTypeNameCandidatesForRefField(fieldName: string): string[] {

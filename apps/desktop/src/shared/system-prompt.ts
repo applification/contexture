@@ -148,6 +148,11 @@ item, used from multiple app surfaces, needs stable child ids for commands,
 needs Convex indexes, or may grow with snapshots/media/generated payloads.
 Common examples include shopping list items, meal plan meals, tasks, checklist
 entries, and other collaborative lists.
+
+For Convex full-text search, use search indexes rather than plain indexes.
+A search index has a string \`searchField\`, optional equality \`filterFields\`,
+and optional \`staged\`. Array-valued filters are bounded scans unless the
+model adds a lookup table or another query handle.
 `;
 
 const STDLIB_RULES = `
@@ -217,6 +222,15 @@ const OP_CATALOGUE: OpSpec[] = [
   { name: 'add_index', shape: '{ typeName: string; index: IndexDef }' },
   { name: 'update_index', shape: '{ typeName: string; name: string; patch: Partial<IndexDef> }' },
   { name: 'remove_index', shape: '{ typeName: string; name: string }' },
+  {
+    name: 'add_search_index',
+    shape: '{ typeName: string; searchIndex: SearchIndexDef }',
+  },
+  {
+    name: 'update_search_index',
+    shape: '{ typeName: string; name: string; patch: Partial<SearchIndexDef> }',
+  },
+  { name: 'remove_search_index', shape: '{ typeName: string; name: string }' },
   { name: 'replace_schema', shape: '{ schema: Schema }   # escape hatch; full IR' },
 ];
 

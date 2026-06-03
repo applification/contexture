@@ -84,6 +84,98 @@ describe('analyzeModelingHints', () => {
     );
   });
 
+  it('identifies household-bounded array scans for recipe filters', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'tags', type: { kind: 'array', element: { kind: 'string' } } },
+            { name: 'mealTypes', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+          indexes: [{ name: 'by_household', fields: ['householdId'] }],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'bounded_scan',
+          fieldName: 'tags',
+          title: 'Bounded array scan',
+          message: expect.stringContaining('after an indexed householdId query'),
+        }),
+        expect.objectContaining({
+          kind: 'bounded_scan',
+          fieldName: 'mealTypes',
+        }),
+      ]),
+    );
+  });
+
+  it('suggests lookup and merge semantics for alias arrays', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'string' } },
+            { name: 'aliases', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'alias_lookup',
+          typeName: 'Ingredient',
+          fieldName: 'aliases',
+          message: expect.stringContaining('normalized lookup table'),
+        }),
+        expect.objectContaining({
+          kind: 'merge_semantics',
+          typeName: 'Ingredient',
+          fieldName: 'aliases',
+          message: expect.stringContaining('no merged-into pointer'),
+        }),
+      ]),
+    );
+  });
+
+  it('does not suggest merge semantics when a merge pointer exists', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'string' } },
+            { name: 'aliases', type: { kind: 'array', element: { kind: 'string' } } },
+            {
+              name: 'mergedIntoIngredientId',
+              type: { kind: 'ref', typeName: 'Ingredient' },
+              nullable: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hints.some((hint) => hint.kind === 'merge_semantics')).toBe(false);
+  });
+
   it('surfaces incomplete derivation policy on stored computed fields', () => {
     const hints = analyzeModelingHints({
       version: '1',

@@ -113,6 +113,7 @@ The implementation should therefore make Convex the default story and primary pa
 - The agent demo asks for generic app contracts instead of Convex schema and validators.
 - The generated-output panel does not explicitly frame `convex/schema.ts` and `convex/validators.ts` as the primary outputs for Convex projects.
 - The app has Convex table and index controls, but the product shell does not yet make those feel like the main path.
+- Plantry dog-fooding exposed that the current IR only models plain Convex field indexes, not `searchIndex`, bounded-scan query intent, alias lookup tables, or merge semantics. See [Plantry Convex Query Contract Dog-Food Plan](../plantry-convex-query-contract-plan.md).
 
 ### Slice 0: Update Brand And Design-System Source Of Truth
 

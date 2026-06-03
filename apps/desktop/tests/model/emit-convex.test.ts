@@ -257,6 +257,36 @@ describe('emitConvexSchema', () => {
     expect(parses(out)).toBe(true);
   });
 
+  it('emits .searchIndex("name", {...}) chained on defineTable', () => {
+    const ir: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'searchText', type: { kind: 'string' } },
+          ],
+          searchIndexes: [
+            {
+              name: 'search_recipes',
+              searchField: 'searchText',
+              filterFields: ['householdId'],
+              staged: false,
+            },
+          ],
+        },
+      ],
+    };
+    const out = emitConvexSchema(ir);
+    expect(out).toContain(
+      '.searchIndex("search_recipes", { searchField: "searchText", filterFields: ["householdId"], staged: false })',
+    );
+    expect(parses(out)).toBe(true);
+  });
+
   it('emits lower camel case Convex table names', () => {
     const ir: Schema = {
       version: '1',

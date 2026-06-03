@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
 import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
+import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { ButtonGroup } from '../ui/button-group';
 import { Checkbox } from '../ui/checkbox';
@@ -221,7 +222,7 @@ function TableTypeDetail({
     0,
   );
   const fieldIndexInsights = useMemo(() => fieldIndexInsightsForType(type), [type]);
-  const indexCount = type.indexes?.length ?? 0;
+  const indexCount = (type.indexes?.length ?? 0) + (type.searchIndexes?.length ?? 0);
   const suggestionCount = suggestedIndexes(type).length;
 
   return (
@@ -961,7 +962,11 @@ function ConvexSection({
 }) {
   const isTable = type.table === true;
   const indexes = type.indexes ?? [];
+  const searchIndexes = type.searchIndexes ?? [];
   const fieldNames = type.fields.map((f) => f.name);
+  const stringFieldNames = type.fields
+    .filter((field) => field.type.kind === 'string')
+    .map((field) => field.name);
   const suggestions = suggestedIndexes(type);
 
   const toggleTable = () => {
@@ -977,6 +982,16 @@ function ConvexSection({
       kind: 'add_index',
       typeName: type.name,
       index: { name, fields: [seed] },
+    });
+  };
+
+  const addSearchIndex = () => {
+    const seed = stringFieldNames[0];
+    if (!seed) return;
+    dispatch({
+      kind: 'add_search_index',
+      typeName: type.name,
+      searchIndex: { name: nextSearchIndexName(type), searchField: seed },
     });
   };
 
@@ -1086,9 +1101,180 @@ function ConvexSection({
               </Table>
             </div>
           )}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <Label>Search indexes</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addSearchIndex}
+                disabled={stringFieldNames.length === 0}
+                className="h-7 px-2 text-xs"
+              >
+                <Plus aria-hidden="true" />
+                Add search index
+              </Button>
+            </div>
+            {stringFieldNames.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Add a string field before creating a search index.
+              </p>
+            )}
+            {searchIndexes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No search indexes yet.</p>
+            ) : (
+              <Table className="text-xs">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-7 px-2">Search index</TableHead>
+                    <TableHead className="h-7 px-2">Search field</TableHead>
+                    <TableHead className="h-7 px-2">Filter fields</TableHead>
+                    <TableHead className="h-7 w-9 px-1 text-right">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {searchIndexes.map((index) => (
+                    <SearchIndexRow
+                      key={index.name}
+                      typeName={type.name}
+                      index={index}
+                      stringFieldNames={stringFieldNames}
+                      fieldNames={fieldNames}
+                      dispatch={dispatch}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function SearchIndexRow({
+  typeName,
+  index,
+  stringFieldNames,
+  fieldNames,
+  dispatch,
+}: {
+  typeName: string;
+  index: NonNullable<Extract<TypeDef, { kind: 'object' }>['searchIndexes']>[number];
+  stringFieldNames: string[];
+  fieldNames: string[];
+  dispatch: (op: Op) => void;
+}) {
+  const filterFields = index.filterFields ?? [];
+  const availableFilterFields = fieldNames.filter((fieldName) => !filterFields.includes(fieldName));
+
+  const patchSearchIndex = (
+    patch: Partial<NonNullable<Extract<TypeDef, { kind: 'object' }>['searchIndexes']>[number]>,
+  ) => {
+    dispatch({
+      kind: 'update_search_index',
+      typeName,
+      name: index.name,
+      patch,
+    });
+  };
+
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell className="px-2 py-1.5 align-top">
+        <Input
+          aria-label={`Search index name for ${index.name}`}
+          defaultValue={index.name}
+          className="h-8 px-2 text-xs"
+          onBlur={(ev) => {
+            const next = ev.target.value.trim();
+            if (next && next !== index.name) patchSearchIndex({ name: next });
+          }}
+        />
+        {index.staged !== undefined && (
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            {index.staged ? 'staged backfill' : 'active'}
+          </div>
+        )}
+      </TableCell>
+      <TableCell className="px-2 py-1.5 align-top">
+        <Select
+          value={index.searchField}
+          onValueChange={(searchField) => patchSearchIndex({ searchField })}
+        >
+          <SelectTrigger
+            aria-label={`Search field for ${index.name}`}
+            className="h-8 min-w-36 px-2 font-mono text-xs"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {stringFieldNames.map((fieldName) => (
+              <SelectItem key={fieldName} value={fieldName}>
+                {fieldName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      <TableCell className="px-2 py-1.5 align-top">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {filterFields.length === 0 ? (
+            <span className="text-[11px] text-muted-foreground">None</span>
+          ) : (
+            filterFields.map((field) => (
+              <Badge
+                key={field}
+                variant="outline"
+                className="inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 font-mono text-[11px]"
+                style={toneSurfaceStyle('var(--inspector-index)', 10, 44)}
+              >
+                {field}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${field} from search index ${index.name}`}
+                  onClick={() =>
+                    patchSearchIndex({
+                      filterFields: filterFields.filter((candidate) => candidate !== field),
+                    })
+                  }
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              </Badge>
+            ))
+          )}
+          <IndexFieldPicker
+            indexName={index.name}
+            availableFieldNames={availableFilterFields}
+            onSelect={(fieldName) =>
+              patchSearchIndex({ filterFields: [...filterFields, fieldName] })
+            }
+            label="Add filter"
+            ariaLabel={`Add filter field to search index ${index.name}`}
+          />
+        </div>
+      </TableCell>
+      <TableCell className="w-9 px-1 py-1.5 text-right align-top">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete search index ${index.name}`}
+          onClick={() => dispatch({ kind: 'remove_search_index', typeName, name: index.name })}
+          className="h-8 w-8 text-destructive hover:text-destructive"
+        >
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -1355,10 +1541,14 @@ function IndexFieldPicker({
   indexName,
   availableFieldNames,
   onSelect,
+  label = 'Add field',
+  ariaLabel,
 }: {
   indexName: string;
   availableFieldNames: string[];
   onSelect: (fieldName: string) => void;
+  label?: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const triggerId = useStableDomId('add-index-field');
@@ -1374,10 +1564,10 @@ function IndexFieldPicker({
           size="sm"
           disabled={!hasAvailableFields}
           className="h-7 px-2 text-xs"
-          aria-label={`Add field to index ${indexName}`}
+          aria-label={ariaLabel ?? `Add field to index ${indexName}`}
         >
           <Plus aria-hidden="true" />
-          Add field
+          {label}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-0">
@@ -1425,6 +1615,16 @@ function nextIndexName(existing: IndexDef[]): string {
   let n = existing.length + 1;
   while (taken.has(`index${n}`)) n += 1;
   return `index${n}`;
+}
+
+function nextSearchIndexName(type: Extract<TypeDef, { kind: 'object' }>): string {
+  const taken = new Set([
+    ...(type.indexes ?? []).map((index) => index.name),
+    ...(type.searchIndexes ?? []).map((index) => index.name),
+  ]);
+  let n = (type.searchIndexes?.length ?? 0) + 1;
+  while (taken.has(`search${n}`)) n += 1;
+  return `search${n}`;
 }
 
 interface SuggestedIndex {
@@ -1480,10 +1680,12 @@ function fieldIndexInsightsForType(
 function suggestedIndexes(type: Extract<TypeDef, { kind: 'object' }>): SuggestedIndex[] {
   if (type.table !== true) return [];
   const existing = type.indexes ?? [];
+  const searchFields = new Set((type.searchIndexes ?? []).map((index) => index.searchField));
   const suggestions: SuggestedIndex[] = [];
 
   for (const field of type.fields) {
     if (!isIndexSuggestionField(field)) continue;
+    if (searchFields.has(field.name)) continue;
     const fields = [field.name];
     if (existing.some((index) => arraysEqual(index.fields, fields))) continue;
     const name = nextSuggestedIndexName(existing, suggestions, field.name);

@@ -55,6 +55,9 @@ Skills are available and auto-load on topic match:
 - \`add_index\` { typeName: string; index: IndexDef }
 - \`update_index\` { typeName: string; name: string; patch: Partial<IndexDef> }
 - \`remove_index\` { typeName: string; name: string }
+- \`add_search_index\` { typeName: string; searchIndex: SearchIndexDef }
+- \`update_search_index\` { typeName: string; name: string; patch: Partial<SearchIndexDef> }
+- \`remove_search_index\` { typeName: string; name: string }
 - \`replace_schema\` { schema: Schema }   # escape hatch; full IR
 
 ## Convex collection modeling
@@ -66,6 +69,11 @@ item, used from multiple app surfaces, needs stable child ids for commands,
 needs Convex indexes, or may grow with snapshots/media/generated payloads.
 Common examples include shopping list items, meal plan meals, tasks, checklist
 entries, and other collaborative lists.
+
+For Convex full-text search, use search indexes rather than plain indexes.
+A search index has a string \`searchField\`, optional equality \`filterFields\`,
+and optional \`staged\`. Array-valued filters are bounded scans unless the
+model adds a lookup table or another query handle.
 
 ## Stdlib-first modeling
 

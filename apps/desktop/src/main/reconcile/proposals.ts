@@ -149,6 +149,9 @@ Contexture emit an output as close as possible to the hand-edited file.
 - \`add_index\` { typeName: string; index: { name: string; fields: string[] } }
 - \`remove_index\` { typeName: string; name: string }
 - \`update_index\` { typeName: string; name: string; patch: Partial<{ name: string; fields: string[] }> }
+- \`add_search_index\` { typeName: string; searchIndex: { name: string; searchField: string; filterFields?: string[]; staged?: boolean } }
+- \`remove_search_index\` { typeName: string; name: string }
+- \`update_search_index\` { typeName: string; name: string; patch: Partial<{ name: string; searchField: string; filterFields: string[]; staged: boolean }> }
 - \`replace_schema\` { schema: Schema }   # escape hatch; full IR
 
 ## FieldDef

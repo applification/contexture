@@ -250,6 +250,7 @@ const TypeDefAliasSchema = {
   table: z.boolean().optional(),
   tableName: z.string().optional(),
   indexes: z.array(z.unknown()).optional(),
+  searchIndexes: z.array(z.unknown()).optional(),
   extends: z.array(z.string()).optional(),
   invariants: z.array(z.unknown()).optional(),
   values: z.array(z.unknown()).optional(),
@@ -460,6 +461,49 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
         }),
       },
       ({ typeName, name, patch }) => ({ kind: 'update_index', typeName, name, patch }),
+      forward,
+    ),
+    strictTool(
+      'add_search_index',
+      'Add a Convex full-text search index to a table-flagged object type.',
+      {
+        typeName: z.string().min(1),
+        searchIndex: z.object({
+          name: z.string().min(1),
+          searchField: z.string().min(1),
+          filterFields: z.array(z.string().min(1)).optional(),
+          staged: z.boolean().optional(),
+        }),
+      },
+      ({ typeName, searchIndex }) => ({ kind: 'add_search_index', typeName, searchIndex }),
+      forward,
+    ),
+    strictTool(
+      'remove_search_index',
+      'Remove a Convex full-text search index from an object type by index name.',
+      { typeName: z.string().min(1), name: z.string().min(1) },
+      ({ typeName, name }) => ({ kind: 'remove_search_index', typeName, name }),
+      forward,
+    ),
+    strictTool(
+      'update_search_index',
+      'Update a Convex search index name, search field, filter fields, and staged flag.',
+      {
+        typeName: z.string().min(1),
+        name: z.string().min(1),
+        patch: z.object({
+          name: z.string().min(1).optional(),
+          searchField: z.string().min(1).optional(),
+          filterFields: z.array(z.string().min(1)).optional(),
+          staged: z.boolean().optional(),
+        }),
+      },
+      ({ typeName, name, patch }) => ({
+        kind: 'update_search_index',
+        typeName,
+        name,
+        patch,
+      }),
       forward,
     ),
     strictTool(

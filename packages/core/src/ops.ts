@@ -30,6 +30,7 @@ import type {
   IndexDef,
   ObjectInvariant,
   Schema,
+  SearchIndexDef,
   TypeDef,
 } from './ir';
 import {
@@ -38,6 +39,7 @@ import {
   IRSchema,
   IRSchemaObject,
   ObjectInvariantSchema,
+  SearchIndexDefSchema,
   TypeDefSchema,
 } from './ir';
 import {
@@ -88,6 +90,14 @@ export type Op =
   | { kind: 'add_index'; typeName: string; index: IndexDef }
   | { kind: 'remove_index'; typeName: string; name: string }
   | { kind: 'update_index'; typeName: string; name: string; patch: Partial<IndexDef> }
+  | { kind: 'add_search_index'; typeName: string; searchIndex: SearchIndexDef }
+  | { kind: 'remove_search_index'; typeName: string; name: string }
+  | {
+      kind: 'update_search_index';
+      typeName: string;
+      name: string;
+      patch: Partial<SearchIndexDef>;
+    }
   | { kind: 'replace_schema'; schema: unknown };
 
 export type ApplyResult = { schema: Schema } | { error: string };
@@ -217,6 +227,22 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
     name: z.string().min(1),
     patch: IndexDefSchema.partial(),
   }),
+  z.object({
+    kind: z.literal('add_search_index'),
+    typeName: z.string().min(1),
+    searchIndex: SearchIndexDefSchema,
+  }),
+  z.object({
+    kind: z.literal('remove_search_index'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('update_search_index'),
+    typeName: z.string().min(1),
+    name: z.string().min(1),
+    patch: SearchIndexDefSchema.partial(),
+  }),
   z.object({ kind: z.literal('replace_schema'), schema: IRSchema }),
 ]) as z.ZodType<Op>;
 
@@ -340,6 +366,12 @@ function applyStructural(schema: Schema, op: Op): ApplyResult {
       return removeIndex(schema, op.typeName, op.name);
     case 'update_index':
       return updateIndex(schema, op.typeName, op.name, op.patch);
+    case 'add_search_index':
+      return addSearchIndex(schema, op.typeName, op.searchIndex);
+    case 'remove_search_index':
+      return removeSearchIndex(schema, op.typeName, op.name);
+    case 'update_search_index':
+      return updateSearchIndex(schema, op.typeName, op.name, op.patch);
     case 'replace_schema':
       return replaceSchema(op.schema);
     default:
@@ -484,7 +516,17 @@ function updateField(
             fields: index.fields.map((name) => (name === fieldName ? nextFieldName : name)),
           }))
         : t.indexes;
-    return { ...t, fields, indexes, invariants };
+    const searchIndexes =
+      nextFieldName && nextFieldName !== fieldName
+        ? t.searchIndexes?.map((index) => ({
+            ...index,
+            searchField: index.searchField === fieldName ? nextFieldName : index.searchField,
+            filterFields: index.filterFields?.map((name) =>
+              name === fieldName ? nextFieldName : name,
+            ),
+          }))
+        : t.searchIndexes;
+    return { ...t, fields, indexes, searchIndexes, invariants };
   });
 }
 
@@ -499,11 +541,18 @@ function removeField(schema: Schema, typeName: string, fieldName: string): Apply
         fields: index.fields.filter((field) => field !== fieldName),
       }))
       .filter((index) => index.fields.length > 0);
+    const searchIndexes = (t.searchIndexes ?? [])
+      .filter((index) => index.searchField !== fieldName)
+      .map((index) => ({
+        ...index,
+        filterFields: index.filterFields?.filter((field) => field !== fieldName),
+      }));
     return {
       ...t,
       fields: t.fields.filter((f) => f.name !== fieldName),
       invariants: t.invariants?.map((invariant) => removeInvariantField(invariant, fieldName)),
       indexes: indexes.length > 0 ? indexes : undefined,
+      searchIndexes: searchIndexes.length > 0 ? searchIndexes : undefined,
     };
   });
 }
@@ -721,6 +770,11 @@ function addIndex(schema: Schema, typeName: string, index: IndexDef): ApplyResul
     if (existing.some((i) => i.name === index.name)) {
       return { error: `index "${index.name}" already exists on "${typeName}"` };
     }
+    if ((t.searchIndexes ?? []).some((i) => i.name === index.name)) {
+      return {
+        error: `index "${index.name}" conflicts with an existing search index on "${typeName}"`,
+      };
+    }
     const fieldNames = new Set(t.fields.map((f) => f.name));
     for (const f of index.fields) {
       if (!fieldNames.has(f)) {
@@ -765,6 +819,11 @@ function updateIndex(
     if (patch.name && patch.name !== name && existing.some((i) => i.name === patch.name)) {
       return { error: `index "${patch.name}" already exists on "${typeName}"` };
     }
+    if ((t.searchIndexes ?? []).some((index) => index.name === nextName)) {
+      return {
+        error: `index "${nextName}" conflicts with an existing search index on "${typeName}"`,
+      };
+    }
     const fieldNames = new Set(t.fields.map((f) => f.name));
     for (const f of nextFields) {
       if (!fieldNames.has(f)) {
@@ -775,6 +834,102 @@ function updateIndex(
     indexes[idx] = { name: nextName, fields: nextFields };
     return { ...t, indexes };
   });
+}
+
+function addSearchIndex(
+  schema: Schema,
+  typeName: string,
+  searchIndex: SearchIndexDef,
+): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    if (t.table !== true) {
+      return { error: `add_search_index: "${typeName}" is not a Convex table` };
+    }
+    const existing = t.searchIndexes ?? [];
+    if (existing.some((index) => index.name === searchIndex.name)) {
+      return { error: `search index "${searchIndex.name}" already exists on "${typeName}"` };
+    }
+    if ((t.indexes ?? []).some((index) => index.name === searchIndex.name)) {
+      return {
+        error: `search index "${searchIndex.name}" conflicts with an existing index on "${typeName}"`,
+      };
+    }
+    const validation = validateSearchIndexFields(t, searchIndex, 'add_search_index');
+    if (validation) return validation;
+    return { ...t, searchIndexes: [...existing, searchIndex] };
+  });
+}
+
+function removeSearchIndex(schema: Schema, typeName: string, name: string): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    const existing = t.searchIndexes ?? [];
+    if (!existing.some((index) => index.name === name)) {
+      return { error: `search index "${name}" not found on "${typeName}"` };
+    }
+    const searchIndexes = existing.filter((index) => index.name !== name);
+    return { ...t, searchIndexes: searchIndexes.length > 0 ? searchIndexes : undefined };
+  });
+}
+
+function updateSearchIndex(
+  schema: Schema,
+  typeName: string,
+  name: string,
+  patch: Partial<SearchIndexDef>,
+): ApplyResult {
+  return withObject(schema, typeName, (t) => {
+    if (t.table !== true) {
+      return { error: `update_search_index: "${typeName}" is not a Convex table` };
+    }
+    const existing = t.searchIndexes ?? [];
+    const idx = existing.findIndex((index) => index.name === name);
+    if (idx === -1) return { error: `search index "${name}" not found on "${typeName}"` };
+    const current = existing[idx];
+    if (!current) return { error: `search index "${name}" not found on "${typeName}"` };
+    const next: SearchIndexDef = { ...current, ...patch };
+    if (patch.name && patch.name !== name && existing.some((index) => index.name === patch.name)) {
+      return { error: `search index "${patch.name}" already exists on "${typeName}"` };
+    }
+    if ((t.indexes ?? []).some((index) => index.name === next.name)) {
+      return {
+        error: `search index "${next.name}" conflicts with an existing index on "${typeName}"`,
+      };
+    }
+    const validation = validateSearchIndexFields(t, next, 'update_search_index');
+    if (validation) return validation;
+    const searchIndexes = [...existing];
+    searchIndexes[idx] = next;
+    return { ...t, searchIndexes };
+  });
+}
+
+function validateSearchIndexFields(
+  type: ObjectType,
+  searchIndex: SearchIndexDef,
+  opKind: 'add_search_index' | 'update_search_index',
+): { error: string } | null {
+  const searchField = type.fields.find((field) => field.name === searchIndex.searchField);
+  if (!searchField) {
+    return {
+      error: `${opKind}: unknown search field "${searchIndex.searchField}" on "${type.name}"`,
+    };
+  }
+  if (searchField.type.kind !== 'string') {
+    return {
+      error: `${opKind}: search field "${searchIndex.searchField}" must be a string field`,
+    };
+  }
+  const duplicateFilterField = firstDuplicate(searchIndex.filterFields ?? []);
+  if (duplicateFilterField) {
+    return { error: `${opKind}: filter field "${duplicateFilterField}" appears more than once` };
+  }
+  const fieldNames = new Set(type.fields.map((field) => field.name));
+  for (const fieldName of searchIndex.filterFields ?? []) {
+    if (!fieldNames.has(fieldName)) {
+      return { error: `${opKind}: unknown filter field "${fieldName}" on "${type.name}"` };
+    }
+  }
+  return null;
 }
 
 function firstDuplicate(values: readonly string[]): string | null {
@@ -855,6 +1010,13 @@ function setDiscriminator(schema: Schema, typeName: string, discriminator: strin
       indexes: type.indexes?.map((index) => ({
         ...index,
         fields: index.fields.map((field) =>
+          field === union.discriminator ? discriminator : field,
+        ),
+      })),
+      searchIndexes: type.searchIndexes?.map((index) => ({
+        ...index,
+        searchField: index.searchField === union.discriminator ? discriminator : index.searchField,
+        filterFields: index.filterFields?.map((field) =>
           field === union.discriminator ? discriminator : field,
         ),
       })),
