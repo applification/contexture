@@ -12,13 +12,15 @@ import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics'
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { parseTypePath, repairForValidationError } from '@renderer/services/validation-repairs';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useConvexVersionStore } from '@renderer/store/convex-version';
 import { useDocumentStore } from '@renderer/store/document';
 import { sourceLabel, useModelSyncStore } from '@renderer/store/model-sync';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
-import { BarChart3, Circle, CircleAlert, Lightbulb } from 'lucide-react';
+import { BarChart3, Circle, CircleAlert, Lightbulb, MessageSquare } from 'lucide-react';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -125,6 +127,16 @@ export function StatusBar(): React.JSX.Element {
       click(repair.focusTypeName, 'replace');
       useGraphSelectionStore.getState().focus(repair.focusTypeName);
     }
+    setPopoverOpen(false);
+  }
+
+  function handleFixInChat(error: ValidationError): void {
+    useChatComposerStore.getState().setPendingChatMessage({
+      message: validationChatPrompt(error),
+      context: ['## Current IR', '```json', JSON.stringify(schema, null, 2), '```'].join('\n'),
+    });
+    useUIChromeStore.getState().setSidebarTab('chat');
+    useUIChromeStore.getState().setSidebarVisible(true);
     setPopoverOpen(false);
   }
 
@@ -245,7 +257,7 @@ export function StatusBar(): React.JSX.Element {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-96 p-0" align="end">
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-96 overflow-y-auto">
                 {validationIssues.map((err) => {
                   const repair = repairForValidationError(schema, err);
                   const Icon = err.severity === 'error' ? CircleAlert : Lightbulb;
@@ -288,6 +300,14 @@ export function StatusBar(): React.JSX.Element {
                           {repair.label}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleFixInChat(err)}
+                        className="inline-flex shrink-0 items-center gap-1 self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                      >
+                        <MessageSquare aria-hidden="true" className="size-3" />
+                        Fix in chat
+                      </button>
                     </div>
                   );
                 })}
@@ -317,6 +337,22 @@ export function StatusBar(): React.JSX.Element {
       </TooltipProvider>
     </div>
   );
+}
+
+function validationChatPrompt(error: ValidationError): string {
+  return [
+    'Help me resolve this Contexture validation issue.',
+    '',
+    `Code: ${error.code}`,
+    `Severity: ${error.severity}`,
+    `Path: ${error.path}`,
+    `Message: ${error.message}`,
+    error.hint ? `Hint: ${error.hint}` : null,
+    '',
+    'Please review the current IR and suggest the smallest safe model change. If the fix should be app-runtime owned instead of modeled, explain the runtime contract to document.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 function convexVersionStatusLabel(version: {

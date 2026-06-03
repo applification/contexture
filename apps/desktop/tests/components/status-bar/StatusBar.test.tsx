@@ -1,7 +1,9 @@
 import type { Schema } from '@contexture/core/ir';
 import { StatusBar } from '@renderer/components/status-bar/StatusBar';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useConvexVersionStore } from '@renderer/store/convex-version';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -21,7 +23,9 @@ function seed(schema: Schema) {
 describe('StatusBar validation repairs', () => {
   beforeEach(() => {
     seed({ version: '1', types: [] });
+    useChatComposerStore.getState().setPendingChatMessage(null);
     useGraphSelectionStore.getState().clear();
+    useUIChromeStore.setState({ sidebarTab: 'schema', sidebarVisible: false });
     useConvexVersionStore.getState().reset();
   });
 
@@ -63,11 +67,45 @@ describe('StatusBar validation repairs', () => {
     expect(screen.queryByRole('button', { name: '1 error' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '1 advisory' }));
+    expect(
+      screen.getByText('operational_timezone_missing').closest('.overflow-y-auto'),
+    ).toHaveClass('max-h-96');
     expect(screen.getByText('operational_timezone_missing')).toBeVisible();
     expect(screen.getByText(/Household-scoped field "PantryItem.expiresOn"/i)).toHaveClass(
       'whitespace-normal',
       'break-words',
     );
+  });
+
+  it('opens a validation issue in chat with IR context', () => {
+    seed({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'expiresOn', type: { kind: 'date' } },
+          ],
+        },
+      ],
+    });
+    render(<StatusBar />);
+
+    fireEvent.click(screen.getByRole('button', { name: '1 advisory' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fix in chat' }));
+
+    expect(useUIChromeStore.getState()).toMatchObject({
+      sidebarTab: 'chat',
+      sidebarVisible: true,
+    });
+    const pending = useChatComposerStore.getState().pendingChatMessage;
+    expect(pending?.message).toContain('Code: operational_timezone_missing');
+    expect(pending?.message).toContain('Path: types.0.fields');
+    expect(pending?.context).toContain('"name": "PantryItem"');
   });
 
   it('does not offer duplicate enum value repair without index-addressed ops', () => {
