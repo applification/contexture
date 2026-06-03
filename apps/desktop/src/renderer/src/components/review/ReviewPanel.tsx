@@ -1,4 +1,8 @@
-import { buildDomainBrief, type DomainDecision, type DomainReviewItem } from '@contexture/core';
+import {
+  buildDomainBrief,
+  type DomainDecision,
+  type DomainReviewItem,
+} from '@contexture/core/domain-brief';
 import type { Schema } from '@contexture/core/ir';
 import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useGraphSelectionStore } from '@renderer/store/selection';
