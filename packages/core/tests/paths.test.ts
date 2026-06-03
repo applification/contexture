@@ -48,6 +48,10 @@ describe('Contexture path policy', () => {
       { kind: 'convex', path: '/repo/packages/contexture/convex/schema.ts' },
       { kind: 'convex-validators', path: '/repo/packages/contexture/convex/validators.ts' },
       {
+        kind: 'convex-relationships',
+        path: '/repo/packages/contexture/convex/relationships.ts',
+      },
+      {
         kind: 'ai-tool-schemas',
         path: '/repo/packages/contexture/.contexture/ai-tool-schemas.json',
       },

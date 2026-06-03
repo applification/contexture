@@ -1,0 +1,55 @@
+import * as ts from 'typescript';
+import { describe, expect, it } from 'vitest';
+import { emitConvexRelationships, type Schema } from '../src';
+
+function parses(source: string): boolean {
+  const sf = ts.createSourceFile('relationships.ts', source, ts.ScriptTarget.Latest, false);
+  return (sf as unknown as { parseDiagnostics: ts.Diagnostic[] }).parseDiagnostics.length === 0;
+}
+
+describe('emitConvexRelationships', () => {
+  it('emits relationship metadata and generic app-layer helpers for table refs', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            {
+              name: 'recipeId',
+              type: {
+                kind: 'ref',
+                typeName: 'Recipe',
+                relationship: {
+                  onDelete: 'restrict',
+                  ownership: { scopeField: 'householdId' },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const out = emitConvexRelationships(schema, 'plantry.contexture.json');
+
+    expect(out).toContain('Source: plantry.contexture.json');
+    expect(out).toContain('"fromTable": "mealPlanMeal"');
+    expect(out).toContain('"fromField": "recipeId"');
+    expect(out).toContain('"toTable": "recipe"');
+    expect(out).toContain('"onDelete": "restrict"');
+    expect(out).toContain('export async function assertContextureRefs');
+    expect(out).toContain('export async function deleteWithContextureRelations');
+    expect(parses(out)).toBe(true);
+  });
+});

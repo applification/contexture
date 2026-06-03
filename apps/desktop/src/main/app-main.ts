@@ -9,6 +9,7 @@ syncShellEnvironment();
 
 import { join } from 'node:path';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { registerConvexIpc } from './ipc/convex';
 import { registerDriftIpc } from './ipc/drift';
 import { registerFileIpc } from './ipc/file';
 import { registerModelSyncIpc } from './ipc/model-sync';
@@ -89,6 +90,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(createMenu(mainWindow));
   registerUpdateIpc(mainWindow, { autoCheck: !isE2E });
   registerFileIpc(mainWindow);
+  registerConvexIpc();
   registerShellIpc();
   registerReconcileIpc();
   registerSchemaAgentIpc(mainWindow);

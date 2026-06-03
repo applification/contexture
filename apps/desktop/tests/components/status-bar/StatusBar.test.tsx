@@ -1,5 +1,6 @@
 import type { Schema } from '@contexture/core/ir';
 import { StatusBar } from '@renderer/components/status-bar/StatusBar';
+import { useConvexVersionStore } from '@renderer/store/convex-version';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -21,6 +22,7 @@ describe('StatusBar validation repairs', () => {
   beforeEach(() => {
     seed({ version: '1', types: [] });
     useGraphSelectionStore.getState().clear();
+    useConvexVersionStore.getState().reset();
   });
 
   afterEach(cleanup);
@@ -284,5 +286,19 @@ describe('StatusBar validation repairs', () => {
       ],
     });
     expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'LoginEvent' });
+  });
+
+  it('shows an actionable Convex version badge when target app version differs', () => {
+    useConvexVersionStore.setState({
+      emitterVersion: '1.40.0',
+      targetVersion: '1.37.0',
+      targetPackagePath: '/repo/apps/plantry/package.json',
+      status: 'mismatch',
+      message: 'Contexture emitter and target app Convex versions differ.',
+    });
+
+    render(<StatusBar />);
+
+    expect(screen.getByTestId('status-convex-version')).toHaveTextContent('Convex mismatch');
   });
 });

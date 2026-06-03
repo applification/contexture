@@ -44,7 +44,10 @@ export type SemanticIssueCode =
   | 'convex_reserved_table_name'
   | 'convex_reserved_field_name'
   | 'convex_index_duplicate_field'
-  | 'convex_index_unknown_field';
+  | 'convex_index_unknown_field'
+  | 'relationship_target_not_table'
+  | 'relationship_scope_field_missing'
+  | 'relationship_set_null_requires_nullable';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
@@ -185,10 +188,18 @@ function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] 
 
 function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {
   const issues: SemanticIssue[] = [];
-  const localNames = new Set(schema.types.map((t) => t.name));
+  const localTypes = new Map(schema.types.map((t) => [t.name, t]));
+  const localNames = new Set(localTypes.keys());
   const aliases = new Set((schema.imports ?? []).map((i) => i.alias));
 
-  const walk = (t: FieldType, path: string): void => {
+  const walk = (
+    t: FieldType,
+    path: string,
+    owner: ObjectType,
+    fieldName: string,
+    fieldOptional: boolean,
+    fieldNullable: boolean,
+  ): void => {
     if (t.kind === 'ref') {
       if (!resolves(t.typeName, localNames, aliases, catalog)) {
         issues.push({
@@ -198,17 +209,94 @@ function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {
           hint: hintForUnresolvedRef(t.typeName, catalog),
         });
       }
+      issues.push(
+        ...checkRelationshipMetadata(
+          t,
+          path,
+          owner,
+          fieldName,
+          fieldOptional,
+          fieldNullable,
+          localTypes,
+        ),
+      );
     } else if (t.kind === 'array') {
-      walk(t.element, `${path}.element`);
+      walk(t.element, `${path}.element`, owner, fieldName, fieldOptional, fieldNullable);
     }
   };
 
   schema.types.forEach((type, ti) => {
     if (type.kind !== 'object') return;
     type.fields.forEach((f, fi) => {
-      walk(f.type, `types.${ti}.fields.${fi}.type`);
+      walk(
+        f.type,
+        `types.${ti}.fields.${fi}.type`,
+        type,
+        f.name,
+        f.optional === true,
+        f.nullable === true,
+      );
     });
   });
+  return issues;
+}
+
+function checkRelationshipMetadata(
+  ref: Extract<FieldType, { kind: 'ref' }>,
+  path: string,
+  owner: ObjectType,
+  fieldName: string,
+  fieldOptional: boolean,
+  fieldNullable: boolean,
+  localTypes: ReadonlyMap<string, TypeDef>,
+): SemanticIssue[] {
+  if (!ref.relationship) return [];
+  const issues: SemanticIssue[] = [];
+  const target = localTypes.get(ref.typeName);
+  if (target?.kind !== 'object' || target.table !== true) {
+    issues.push({
+      code: 'relationship_target_not_table',
+      path: `${path}.relationship`,
+      message: `Relationship field "${fieldName}" must reference a Convex table type.`,
+      hint: 'Mark the target object as a Convex table or remove relationship metadata from this ref.',
+    });
+  }
+
+  if (ref.relationship.onDelete === 'setNull' && !fieldOptional && !fieldNullable) {
+    issues.push({
+      code: 'relationship_set_null_requires_nullable',
+      path: `${path}.relationship.onDelete`,
+      message: `Relationship "${fieldName}" uses setNull but the field is required and non-nullable.`,
+      hint: 'Mark the field nullable or optional, or use restrict/cascade/none.',
+    });
+  }
+
+  const ownership = ref.relationship.ownership;
+  if (ownership && !owner.fields.some((field) => field.name === ownership.scopeField)) {
+    issues.push({
+      code: 'relationship_scope_field_missing',
+      path: `${path}.relationship.ownership.scopeField`,
+      message: `Relationship "${fieldName}" uses missing ownership scope field "${ownership.scopeField}".`,
+      hint: 'Use an existing source field such as householdId, tenantId, or orgId.',
+    });
+  }
+
+  if (
+    ownership &&
+    target?.kind === 'object' &&
+    !target.fields.some(
+      (field) => field.name === (ownership.targetScopeField ?? ownership.scopeField),
+    )
+  ) {
+    const targetField = ownership.targetScopeField ?? ownership.scopeField;
+    issues.push({
+      code: 'relationship_scope_field_missing',
+      path: `${path}.relationship.ownership.targetScopeField`,
+      message: `Relationship "${fieldName}" target is missing ownership scope field "${targetField}".`,
+      hint: 'Set targetScopeField or add the corresponding scope field to the target table.',
+    });
+  }
+
   return issues;
 }
 

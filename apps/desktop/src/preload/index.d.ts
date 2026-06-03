@@ -154,6 +154,20 @@ export interface ContextureDriftAPI {
   onResolved: (listener: () => void) => Unsubscribe;
 }
 
+export type ConvexVersionStatus = 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
+
+export interface ConvexVersionInfo {
+  emitterVersion: string;
+  targetVersion: string | null;
+  targetPackagePath: string | null;
+  status: ConvexVersionStatus;
+  message: string;
+}
+
+export interface ContextureConvexAPI {
+  versionInfo: (payload: { irPath: string }) => Promise<ConvexVersionInfo>;
+}
+
 export interface DriftDetectedPayload {
   paths: string[];
   files?: Array<{
@@ -244,6 +258,7 @@ export interface ContextureAPI {
   file: ContextureFileAPI;
   shell: ContextureShellAPI;
   drift: ContextureDriftAPI;
+  convex: ContextureConvexAPI;
   modelSync: ContextureModelSyncAPI;
   reconcile: ContextureReconcileAPI;
   update: ContextureUpdateAPI;

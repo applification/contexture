@@ -19,6 +19,7 @@
  * so Zustand triggers a re-render (it relies on referential
  * inequality).
  */
+import type { Schema } from '@contexture/core/ir';
 import { type GeneratedTargetKind, generatedTargetForPath } from '@contexture/core/paths';
 import { create } from 'zustand';
 import type { Op } from './ops';
@@ -28,8 +29,8 @@ export type ReconcileStatus = 'idle' | 'loading' | 'ready' | 'error' | 'applying
 /** Which emitted-file kind the modal is reconciling against. */
 export type TargetKind = GeneratedTargetKind | 'unknown';
 
-export function targetKindFor(path: string, irPath?: string | null): TargetKind {
-  if (irPath) return generatedTargetForPath(irPath, path)?.kind ?? 'unknown';
+export function targetKindFor(path: string, irPath?: string | null, schema?: Schema): TargetKind {
+  if (irPath) return generatedTargetForPath(irPath, path, schema)?.kind ?? 'unknown';
   return 'unknown';
 }
 

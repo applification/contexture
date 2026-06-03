@@ -1,9 +1,11 @@
 export * from './agent-turn-ledger';
 export * from './change-log';
 export * from './chat-history';
+export * from './convex-capabilities';
 export * from './document-bundle';
 export { emitAiToolSchemas } from './emit-ai-tool-schemas';
 export { emitConvexSchema, emitConvexValidators } from './emit-convex';
+export { emitConvexRelationships } from './emit-convex-relationships';
 export { emitFormValidators } from './emit-form-validators';
 export { emit as emitJsonSchema } from './emit-json-schema';
 export { emitMcpDefinitions } from './emit-mcp-definitions';

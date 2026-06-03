@@ -1,5 +1,6 @@
 import { emitAiToolSchemas } from './emit-ai-tool-schemas';
 import { emitConvexSchema, emitConvexValidators } from './emit-convex';
+import { emitConvexRelationships } from './emit-convex-relationships';
 import { emitFormValidators } from './emit-form-validators';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import { emitMcpDefinitions } from './emit-mcp-definitions';
@@ -48,6 +49,7 @@ export interface EmitPipelineDeps {
   emitSchemaIndex?: (baseName: string, sourcePath?: string, schemaModule?: string) => string;
   emitConvex?: (schema: Schema, sourcePath?: string) => string;
   emitConvexValidators?: (schema: Schema, sourcePath?: string) => string;
+  emitConvexRelationships?: (schema: Schema, sourcePath?: string) => string;
   emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitStructuredOutputSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitMcpDefinitions?: (schema: Schema, sourcePath?: string) => unknown;
@@ -148,6 +150,20 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
     enable: (schema) => enableCoreOutput(schema, 'convex'),
     emit: (schema, irPath, _paths, deps) =>
       (deps.emitConvexValidators ?? emitConvexValidators)(schema, irPath),
+  },
+  {
+    kind: 'convex-relationships',
+    group: 'convex',
+    label: 'Convex relationships',
+    help: 'Relationship metadata and app-layer helpers for Convex refs.',
+    language: 'typescript',
+    previewable: true,
+    displayPath: () => 'convex/relationships.ts',
+    path: (paths) => paths.convexRelationships,
+    enabled: (schema) => coreOutputEnabled(schema, 'convex'),
+    enable: (schema) => enableCoreOutput(schema, 'convex'),
+    emit: (schema, irPath, _paths, deps) =>
+      (deps.emitConvexRelationships ?? emitConvexRelationships)(schema, irPath),
   },
   {
     kind: 'zod',
@@ -301,6 +317,7 @@ export function generatedTargetOutputDir(schema: Schema, kind: GeneratedTargetKi
       return schema.outputs?.schemaIndex?.dir ?? null;
     case 'convex':
     case 'convex-validators':
+    case 'convex-relationships':
       return schema.outputs?.convex?.dir ?? null;
     case 'ai-tool-schemas':
       return schema.outputs?.aiPipeline?.toolSchemas?.dir ?? null;
@@ -346,6 +363,7 @@ export function setGeneratedTargetOutputDir(
       };
     case 'convex':
     case 'convex-validators':
+    case 'convex-relationships':
       return {
         ...schema,
         outputs: { ...(schema.outputs ?? {}), convex: nextConfig(schema.outputs?.convex) },

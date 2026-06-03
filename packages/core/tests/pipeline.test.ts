@@ -29,6 +29,7 @@ describe('runEmitPipeline output config', () => {
     expect(emitted.map((file) => file.path)).toEqual([
       '/repo/packages/contexture/convex/schema.ts',
       '/repo/packages/contexture/convex/validators.ts',
+      '/repo/packages/contexture/convex/relationships.ts',
       '/repo/packages/contexture/app.schema.ts',
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',
@@ -41,6 +42,7 @@ describe('runEmitPipeline output config', () => {
     expect(emitted.map((file) => file.path)).toEqual([
       '/repo/apps/misprint/convex/schema.ts',
       '/repo/apps/misprint/convex/validators.ts',
+      '/repo/apps/misprint/convex/relationships.ts',
       '/repo/apps/misprint/schema/misprint.schema.ts',
       '/repo/apps/misprint/schema/misprint.schema.json',
       '/repo/apps/misprint/schema/index.ts',
@@ -89,6 +91,7 @@ describe('runEmitPipeline output config', () => {
     expect(emitted.map((file) => file.path)).toEqual([
       '/repo/apps/api/convex/schema.ts',
       '/repo/apps/api/convex/validators.ts',
+      '/repo/apps/api/convex/relationships.ts',
       '/repo/packages/domain/src/generated/app.schema.ts',
       '/repo/packages/domain/schema/app.schema.json',
       '/repo/packages/domain/src/indexes/index.ts',
@@ -102,6 +105,7 @@ describe('runEmitPipeline output config', () => {
       "import { Post } from '../../../../packages/domain/src/generated/app.schema';",
     );
     expect(manifest.files).toHaveProperty('apps/api/convex/schema.ts');
+    expect(manifest.files).toHaveProperty('apps/api/convex/relationships.ts');
     expect(manifest.files).toHaveProperty('packages/domain/src/generated/app.schema.ts');
   });
 
@@ -142,6 +146,7 @@ describe('runEmitPipeline output config', () => {
     expect(emitted.map((file) => file.path)).toEqual([
       '/repo/packages/contexture/convex/schema.ts',
       '/repo/packages/contexture/convex/validators.ts',
+      '/repo/packages/contexture/convex/relationships.ts',
       '/repo/packages/contexture/app.schema.ts',
       '/repo/packages/contexture/app.schema.json',
       '/repo/packages/contexture/index.ts',

@@ -580,7 +580,7 @@ describe('Contexture MCP server', () => {
       expect(cleanResult.structuredContent).toMatchObject({
         path: irPath,
         clean: true,
-        checked: 6,
+        checked: 7,
         drift: [],
       });
 

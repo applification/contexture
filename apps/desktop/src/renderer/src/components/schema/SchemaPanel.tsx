@@ -124,6 +124,14 @@ export interface SchemaPanelProps {
   onOpenGeneratedFile?: (path: string) => void;
   /** Prompt the app save flow when agent setup needs a stable IR path. */
   onRequestSave?: () => void;
+  /** Local Convex support and target app version information. */
+  convexVersion?: {
+    emitterVersion: string | null;
+    targetVersion: string | null;
+    targetPackagePath: string | null;
+    status: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
+    message: string | null;
+  };
 }
 
 /**
@@ -212,6 +220,7 @@ export function SchemaPanel({
   schema,
   onOpenGeneratedFile,
   onRequestSave,
+  convexVersion,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<GeneratedTargetKind>('convex');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -480,6 +489,15 @@ export function SchemaPanel({
               >
                 Read-only generated output
               </div>
+              {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
+                <div
+                  className="mt-0.5 truncate text-[10px] text-muted-foreground"
+                  title={convexVersionTooltip(convexVersion)}
+                  data-testid="schema-convex-version"
+                >
+                  {convexVersionLabel(convexVersion)}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
@@ -551,6 +569,28 @@ export function SchemaPanel({
       </div>
     </div>
   );
+}
+
+function convexVersionLabel(version: NonNullable<SchemaPanelProps['convexVersion']>): string {
+  if (version.status === 'loading') return 'Checking Convex version...';
+  if (version.targetVersion) {
+    if (version.status === 'ok') {
+      return `Convex ${version.emitterVersion} · emitter and target app`;
+    }
+    return `Emitter Convex ${version.emitterVersion} · target app ${version.targetVersion}`;
+  }
+  return `Emitter Convex ${version.emitterVersion}`;
+}
+
+function convexVersionTooltip(version: NonNullable<SchemaPanelProps['convexVersion']>): string {
+  return [
+    `Contexture emitter Convex: ${version.emitterVersion ?? 'unknown'}`,
+    `Target app Convex: ${version.targetVersion ?? 'not detected'}`,
+    version.targetPackagePath ? `Target package: ${version.targetPackagePath}` : null,
+    version.message,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n');
 }
 
 function safeGeneratedTargetPath(

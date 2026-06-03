@@ -87,6 +87,7 @@ import { useModelSync } from './hooks/useModelSync';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
+import { useConvexVersionStore } from './store/convex-version';
 import { useDocumentStore } from './store/document';
 import { useDriftStore } from './store/drift';
 import { useGraphLayoutStore } from './store/layout-config';
@@ -120,6 +121,7 @@ export default function App(): React.JSX.Element {
   const sidebarRef = useRef<PanelImperativeHandle>(null);
   const isDirty = useDocumentStore((s) => s.isDirty);
   const filePath = useDocumentStore((s) => s.filePath);
+  const convexVersion = useConvexVersionStore();
   const driftedPaths = useDriftStore((s) => s.driftedPaths);
 
   // Drive the collapse/expand imperative API from the UI-store flag so
@@ -149,6 +151,10 @@ export default function App(): React.JSX.Element {
     document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
     return () => document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
   }, []);
+
+  useEffect(() => {
+    void useConvexVersionStore.getState().refresh(filePath);
+  }, [filePath]);
 
   useEffect(() => {
     function onTypeSelect(event: Event): void {
@@ -607,6 +613,7 @@ export default function App(): React.JSX.Element {
                   onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                   schema={schema}
+                  convexVersion={convexVersion}
                 />
               </div>
               <div
