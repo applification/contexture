@@ -46,10 +46,64 @@ describe('emitConvexRelationships', () => {
     expect(out).toContain('Source: plantry.contexture.json');
     expect(out).toContain('"fromTable": "mealPlanMeal"');
     expect(out).toContain('"fromField": "recipeId"');
+    expect(out).toContain('"fromPath": [\n      "recipeId"\n    ]');
     expect(out).toContain('"toTable": "recipe"');
     expect(out).toContain('"onDelete": "restrict"');
     expect(out).toContain('export async function assertContextureRefs');
     expect(out).toContain('export async function deleteWithContextureRelations');
+    expect(parses(out)).toBe(true);
+  });
+
+  it('registers refs inside embedded object paths from each root table', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'string' } }],
+        },
+        {
+          kind: 'object',
+          name: 'RecipeIngredient',
+          fields: [{ name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            {
+              name: 'ingredients',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'RecipeIngredient' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'ingredient', type: { kind: 'ref', typeName: 'RecipeIngredient' } },
+          ],
+        },
+      ],
+    };
+
+    const out = emitConvexRelationships(schema);
+
+    expect(out).toContain('"name": "Recipe.ingredients.[].ingredientId"');
+    expect(out).toContain('"fromTable": "recipe"');
+    expect(out).toContain('"fromField": "ingredientId"');
+    expect(out).toContain(
+      '"fromPath": [\n      "ingredients",\n      "[]",\n      "ingredientId"\n    ]',
+    );
+    expect(out).toContain('"name": "PantryItem.ingredient.ingredientId"');
+    expect(out).toContain('"fromPath": [\n      "ingredient",\n      "ingredientId"\n    ]');
+    expect(out).toContain('collectContexturePathValues(input, relationship.fromPath)');
     expect(parses(out)).toBe(true);
   });
 

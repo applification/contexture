@@ -7,6 +7,7 @@ interface Relationship {
   fromType: string;
   fromTable: string;
   fromField: string;
+  fromPath: string[];
   toType: string;
   toTable: string;
   cardinality: 'one' | 'many';
@@ -46,6 +47,7 @@ function relationshipType(): string {
   fromType: string;
   fromTable: string;
   fromField: string;
+  fromPath: string[];
   toType: string;
   toTable: string;
   cardinality: 'one' | 'many';
@@ -65,30 +67,99 @@ function collectRelationships(schema: Schema): Relationship[] {
   for (const owner of objects) {
     if (owner.table !== true) continue;
     for (const field of owner.fields) {
-      const ref = unwrapRef(field.type);
-      if (!ref) continue;
-      const target = byName.get(ref.typeName);
-      if (!target || target.table !== true) continue;
-      const relationship = ref.relationship;
-      const ownership = relationship?.ownership;
-      relationships.push({
-        name: relationship?.name ?? `${owner.name}.${field.name}`,
-        fromType: owner.name,
-        fromTable: tableName(owner),
-        fromField: field.name,
-        toType: target.name,
-        toTable: tableName(target),
-        cardinality: ref.cardinality,
+      collectRelationshipsForType({
+        root: owner,
+        type: field.type,
+        byName,
+        relationships,
+        path: [field.name],
+        cardinality: 'one',
         optional: field.optional === true,
         nullable: field.nullable === true,
-        onDelete: relationship?.onDelete ?? 'none',
-        ownershipScopeField: ownership?.scopeField ?? null,
-        targetOwnershipScopeField: ownership?.targetScopeField ?? ownership?.scopeField ?? null,
+        visitedEmbeds: new Set([owner.name]),
       });
     }
   }
 
   return relationships.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function collectRelationshipsForType(args: {
+  root: ObjectType;
+  type: FieldType;
+  byName: ReadonlyMap<string, ObjectType>;
+  relationships: Relationship[];
+  path: string[];
+  cardinality: 'one' | 'many';
+  optional: boolean;
+  nullable: boolean;
+  visitedEmbeds: ReadonlySet<string>;
+}): void {
+  const {
+    root,
+    type,
+    byName,
+    relationships,
+    path,
+    cardinality,
+    optional,
+    nullable,
+    visitedEmbeds,
+  } = args;
+
+  if (type.kind === 'array') {
+    collectRelationshipsForType({
+      ...args,
+      type: type.element,
+      path: [...path, '[]'],
+      cardinality: 'many',
+    });
+    return;
+  }
+
+  if (type.kind !== 'ref') return;
+
+  const target = byName.get(type.typeName);
+  if (!target) return;
+
+  if (target.table === true) {
+    const relationship = type.relationship;
+    const ownership = relationship?.ownership;
+    const fromField = leafField(path);
+    relationships.push({
+      name: relationship?.name ?? `${root.name}.${formatPath(path)}`,
+      fromType: root.name,
+      fromTable: tableName(root),
+      fromField,
+      fromPath: path,
+      toType: target.name,
+      toTable: tableName(target),
+      cardinality,
+      optional,
+      nullable,
+      onDelete: relationship?.onDelete ?? 'none',
+      ownershipScopeField: ownership?.scopeField ?? null,
+      targetOwnershipScopeField: ownership?.targetScopeField ?? ownership?.scopeField ?? null,
+    });
+    return;
+  }
+
+  if (visitedEmbeds.has(target.name)) return;
+  const nextVisited = new Set(visitedEmbeds);
+  nextVisited.add(target.name);
+  for (const field of target.fields) {
+    collectRelationshipsForType({
+      root,
+      type: field.type,
+      byName,
+      relationships,
+      path: [...path, field.name],
+      cardinality,
+      optional: optional || field.optional === true,
+      nullable: nullable || field.nullable === true,
+      visitedEmbeds: nextVisited,
+    });
+  }
 }
 
 function assertionHelpers(relationships: Relationship[]): string[] {
@@ -111,10 +182,9 @@ function assertionHelpers(relationships: Relationship[]): string[] {
     `  relationship: ContextureRelationship,`,
     `  input: ContextureSource,`,
     `): Promise<void> {`,
-    `  const value = input[relationship.fromField];`,
-    `  if (value === undefined || value === null) return;`,
-    `  const ids = Array.isArray(value) ? value : [value];`,
+    `  const ids = collectContexturePathValues(input, relationship.fromPath);`,
     `  for (const id of ids) {`,
+    `    if (id === undefined || id === null) continue;`,
     `    if (typeof id !== 'string') {`,
     `      throw new Error(\`\${relationship.fromField} must be a Convex document id string.\`);`,
     `    }`,
@@ -129,6 +199,21 @@ function assertionHelpers(relationships: Relationship[]): string[] {
     `      throw new Error(\`\${relationship.fromField} must reference a \${relationship.toTable} document in the same \${relationship.ownershipScopeField} scope.\`);`,
     `    }`,
     `  }`,
+    `}`,
+    '',
+    `function collectContexturePathValues(value: unknown, path: readonly string[]): unknown[] {`,
+    `  if (path.length === 0) return [value];`,
+    `  const [segment, ...rest] = path;`,
+    `  if (segment === '[]') {`,
+    `    if (!Array.isArray(value)) return [];`,
+    `    return value.flatMap((item) => collectContexturePathValues(item, rest));`,
+    `  }`,
+    `  if (!isContextureRecord(value)) return [];`,
+    `  return collectContexturePathValues(value[segment], rest);`,
+    `}`,
+    '',
+    `function isContextureRecord(value: unknown): value is Record<string, unknown> {`,
+    `  return typeof value === 'object' && value !== null && !Array.isArray(value);`,
     `}`,
   ];
 
@@ -167,26 +252,16 @@ function deleteHelpers(relationships: Relationship[]): string[] {
   return lines;
 }
 
-function unwrapRef(type: FieldType): {
-  typeName: string;
-  relationship: Extract<FieldType, { kind: 'ref' }>['relationship'];
-  cardinality: 'one' | 'many';
-} | null {
-  if (type.kind === 'ref') {
-    return { typeName: type.typeName, relationship: type.relationship, cardinality: 'one' };
-  }
-  if (type.kind === 'array' && type.element.kind === 'ref') {
-    return {
-      typeName: type.element.typeName,
-      relationship: type.element.relationship,
-      cardinality: 'many',
-    };
-  }
-  return null;
-}
-
 function isObjectType(type: TypeDef): type is ObjectType {
   return type.kind === 'object';
+}
+
+function leafField(path: readonly string[]): string {
+  return [...path].reverse().find((segment) => segment !== '[]') ?? '';
+}
+
+function formatPath(path: readonly string[]): string {
+  return path.join('.');
 }
 
 function tableName(type: ObjectType): string {
