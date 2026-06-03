@@ -12,11 +12,12 @@ import { assertContextureIrPath, bundlePathsFor } from './paths';
 import type { EmitPipelineDeps } from './pipeline';
 import { checkSemantic, type StdlibCatalog } from './semantic-validation';
 
-const VERSION = '0.0.0';
+const DEFAULT_VERSION = '0.0.0';
 
 export interface ContextureMcpServerOptions {
   stdlib?: StdlibCatalog;
   emitDeps?: EmitPipelineDeps;
+  version?: string;
 }
 
 const IrPathInput = {
@@ -94,6 +95,9 @@ const ValidationIssueSchema = z.object({
 const ValidateOutput = {
   path: z.string(),
   valid: z.boolean(),
+  mcp: z.object({
+    version: z.string(),
+  }),
   warnings: z.array(z.union([z.string(), ValidationIssueSchema])),
   errors: z.array(ValidationIssueSchema),
 };
@@ -150,7 +154,8 @@ const IntegrationGuidanceOutput = {
 };
 
 export function createContextureMcpServer(options: ContextureMcpServerOptions = {}): McpServer {
-  const server = new McpServer({ name: 'contexture-core', version: VERSION });
+  const version = options.version ?? DEFAULT_VERSION;
+  const server = new McpServer({ name: 'contexture-core', version });
 
   server.registerTool(
     'inspect_contexture',
@@ -187,7 +192,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       },
     },
     async ({ irPath }) => {
-      const structuredContent = await validateContextureFile(irPath, options.stdlib);
+      const structuredContent = await validateContextureFile(irPath, options.stdlib, version);
       return jsonToolResult(structuredContent);
     },
   );
@@ -316,6 +321,7 @@ async function readContextureFile(irPath: string): Promise<{ schema: Schema; war
 async function validateContextureFile(
   irPath: string,
   catalog?: StdlibCatalog,
+  version = DEFAULT_VERSION,
 ): Promise<z.infer<z.ZodObject<typeof ValidateOutput>>> {
   try {
     const { schema, warnings } = await readContextureFile(irPath);
@@ -331,6 +337,7 @@ async function validateContextureFile(
     return {
       path: irPath,
       valid: errors.length === 0,
+      mcp: { version },
       warnings: [...warnings, ...semanticWarnings],
       errors,
     };
@@ -338,6 +345,7 @@ async function validateContextureFile(
     return {
       path: irPath,
       valid: false,
+      mcp: { version },
       warnings: [],
       errors: normalizeValidationError(err),
     };

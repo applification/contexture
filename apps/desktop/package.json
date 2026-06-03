@@ -1,6 +1,6 @@
 {
   "name": "@contexture/desktop",
-  "version": "0.15.37",
+  "version": "0.15.38",
   "description": "Convex model editor with generated schema, validators, and agent-safe ops",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/applification/contexture",
@@ -10,7 +10,7 @@
     "postinstall": "bun run electron:install",
     "electron:install": "install-electron && node scripts/patch-electron-name.js",
     "dev": "bun run electron:install && electron-vite dev",
-    "build": "electron-vite build",
+    "build": "bun run build:mcp-cli && electron-vite build",
     "build:mcp-cli": "node scripts/build-mcp-cli.cjs",
     "start": "bun run electron:install && electron-vite preview",
     "typegen": "varlock typegen",

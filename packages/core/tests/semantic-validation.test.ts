@@ -406,6 +406,61 @@ describe('checkSemantic — refs', () => {
       }),
     ]);
   });
+
+  it('does not use audit fields as tenant axes for missing ownership warnings', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'string' } },
+            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+            { name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } },
+            { name: 'householdRefId', type: { kind: 'ref', typeName: 'Household' } },
+          ],
+        },
+      ],
+    };
+
+    const warnings = checkSemantic(schema, STDLIB).filter(
+      (issue) => issue.code === 'relationship_ownership_scope_missing',
+    );
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        path: 'types.3.fields.3.type.relationship.ownership',
+        message: expect.stringContaining('tenant axis "householdId"'),
+        hint: expect.stringContaining('scopeField: "householdId"'),
+      }),
+    ]);
+    expect(JSON.stringify(warnings)).not.toContain('createdAt');
+    expect(JSON.stringify(warnings)).not.toContain('updatedAt');
+  });
 });
 
 describe('checkSemantic — imports', () => {

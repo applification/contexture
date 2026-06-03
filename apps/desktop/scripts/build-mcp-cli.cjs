@@ -1,10 +1,14 @@
 const { spawnSync } = require('node:child_process');
-const { mkdirSync } = require('node:fs');
+const { mkdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 
 function buildMcpCli(options = {}) {
   const appDir = options.appDir ?? path.resolve(__dirname, '..');
   const workspaceRoot = options.workspaceRoot ?? path.resolve(appDir, '../..');
+  const version =
+    options.version ??
+    JSON.parse(readFileSync(path.join(appDir, 'package.json'), 'utf8')).version ??
+    '0.0.0';
   const outDir = path.join(appDir, 'build', 'bin');
   const executableName =
     (options.platform ?? process.platform) === 'win32' ? 'contexture-mcp.exe' : 'contexture-mcp';
@@ -15,10 +19,22 @@ function buildMcpCli(options = {}) {
 
   mkdir(outDir, { recursive: true });
 
-  const result = spawn('bun', ['build', '--compile', '--outfile', outFile, entrypoint], {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-  });
+  const result = spawn(
+    'bun',
+    [
+      'build',
+      '--compile',
+      '--define',
+      `CONTEXTURE_MCP_VERSION=${JSON.stringify(version)}`,
+      '--outfile',
+      outFile,
+      entrypoint,
+    ],
+    {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+    },
+  );
 
   if (result.error) {
     throw result.error;
