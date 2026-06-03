@@ -3,6 +3,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   assertContextureIrPath,
+  buildConvexCapabilityManifest,
   checkGeneratedBundle,
   checkSemantic,
   createFileBackedForward,
@@ -50,6 +51,7 @@ Read helpers:
   validate [--json]
   emit [--json]
   check-generated [--json]
+  convex-capabilities [--json]
 
 Schema mutations:
   apply (--op-json <json> | --op-file <path>)
@@ -496,10 +498,70 @@ function writeResult(value: unknown, json: boolean): void {
   writeJson(value);
 }
 
+async function collectConvexCapabilities() {
+  const [{ v }, server, convexPackage, cliVersion, cliHelp] = await Promise.all([
+    import('convex/values'),
+    import('convex/server'),
+    import('convex/package.json'),
+    runCommand(['bunx', 'convex', '--version']),
+    runCommand(['bunx', 'convex', '--help']),
+  ]);
+
+  return buildConvexCapabilityManifest({
+    packageVersion: packageVersionFromModule(convexPackage),
+    cliVersion: cliVersion.trim() || null,
+    validators: Object.keys(v),
+    serverExports: Object.keys(server),
+    cliHelp,
+  });
+}
+
+function packageVersionFromModule(module: unknown): string | null {
+  const candidate =
+    module && typeof module === 'object' && 'default' in module ? module.default : module;
+  if (!candidate || typeof candidate !== 'object' || !('version' in candidate)) return null;
+  return typeof candidate.version === 'string' ? candidate.version : null;
+}
+
+async function runCommand(cmd: string[]): Promise<string> {
+  const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    const detail = stderr.trim() || stdout.trim() || `exit code ${exitCode}`;
+    throw new Error(`${cmd.join(' ')} failed: ${detail}`);
+  }
+  return stdout;
+}
+
+function renderConvexCapabilitiesText(
+  manifest: Awaited<ReturnType<typeof collectConvexCapabilities>>,
+) {
+  return [
+    `Convex package: ${manifest.packageVersion ?? '(unknown)'}`,
+    `Convex CLI: ${manifest.cliVersion ?? '(unknown)'}`,
+    `Validators: ${manifest.validators.join(', ')}`,
+    `Server exports: ${manifest.serverExports.join(', ')}`,
+    `CLI commands: ${manifest.cliCommands.join(', ')}`,
+    `Schema options: ${manifest.defineSchemaOptions.join(', ')}`,
+    '',
+  ].join('\n');
+}
+
 async function run(argv: string[]): Promise<void> {
   const { command, args, options } = parseArgv(argv);
   if (command === 'help' || command === '--help' || command === '-h') {
     process.stdout.write(HELP);
+    return;
+  }
+
+  if (command === 'convex-capabilities') {
+    const manifest = await collectConvexCapabilities();
+    if (options.json) writeJson({ ok: true, manifest });
+    else process.stdout.write(renderConvexCapabilitiesText(manifest));
     return;
   }
 

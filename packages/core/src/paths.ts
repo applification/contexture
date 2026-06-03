@@ -12,6 +12,7 @@ export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
 export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
 export const FORM_VALIDATORS_FILE = 'form-validators.ts';
 export const CONVEX_VALIDATORS_FILE = 'validators.ts';
+export const CONVEX_RELATIONSHIPS_FILE = 'relationships.ts';
 export const SCHEMA_DIR = 'schema';
 export const STDLIB_RUNTIME_DIR = 'contexture-runtime';
 
@@ -26,6 +27,7 @@ export interface BundlePaths {
   schemaIndex: string;
   convex: string;
   convexValidators: string;
+  convexRelationships: string;
   aiToolSchemas: string;
   structuredOutputSchemas: string;
   mcpDefinitions: string;
@@ -39,6 +41,7 @@ export type GeneratedTargetKind =
   | 'schema-index'
   | 'convex'
   | 'convex-validators'
+  | 'convex-relationships'
   | 'ai-tool-schemas'
   | 'structured-output-schemas'
   | 'mcp-definitions'
@@ -112,6 +115,7 @@ export function bundlePathsFor(irPath: string, schema?: Schema): BundlePaths {
     schemaIndex: `${schemaIndexDir}/index.ts`,
     convex: `${convexDir}/schema.ts`,
     convexValidators: `${convexDir}/${CONVEX_VALIDATORS_FILE}`,
+    convexRelationships: `${convexDir}/${CONVEX_RELATIONSHIPS_FILE}`,
     aiToolSchemas: `${aiToolSchemasDir}/${AI_TOOL_SCHEMAS_FILE}`,
     structuredOutputSchemas: `${structuredOutputSchemasDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
     mcpDefinitions: `${mcpDefinitionsDir}/${MCP_DEFINITIONS_FILE}`,
@@ -128,6 +132,7 @@ export function generatedTargetsFor(irPath: string, schema?: Schema): GeneratedT
     { kind: 'schema-index', path: paths.schemaIndex },
     { kind: 'convex', path: paths.convex },
     { kind: 'convex-validators', path: paths.convexValidators },
+    { kind: 'convex-relationships', path: paths.convexRelationships },
     { kind: 'ai-tool-schemas', path: paths.aiToolSchemas },
     { kind: 'structured-output-schemas', path: paths.structuredOutputSchemas },
     { kind: 'mcp-definitions', path: paths.mcpDefinitions },
@@ -299,6 +304,7 @@ function outputDirConfigFor(schema: Schema | undefined, kind: OutputDirTargetKin
       return schema.outputs.schemaIndex?.dir ?? null;
     case 'convex':
     case 'convex-validators':
+    case 'convex-relationships':
       return schema.outputs.convex?.dir ?? null;
     case 'stdlib-runtime':
       return schema.outputs.stdlibRuntime?.dir ?? null;

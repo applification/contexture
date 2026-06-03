@@ -321,6 +321,7 @@ describe('DocumentStore', () => {
         'schema/index.ts',
         'convex/schema.ts',
         'convex/validators.ts',
+        'convex/relationships.ts',
       ].sort(),
     );
     for (const hash of Object.values(manifest.files)) {

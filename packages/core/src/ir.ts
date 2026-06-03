@@ -39,6 +39,18 @@ const LiteralFieldTypeSchema = z.object({
 const RefFieldTypeSchema = z.object({
   kind: z.literal('ref'),
   typeName: z.string().min(1),
+  relationship: z
+    .object({
+      name: z.string().min(1).optional(),
+      onDelete: z.enum(['none', 'restrict', 'cascade', 'setNull']).optional(),
+      ownership: z
+        .object({
+          scopeField: z.string().min(1),
+          targetScopeField: z.string().min(1).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const SampleDataHintSchema = z.object({

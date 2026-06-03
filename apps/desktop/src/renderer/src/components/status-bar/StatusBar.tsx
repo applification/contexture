@@ -12,6 +12,7 @@ import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics'
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { parseTypePath, repairForValidationError } from '@renderer/services/validation-repairs';
+import { useConvexVersionStore } from '@renderer/store/convex-version';
 import { useDocumentStore } from '@renderer/store/document';
 import { sourceLabel, useModelSyncStore } from '@renderer/store/model-sync';
 import { useGraphSelectionStore } from '@renderer/store/selection';
@@ -30,6 +31,7 @@ export function StatusBar(): React.JSX.Element {
   const syncStatus = useModelSyncStore((s) => s.status);
   const syncNotice = useModelSyncStore((s) => s.notice);
   const click = useGraphSelectionStore((s) => s.click);
+  const convexVersion = useConvexVersionStore();
 
   const typeCount = schema.types.length;
   const fieldCount = useMemo(() => {
@@ -193,6 +195,21 @@ export function StatusBar(): React.JSX.Element {
 
         {syncStatus === 'invalid_model' && <span className="text-destructive">Invalid model</span>}
 
+        {convexVersionStatusLabel(convexVersion) ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="whitespace-nowrap text-warning" data-testid="status-convex-version">
+                {convexVersionStatusLabel(convexVersion)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="max-w-80 text-xs whitespace-pre-line">
+                {convexVersionStatusTooltip(convexVersion)}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+
         <div className="flex-1" />
 
         {hasIssues ? (
@@ -271,6 +288,34 @@ export function StatusBar(): React.JSX.Element {
       </TooltipProvider>
     </div>
   );
+}
+
+function convexVersionStatusLabel(version: {
+  status: string;
+  emitterVersion: string | null;
+  targetVersion: string | null;
+}): string | null {
+  if (version.status === 'mismatch') return 'Convex mismatch';
+  if (version.status === 'target_missing') return 'Convex target unknown';
+  if (version.status === 'probe_failed') return 'Convex probe failed';
+  return null;
+}
+
+function convexVersionStatusTooltip(version: {
+  status: string;
+  emitterVersion: string | null;
+  targetVersion: string | null;
+  targetPackagePath: string | null;
+  message: string | null;
+}): string {
+  return [
+    `Emitter Convex: ${version.emitterVersion ?? 'unknown'}`,
+    `Target app Convex: ${version.targetVersion ?? 'not detected'}`,
+    version.targetPackagePath ? `Package: ${version.targetPackagePath}` : null,
+    version.message,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n');
 }
 
 function countRefs(type: FieldType): number {

@@ -123,9 +123,13 @@ function shortPath(fullPath: string): string {
   return slash === -1 ? fullPath : fullPath.slice(slash + 1);
 }
 
-function generatedTargetKindFor(targetPath: string | null, irPath: string | null): TargetKind {
+function generatedTargetKindFor(
+  targetPath: string | null,
+  irPath: string | null,
+  schema: Schema,
+): TargetKind {
   if (!targetPath || !irPath) return 'unknown';
-  return targetKindFor(targetPath, irPath);
+  return targetKindFor(targetPath, irPath, schema);
 }
 
 function reconcileStatusCopy(status: DriftFileStatus['status'] | null): string {
@@ -173,8 +177,9 @@ export function ReconcileModal(): React.JSX.Element {
   const driftFiles = useDriftStore((s) => s.files);
 
   const displayName = targetPath ? shortPath(targetPath) : 'generated file';
-  const targetKind = generatedTargetKindFor(targetPath, filePath);
+  const targetKind = generatedTargetKindFor(targetPath, filePath, schema);
   const driftStatus = driftFiles.find((file) => file.path === targetPath)?.status ?? null;
+  const targetUnavailable = driftStatus === 'missing' || driftStatus === 'unreadable';
 
   // Recompute the would-be emit each time the user toggles an op.
   // Cheap (pure function, < 10ms even on large schemas), so a
@@ -453,7 +458,12 @@ export function ReconcileModal(): React.JSX.Element {
                   </Button>
                 </div>
               )}
-              {status === 'ready' && proposedOps.length === 0 && (
+              {status === 'ready' && proposedOps.length === 0 && targetUnavailable && (
+                <p className="text-sm text-muted-foreground">
+                  No readable generated file is available. Regenerate from IR to recreate it.
+                </p>
+              )}
+              {status === 'ready' && proposedOps.length === 0 && !targetUnavailable && (
                 <p className="text-sm text-muted-foreground">
                   No ops needed — Contexture would already emit the file as it stands on disk.
                 </p>
@@ -532,6 +542,7 @@ export function ReconcileModal(): React.JSX.Element {
               )}
               {(status === 'ready' || status === 'applying') &&
                 onDiskSource !== null &&
+                !targetUnavailable &&
                 (activeDiff.error ? (
                   <p className="p-3 text-sm text-destructive">
                     Cannot emit current schema: {activeDiff.error}
@@ -559,20 +570,30 @@ export function ReconcileModal(): React.JSX.Element {
                     disableWorkerPool={true}
                   />
                 ))}
+              {(status === 'ready' || status === 'applying') && targetUnavailable && (
+                <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-1 p-6 text-center">
+                  <p className="text-sm font-medium">Generated file unavailable</p>
+                  <p className="text-sm text-muted-foreground">
+                    Regenerate from IR will write a fresh {displayName}.
+                  </p>
+                </div>
+              )}
             </div>
-            {(status === 'ready' || status === 'applying') && onDiskSource !== null && (
-              <div className="px-3 py-2 border-t text-xs text-muted-foreground">
-                {diffMode === 'file-changes'
-                  ? `${fileChangedLines} changed line${
-                      fileChangedLines !== 1 ? 's' : ''
-                    } detected in the generated file.`
-                  : residualLines === 0
-                    ? '0 uncovered lines. The selected ops fully explain the on-disk edit.'
-                    : `${residualLines} uncovered line${
-                        residualLines !== 1 ? 's' : ''
-                      } remain outside the selected ops.`}
-              </div>
-            )}
+            {(status === 'ready' || status === 'applying') &&
+              onDiskSource !== null &&
+              !targetUnavailable && (
+                <div className="px-3 py-2 border-t text-xs text-muted-foreground">
+                  {diffMode === 'file-changes'
+                    ? `${fileChangedLines} changed line${
+                        fileChangedLines !== 1 ? 's' : ''
+                      } detected in the generated file.`
+                    : residualLines === 0
+                      ? '0 uncovered lines. The selected ops fully explain the on-disk edit.'
+                      : `${residualLines} uncovered line${
+                          residualLines !== 1 ? 's' : ''
+                        } remain outside the selected ops.`}
+                </div>
+              )}
           </div>
         </div>
 

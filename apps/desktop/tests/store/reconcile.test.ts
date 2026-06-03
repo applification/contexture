@@ -8,6 +8,28 @@ describe('targetKindFor', () => {
     expect(targetKindFor('/proj/packages/contexture/convex/schema.ts', irPath)).toBe('convex');
   });
 
+  it('detects convex relationship helpers', () => {
+    expect(targetKindFor('/proj/packages/contexture/convex/relationships.ts', irPath)).toBe(
+      'convex-relationships',
+    );
+  });
+
+  it('detects configured Convex output directories from the current schema', () => {
+    const schema = {
+      version: '1',
+      outputs: { convex: { dir: 'packages/convex/convex' } },
+      types: [],
+    } as const;
+
+    expect(
+      targetKindFor(
+        '/proj/packages/contexture/packages/convex/convex/relationships.ts',
+        irPath,
+        schema,
+      ),
+    ).toBe('convex-relationships');
+  });
+
   it('detects zod .schema.ts', () => {
     expect(targetKindFor('/proj/packages/contexture/garden.schema.ts', irPath)).toBe('zod');
   });

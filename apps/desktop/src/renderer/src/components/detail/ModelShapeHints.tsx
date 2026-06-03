@@ -86,6 +86,7 @@ const fieldBadgeStyle: CSSProperties = {
 
 function toneForHint(kind: ModelingHint['kind']): CSSProperties {
   switch (kind) {
+    case 'stringly_ref':
     case 'stdlib_type':
       return {
         background: 'color-mix(in oklch, var(--reference) 14%, transparent)',
@@ -125,6 +126,7 @@ function compareHints(a: ModelingHint, b: ModelingHint): number {
 
 function hintRank(hint: ModelingHint): number {
   switch (hint.kind) {
+    case 'stringly_ref':
     case 'stdlib_type':
       return 0;
     case 'possible_entity':

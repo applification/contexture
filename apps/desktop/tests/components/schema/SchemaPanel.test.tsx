@@ -272,6 +272,28 @@ describe('SchemaPanel', () => {
       expect(screen.queryByTestId('schema-group-agent')).not.toBeInTheDocument();
     });
 
+    it('shows the Convex emitter and target app version for Convex outputs', () => {
+      const convexSrc = 'import { defineSchema } from "convex/server";\n';
+      render(
+        <SchemaPanel
+          {...DEFAULT_PROPS}
+          zodSource="zod"
+          convexSource={convexSrc}
+          convexVersion={{
+            emitterVersion: '1.40.0',
+            targetVersion: '1.37.0',
+            targetPackagePath: '/repo/apps/plantry/package.json',
+            status: 'mismatch',
+            message: 'Contexture emitter and target app Convex versions differ.',
+          }}
+        />,
+      );
+
+      expect(screen.getByTestId('schema-convex-version')).toHaveTextContent(
+        'Emitter Convex 1.40.0 · target app 1.37.0',
+      );
+    });
+
     it('switches to JSON Schema source when the JSON output is selected', async () => {
       const zodSrc = "import { z } from 'zod';\n";
       const jsonSrc = '{\n  "$schema": "https://json-schema.org/draft/2020-12/schema"\n}';

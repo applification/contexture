@@ -153,6 +153,17 @@ const drift = {
     subscribe('drift:resolved', (() => listener()) as (p: unknown) => void),
 };
 
+const convex = {
+  versionInfo: (payload: { irPath: string }) =>
+    ipcRenderer.invoke('convex:version-info', payload) as Promise<{
+      emitterVersion: string;
+      targetVersion: string | null;
+      targetPackagePath: string | null;
+      status: 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
+      message: string;
+    }>,
+};
+
 const modelSync = {
   watch: (payload: { irPath: string }): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('model-sync:watch', payload) as Promise<{ ok: boolean }>,
@@ -244,7 +255,7 @@ const update = {
   },
 };
 
-const contexture = { schemaAgent, file, shell, drift, modelSync, reconcile, update };
+const contexture = { schemaAgent, file, shell, drift, convex, modelSync, reconcile, update };
 
 if (process.contextIsolated) {
   try {

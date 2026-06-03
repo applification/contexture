@@ -151,4 +151,37 @@ describe('analyzeModelingHints', () => {
       ]),
     );
   });
+
+  it('suggests converting stringly Convex ids to refs', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Recipe', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'variantOfRecipeId', type: { kind: 'string' } },
+            { name: 'sourceRecipeIds', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'stringly_ref',
+          fieldName: 'variantOfRecipeId',
+          action: { kind: 'convert_to_ref', typeName: 'Recipe' },
+        }),
+        expect.objectContaining({
+          kind: 'stringly_ref',
+          fieldName: 'sourceRecipeIds',
+          action: { kind: 'convert_to_ref', typeName: 'Recipe' },
+        }),
+      ]),
+    );
+  });
 });

@@ -30,6 +30,8 @@ vi.mock('@renderer/hooks/useSchemaAgentReconcile', () => ({
 const IR_PATH = '/repo/packages/contexture/garden.contexture.json';
 const ZOD_PATH = '/repo/packages/contexture/garden.schema.ts';
 const CONVEX_PATH = '/repo/packages/contexture/convex/schema.ts';
+const CONFIGURED_CONVEX_RELATIONSHIPS_PATH =
+  '/repo/packages/contexture/packages/convex/convex/relationships.ts';
 const UNKNOWN_PATH = '/repo/packages/contexture/custom.ts';
 const USER_INDEX_PATH = '/repo/packages/contexture/src/index.ts';
 
@@ -108,6 +110,46 @@ describe('ReconcileModal', () => {
     expect(contents).toContain('Plot');
     expect(window.contexture?.drift.check).toHaveBeenCalledOnce();
     expect(useReconcileStore.getState().isOpen).toBe(false);
+  });
+
+  it('regenerates a missing relationships helper from a configured Convex output directory', async () => {
+    const configuredSchema = {
+      ...SCHEMA,
+      outputs: { convex: { dir: 'packages/convex/convex' } },
+    } as const;
+    useUndoStore.setState({
+      schema: configuredSchema,
+      past: [],
+      future: [],
+      txDepth: 0,
+      txStart: null,
+      canUndo: false,
+      canRedo: false,
+    });
+    useDriftStore
+      .getState()
+      .setDetected([{ path: CONFIGURED_CONVEX_RELATIONSHIPS_PATH, status: 'missing' }]);
+    useReconcileStore.getState().open(CONFIGURED_CONVEX_RELATIONSHIPS_PATH);
+    useReconcileStore.getState().setReady([], '');
+
+    render(<ReconcileModal />);
+
+    expect(screen.getByText(/No readable generated file is available/i)).toBeVisible();
+    expect(screen.getByText(/Generated file unavailable/i)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /regenerate from ir/i }));
+
+    await waitFor(() =>
+      expect(window.contexture?.reconcile.acceptGeneratedTarget).toHaveBeenCalledOnce(),
+    );
+    const [payload] =
+      vi.mocked(window.contexture?.reconcile.acceptGeneratedTarget).mock.calls[0] ?? [];
+    expect(payload).toMatchObject({
+      irPath: IR_PATH,
+      targetPath: CONFIGURED_CONVEX_RELATIONSHIPS_PATH,
+      schema: configuredSchema,
+    });
+    expect(payload?.contents).toContain('@contexture-generated');
+    expect(payload?.contents).toContain('relationships');
   });
 
   it('does not offer regeneration for unknown or user-owned targets', () => {

@@ -7,7 +7,8 @@ export type ModelingHintKind =
   | 'possible_entity'
   | 'query_handle'
   | 'embedded_collection'
-  | 'stdlib_type';
+  | 'stdlib_type'
+  | 'stringly_ref';
 
 export type ModelingSignal =
   | 'identity_pressure'
@@ -30,10 +31,15 @@ export interface ModelingHint {
   action?: ModelingHintAction;
 }
 
-export type ModelingHintAction = {
-  kind: 'use_stdlib_type';
-  typeName: string;
-};
+export type ModelingHintAction =
+  | {
+      kind: 'use_stdlib_type';
+      typeName: string;
+    }
+  | {
+      kind: 'convert_to_ref';
+      typeName: string;
+    };
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
@@ -100,10 +106,42 @@ export function analyzeModelingHints(schema: Schema): ModelingHint[] {
 
       const stdlibHint = stdlibTypeHint(type, field, fieldPath);
       if (stdlibHint) hints.push(stdlibHint);
+
+      const refHint = stringlyRefHint(schema, type, field, fieldPath);
+      if (refHint) hints.push(refHint);
     });
   });
 
   return hints;
+}
+
+function stringlyRefHint(
+  schema: Schema,
+  type: ObjectType,
+  field: FieldDef,
+  path: string,
+): ModelingHint | null {
+  if (!isStringlyRefField(field)) return null;
+  const targetNames = targetTypeNameCandidatesForRefField(field.name);
+  const target = schema.types
+    .filter(isObjectType)
+    .find((candidate) => candidate.table === true && targetNames.includes(candidate.name));
+  if (!target) return null;
+
+  return {
+    id: hintId('stringly_ref', type.name, field.name, [target.name]),
+    kind: 'stringly_ref',
+    signals: ['relationship_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Stringly reference',
+    message: `${field.name} looks like a Convex id for ${target.name}. Convert it to a ref so generated validators emit v.id("${convexTableName(target)}").`,
+    rationale:
+      'Refs preserve the target type in Contexture and give Convex generated schemas table-tagged id validation.',
+    fieldNames: [field.name],
+    action: { kind: 'convert_to_ref', typeName: target.name },
+  };
 }
 
 function possibleEntityHint({
@@ -268,6 +306,40 @@ function isIdentityLikeField(field: FieldDef): boolean {
   return false;
 }
 
+function isStringlyRefField(field: FieldDef): boolean {
+  if (field.type.kind === 'string') return singularRefName(field.name) !== null;
+  if (field.type.kind === 'array' && field.type.element.kind === 'string') {
+    return singularRefName(field.name) !== null;
+  }
+  return false;
+}
+
+function targetTypeNameCandidatesForRefField(fieldName: string): string[] {
+  const singular = singularRefName(fieldName);
+  if (!singular) return [];
+  const pascal = singular
+    .split(/(?=[A-Z])/u)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join('');
+  const parts = pascal.split(/(?=[A-Z])/u).filter((part) => part.length > 0);
+  const candidates: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    candidates.push(parts.slice(i).join(''));
+  }
+  return [...new Set(candidates)];
+}
+
+function singularRefName(fieldName: string): string | null {
+  if (fieldName.endsWith('Ids') && fieldName.length > 'Ids'.length) {
+    return fieldName.slice(0, -'Ids'.length);
+  }
+  if (fieldName.endsWith('Id') && fieldName.length > 'Id'.length) {
+    return fieldName.slice(0, -'Id'.length);
+  }
+  return null;
+}
+
 function stdlibTargetForField(field: FieldDef): { typeName: string; label: string } | null {
   const name = field.name.toLowerCase();
   const description = field.description?.toLowerCase() ?? '';
@@ -341,6 +413,10 @@ function ownerLabel(usages: TypeUsage[]): string | undefined {
 
 function isObjectType(type: TypeDef): type is ObjectType {
   return type.kind === 'object';
+}
+
+function convexTableName(type: ObjectType): string {
+  return type.tableName ?? `${type.name.charAt(0).toLowerCase()}${type.name.slice(1)}`;
 }
 
 function hintId(

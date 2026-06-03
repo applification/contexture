@@ -124,6 +124,78 @@ describe('checkSemantic — refs', () => {
     };
     expect(checkSemantic(schema)).toEqual([]);
   });
+
+  it('validates relationship metadata on table refs', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Household',
+          table: true,
+          fields: [],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            {
+              name: 'recipeId',
+              type: {
+                kind: 'ref',
+                typeName: 'Recipe',
+                relationship: {
+                  onDelete: 'restrict',
+                  ownership: { scopeField: 'householdId' },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB)).toEqual([]);
+  });
+
+  it('rejects relationship metadata that cannot be enforced safely', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Address', fields: [] },
+        {
+          kind: 'object',
+          name: 'Order',
+          table: true,
+          fields: [
+            {
+              name: 'addressId',
+              type: {
+                kind: 'ref',
+                typeName: 'Address',
+                relationship: { onDelete: 'setNull', ownership: { scopeField: 'householdId' } },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).toEqual([
+      'relationship_target_not_table',
+      'relationship_set_null_requires_nullable',
+      'relationship_scope_field_missing',
+      'relationship_scope_field_missing',
+    ]);
+  });
 });
 
 describe('checkSemantic — imports', () => {

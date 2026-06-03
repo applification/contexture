@@ -20,6 +20,7 @@
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
 import { useEffect, useRef } from 'react';
 import { useDocumentStore } from '../store/document';
+import { useDriftStore } from '../store/drift';
 import { type ApplyResult, apply, type Op } from '../store/ops';
 import { type ReconcileOp, targetKindFor, useReconcileStore } from '../store/reconcile';
 import { useUndoStore } from '../store/undo';
@@ -69,25 +70,34 @@ export function useSchemaAgentReconcile(): void {
         return;
       }
 
+      const schema = useUndoStore.getState().schema;
+      const targetKind = targetKindFor(targetPath, irPath, schema);
+      const driftStatus =
+        useDriftStore.getState().files.find((file) => file.path === targetPath)?.status ?? null;
+
       const onDiskSource = await window.contexture?.reconcile.readGeneratedTarget({
         irPath,
         targetPath,
       });
       if (cancelledRef.current) return;
       if (onDiskSource === null || onDiskSource === undefined) {
+        if (
+          targetKind !== 'unknown' &&
+          (driftStatus === 'missing' || driftStatus === 'unreadable')
+        ) {
+          reconcileStore.setReady([], '');
+          return;
+        }
         reconcileStore.setError(`Cannot read ${targetPath}.`);
         return;
       }
 
-      const schema = useUndoStore.getState().schema;
       let validationSchema = schema;
       const reconcileApi = window.contexture?.reconcile;
       if (!reconcileApi) {
         reconcileStore.setError('Reconcile IPC bridge is unavailable.');
         return;
       }
-
-      const targetKind = targetKindFor(targetPath, irPath);
 
       let result: {
         ok: boolean;
