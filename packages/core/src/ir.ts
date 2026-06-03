@@ -61,6 +61,18 @@ const SampleDataHintSchema = z.object({
 
 export type SampleDataHint = z.infer<typeof SampleDataHintSchema>;
 
+const DerivationPolicySchema = z.object({
+  kind: z.enum(['computed', 'cachedHandle', 'snapshot', 'rollup', 'estimate']),
+  sources: z.array(z.string().min(1)).optional(),
+  refresh: z.enum(['onWrite', 'asyncJob', 'onRead', 'manual', 'frozen', 'external']).optional(),
+  driftPolicy: z.enum(['mustMatch', 'eventual', 'allowed', 'warnWhenStale']).optional(),
+  owner: z.enum(['backend', 'client', 'external']).optional(),
+  staleField: z.string().min(1).optional(),
+  confidenceField: z.string().min(1).optional(),
+});
+
+export type DerivationPolicy = z.infer<typeof DerivationPolicySchema>;
+
 // Recursive discriminated union: `array.element` refers back to `FieldType`.
 // The explicit `z.ZodType<FieldType>` annotation breaks the circularity for
 // TypeScript; the `FieldType` itself is inferred further down.
@@ -105,6 +117,7 @@ export const FieldDefSchema = z.object({
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
   serverDerived: z.boolean().optional(),
+  derivation: DerivationPolicySchema.optional(),
   sampleData: SampleDataHintSchema.optional(),
 });
 

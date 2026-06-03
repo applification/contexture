@@ -18,6 +18,16 @@ const tableType: Extract<TypeDef, { kind: 'object' }> = {
     { name: 'status', type: { kind: 'string' } },
     { name: 'partySize', type: { kind: 'number', int: true } },
     { name: 'requestedDates', type: { kind: 'array', element: { kind: 'date' } }, optional: true },
+    {
+      name: 'nutrition',
+      type: { kind: 'string' },
+      serverDerived: true,
+      derivation: {
+        kind: 'computed',
+        sources: ['menuItems[].grams', 'Ingredient.nutrition'],
+        owner: 'backend',
+      },
+    },
   ],
   indexes: [
     { name: 'by_customerId', fields: ['customerId'] },
@@ -64,8 +74,14 @@ const hints: ModelingHint[] = [
 ];
 
 const selectedField: FieldDef = {
-  name: 'customerId',
-  type: { kind: 'ref', typeName: 'Customer' },
+  name: 'nutrition',
+  type: { kind: 'string' },
+  serverDerived: true,
+  derivation: {
+    kind: 'computed',
+    sources: ['menuItems[].grams', 'Ingredient.nutrition'],
+    owner: 'backend',
+  },
 };
 
 function StoryFrame({ children }: { children: React.ReactNode }) {

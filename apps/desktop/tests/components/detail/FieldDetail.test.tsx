@@ -486,31 +486,64 @@ describe('FieldDetail', () => {
     });
   });
 
-  it('server-derived checkbox dispatches update_field', () => {
+  it('derivation mode marks computed fields as backend-owned', async () => {
     const { dispatch } = setup({ name: 'createdAt', type: { kind: 'date' } });
-    const serverDerived = screen.getByRole('checkbox', { name: 'Server derived' });
-    expect(serverDerived).toHaveAccessibleDescription('Computed by backend');
-    fireEvent.click(serverDerived);
+    expect(screen.getByText('Derivation')).toBeInTheDocument();
+    expect(screen.getByText('Stored directly. No derivation policy.')).toBeInTheDocument();
+
+    await chooseSelectOption('Mode', 'Computed');
+
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
       fieldName: 'createdAt',
-      patch: { serverDerived: true },
+      patch: {
+        derivation: { kind: 'computed', owner: 'backend' },
+        serverDerived: true,
+      },
     });
   });
 
-  it('server-derived checkbox clears the marker when unchecked', () => {
+  it('stored input mode clears derivation and legacy server-derived marker', async () => {
     const { dispatch } = setup({
       name: 'createdAt',
       type: { kind: 'date' },
       serverDerived: true,
+      derivation: { kind: 'computed', owner: 'backend' },
     });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Server derived' }));
+
+    await chooseSelectOption('Mode', 'Stored input');
+
     expect(dispatch).toHaveBeenCalledWith({
       kind: 'update_field',
       typeName: 'Plot',
       fieldName: 'createdAt',
-      patch: { serverDerived: undefined },
+      patch: { derivation: undefined, serverDerived: undefined },
+    });
+  });
+
+  it('edits derivation source paths', () => {
+    const { dispatch } = setup({
+      name: 'nutrition',
+      type: { kind: 'string' },
+      derivation: { kind: 'computed', owner: 'backend' },
+    });
+
+    const sources = screen.getByLabelText('Sources');
+    fireEvent.change(sources, { target: { value: 'ingredients[].grams, Ingredient.calories' } });
+    fireEvent.blur(sources);
+
+    expect(dispatch).toHaveBeenCalledWith({
+      kind: 'update_field',
+      typeName: 'Plot',
+      fieldName: 'nutrition',
+      patch: {
+        derivation: {
+          kind: 'computed',
+          owner: 'backend',
+          sources: ['ingredients[].grams', 'Ingredient.calories'],
+        },
+      },
     });
   });
 

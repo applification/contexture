@@ -100,6 +100,7 @@ function toneForHint(kind: ModelingHint['kind']): CSSProperties {
         color: 'var(--inspector-advisory)',
       };
     case 'query_handle':
+    case 'derivation_policy':
       return {
         background: 'color-mix(in oklch, var(--graph-node-selected) 14%, transparent)',
         borderColor: 'color-mix(in oklch, var(--graph-node-selected) 55%, var(--foreground))',
@@ -132,6 +133,7 @@ function hintRank(hint: ModelingHint): number {
     case 'possible_entity':
       return 1;
     case 'query_handle':
+    case 'derivation_policy':
       return 2;
     case 'embedded_collection':
       return 3;

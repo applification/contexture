@@ -19,7 +19,7 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { CircleAlert, Focus, Table2 } from 'lucide-react';
+import { Focus, Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -310,6 +310,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         <span
           style={{
             flex: 1,
+            minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -317,47 +318,15 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
         >
           {data.typeName}
         </span>
-        {hasValidationIssues && (
-          <span
-            data-testid="type-node-validation-label"
-            role="img"
-            aria-label={`${data.validationIssueCount} validation ${
-              data.validationIssueCount === 1 ? 'issue' : 'issues'
-            }`}
-            title={`${data.validationIssueCount} validation ${
-              data.validationIssueCount === 1 ? 'issue' : 'issues'
-            }`}
-            style={{
-              flex: '0 0 auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              minWidth: 18,
-              height: 18,
-              borderRadius: 999,
-              background: 'color-mix(in oklch, var(--destructive) 24%, var(--background))',
-              color: 'var(--destructive-foreground)',
-              border: '1px solid color-mix(in oklch, var(--destructive) 60%, transparent)',
-              fontSize: 10,
-              fontWeight: 700,
-            }}
-          >
-            <CircleAlert aria-hidden="true" size={11} strokeWidth={2.4} />
-            {data.validationIssueCount && data.validationIssueCount > 1
-              ? data.validationIssueCount
-              : null}
-          </span>
-        )}
         {data.table ? (
           <NodeKindLabel
             data-testid="type-node-table-label"
-            style={{ color: 'var(--graph-node-table-accent)', opacity: 1 }}
+            style={{ flex: '0 0 auto', color: 'var(--graph-node-table-accent)', opacity: 1 }}
           >
             table
           </NodeKindLabel>
         ) : (
-          <NodeKindLabel>{nodeKindLabel}</NodeKindLabel>
+          <NodeKindLabel style={{ flex: '0 0 auto' }}>{nodeKindLabel}</NodeKindLabel>
         )}
       </button>
 

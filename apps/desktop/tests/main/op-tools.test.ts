@@ -265,6 +265,43 @@ describe('createOpTools', () => {
     });
   });
 
+  it('update_field forwards derivation policy patches', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const updateField = toolNamed(tools, 'update_field');
+
+    await updateField.handler({
+      typeName: 'Recipe',
+      fieldName: 'nutrition',
+      patch: {
+        derivation: {
+          kind: 'computed',
+          sources: ['ingredients[].grams', 'Ingredient.calories'],
+          refresh: 'onWrite',
+          driftPolicy: 'mustMatch',
+          owner: 'backend',
+        },
+        serverDerived: true,
+      },
+    });
+
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'update_field',
+      typeName: 'Recipe',
+      fieldName: 'nutrition',
+      patch: {
+        derivation: {
+          kind: 'computed',
+          sources: ['ingredients[].grams', 'Ingredient.calories'],
+          refresh: 'onWrite',
+          driftPolicy: 'mustMatch',
+          owner: 'backend',
+        },
+        serverDerived: true,
+      },
+    });
+  });
+
   it('add_type lenient tool accepts a valid TypeDef payload and forwards the op', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);

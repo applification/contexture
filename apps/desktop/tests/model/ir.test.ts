@@ -115,7 +115,7 @@ describe('IRSchema', () => {
     expect(nested.element.kind).toBe('array');
   });
 
-  it('accepts FieldDef optional/nullable/default/description/serverDerived', () => {
+  it('accepts FieldDef optional/nullable/default/description/serverDerived/derivation', () => {
     const input = {
       version: '1',
       types: [
@@ -131,6 +131,13 @@ describe('IRSchema', () => {
               nullable: true,
               default: 'anon',
               serverDerived: true,
+              derivation: {
+                kind: 'cachedHandle',
+                sources: ['displayName'],
+                refresh: 'onWrite',
+                driftPolicy: 'mustMatch',
+                owner: 'backend',
+              },
             },
           ],
         },
@@ -146,6 +153,13 @@ describe('IRSchema', () => {
       nullable: true,
       default: 'anon',
       serverDerived: true,
+      derivation: {
+        kind: 'cachedHandle',
+        sources: ['displayName'],
+        refresh: 'onWrite',
+        driftPolicy: 'mustMatch',
+        owner: 'backend',
+      },
     });
   });
 

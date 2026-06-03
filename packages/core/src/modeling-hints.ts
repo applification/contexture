@@ -1,3 +1,4 @@
+import { derivationKindLabel } from './derivation';
 import type { FieldDef, FieldType, Schema, TypeDef } from './ir';
 
 export const MODELING_HINT_ANALYZER_VERSION = 1;
@@ -6,6 +7,7 @@ export type ModelingHintKind =
   | 'owned_value_object'
   | 'possible_entity'
   | 'query_handle'
+  | 'derivation_policy'
   | 'embedded_collection'
   | 'stdlib_type'
   | 'stringly_ref';
@@ -13,6 +15,7 @@ export type ModelingHintKind =
 export type ModelingSignal =
   | 'identity_pressure'
   | 'query_pressure'
+  | 'derivation_pressure'
   | 'embedded_collection_pressure'
   | 'lifecycle_pressure'
   | 'relationship_pressure';
@@ -104,6 +107,9 @@ export function analyzeModelingHints(schema: Schema): ModelingHint[] {
         hints.push(queryHandleHint(type, field, fieldPath));
       }
 
+      const derivationHint = fieldDerivationHint(type, field, fieldPath);
+      if (derivationHint) hints.push(derivationHint);
+
       const stdlibHint = stdlibTypeHint(type, field, fieldPath);
       if (stdlibHint) hints.push(stdlibHint);
 
@@ -113,6 +119,75 @@ export function analyzeModelingHints(schema: Schema): ModelingHint[] {
   });
 
   return hints;
+}
+
+function fieldDerivationHint(type: ObjectType, field: FieldDef, path: string): ModelingHint | null {
+  const derivation = field.derivation;
+  if (!derivation) return null;
+
+  const label = derivationKindLabel(derivation.kind);
+  const sourceCount = derivation.sources?.length ?? 0;
+  if (derivation.kind === 'snapshot') {
+    return {
+      id: hintId('derivation_policy', type.name, field.name, [derivation.kind]),
+      kind: 'derivation_policy',
+      signals: ['derivation_pressure'],
+      path,
+      typeName: type.name,
+      fieldName: field.name,
+      title: 'Snapshot field',
+      message: `${field.name} is a frozen snapshot. Drift is expected unless the product needs a stale indicator.`,
+      rationale:
+        'Snapshots preserve historical context, so Contexture should document intent instead of warning by default.',
+      fieldNames: [field.name],
+    };
+  }
+
+  if (sourceCount === 0) {
+    return {
+      id: hintId('derivation_policy', type.name, field.name, [derivation.kind, 'sources']),
+      kind: 'derivation_policy',
+      signals: ['derivation_pressure'],
+      path,
+      typeName: type.name,
+      fieldName: field.name,
+      title: 'Derivation source missing',
+      message: `${field.name} is marked as a ${label}, but no source fields are declared.`,
+      rationale:
+        'Source fields make invalidation and backfill responsibilities visible to app code reviewers.',
+      fieldNames: [field.name],
+    };
+  }
+
+  if (!derivation.refresh && !derivation.driftPolicy) {
+    return {
+      id: hintId('derivation_policy', type.name, field.name, [derivation.kind, 'refresh']),
+      kind: 'derivation_policy',
+      signals: ['derivation_pressure', 'lifecycle_pressure'],
+      path,
+      typeName: type.name,
+      fieldName: field.name,
+      title: 'Drift policy missing',
+      message: `${field.name} is stored from ${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'} without a refresh or drift policy.`,
+      rationale:
+        'A stored derived value needs an explicit recompute cadence, stale behavior, or intentional drift policy.',
+      fieldNames: [field.name],
+    };
+  }
+
+  return {
+    id: hintId('derivation_policy', type.name, field.name, [derivation.kind, 'declared']),
+    kind: 'derivation_policy',
+    signals: ['derivation_pressure'],
+    path,
+    typeName: type.name,
+    fieldName: field.name,
+    title: 'Derivation policy',
+    message: `${field.name} is a ${label} with declared source and freshness policy.`,
+    rationale:
+      'Documented derivation lets Contexture surface intent without treating normal denormalization as a bug.',
+    fieldNames: [field.name],
+  };
 }
 
 function stringlyRefHint(

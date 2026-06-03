@@ -2,6 +2,7 @@ export * from './agent-turn-ledger';
 export * from './change-log';
 export * from './chat-history';
 export * from './convex-capabilities';
+export * from './derivation';
 export * from './document-bundle';
 export { emitAiToolSchemas } from './emit-ai-tool-schemas';
 export { emitConvexSchema, emitConvexValidators } from './emit-convex';

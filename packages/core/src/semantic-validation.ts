@@ -49,7 +49,10 @@ export type SemanticIssueCode =
   | 'relationship_scope_field_missing'
   | 'relationship_set_null_requires_nullable'
   | 'relationship_cleanup_index_missing'
-  | 'relationship_ownership_scope_missing';
+  | 'relationship_ownership_scope_missing'
+  | 'derivation_missing_source'
+  | 'derivation_unknown_source'
+  | 'derivation_missing_refresh';
 
 export type SemanticIssueSeverity = 'error' | 'warning';
 
@@ -71,6 +74,7 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkDuplicateFieldNames(schema),
     ...checkDuplicateConvexTableNames(schema),
     ...checkConvexTableShapes(schema),
+    ...checkDerivations(schema),
     ...checkDiscriminatedUnions(schema),
     ...checkEnums(schema),
   ]);
@@ -197,6 +201,101 @@ function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDra
     }
   });
   return issues;
+}
+
+function checkDerivations(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const objects = schema.types.filter((type): type is ObjectType => type.kind === 'object');
+  const objectsByName = new Map(objects.map((type) => [type.name, type]));
+
+  objects.forEach((type, typeIndex) => {
+    const fieldNames = new Set(type.fields.map((field) => field.name));
+    type.fields.forEach((field, fieldIndex) => {
+      const derivation = field.derivation;
+      if (!derivation) return;
+      const path = `types.${typeIndex}.fields.${fieldIndex}.derivation`;
+      const sources = derivation.sources ?? [];
+
+      if (derivation.kind !== 'snapshot' && sources.length === 0) {
+        issues.push({
+          code: 'derivation_missing_source',
+          path: `${path}.sources`,
+          severity: 'warning',
+          message: `${type.name}.${field.name} declares a ${derivation.kind} derivation without source fields.`,
+          hint: 'Add source field paths so downstream app code and reviewers can see what invalidates this value.',
+        });
+      }
+
+      if (
+        derivation.kind !== 'snapshot' &&
+        sources.length > 0 &&
+        !derivation.refresh &&
+        !derivation.driftPolicy
+      ) {
+        issues.push({
+          code: 'derivation_missing_refresh',
+          path,
+          severity: 'warning',
+          message: `${type.name}.${field.name} can drift because it has sources but no refresh or drift policy.`,
+          hint: 'Declare whether it refreshes on write, asynchronously, on read, manually, or is allowed to drift.',
+        });
+      }
+
+      sources.forEach((source, sourceIndex) => {
+        if (sourcePathExists(source, type, fieldNames, objectsByName)) return;
+        issues.push({
+          code: 'derivation_unknown_source',
+          path: `${path}.sources.${sourceIndex}`,
+          severity: 'warning',
+          message: `${type.name}.${field.name} derivation source "${source}" does not match a known field path.`,
+          hint: 'Use a field on the same object, a nested path such as ingredients[].grams, or a qualified path such as Ingredient.allergens.',
+        });
+      });
+    });
+  });
+
+  return issues;
+}
+
+function sourcePathExists(
+  source: string,
+  owner: ObjectType,
+  ownerFieldNames: ReadonlySet<string>,
+  objectsByName: ReadonlyMap<string, ObjectType>,
+): boolean {
+  const normalized = source.replace(/\[\]/gu, '');
+  const [first, second] = normalized.split('.');
+  if (!first) return false;
+
+  const qualifiedType = objectsByName.get(first);
+  if (qualifiedType && second) {
+    return hasNestedFieldPath(qualifiedType, normalized.split('.').slice(1), objectsByName);
+  }
+
+  if (!ownerFieldNames.has(first)) return false;
+  return hasNestedFieldPath(owner, normalized.split('.'), objectsByName);
+}
+
+function hasNestedFieldPath(
+  type: ObjectType,
+  parts: readonly string[],
+  objectsByName: ReadonlyMap<string, ObjectType>,
+): boolean {
+  let current: ObjectType | undefined = type;
+  for (const part of parts) {
+    if (!current) return false;
+    const field = current.fields.find((candidate) => candidate.name === part);
+    if (!field) return false;
+    const refTarget = unwrapRefTarget(field.type);
+    current = refTarget ? objectsByName.get(refTarget) : undefined;
+  }
+  return true;
+}
+
+function unwrapRefTarget(type: FieldType): string | undefined {
+  if (type.kind === 'ref') return type.typeName;
+  if (type.kind === 'array') return unwrapRefTarget(type.element);
+  return undefined;
 }
 
 function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[] {
