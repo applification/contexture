@@ -853,46 +853,96 @@ function OnboardingLoopPanel({
   onSave: () => void;
   onShowAgent: () => void;
 }): React.JSX.Element {
-  type ReadinessDetail = readonly [label: string, done: boolean];
+  interface ReadinessDetail {
+    label: string;
+    done: boolean;
+    help: string;
+  }
   const groups: {
     label: string;
     done: boolean;
-    detail: readonly ReadinessDetail[];
+    note?: string;
+    detail: ReadinessDetail[];
   }[] = [
     {
       label: 'Model',
       done: state.hasTable && state.hasField && state.hasRef && state.hasIndex,
       detail: [
-        ['Table', state.hasTable],
-        ['Fields', state.hasField],
-        ['Ref', state.hasRef],
-        ['Index', state.hasIndex],
-      ] as const,
+        {
+          label: 'Table',
+          done: state.hasTable,
+          help: 'Mark at least one object type as a Convex table.',
+        },
+        {
+          label: 'Fields',
+          done: state.hasField,
+          help: 'Add at least one field to an object type.',
+        },
+        {
+          label: 'Ref',
+          done: state.hasRef,
+          help: 'Add a ref field that points at another model type.',
+        },
+        {
+          label: 'Index',
+          done: state.hasIndex,
+          help: 'Add an index or search index to a table.',
+        },
+      ],
     },
     {
       label: 'Generated',
       done: state.outputsVisible && state.hasSavedOutputs && state.driftClean,
       detail: [
-        ['Files visible', state.outputsVisible],
-        ['Saved', state.hasSavedOutputs],
-        ['Drift clean', state.driftClean],
-      ] as const,
+        {
+          label: 'Files visible',
+          done: state.outputsVisible,
+          help: 'Open the generated output preview in this panel.',
+        },
+        {
+          label: 'Saved',
+          done: state.hasSavedOutputs,
+          help: 'Save and emit this model so generated files are written to disk.',
+        },
+        {
+          label: 'Drift clean',
+          done: state.driftClean,
+          help: 'Resolve generated-file drift, then emit or check drift again.',
+        },
+      ],
     },
     {
       label: 'Convex',
       done: state.convexVersionChecked && state.convexVersionReady,
       detail: [
-        ['Package checked', state.convexVersionChecked],
-        ['Version match', state.convexVersionReady],
-      ] as const,
+        {
+          label: 'Package checked',
+          done: state.convexVersionChecked,
+          help: 'Open a saved project so Contexture can inspect the target app package.',
+        },
+        {
+          label: 'Version match',
+          done: state.convexVersionReady,
+          help: 'Install or update Convex so the target app matches the Contexture emitter version.',
+        },
+      ],
     },
     {
       label: 'Agent',
       done: false,
+      note: 'Agent setup is not auto-detected yet, so this group stays informational even after you connect Codex or install Convex AI files.',
       detail: [
-        ['Convex AI files', false],
-        ['Contexture MCP', false],
-      ] as const,
+        {
+          label: 'Convex AI files',
+          done: false,
+          help: 'Run bunx convex ai-files install in the target repo.',
+        },
+        {
+          label: 'Contexture MCP',
+          done: false,
+          help: 'Connect Contexture MCP to your agent client, then start a fresh agent session.',
+        },
+      ],
     },
   ];
 
@@ -914,31 +964,82 @@ function OnboardingLoopPanel({
 
       <ul className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {groups.map((group) => {
-          const completeCount = group.detail.filter(([, done]) => done).length;
+          const completeCount = group.detail.filter((detail) => detail.done).length;
           const detailText = group.detail
-            .map(([label, done]) => `${label}: ${done ? 'ready' : 'needs action'}`)
+            .map((detail) => `${detail.label}: ${detail.done ? 'ready' : 'needs action'}`)
             .join(', ');
           return (
-            <li
-              key={group.label}
-              className="flex min-h-8 items-center gap-1.5 rounded border border-border/70 bg-card/60 px-2"
-              aria-label={`${group.label}: ${detailText}`}
-              title={detailText}
-            >
-              {group.done ? (
-                <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
-              ) : (
-                <span
-                  className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
-                  aria-hidden="true"
-                />
-              )}
-              <span className={group.done ? 'text-foreground' : 'text-muted-foreground'}>
-                {group.label}
-              </span>
-              <span className="ml-auto text-[10px] text-muted-foreground/80">
-                {completeCount}/{group.detail.length}
-              </span>
+            <li key={group.label}>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex min-h-8 w-full items-center gap-1.5 rounded border border-border/70 bg-card/60 px-2 text-left transition-colors hover:border-reference/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+                    aria-label={`${group.label}: ${detailText}. Open readiness details.`}
+                  >
+                    {group.done ? (
+                      <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+                    ) : (
+                      <span
+                        className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span className={group.done ? 'text-foreground' : 'text-muted-foreground'}>
+                      {group.label}
+                    </span>
+                    <span className="ml-auto text-[10px] text-muted-foreground/80">
+                      {completeCount}/{group.detail.length}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-2" align="start">
+                  <div className="px-1 pb-1">
+                    <h3 className="text-xs font-semibold text-foreground">
+                      {group.label} readiness
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      {completeCount}/{group.detail.length} checks ready.
+                    </p>
+                  </div>
+                  <ul className="space-y-1">
+                    {group.detail.map((detail) => (
+                      <li
+                        key={detail.label}
+                        className="rounded border border-border/60 bg-background/70 px-2 py-1.5"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {detail.done ? (
+                            <CheckCircle2
+                              className="size-3.5 shrink-0 text-success"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <span
+                              className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <span className="text-[11px] font-medium text-foreground">
+                            {detail.label}
+                          </span>
+                          <span className="ml-auto text-[10px] text-muted-foreground">
+                            {detail.done ? 'Ready' : 'Needs action'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                          {detail.help}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  {group.note ? (
+                    <p className="mt-2 rounded border border-warning/30 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                      {group.note}
+                    </p>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
             </li>
           );
         })}

@@ -4,6 +4,7 @@ import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const unsub = () => undefined;
@@ -100,6 +101,24 @@ describe('App Codex-first copy', () => {
     expect(screen.getByLabelText(/Model: Table: ready/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Generated: Files visible: ready/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Saved: needs action/)).toBeInTheDocument();
+  });
+
+  it('explains readiness checks from the grouped status tiles', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+    await user.click(screen.getByLabelText(/Agent: Convex AI files: needs action/));
+
+    expect(screen.getByText('Agent readiness')).toBeInTheDocument();
+    expect(
+      screen.getByText('Run bunx convex ai-files install in the target repo.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Agent setup is not auto-detected yet, so this group stays informational even after you connect Codex or install Convex AI files.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('opens the file picker from the start screen', async () => {
