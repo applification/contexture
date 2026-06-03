@@ -428,6 +428,58 @@ describe('TypeNode', () => {
     });
   });
 
+  it('marks field rows with modeling advice on the canvas node', () => {
+    const data: TypeNodeData = {
+      typeName: 'ShoppingList',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'items',
+          summary: '→ ShoppingListItem[]',
+          optional: false,
+          nullable: false,
+          refTarget: 'ShoppingListItem',
+          modelingHintCount: 1,
+          modelingHintTone: 'warning',
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    const field = screen.getByTestId('type-node-field');
+    const advice = screen.getByTestId('type-node-field-advice');
+
+    expect(field.dataset.modelingAdvice).toBe('warning');
+    expect(advice).toHaveAttribute('title', '1 modeling advisory');
+    expect(advice.getAttribute('style')).toContain('var(--warning)');
+    expect(screen.getByTestId('type-node-field-ref-summary')).toHaveTextContent(
+      '→ ShoppingListItem[]',
+    );
+  });
+
+  it('keeps low-pressure modeling advice out of canvas field rows', () => {
+    const data: TypeNodeData = {
+      typeName: 'Post',
+      kind: 'object',
+      imported: false,
+      fields: [
+        {
+          name: 'title',
+          summary: 'string',
+          optional: false,
+          nullable: false,
+          modelingHintCount: 1,
+          modelingHintTone: 'advisory',
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-field').dataset.modelingAdvice).toBeUndefined();
+    expect(screen.queryByTestId('type-node-field-advice')).not.toBeInTheDocument();
+  });
+
   it('renders local enum refs as inline enum affordances with hover details', () => {
     vi.useFakeTimers();
     const data: TypeNodeData = {

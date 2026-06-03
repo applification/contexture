@@ -20,6 +20,8 @@
  *    Adjacency (neighbour-dimming in `TypeNode`) is computed here on
  *    every render — cheap because it's O(edges).
  */
+
+import { analyzeModelingHints } from '@contexture/core/modeling-hints';
 import {
   applyNodeChanges,
   Background,
@@ -176,10 +178,14 @@ function GraphCanvasInner({
   const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
   const validationErrors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
+  const modelingHints = useMemo(() => analyzeModelingHints(schema), [schema]);
 
   const { nodes: builtNodes, edges: builtEdges }: BuildGraphResult = useMemo(() => {
     const highlighted = new Set(highlightedNodeIds);
-    const graph = applyValidationHighlights(buildGraph({ schema, positions }), validationErrors);
+    const graph = applyValidationHighlights(
+      buildGraph({ schema, positions, modelingHints }),
+      validationErrors,
+    );
     return {
       ...graph,
       nodes: graph.nodes.map((node) =>
@@ -188,7 +194,7 @@ function GraphCanvasInner({
           : node,
       ),
     };
-  }, [schema, positions, highlightedNodeIds, validationErrors]);
+  }, [schema, positions, modelingHints, highlightedNodeIds, validationErrors]);
 
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const showEnums = graphLayout.showEnums;

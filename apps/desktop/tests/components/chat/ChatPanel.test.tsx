@@ -7,6 +7,7 @@ import { useChatThreadStore } from '@renderer/chat/useChatThreads';
 import type { SchemaAgentChatState } from '@renderer/chat/useSchemaAgentChat';
 import { ChatPanel } from '@renderer/components/chat/ChatPanel';
 import { useAgentTurnsStore } from '@renderer/store/agent-turns';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useDocumentStore } from '@renderer/store/document';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -104,6 +105,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  useChatComposerStore.getState().setPendingChatMessage(null);
   vi.clearAllMocks();
 });
 
@@ -547,6 +549,28 @@ describe('ChatPanel', () => {
 
     await waitFor(() => expect(localStorage.getItem('contexture-active-thread')).toBeNull());
     expect(JSON.parse(localStorage.getItem('contexture-chat-threads') ?? '[]')).toEqual([]);
+  });
+
+  it('opens pending advisory context as a fresh chat draft', async () => {
+    useDocumentStore.setState({ filePath: '/repo/plantry.contexture.json' });
+    useChatComposerStore.getState().setPendingChatMessage({
+      message: 'Help me resolve ShoppingList.items.',
+      context: 'Advisory: Collaborative embedded collection',
+    });
+    const hydrateHistory = vi.fn();
+
+    render(<ChatPanel chat={makeChat({ hydrateHistory })} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-input')).toHaveValue(
+        'Help me resolve ShoppingList.items.\n\nAdvisory: Collaborative embedded collection',
+      );
+    });
+    expect(useChatComposerStore.getState().pendingChatMessage).toBeNull();
+    expect(
+      useChatThreadStore.getState().threadsForFile('/repo/plantry.contexture.json'),
+    ).toHaveLength(1);
+    expect(hydrateHistory).toHaveBeenCalledWith({ version: '1', messages: [] });
   });
 
   it('auto-grows the textarea via CSS field-sizing with an 8-line cap and scroll overflow', async () => {

@@ -28,6 +28,7 @@
  */
 
 import type { FieldDef, FieldType, Schema, TypeDef } from '@contexture/core/ir';
+import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import type { Edge, Node } from '@xyflow/react';
 
@@ -77,6 +78,8 @@ export interface FieldRow {
   /** Bundled stdlib metadata when this field references `namespace.Type`. */
   stdlibTarget?: StdlibTargetRow;
   validationIssueCount?: number;
+  modelingHintCount?: number;
+  modelingHintTone?: 'advisory' | 'warning';
 }
 
 export interface EnumTargetRow {
@@ -109,6 +112,7 @@ export interface RefEdgeData extends Record<string, unknown> {
 export interface BuildGraphInput {
   schema: Schema;
   positions?: Record<string, { x: number; y: number }>;
+  modelingHints?: readonly ModelingHint[];
 }
 
 export interface BuildGraphResult {
@@ -118,13 +122,18 @@ export interface BuildGraphResult {
 
 const DEFAULT_POSITION = { x: 0, y: 0 };
 
-export function buildGraph({ schema, positions }: BuildGraphInput): BuildGraphResult {
+export function buildGraph({
+  schema,
+  positions,
+  modelingHints = [],
+}: BuildGraphInput): BuildGraphResult {
   const localNames = new Set(schema.types.map((t) => t.name));
   const localTypes = new Map(schema.types.map((type) => [type.name, type]));
   const tableTypes = schema.types.filter(isTableType);
+  const fieldHintMap = fieldModelingHintMap(modelingHints);
 
   const nodes: Node<TypeNodeData>[] = schema.types.map((t, schemaIndex) =>
-    localNodeFor(t, schemaIndex, positions?.[t.name] ?? DEFAULT_POSITION, localTypes),
+    localNodeFor(t, schemaIndex, positions?.[t.name] ?? DEFAULT_POSITION, localTypes, fieldHintMap),
   );
 
   // Collect edges + shadow nodes for targets that point outside the local
@@ -216,6 +225,7 @@ function localNodeFor(
   schemaIndex: number,
   position: { x: number; y: number },
   localTypes: ReadonlyMap<string, TypeDef>,
+  fieldHintMap: ReadonlyMap<string, FieldModelingHintSummary>,
 ): Node<TypeNodeData> {
   return {
     id: type.name,
@@ -227,7 +237,12 @@ function localNodeFor(
       kind: type.kind,
       description: type.description,
       enumValues: type.kind === 'enum' ? type.values.map(enumValueRow) : undefined,
-      fields: type.kind === 'object' ? type.fields.map((field) => fieldRow(field, localTypes)) : [],
+      fields:
+        type.kind === 'object'
+          ? type.fields.map((field) =>
+              fieldRow(field, localTypes, fieldHintMap.get(fieldHintKey(type.name, field.name))),
+            )
+          : [],
       imported: false,
       table: type.kind === 'object' && type.table === true ? true : undefined,
       canAddFields: type.kind === 'object' ? true : undefined,
@@ -298,7 +313,16 @@ function enumValueRow(value: { value: string; description?: string }): EnumValue
   };
 }
 
-function fieldRow(field: FieldDef, localTypes: ReadonlyMap<string, TypeDef>): FieldRow {
+interface FieldModelingHintSummary {
+  count: number;
+  tone: 'advisory' | 'warning';
+}
+
+function fieldRow(
+  field: FieldDef,
+  localTypes: ReadonlyMap<string, TypeDef>,
+  modelingHint?: FieldModelingHintSummary,
+): FieldRow {
   const target = unwrapRefTarget(field.type);
   const refTargetType = target ? localTypes.get(target) : undefined;
   const enumTarget = refTargetType?.kind === 'enum' ? refTargetType : undefined;
@@ -318,7 +342,41 @@ function fieldRow(field: FieldDef, localTypes: ReadonlyMap<string, TypeDef>): Fi
         }
       : undefined,
     stdlibTarget,
+    modelingHintCount: modelingHint?.count,
+    modelingHintTone: modelingHint?.tone,
   };
+}
+
+function fieldModelingHintMap(
+  modelingHints: readonly ModelingHint[],
+): Map<string, FieldModelingHintSummary> {
+  const hintsByField = new Map<string, ModelingHint[]>();
+  for (const hint of modelingHints) {
+    if (!hint.fieldName) continue;
+    const key = fieldHintKey(hint.typeName, hint.fieldName);
+    const existing = hintsByField.get(key) ?? [];
+    existing.push(hint);
+    hintsByField.set(key, existing);
+  }
+
+  const summaries = new Map<string, FieldModelingHintSummary>();
+  for (const [key, hints] of hintsByField) {
+    summaries.set(key, {
+      count: hints.length,
+      tone: hints.some(hasHighPressureModelingSignal) ? 'warning' : 'advisory',
+    });
+  }
+  return summaries;
+}
+
+function fieldHintKey(typeName: string, fieldName: string): string {
+  return `${typeName}:${fieldName}`;
+}
+
+function hasHighPressureModelingSignal(hint: ModelingHint): boolean {
+  return hint.signals.some(
+    (signal) => signal === 'concurrency_pressure' || signal === 'document_size_pressure',
+  );
 }
 
 function stdlibTargetRow(typeName: string): StdlibTargetRow | undefined {

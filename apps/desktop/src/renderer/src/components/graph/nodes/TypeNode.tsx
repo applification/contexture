@@ -19,7 +19,7 @@
  * later slice.
  */
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { Focus, Table2 } from 'lucide-react';
+import { Focus, Lightbulb, Table2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -525,6 +525,9 @@ function FieldRowButton({
   const stdlibSummary = field.stdlibTarget ? field.summary.replace(/^→\s*/, '') : undefined;
   const isUnionRef = field.refTargetKind === 'discriminatedUnion';
   const hoverTarget = field.enumTarget ?? field.stdlibTarget;
+  const showModelingAdvice = field.modelingHintTone === 'warning';
+  const modelingHintColor =
+    field.modelingHintTone === 'warning' ? 'var(--warning)' : 'var(--inspector-advisory)';
   const button = (
     <button
       type="button"
@@ -532,6 +535,7 @@ function FieldRowButton({
       data-field-name={field.name}
       data-selected-field={selected ? 'true' : undefined}
       data-validation-issues={hasValidationIssues ? 'true' : undefined}
+      data-modeling-advice={showModelingAdvice ? field.modelingHintTone : undefined}
       onClick={(ev) => onFieldClick(field, ev)}
       onFocus={() => {
         setHighlighted(true);
@@ -614,16 +618,12 @@ function FieldRowButton({
         {field.nullable ? ' | null' : ''}
       </span>
       <span
-        data-testid={
-          field.enumTarget
-            ? 'type-node-field-enum-summary'
-            : field.stdlibTarget
-              ? 'type-node-field-stdlib-summary'
-              : field.refTarget
-                ? 'type-node-field-ref-summary'
-                : undefined
-        }
         style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 4,
+          minWidth: 0,
           color: refTargetSelected
             ? 'var(--graph-node-selected)'
             : selected
@@ -649,44 +649,75 @@ function FieldRowButton({
           fontSize: 9,
           fontWeight: refTargetSelected ? 700 : 400,
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          minWidth: 0,
         }}
       >
-        {field.enumTarget ? (
+        {showModelingAdvice && field.modelingHintCount ? (
           <span
-            data-testid="type-node-field-enum-affordance"
-            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {enumSummary}
-          </span>
-        ) : field.stdlibTarget ? (
-          <span
-            data-testid="type-node-field-stdlib-affordance"
-            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {stdlibSummary}
-          </span>
-        ) : isUnionRef ? (
-          <span
-            data-testid="type-node-field-union-affordance"
+            data-testid="type-node-field-advice"
+            title={`${field.modelingHintCount} modeling ${
+              field.modelingHintCount === 1 ? 'advisory' : 'advisories'
+            }`}
             style={{
-              display: 'inline-flex',
-              alignItems: 'baseline',
-              maxWidth: '100%',
-              minWidth: 0,
-              gap: 3,
+              display: 'inline-grid',
+              placeItems: 'center',
+              flex: '0 0 auto',
+              width: 13,
+              height: 13,
+              borderRadius: 999,
+              background: `color-mix(in oklch, ${modelingHintColor} 18%, transparent)`,
+              color: modelingHintColor,
+              boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${modelingHintColor} 48%, transparent)`,
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {field.summary}
-            </span>
-            <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>· union</span>
+            <Lightbulb aria-hidden="true" className="size-2.5" />
           </span>
-        ) : (
-          field.summary
-        )}
+        ) : null}
+        <span
+          data-testid={
+            field.enumTarget
+              ? 'type-node-field-enum-summary'
+              : field.stdlibTarget
+                ? 'type-node-field-stdlib-summary'
+                : field.refTarget
+                  ? 'type-node-field-ref-summary'
+                  : undefined
+          }
+          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {field.enumTarget ? (
+            <span
+              data-testid="type-node-field-enum-affordance"
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {enumSummary}
+            </span>
+          ) : field.stdlibTarget ? (
+            <span
+              data-testid="type-node-field-stdlib-affordance"
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {stdlibSummary}
+            </span>
+          ) : isUnionRef ? (
+            <span
+              data-testid="type-node-field-union-affordance"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                maxWidth: '100%',
+                minWidth: 0,
+                gap: 3,
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {field.summary}
+              </span>
+              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>· union</span>
+            </span>
+          ) : (
+            field.summary
+          )}
+        </span>
       </span>
     </button>
   );
