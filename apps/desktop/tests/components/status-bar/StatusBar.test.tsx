@@ -96,7 +96,9 @@ describe('StatusBar validation repairs', () => {
     render(<StatusBar />);
 
     fireEvent.click(screen.getByRole('button', { name: '1 advisory' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Fix in chat' }));
+    const discussButton = screen.getByRole('button', { name: 'Discuss in chat' });
+    expect(discussButton.parentElement).toHaveClass('justify-end');
+    fireEvent.click(discussButton);
 
     expect(useUIChromeStore.getState()).toMatchObject({
       sidebarTab: 'chat',

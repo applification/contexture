@@ -803,7 +803,7 @@ function FieldAdvicePopover({
               onClick={openInChat}
             >
               <MessageSquare aria-hidden="true" className="size-3.5" />
-              Ask in chat
+              Discuss in chat
             </Button>
           </div>
         </div>

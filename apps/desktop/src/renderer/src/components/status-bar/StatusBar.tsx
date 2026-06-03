@@ -264,50 +264,54 @@ export function StatusBar(): React.JSX.Element {
                   return (
                     <div
                       key={`${err.code}:${err.path}`}
-                      className="flex gap-2 border-b border-border px-3 py-2 text-xs last:border-b-0 hover:bg-muted"
+                      className="space-y-2 border-b border-border px-3 py-2 text-xs last:border-b-0 hover:bg-muted"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleErrorClick(err)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <div className="flex items-start gap-2">
-                          <Icon
-                            className={cn(
-                              'size-3 shrink-0 mt-0.5',
-                              err.severity === 'error' ? 'text-destructive' : 'text-warning',
-                            )}
-                          />
-                          <div className="min-w-0">
-                            <div className="mb-0.5 font-mono text-[10px] text-muted-foreground/80">
-                              {err.code}
-                            </div>
-                            <div className="font-medium whitespace-normal break-words">
-                              {err.message}
-                            </div>
-                            <div className="text-muted-foreground/70 whitespace-normal break-all">
-                              {err.path}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                      {repair && (
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => handleRepair(err)}
-                          className="self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                          onClick={() => handleErrorClick(err)}
+                          className="min-w-0 flex-1 text-left"
                         >
-                          {repair.label}
+                          <div className="flex items-start gap-2">
+                            <Icon
+                              className={cn(
+                                'size-3 shrink-0 mt-0.5',
+                                err.severity === 'error' ? 'text-destructive' : 'text-warning',
+                              )}
+                            />
+                            <div className="min-w-0">
+                              <div className="mb-0.5 font-mono text-[10px] text-muted-foreground/80">
+                                {err.code}
+                              </div>
+                              <div className="font-medium whitespace-normal break-words">
+                                {err.message}
+                              </div>
+                              <div className="text-muted-foreground/70 whitespace-normal break-all">
+                                {err.path}
+                              </div>
+                            </div>
+                          </div>
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleFixInChat(err)}
-                        className="inline-flex shrink-0 items-center gap-1 self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
-                      >
-                        <MessageSquare aria-hidden="true" className="size-3" />
-                        Fix in chat
-                      </button>
+                        {repair && (
+                          <button
+                            type="button"
+                            onClick={() => handleRepair(err)}
+                            className="self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                          >
+                            {repair.label}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleFixInChat(err)}
+                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                        >
+                          <MessageSquare aria-hidden="true" className="size-3" />
+                          Discuss in chat
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

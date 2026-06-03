@@ -319,7 +319,7 @@ describe('TypeDetail', () => {
 
       expect(screen.getByText('Query handle')).toBeInTheDocument();
       expect(screen.getByText(/useful for filtering/i)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Ask in chat' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Discuss in chat' }));
 
       expect(useUIChromeStore.getState().sidebarTab).toBe('chat');
       expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain('Post.title');
