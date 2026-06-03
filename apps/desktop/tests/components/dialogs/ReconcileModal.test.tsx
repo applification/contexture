@@ -89,6 +89,36 @@ afterEach(() => {
 });
 
 describe('ReconcileModal', () => {
+  it('keeps the reconcile workflow scrollable within the viewport', () => {
+    useReconcileStore.getState().open(ZOD_PATH);
+    useReconcileStore.getState().setReady(
+      Array.from({ length: 12 }, (_, index) => ({
+        id: `op-${index}`,
+        label: `Add field generatedField${index} to Plot`,
+        lossy: false,
+        provenance: 'deterministic',
+        op: {
+          kind: 'add_field',
+          typeName: 'Plot',
+          field: { name: `generatedField${index}`, type: { kind: 'string' } },
+        },
+      })),
+      'hand edited source',
+    );
+
+    render(<ReconcileModal />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('max-h-[calc(100vh-2rem)]', 'overflow-hidden', 'flex');
+    expect(screen.getByText('Generated file change').closest('.overflow-y-auto')).toHaveClass(
+      'min-h-0',
+      'flex-1',
+    );
+    expect(screen.getByRole('button', { name: /apply selected ops/i }).closest('div')).toHaveClass(
+      'shrink-0',
+    );
+  });
+
   it('regenerates a generated file from the current IR even when reconcile analysis failed', async () => {
     useDriftStore.getState().setDetected([{ path: ZOD_PATH, status: 'unreadable' }]);
     useReconcileStore.getState().open(ZOD_PATH);

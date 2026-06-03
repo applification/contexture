@@ -382,8 +382,8 @@ export function ReconcileModal(): React.JSX.Element {
         if (!open) close();
       }}
     >
-      <DialogContent className="max-w-6xl w-full">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Reconcile changes</DialogTitle>
           <DialogDescription>
             <code className="font-mono">{displayName}</code> changed outside Contexture. Review the
@@ -392,7 +392,7 @@ export function ReconcileModal(): React.JSX.Element {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
           <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
             <div>{reconcileStatusCopy(driftStatus)}</div>
             {status === 'ready' && totalCount > 0 && (
@@ -499,7 +499,7 @@ export function ReconcileModal(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="flex flex-col border rounded-md overflow-hidden min-h-[360px]">
+          <div className="flex min-h-[360px] flex-col overflow-hidden rounded-md border">
             <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-b bg-muted/30">
               <div>
                 <div className="text-xs font-medium">{activeDiffTitle}</div>
@@ -531,7 +531,7 @@ export function ReconcileModal(): React.JSX.Element {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto max-h-[60vh]">
+            <div className="min-h-[240px] flex-1 overflow-auto">
               {status === 'loading' && (
                 <p className="p-3 text-sm text-muted-foreground">Loading…</p>
               )}
@@ -597,7 +597,7 @@ export function ReconcileModal(): React.JSX.Element {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" onClick={close}>
             Leave dirty
           </Button>
