@@ -3,7 +3,7 @@
  * and the right op dispatches on blur/change.
  */
 
-import type { TypeDef } from '@contexture/core/ir';
+import type { Schema, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { FOCUS_TYPE_NAME_EVENT, TypeDetail } from '@renderer/components/detail/TypeDetail';
 import type { ValidationError } from '@renderer/services/validation';
@@ -20,6 +20,7 @@ function setup(
   availableObjectTypeNames: readonly string[] = [],
   validationErrors: ValidationError[] = [],
   availableTypeNames: readonly string[] = availableObjectTypeNames,
+  schema?: Schema,
 ) {
   const dispatch = vi.fn<(op: Op) => void>();
   render(
@@ -30,6 +31,7 @@ function setup(
       availableTypeNames={availableTypeNames}
       availableObjectTypeNames={availableObjectTypeNames}
       validationErrors={validationErrors}
+      schema={schema}
     />,
   );
   return { dispatch };
@@ -131,6 +133,104 @@ describe('TypeDetail', () => {
         typeName: 'Plot',
         fieldName: 'name',
         patch: { optional: true },
+      });
+    });
+
+    it('shows inherited fields and object invariants', () => {
+      const schema: Schema = {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'BasePlot',
+            fields: [{ name: 'createdAt', type: { kind: 'date' } }],
+          },
+          {
+            kind: 'object',
+            name: 'Plot',
+            extends: ['BasePlot'],
+            fields: [
+              { name: 'name', type: { kind: 'string' } },
+              { name: 'area', type: { kind: 'number' }, optional: true },
+            ],
+            invariants: [
+              {
+                kind: 'exactlyOneOf',
+                name: 'one_identifier',
+                fields: ['name', 'area'],
+              },
+            ],
+          },
+        ],
+      };
+
+      setup(schema.types[1] as TypeDef, [], [], [], [], schema);
+
+      expect(screen.getByText('BasePlot')).toBeInTheDocument();
+      expect(screen.getByTestId('inherited-field-summary')).toHaveTextContent('createdAt');
+      expect(screen.getByText('Invariants')).toBeInTheDocument();
+      expect(screen.getByTestId('object-invariant-row')).toHaveTextContent('one_identifier');
+      expect(screen.getByTestId('object-invariant-row')).toHaveTextContent(
+        'Exactly one of name, area must be present.',
+      );
+    });
+
+    it('dispatches remove_invariant when an invariant is deleted', () => {
+      const { dispatch } = setup({
+        ...type,
+        invariants: [{ kind: 'mutuallyExclusive', name: 'one_state', fields: ['name', 'area'] }],
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete invariant one_state' }));
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_invariant',
+        typeName: 'Plot',
+        name: 'one_state',
+      });
+    });
+
+    it('adds an invariant from the editor dialog', () => {
+      const { dispatch } = setup(type);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add invariant' }));
+      fireEvent.change(screen.getAllByLabelText('Name').at(-1) as HTMLElement, {
+        target: { value: 'one_plot_measure' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save invariant' }));
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_invariant',
+        typeName: 'Plot',
+        invariant: {
+          kind: 'exactlyOneOf',
+          name: 'one_plot_measure',
+          fields: ['name', 'area'],
+        },
+      });
+    });
+
+    it('updates an invariant from the editor dialog', () => {
+      const { dispatch } = setup({
+        ...type,
+        invariants: [{ kind: 'exactlyOneOf', name: 'one_identifier', fields: ['name', 'area'] }],
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit invariant one_identifier' }));
+      fireEvent.change(screen.getAllByLabelText('Name').at(-1) as HTMLElement, {
+        target: { value: 'one_plot_identifier' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save invariant' }));
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_invariant',
+        typeName: 'Plot',
+        name: 'one_identifier',
+        patch: {
+          kind: 'exactlyOneOf',
+          name: 'one_plot_identifier',
+          fields: ['name', 'area'],
+        },
       });
     });
 

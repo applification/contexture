@@ -15,7 +15,14 @@
 
 import { derivationKindLabel } from '@contexture/core/derivation';
 import { listFixtureModules } from '@contexture/core/fixture-generators';
-import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core/ir';
+import type {
+  FieldDef,
+  FieldType,
+  IndexDef,
+  ObjectInvariant,
+  Schema,
+  TypeDef,
+} from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
@@ -26,6 +33,7 @@ import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import {
   ChevronDown,
   ChevronUp,
+  GitBranch,
   Hash,
   Lightbulb,
   MessageSquare,
@@ -52,6 +60,14 @@ import {
   CommandItem,
   CommandList,
 } from '../ui/command';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -172,7 +188,7 @@ export function TypeDetail({
       <DescriptionField type={type} dispatch={dispatch} />
       <ModelShapeHints hints={modelingHints} />
 
-      {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
+      {type.kind === 'object' && <ObjectBody type={type} schema={schema} dispatch={dispatch} />}
       <SampleDataSection type={type} dispatch={dispatch} />
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
@@ -286,6 +302,7 @@ function TableTypeDetail({
           <TableModelingAdvisoryStrip hints={tableHints} />
           <ObjectBody
             type={type}
+            schema={schema}
             dispatch={dispatch}
             quietControls
             fieldHintsByName={fieldHintsByName}
@@ -507,6 +524,7 @@ function DescriptionField({ type, dispatch }: TypeDetailProps) {
 
 function ObjectBody({
   type,
+  schema,
   dispatch,
   quietControls = false,
   fieldHintsByName,
@@ -514,6 +532,7 @@ function ObjectBody({
   fieldIndexInsights,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
   dispatch: (op: Op) => void;
   quietControls?: boolean;
   fieldHintsByName?: ReadonlyMap<string, readonly ModelingHint[]>;
@@ -521,6 +540,7 @@ function ObjectBody({
   fieldIndexInsights?: ReadonlyMap<string, FieldIndexInsight>;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
+  const inheritedFields = inheritedObjectFields(type, schema);
   const addField = () => {
     const field: FieldDef = { name: nextFieldName(type.fields), type: { kind: 'string' } };
     dispatch({
@@ -541,9 +561,45 @@ function ObjectBody({
 
   if (type.fields.length === 0) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
+        <ObjectInheritanceSection type={type} inheritedFields={inheritedFields} />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Fields</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={addField}
+              className="h-7 text-xs"
+            >
+              <Plus aria-hidden="true" />
+              Add field
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            No fields yet. Add a field to start shaping this type.
+          </p>
+        </div>
+        <ObjectInvariantsSection type={type} schema={schema} dispatch={dispatch} />
+      </div>
+    );
+  }
+  const isTable = type.table === true;
+  const showAdviceColumn = Boolean(fieldHintsByName && fieldHintsByName.size > 0);
+  return (
+    <div className="space-y-4">
+      <ObjectInheritanceSection type={type} inheritedFields={inheritedFields} />
+      <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <Label>Fields</Label>
+          <div className="flex items-center gap-2">
+            <Label>Fields</Label>
+            {fieldHintCount > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                {fieldHintCount} {fieldHintCount === 1 ? 'advisory' : 'advisories'}
+              </span>
+            )}
+          </div>
           <Button
             type="button"
             variant="ghost"
@@ -555,183 +611,701 @@ function ObjectBody({
             Add field
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          No fields yet. Add a field to start shaping this type.
-        </p>
-      </div>
-    );
-  }
-  const isTable = type.table === true;
-  const showAdviceColumn = Boolean(fieldHintsByName && fieldHintsByName.size > 0);
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Label>Fields</Label>
-          {fieldHintCount > 0 && (
-            <span className="text-[11px] text-muted-foreground">
-              {fieldHintCount} {fieldHintCount === 1 ? 'advisory' : 'advisories'}
-            </span>
-          )}
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={addField} className="h-7 text-xs">
-          <Plus aria-hidden="true" />
-          Add field
-        </Button>
-      </div>
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="h-7 px-2">Name</TableHead>
-            <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
-            <TableHead className="h-7 px-2 text-right">Type</TableHead>
-            {showAdviceColumn && (
-              <TableHead className="h-7 w-14 px-1 text-center">
-                <span className="sr-only">Advice</span>
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-7 px-2">Name</TableHead>
+              <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
+              <TableHead className="h-7 px-2 text-right">Type</TableHead>
+              {showAdviceColumn && (
+                <TableHead className="h-7 w-14 px-1 text-center">
+                  <span className="sr-only">Advice</span>
+                </TableHead>
+              )}
+              <TableHead className="h-7 w-36 px-1 text-right">
+                <span className="sr-only">Actions</span>
               </TableHead>
-            )}
-            <TableHead className="h-7 w-36 px-1 text-right">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {type.fields.map((f, fieldIndex) => {
-            const reserved = isTable && isConvexReservedName(f.name);
-            const fieldHints = fieldHintsByName?.get(f.name) ?? [];
-            const fieldIndexInsight = fieldIndexInsights?.get(f.name);
-            return (
-              <TableRow
-                key={f.name}
-                data-testid="object-field-summary"
-                data-reserved={reserved || undefined}
-                title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
-                className={cn('group', reserved && 'text-destructive')}
-              >
-                <TableCell className="px-2 py-1.5 font-medium">
-                  <Input
-                    aria-label={`Field name ${f.name}`}
-                    defaultValue={f.name}
-                    className="h-7 px-2 text-xs font-medium"
-                    onBlur={(ev) => {
-                      const next = ev.target.value.trim();
-                      if (next && next !== f.name) {
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {type.fields.map((f, fieldIndex) => {
+              const reserved = isTable && isConvexReservedName(f.name);
+              const fieldHints = fieldHintsByName?.get(f.name) ?? [];
+              const fieldIndexInsight = fieldIndexInsights?.get(f.name);
+              return (
+                <TableRow
+                  key={f.name}
+                  data-testid="object-field-summary"
+                  data-reserved={reserved || undefined}
+                  title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
+                  className={cn('group', reserved && 'text-destructive')}
+                >
+                  <TableCell className="px-2 py-1.5 font-medium">
+                    <Input
+                      aria-label={`Field name ${f.name}`}
+                      defaultValue={f.name}
+                      className="h-7 px-2 text-xs font-medium"
+                      onBlur={(ev) => {
+                        const next = ev.target.value.trim();
+                        if (next && next !== f.name) {
+                          dispatch({
+                            kind: 'update_field',
+                            typeName: type.name,
+                            fieldName: f.name,
+                            patch: { name: next },
+                          });
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center">
+                    <Checkbox
+                      aria-label={`${f.name} optional`}
+                      checked={f.optional === true}
+                      onCheckedChange={(v) =>
                         dispatch({
                           kind: 'update_field',
                           typeName: type.name,
                           fieldName: f.name,
-                          patch: { name: next },
-                        });
+                          patch: { optional: v === true },
+                        })
                       }
-                    }}
-                  />
-                </TableCell>
-                <TableCell className="px-2 py-1.5 text-center">
-                  <Checkbox
-                    aria-label={`${f.name} optional`}
-                    checked={f.optional === true}
-                    onCheckedChange={(v) =>
-                      dispatch({
-                        kind: 'update_field',
-                        typeName: type.name,
-                        fieldName: f.name,
-                        patch: { optional: v === true },
-                      })
-                    }
-                  />
-                </TableCell>
-                <TableCell className="px-2 py-1.5 text-right">
-                  <div className="inline-flex items-center justify-end gap-1">
-                    {f.derivation && <FieldDerivationPill field={f} />}
-                    <FieldKindPill fieldType={f.type} />
-                  </div>
-                </TableCell>
-                {showAdviceColumn && (
-                  <TableCell className="w-14 px-1 py-1.5 text-center">
-                    <FieldAdvicePopover
-                      typeName={type.name}
-                      fieldName={f.name}
-                      hints={fieldHints}
                     />
                   </TableCell>
-                )}
-                <TableCell className="w-36 px-1 py-1.5 text-right">
-                  <div className="inline-flex items-center justify-end gap-0.5">
-                    {fieldIndexInsight && (
-                      <FieldIndexPopover
+                  <TableCell className="px-2 py-1.5 text-right">
+                    <div className="inline-flex items-center justify-end gap-1">
+                      {f.derivation && <FieldDerivationPill field={f} />}
+                      <FieldKindPill fieldType={f.type} />
+                    </div>
+                  </TableCell>
+                  {showAdviceColumn && (
+                    <TableCell className="w-14 px-1 py-1.5 text-center">
+                      <FieldAdvicePopover
                         typeName={type.name}
                         fieldName={f.name}
-                        insight={fieldIndexInsight}
-                        dispatch={dispatch}
+                        hints={fieldHints}
                       />
-                    )}
-                    <div
-                      className={cn(
-                        'inline-flex items-center gap-0.5 transition-opacity',
-                        quietControls &&
-                          'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                    </TableCell>
+                  )}
+                  <TableCell className="w-36 px-1 py-1.5 text-right">
+                    <div className="inline-flex items-center justify-end gap-0.5">
+                      {fieldIndexInsight && (
+                        <FieldIndexPopover
+                          typeName={type.name}
+                          fieldName={f.name}
+                          insight={fieldIndexInsight}
+                          dispatch={dispatch}
+                        />
                       )}
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Edit field ${f.name}`}
-                        onClick={() =>
-                          useGraphSelectionStore
-                            .getState()
-                            .selectField({ typeName: type.name, fieldName: f.name })
-                        }
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      <div
+                        className={cn(
+                          'inline-flex items-center gap-0.5 transition-opacity',
+                          quietControls &&
+                            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                        )}
                       >
-                        <SlidersHorizontal aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move field ${f.name} earlier`}
-                        disabled={fieldIndex === 0}
-                        onClick={() => moveField(fieldIndex, fieldIndex - 1)}
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      >
-                        <ChevronUp aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move field ${f.name} later`}
-                        disabled={fieldIndex === type.fields.length - 1}
-                        onClick={() => moveField(fieldIndex, fieldIndex + 1)}
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      >
-                        <ChevronDown aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete field ${f.name}`}
-                        onClick={() =>
-                          dispatch({
-                            kind: 'remove_field',
-                            typeName: type.name,
-                            fieldName: f.name,
-                          })
-                        }
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Edit field ${f.name}`}
+                          onClick={() =>
+                            useGraphSelectionStore
+                              .getState()
+                              .selectField({ typeName: type.name, fieldName: f.name })
+                          }
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <SlidersHorizontal aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Move field ${f.name} earlier`}
+                          disabled={fieldIndex === 0}
+                          onClick={() => moveField(fieldIndex, fieldIndex - 1)}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <ChevronUp aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Move field ${f.name} later`}
+                          disabled={fieldIndex === type.fields.length - 1}
+                          onClick={() => moveField(fieldIndex, fieldIndex + 1)}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <ChevronDown aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Delete field ${f.name}`}
+                          onClick={() =>
+                            dispatch({
+                              kind: 'remove_field',
+                              typeName: type.name,
+                              fieldName: f.name,
+                            })
+                          }
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+      <ObjectInvariantsSection type={type} schema={schema} dispatch={dispatch} />
+    </div>
+  );
+}
+
+interface InheritedObjectField {
+  field: FieldDef;
+  sourceTypeName: string;
+}
+
+function ObjectInheritanceSection({
+  type,
+  inheritedFields,
+}: {
+  type: Extract<TypeDef, { kind: 'object' }>;
+  inheritedFields: readonly InheritedObjectField[];
+}) {
+  if ((type.extends?.length ?? 0) === 0 && inheritedFields.length === 0) return null;
+  return (
+    <div className="space-y-2 rounded-md border border-border/70 p-2.5">
+      <div className="flex items-center gap-2">
+        <GitBranch aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        <Label>Inheritance</Label>
+      </div>
+      {(type.extends?.length ?? 0) > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {type.extends?.map((baseName) => (
+            <span
+              key={baseName}
+              className="inline-flex min-h-6 items-center rounded-md border px-1.5 font-mono text-[11px] font-medium"
+              style={toneSurfaceStyle('var(--inspector-type-object)', 12, 42)}
+            >
+              {baseName}
+            </span>
+          ))}
+        </div>
+      )}
+      {inheritedFields.length > 0 ? (
+        <div className="space-y-1">
+          {inheritedFields.map(({ field, sourceTypeName }) => (
+            <div
+              key={`${sourceTypeName}.${field.name}`}
+              className="flex min-h-7 items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1 text-xs"
+              data-testid="inherited-field-summary"
+            >
+              <div className="min-w-0">
+                <span className="font-medium text-foreground">{field.name}</span>
+                <span className="ml-1 text-[11px] text-muted-foreground">
+                  from {sourceTypeName}
+                </span>
+              </div>
+              <FieldKindPill fieldType={field.type} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Base types will show inherited fields here once schema context is available.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ObjectInvariantsSection({
+  type,
+  schema,
+  dispatch,
+}: {
+  type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
+  dispatch: (op: Op) => void;
+}) {
+  const invariants = type.invariants ?? [];
+  const [editing, setEditing] = useState<ObjectInvariant | null>(null);
+  const [creating, setCreating] = useState(false);
+  const fieldOptions = effectiveObjectFields(type, schema).map((entry) => entry.field);
+  const canAdd = fieldOptions.length > 0;
+
+  const closeDialog = () => {
+    setCreating(false);
+    setEditing(null);
+  };
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label>Invariants</Label>
+          {invariants.length > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              {invariants.length} {invariants.length === 1 ? 'rule' : 'rules'}
+            </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setCreating(true)}
+          disabled={!canAdd}
+          title={canAdd ? undefined : 'Add a field before creating an invariant.'}
+          className="h-7 px-2 text-xs"
+        >
+          <Plus aria-hidden="true" />
+          Add invariant
+        </Button>
+      </div>
+
+      {invariants.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No invariants yet. Add rules for conditional fields, exclusive choices, field predicates,
+          or array uniqueness.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {invariants.map((invariant) => (
+            <div
+              key={invariant.name}
+              className="group flex items-start justify-between gap-2 rounded-md border px-2 py-1.5 text-xs"
+              data-testid="object-invariant-row"
+              style={toneSurfaceStyle(invariantKindColor(invariant.kind), 10, 34)}
+            >
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="rounded border bg-background/80 px-1.5 py-0.5 text-[10px] font-medium">
+                    {invariantKindLabel(invariant.kind)}
+                  </span>
+                  <span className="truncate font-mono text-[11px] font-semibold text-foreground">
+                    {invariant.name}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {invariantSummary(invariant)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Edit invariant ${invariant.name}`}
+                  onClick={() => setEditing(invariant)}
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <SlidersHorizontal aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete invariant ${invariant.name}`}
+                  onClick={() =>
+                    dispatch({
+                      kind: 'remove_invariant',
+                      typeName: type.name,
+                      name: invariant.name,
+                    })
+                  }
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(creating || editing) && (
+        <InvariantDialog
+          type={type}
+          schema={schema}
+          invariant={editing}
+          open={creating || editing !== null}
+          onOpenChange={(open) => {
+            if (!open) closeDialog();
+          }}
+          onSave={(invariant) => {
+            if (editing) {
+              dispatch({
+                kind: 'update_invariant',
+                typeName: type.name,
+                name: editing.name,
+                patch: invariant,
+              });
+            } else {
+              dispatch({ kind: 'add_invariant', typeName: type.name, invariant });
+            }
+            closeDialog();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function InvariantDialog({
+  type,
+  schema,
+  invariant,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
+  invariant: ObjectInvariant | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (invariant: ObjectInvariant) => void;
+}) {
+  const fieldOptions = effectiveObjectFields(type, schema).map((entry) => entry.field);
+  const [draft, setDraft] = useState<ObjectInvariant>(
+    () => invariant ?? defaultInvariant(type, schema, 'exactlyOneOf'),
+  );
+
+  useEffect(() => {
+    setDraft(invariant ?? defaultInvariant(type, schema, draft.kind));
+  }, [invariant, schema, type, draft.kind]);
+
+  const updateDraft = (next: ObjectInvariant) => setDraft(next);
+  const setKind = (kind: ObjectInvariant['kind']) => {
+    setDraft(defaultInvariant(type, schema, kind, draft.name));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl gap-4">
+        <DialogHeader>
+          <DialogTitle>{invariant ? 'Edit invariant' : 'Add invariant'}</DialogTitle>
+          <DialogDescription>
+            Define a validator-level rule for {type.name}. Generated Zod enforces these rules.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+            <div className="space-y-1.5">
+              <Label htmlFor="invariant-name">Name</Label>
+              <Input
+                id="invariant-name"
+                value={draft.name}
+                onChange={(ev) => updateDraft({ ...draft, name: ev.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kind</Label>
+              <Select
+                value={draft.kind}
+                onValueChange={(value) => setKind(value as ObjectInvariant['kind'])}
+              >
+                <SelectTrigger aria-label="Invariant kind" className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="requiresWhen">Requires when</SelectItem>
+                  <SelectItem value="exactlyOneOf">Exactly one</SelectItem>
+                  <SelectItem value="mutuallyExclusive">Mutually exclusive</SelectItem>
+                  <SelectItem value="fieldPredicate">Field rule</SelectItem>
+                  <SelectItem value="uniqueInArray">Unique in array</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <InvariantKindFields
+            draft={draft}
+            type={type}
+            schema={schema}
+            fieldOptions={fieldOptions}
+            onChange={updateDraft}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => onSave(normalizeInvariantDraft(draft, type))}
+            disabled={!draft.name.trim()}
+          >
+            Save invariant
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InvariantKindFields({
+  draft,
+  type,
+  schema,
+  fieldOptions,
+  onChange,
+}: {
+  draft: ObjectInvariant;
+  type: Extract<TypeDef, { kind: 'object' }>;
+  schema?: Schema;
+  fieldOptions: readonly FieldDef[];
+  onChange: (invariant: ObjectInvariant) => void;
+}) {
+  const fieldNames = fieldOptions.map((field) => field.name);
+  switch (draft.kind) {
+    case 'requiresWhen':
+      return (
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+            <FieldSelect
+              label="Condition field"
+              value={draft.when.field}
+              fieldNames={fieldNames}
+              onChange={(field) => onChange({ ...draft, when: { ...draft.when, field } })}
+            />
+            <div className="space-y-1.5">
+              <Label htmlFor="condition-value">Equals</Label>
+              <Input
+                id="condition-value"
+                value={String(draft.when.equals)}
+                onChange={(ev) =>
+                  onChange({ ...draft, when: { ...draft.when, equals: ev.target.value } })
+                }
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <FieldChecklist
+            label="Requires"
+            fieldNames={fieldNames}
+            selected={draft.requires ?? []}
+            onChange={(requires) => onChange({ ...draft, requires })}
+          />
+          <FieldChecklist
+            label="Forbids"
+            fieldNames={fieldNames}
+            selected={draft.forbids ?? []}
+            onChange={(forbids) => onChange({ ...draft, forbids })}
+          />
+        </div>
+      );
+    case 'exactlyOneOf':
+    case 'mutuallyExclusive':
+      return (
+        <FieldChecklist
+          label="Fields"
+          fieldNames={fieldNames}
+          selected={draft.fields}
+          onChange={(fields) => onChange({ ...draft, fields })}
+        />
+      );
+    case 'fieldPredicate':
+      return (
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+          <FieldSelect
+            label="Field"
+            value={draft.field}
+            fieldNames={fieldNames}
+            onChange={(field) => onChange({ ...draft, field })}
+          />
+          <div className="space-y-1.5">
+            <Label>Predicate</Label>
+            <Select
+              value={
+                draft.predicate.kind === 'weekday'
+                  ? `weekday:${draft.predicate.value}`
+                  : draft.predicate.kind
+              }
+              onValueChange={(value) => {
+                if (value.startsWith('weekday:')) {
+                  onChange({
+                    ...draft,
+                    predicate: {
+                      kind: 'weekday',
+                      value: value.slice('weekday:'.length) as WeekdayValue,
+                    },
+                  });
+                  return;
+                }
+                onChange({ ...draft, predicate: { kind: 'nonEmptyTrimmedString' } });
+              }}
+            >
+              <SelectTrigger aria-label="Field predicate" className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nonEmptyTrimmedString">Non-empty trimmed string</SelectItem>
+                <SelectItem value="weekday:monday">Weekday: Monday</SelectItem>
+                <SelectItem value="weekday:tuesday">Weekday: Tuesday</SelectItem>
+                <SelectItem value="weekday:wednesday">Weekday: Wednesday</SelectItem>
+                <SelectItem value="weekday:thursday">Weekday: Thursday</SelectItem>
+                <SelectItem value="weekday:friday">Weekday: Friday</SelectItem>
+                <SelectItem value="weekday:saturday">Weekday: Saturday</SelectItem>
+                <SelectItem value="weekday:sunday">Weekday: Sunday</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    case 'uniqueInArray': {
+      const arrayFields = fieldOptions.filter((field) => field.type.kind === 'array');
+      const arrayFieldNames = arrayFields.map((field) => field.name);
+      const childFields = childFieldsForArray(type, schema, draft.arrayField);
+      const childFieldNames = childFields.map((field) => field.name);
+      return (
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+            <FieldSelect
+              label="Array field"
+              value={draft.arrayField}
+              fieldNames={arrayFieldNames}
+              onChange={(arrayField) => {
+                const [uniqueField] = childFieldsForArray(type, schema, arrayField);
+                onChange({
+                  ...draft,
+                  arrayField,
+                  uniqueField: uniqueField?.name ?? draft.uniqueField,
+                });
+              }}
+            />
+            <FieldSelect
+              label="Unique child field"
+              value={draft.uniqueField}
+              fieldNames={childFieldNames}
+              onChange={(uniqueField) => onChange({ ...draft, uniqueField })}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+            <FieldSelect
+              label="Where field"
+              value={draft.where?.field ?? NO_FIELD_VALUE}
+              fieldNames={[NO_FIELD_VALUE, ...childFieldNames]}
+              labels={{ [NO_FIELD_VALUE]: 'No condition' }}
+              onChange={(field) =>
+                onChange({
+                  ...draft,
+                  where:
+                    field === NO_FIELD_VALUE
+                      ? undefined
+                      : { field, equals: draft.where?.equals ?? '' },
+                })
+              }
+            />
+            <div className="space-y-1.5">
+              <Label htmlFor="where-value">Where equals</Label>
+              <Input
+                id="where-value"
+                value={String(draft.where?.equals ?? '')}
+                disabled={!draft.where}
+                onChange={(ev) =>
+                  draft.where &&
+                  onChange({ ...draft, where: { ...draft.where, equals: ev.target.value } })
+                }
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+}
+
+const NO_FIELD_VALUE = '__none__';
+
+function FieldSelect({
+  label,
+  value,
+  fieldNames,
+  labels = {},
+  onChange,
+}: {
+  label: string;
+  value: string;
+  fieldNames: readonly string[];
+  labels?: Record<string, string>;
+  onChange: (fieldName: string) => void;
+}) {
+  const id = useStableDomId('field-select');
+  const options = fieldNames.length > 0 ? fieldNames : [value || NO_FIELD_VALUE];
+  const safeValue = options.includes(value) ? value : (options[0] ?? NO_FIELD_VALUE);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={safeValue} onValueChange={onChange}>
+        <SelectTrigger id={id} aria-label={label} className="h-8 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((fieldName) => (
+            <SelectItem key={fieldName} value={fieldName}>
+              {labels[fieldName] ?? fieldName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function FieldChecklist({
+  label,
+  fieldNames,
+  selected,
+  onChange,
+}: {
+  label: string;
+  fieldNames: readonly string[];
+  selected: readonly string[];
+  onChange: (fields: string[]) => void;
+}) {
+  const selectedSet = new Set(selected);
+  const toggle = (fieldName: string) => {
+    if (selectedSet.has(fieldName)) {
+      onChange(selected.filter((field) => field !== fieldName));
+      return;
+    }
+    onChange([...selected, fieldName]);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {fieldNames.map((fieldName) => (
+          <Label
+            key={fieldName}
+            className="inline-flex min-h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs font-normal"
+          >
+            <Checkbox
+              aria-label={`${label} ${fieldName}`}
+              checked={selectedSet.has(fieldName)}
+              onCheckedChange={() => toggle(fieldName)}
+            />
+            {fieldName}
+          </Label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1404,6 +1978,230 @@ function IndexFieldPicker({
       </PopoverContent>
     </Popover>
   );
+}
+
+interface EffectiveObjectField {
+  field: FieldDef;
+  sourceTypeName: string;
+  inherited: boolean;
+}
+
+type WeekdayValue = Extract<
+  Extract<ObjectInvariant, { kind: 'fieldPredicate' }>['predicate'],
+  { kind: 'weekday' }
+>['value'];
+
+function effectiveObjectFields(
+  type: Extract<TypeDef, { kind: 'object' }>,
+  schema?: Schema,
+): EffectiveObjectField[] {
+  const fields = new Map<string, EffectiveObjectField>();
+  const seen = new Set<string>();
+  const byName = new Map(schema?.types.map((candidate) => [candidate.name, candidate]) ?? []);
+
+  function addFrom(current: Extract<TypeDef, { kind: 'object' }>, inherited: boolean): void {
+    if (seen.has(current.name)) return;
+    seen.add(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = byName.get(baseName);
+      if (base?.kind === 'object') addFrom(base, true);
+    }
+    for (const field of current.fields) {
+      fields.set(field.name, { field, sourceTypeName: current.name, inherited });
+    }
+  }
+
+  addFrom(type, false);
+  return [...fields.values()];
+}
+
+function inheritedObjectFields(
+  type: Extract<TypeDef, { kind: 'object' }>,
+  schema?: Schema,
+): InheritedObjectField[] {
+  return effectiveObjectFields(type, schema)
+    .filter((entry) => entry.inherited)
+    .map(({ field, sourceTypeName }) => ({ field, sourceTypeName }));
+}
+
+function childFieldsForArray(
+  type: Extract<TypeDef, { kind: 'object' }>,
+  schema: Schema | undefined,
+  arrayFieldName: string,
+): FieldDef[] {
+  const arrayField = effectiveObjectFields(type, schema).find(
+    (entry) => entry.field.name === arrayFieldName,
+  )?.field;
+  const arrayType = arrayField?.type;
+  if (arrayType?.kind !== 'array') return [];
+  const elementType = arrayType.element;
+  if (elementType.kind !== 'ref') return [];
+  const target = schema?.types.find((candidate) => candidate.name === elementType.typeName);
+  if (target?.kind !== 'object') return [];
+  return effectiveObjectFields(target, schema).map((entry) => entry.field);
+}
+
+function defaultInvariant(
+  type: Extract<TypeDef, { kind: 'object' }>,
+  schema: Schema | undefined,
+  kind: ObjectInvariant['kind'],
+  preferredName?: string,
+): ObjectInvariant {
+  const fields = effectiveObjectFields(type, schema).map((entry) => entry.field);
+  const fieldNames = fields.map((field) => field.name);
+  const firstField = fieldNames[0] ?? 'field';
+  const secondField = fieldNames[1] ?? firstField;
+  const name = preferredName?.trim() || nextInvariantName(type, kind);
+
+  switch (kind) {
+    case 'requiresWhen':
+      return {
+        kind,
+        name,
+        when: { field: firstField, equals: '' },
+        requires: [secondField],
+        forbids: [],
+      };
+    case 'exactlyOneOf':
+      return { kind, name, fields: uniqueNonEmpty([firstField, secondField]) };
+    case 'mutuallyExclusive':
+      return { kind, name, fields: uniqueNonEmpty([firstField, secondField]) };
+    case 'fieldPredicate':
+      return {
+        kind,
+        name,
+        field: firstField,
+        predicate: { kind: 'nonEmptyTrimmedString' },
+      };
+    case 'uniqueInArray': {
+      const arrayField = fields.find((field) => field.type.kind === 'array');
+      const arrayFieldName = arrayField?.name ?? firstField;
+      const childField = childFieldsForArray(type, schema, arrayFieldName)[0]?.name ?? 'id';
+      return { kind, name, arrayField: arrayFieldName, uniqueField: childField };
+    }
+  }
+}
+
+function normalizeInvariantDraft(
+  draft: ObjectInvariant,
+  type: Extract<TypeDef, { kind: 'object' }>,
+): ObjectInvariant {
+  const name = draft.name.trim() || nextInvariantName(type, draft.kind);
+  switch (draft.kind) {
+    case 'requiresWhen':
+      return {
+        ...draft,
+        name,
+        requires: uniqueNonEmpty(draft.requires ?? []),
+        forbids: uniqueNonEmpty(draft.forbids ?? []),
+      };
+    case 'exactlyOneOf':
+    case 'mutuallyExclusive':
+      return { ...draft, name, fields: uniqueNonEmpty(draft.fields) };
+    case 'fieldPredicate':
+      return { ...draft, name };
+    case 'uniqueInArray':
+      return {
+        ...draft,
+        name,
+        where:
+          draft.where && draft.where.field !== NO_FIELD_VALUE && draft.where.field.trim()
+            ? draft.where
+            : undefined,
+      };
+  }
+}
+
+function uniqueNonEmpty(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function nextInvariantName(
+  type: Extract<TypeDef, { kind: 'object' }>,
+  kind: ObjectInvariant['kind'],
+): string {
+  const taken = new Set((type.invariants ?? []).map((invariant) => invariant.name));
+  const base = invariantNameBase(kind);
+  if (!taken.has(base)) return base;
+  for (let i = 2; i <= taken.size + 2; i += 1) {
+    const candidate = `${base}${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}${taken.size + 1}`;
+}
+
+function invariantNameBase(kind: ObjectInvariant['kind']): string {
+  switch (kind) {
+    case 'requiresWhen':
+      return 'conditional_fields';
+    case 'exactlyOneOf':
+      return 'exactly_one_field';
+    case 'mutuallyExclusive':
+      return 'mutually_exclusive_fields';
+    case 'fieldPredicate':
+      return 'field_rule';
+    case 'uniqueInArray':
+      return 'unique_array_values';
+  }
+}
+
+function invariantKindLabel(kind: ObjectInvariant['kind']): string {
+  switch (kind) {
+    case 'requiresWhen':
+      return 'Requires when';
+    case 'exactlyOneOf':
+      return 'Exactly one';
+    case 'mutuallyExclusive':
+      return 'Mutually exclusive';
+    case 'fieldPredicate':
+      return 'Field rule';
+    case 'uniqueInArray':
+      return 'Unique in array';
+  }
+}
+
+function invariantKindColor(kind: ObjectInvariant['kind']): string {
+  switch (kind) {
+    case 'requiresWhen':
+      return 'var(--inspector-field-literal)';
+    case 'exactlyOneOf':
+      return 'var(--inspector-type-union)';
+    case 'mutuallyExclusive':
+      return 'var(--inspector-field-boolean)';
+    case 'fieldPredicate':
+      return 'var(--inspector-advisory)';
+    case 'uniqueInArray':
+      return 'var(--inspector-index)';
+  }
+}
+
+function invariantSummary(invariant: ObjectInvariant): string {
+  switch (invariant.kind) {
+    case 'requiresWhen': {
+      const requires = invariant.requires?.length
+        ? `require ${invariant.requires.join(', ')}`
+        : 'require no fields';
+      const forbids = invariant.forbids?.length
+        ? ` and forbid ${invariant.forbids.join(', ')}`
+        : '';
+      return `When ${invariant.when.field} = ${String(invariant.when.equals)}, ${requires}${forbids}.`;
+    }
+    case 'exactlyOneOf':
+      return `Exactly one of ${invariant.fields.join(', ')} must be present.`;
+    case 'mutuallyExclusive':
+      return `At most one of ${invariant.fields.join(', ')} may be present.`;
+    case 'fieldPredicate':
+      if (invariant.predicate.kind === 'weekday') {
+        return `${invariant.field} must fall on ${invariant.predicate.value}.`;
+      }
+      return `${invariant.field} must be a non-empty trimmed string.`;
+    case 'uniqueInArray': {
+      const where = invariant.where
+        ? ` where ${invariant.where.field} = ${String(invariant.where.equals)}`
+        : '';
+      return `${invariant.uniqueField} must be unique inside ${invariant.arrayField}${where}.`;
+    }
+  }
 }
 
 function validationErrorsForIndex(
