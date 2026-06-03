@@ -5,8 +5,8 @@
  *
  * Styling:
  *   - Field refs rest as quiet structure and label the source field.
- *   - Inferred table id relationships are dashed because they are a
- *     diagram-only convention, not an IR ref.
+ *   - Inferred table id relationships are dashed and unlabeled because they
+ *     are diagram-only hints; the detail panel carries their field metadata.
  *   - Union variants use the discriminated-union accent and a dotted
  *     stroke so inheritance-like membership does not read as a field.
  *   - Cross-boundary refs are dashed and muted so imported namespaces read
@@ -28,6 +28,13 @@ import type { RefEdgeData } from '../schema-to-graph';
 import { getFloatingEdgeParams } from './floating-edge-utils';
 
 type RefEdgeKind = Edge<RefEdgeData, 'ref'>;
+
+export function labelForRefEdge(data: RefEdgeData | undefined): string | undefined {
+  if (!data) return undefined;
+  if (data.relation === 'tableId') return undefined;
+  if (data.relation === 'unionVariant') return 'variant';
+  return data.sourceField;
+}
 
 export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
   const { id, source, target, data, selected } = props;
@@ -78,7 +85,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
         : 'var(--graph-edge-fk, var(--muted-foreground))';
   const strokeWidth = selected || isAdjacent || isPreviewHighlighted ? 2 : 1.25;
   const strokeDasharray = isUnionVariant ? '2 4' : isTableId || crossBoundary ? '6 4' : undefined;
-  const label = isUnionVariant ? 'variant' : data?.sourceField;
+  const label = labelForRefEdge(data);
   const baseOpacity = isUnionVariant || isTableId || crossBoundary ? 0.72 : 0.68;
   const opacity = isDimmed ? 0.18 : isActive ? 0.95 : baseOpacity;
 

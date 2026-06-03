@@ -374,7 +374,7 @@ describe('DetailPanel', () => {
       crossBoundary: false,
     };
     render(<DetailPanel selection={{ edge }} />);
-    expect(screen.getByText('Ref edge')).toBeInTheDocument();
+    expect(screen.getByText('Modeled ref edge')).toBeInTheDocument();
   });
 
   it('selects the source field from an editable edge detail', () => {

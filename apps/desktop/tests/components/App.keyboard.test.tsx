@@ -307,7 +307,7 @@ describe('App global keyboard', () => {
       }),
     );
 
-    expect(await screen.findByText('Ref edge')).toBeInTheDocument();
+    expect(await screen.findByText('Modeled ref edge')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Edit field' }));
 
     expect(await screen.findByTestId('field-detail')).toHaveTextContent('harvest');
@@ -347,7 +347,7 @@ describe('App global keyboard', () => {
       }),
     );
 
-    expect(await screen.findByText('Ref edge')).toBeInTheDocument();
+    expect(await screen.findByText('Modeled ref edge')).toBeInTheDocument();
     useUndoStore.getState().apply({
       kind: 'remove_field',
       typeName: 'Plot',
@@ -355,7 +355,7 @@ describe('App global keyboard', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('Ref edge')).not.toBeInTheDocument();
+      expect(screen.queryByText('Modeled ref edge')).not.toBeInTheDocument();
       expect(useGraphSelectionStore.getState().state.edgeId).toBeNull();
     });
   });
