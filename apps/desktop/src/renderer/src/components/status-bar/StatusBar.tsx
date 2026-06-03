@@ -267,8 +267,15 @@ export function StatusBar(): React.JSX.Element {
                             )}
                           />
                           <div className="min-w-0">
-                            <div className="font-medium truncate">{err.message}</div>
-                            <div className="text-muted-foreground/70 truncate">{err.path}</div>
+                            <div className="mb-0.5 font-mono text-[10px] text-muted-foreground/80">
+                              {err.code}
+                            </div>
+                            <div className="font-medium whitespace-normal break-words">
+                              {err.message}
+                            </div>
+                            <div className="text-muted-foreground/70 whitespace-normal break-all">
+                              {err.path}
+                            </div>
                           </div>
                         </div>
                       </button>

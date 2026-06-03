@@ -63,7 +63,11 @@ describe('StatusBar validation repairs', () => {
     expect(screen.queryByRole('button', { name: '1 error' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '1 advisory' }));
-    expect(screen.getByText(/Household-scoped field "PantryItem.expiresOn"/i)).toBeVisible();
+    expect(screen.getByText('operational_timezone_missing')).toBeVisible();
+    expect(screen.getByText(/Household-scoped field "PantryItem.expiresOn"/i)).toHaveClass(
+      'whitespace-normal',
+      'break-words',
+    );
   });
 
   it('does not offer duplicate enum value repair without index-addressed ops', () => {
