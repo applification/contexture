@@ -67,6 +67,10 @@ const DerivationPolicySchema = z.object({
   refresh: z.enum(['onWrite', 'asyncJob', 'onRead', 'manual', 'frozen', 'external']).optional(),
   driftPolicy: z.enum(['mustMatch', 'eventual', 'allowed', 'warnWhenStale']).optional(),
   owner: z.enum(['backend', 'client', 'external']).optional(),
+  writableBy: z
+    .array(z.enum(['backend', 'client', 'agent', 'external']))
+    .min(1)
+    .optional(),
   staleField: z.string().min(1).optional(),
   confidenceField: z.string().min(1).optional(),
 });

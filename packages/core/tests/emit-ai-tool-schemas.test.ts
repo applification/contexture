@@ -90,4 +90,38 @@ describe('emitAiToolSchemas', () => {
       },
     });
   });
+
+  it('omits fields that are not writable by agents from tool parameters', () => {
+    const doc = emitAiToolSchemas({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'RecipeAssessment',
+          fields: [
+            { name: 'recipeId', type: { kind: 'string' } },
+            {
+              name: 'safetyVerdict',
+              type: { kind: 'string' },
+              derivation: {
+                kind: 'computed',
+                owner: 'backend',
+                writableBy: ['backend'],
+                sources: ['recipeId'],
+                refresh: 'onRead',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(doc.tools[0]?.parameters).toMatchObject({
+      properties: {
+        recipeId: { type: 'string' },
+      },
+      required: ['recipeId'],
+    });
+    expect(JSON.stringify(doc.tools[0]?.parameters)).not.toContain('safetyVerdict');
+  });
 });

@@ -6,6 +6,7 @@
  * adapt the `parameters` object into OpenAI, Anthropic, MCP, or local agent
  * tool registries without Contexture choosing a runtime.
  */
+import { fieldAllowsWriter } from './derivation';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import type { Schema } from './ir';
 
@@ -53,7 +54,9 @@ export function emitAiToolSchemas(schema: Schema, sourcePath?: string): AiToolSc
       description: type.description
         ? `Submit a ${type.name}: ${type.description}`
         : `Submit a ${type.name} object.`,
-      parameters: emitJsonSchema(schema, type.name, sourcePath),
+      parameters: emitJsonSchema(schema, type.name, sourcePath, {
+        omitField: (_type, field) => !fieldAllowsWriter(field, 'agent'),
+      }),
     };
   });
 

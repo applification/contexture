@@ -52,7 +52,8 @@ export type SemanticIssueCode =
   | 'relationship_ownership_scope_missing'
   | 'derivation_missing_source'
   | 'derivation_unknown_source'
-  | 'derivation_missing_refresh';
+  | 'derivation_missing_refresh'
+  | 'derivation_owner_not_writable';
 
 export type SemanticIssueSeverity = 'error' | 'warning';
 
@@ -238,6 +239,20 @@ function checkDerivations(schema: Schema): SemanticIssueDraft[] {
           severity: 'warning',
           message: `${type.name}.${field.name} can drift because it has sources but no refresh or drift policy.`,
           hint: 'Declare whether it refreshes on write, asynchronously, on read, manually, or is allowed to drift.',
+        });
+      }
+
+      if (
+        derivation.owner &&
+        derivation.writableBy &&
+        !derivation.writableBy.includes(derivation.owner)
+      ) {
+        issues.push({
+          code: 'derivation_owner_not_writable',
+          path: `${path}.writableBy`,
+          severity: 'warning',
+          message: `${type.name}.${field.name} is owned by ${derivation.owner}, but writableBy does not include ${derivation.owner}.`,
+          hint: 'Include the owner in writableBy, or change owner if another boundary is authoritative for this derived value.',
         });
       }
 

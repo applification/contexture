@@ -87,4 +87,37 @@ describe('emitFormValidators', () => {
       'export const RecipeCreateValidator = createFormValidator(Recipe.omit({ nutrition: true }));',
     );
   });
+
+  it('emits create validators that omit fields not writable by clients', () => {
+    const source = emitFormValidators(
+      {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Invoice',
+            fields: [
+              { name: 'lineItemCount', type: { kind: 'number', int: true } },
+              {
+                name: 'total',
+                type: { kind: 'number' },
+                derivation: {
+                  kind: 'rollup',
+                  owner: 'backend',
+                  writableBy: ['backend'],
+                  sources: ['lineItemCount'],
+                  refresh: 'onWrite',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      'invoice',
+    );
+
+    expect(source).toContain(
+      'export const InvoiceCreateValidator = createFormValidator(Invoice.omit({ total: true }));',
+    );
+  });
 });
