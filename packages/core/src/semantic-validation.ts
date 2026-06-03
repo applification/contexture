@@ -47,7 +47,8 @@ export type SemanticIssueCode =
   | 'convex_index_unknown_field'
   | 'relationship_target_not_table'
   | 'relationship_scope_field_missing'
-  | 'relationship_set_null_requires_nullable';
+  | 'relationship_set_null_requires_nullable'
+  | 'relationship_cleanup_index_missing';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
@@ -269,6 +270,18 @@ function checkRelationshipMetadata(
       message: `Relationship "${fieldName}" uses setNull but the field is required and non-nullable.`,
       hint: 'Mark the field nullable or optional, or use restrict/cascade/none.',
     });
+  }
+
+  if (ref.relationship.onDelete === 'cascade' || ref.relationship.onDelete === 'setNull') {
+    const hasCleanupIndex = (owner.indexes ?? []).some((index) => index.fields[0] === fieldName);
+    if (!hasCleanupIndex) {
+      issues.push({
+        code: 'relationship_cleanup_index_missing',
+        path: `${path}.relationship.onDelete`,
+        message: `Relationship "${fieldName}" uses ${ref.relationship.onDelete} but source table "${owner.name}" has no cleanup index starting with "${fieldName}".`,
+        hint: `Add an index on "${owner.name}" with "${fieldName}" as the first field before relying on generated cleanup plans.`,
+      });
+    }
   }
 
   const ownership = ref.relationship.ownership;

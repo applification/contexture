@@ -52,4 +52,76 @@ describe('emitConvexRelationships', () => {
     expect(out).toContain('export async function deleteWithContextureRelations');
     expect(parses(out)).toBe(true);
   });
+
+  it('auto-derives ownership scope when source and target share one required scope field', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+          ],
+        },
+      ],
+    };
+
+    const out = emitConvexRelationships(schema);
+
+    expect(out).toContain('"name": "MealPlanMeal.recipeId"');
+    expect(out).toContain('"ownershipScopeField": "householdId"');
+    expect(out).toContain('"targetOwnershipScopeField": "householdId"');
+  });
+
+  it('keeps explicit ownership metadata over auto-derived scope', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Tenant', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'tenantId', type: { kind: 'ref', typeName: 'Tenant' } },
+            { name: 'regionId', type: { kind: 'string' } },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'tenantId', type: { kind: 'ref', typeName: 'Tenant' } },
+            { name: 'regionId', type: { kind: 'string' } },
+            {
+              name: 'recipeId',
+              type: {
+                kind: 'ref',
+                typeName: 'Recipe',
+                relationship: {
+                  ownership: { scopeField: 'regionId', targetScopeField: 'regionId' },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const out = emitConvexRelationships(schema);
+
+    expect(out).toContain('"ownershipScopeField": "regionId"');
+    expect(out).toContain('"targetOwnershipScopeField": "regionId"');
+  });
 });

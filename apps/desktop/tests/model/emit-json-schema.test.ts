@@ -207,6 +207,26 @@ describe('emit (JSON Schema)', () => {
     expect(out.$defs.Comment.properties.on).toEqual({ $ref: '#/$defs/Post' });
   });
 
+  it('emits a table ref as an id string instead of a $ref to the table object', () => {
+    const out = emit({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+      ],
+    }) as { $defs: { Recipe: { properties: Record<string, unknown> } } };
+
+    expect(out.$defs.Recipe.properties.householdId).toEqual({
+      type: 'string',
+      description: 'Household id',
+    });
+  });
+
   it('emits a stdlib qualified ref as $ref to the runtime package URL', () => {
     const out = emit({
       version: '1',

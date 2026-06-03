@@ -605,6 +605,7 @@ function buildIntegrationGuidance(
       'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
       'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
       'Typed op tools take irPath plus their direct arguments. The generic apply_contexture_op takes { irPath, op } where op is the closed-world operation with a kind.',
+      'For Convex table refs, put relationship intent under field.type.relationship, for example { onDelete: "restrict", ownership: { scopeField: "householdId" } }.',
       'After any model mutation, validate, emit generated targets, and check drift before finishing.',
       'Wire generated outputs into the existing app architecture; Contexture does not own arbitrary application code.',
     ],

@@ -44,4 +44,25 @@ describe('emitStructuredOutputSchemas', () => {
       ],
     });
   });
+
+  it('emits table refs as id strings in structured output schemas', () => {
+    const doc = emitStructuredOutputSchemas({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+      ],
+    });
+
+    expect(doc.schemas.find((entry) => entry.name === 'Recipe')?.schema).toMatchObject({
+      properties: {
+        householdId: { type: 'string', description: 'Household id' },
+      },
+    });
+  });
 });

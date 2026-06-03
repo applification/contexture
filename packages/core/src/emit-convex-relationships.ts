@@ -70,6 +70,7 @@ function collectRelationships(schema: Schema): Relationship[] {
       const target = byName.get(ref.typeName);
       if (!target || target.table !== true) continue;
       const relationship = ref.relationship;
+      const ownership = relationship?.ownership ?? deriveOwnership(owner, target, field.name);
       relationships.push({
         name: relationship?.name ?? `${owner.name}.${field.name}`,
         fromType: owner.name,
@@ -81,14 +82,41 @@ function collectRelationships(schema: Schema): Relationship[] {
         optional: field.optional === true,
         nullable: field.nullable === true,
         onDelete: relationship?.onDelete ?? 'none',
-        ownershipScopeField: relationship?.ownership?.scopeField ?? null,
-        targetOwnershipScopeField:
-          relationship?.ownership?.targetScopeField ?? relationship?.ownership?.scopeField ?? null,
+        ownershipScopeField: ownership?.scopeField ?? null,
+        targetOwnershipScopeField: ownership?.targetScopeField ?? ownership?.scopeField ?? null,
       });
     }
   }
 
   return relationships.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function deriveOwnership(
+  owner: ObjectType,
+  target: ObjectType,
+  relationshipFieldName: string,
+): { scopeField: string; targetScopeField?: string } | null {
+  const candidates = owner.fields.filter((sourceField) => {
+    if (sourceField.name === relationshipFieldName) return false;
+    if (sourceField.optional === true || sourceField.nullable === true) return false;
+    const targetField = target.fields.find((field) => field.name === sourceField.name);
+    if (!targetField || targetField.optional === true || targetField.nullable === true)
+      return false;
+    return fieldTypesMatch(sourceField.type, targetField.type);
+  });
+
+  const [candidate] = candidates;
+  if (!candidate || candidates.length !== 1) return null;
+  return { scopeField: candidate.name };
+}
+
+function fieldTypesMatch(left: FieldType, right: FieldType): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === 'ref' && right.kind === 'ref') return left.typeName === right.typeName;
+  if (left.kind === 'array' && right.kind === 'array') {
+    return fieldTypesMatch(left.element, right.element);
+  }
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function assertionHelpers(relationships: Relationship[]): string[] {

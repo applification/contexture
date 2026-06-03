@@ -69,4 +69,25 @@ describe('emitAiToolSchemas', () => {
       'AI tool schema name collision: "CustomerProfile" and "Customer_Profile" both emit "submit_customer_profile".',
     );
   });
+
+  it('emits table refs as id strings in tool parameters', () => {
+    const doc = emitAiToolSchemas({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+      ],
+    });
+
+    expect(doc.tools.find((tool) => tool.name === 'submit_recipe')?.parameters).toMatchObject({
+      properties: {
+        householdId: { type: 'string', description: 'Household id' },
+      },
+    });
+  });
 });

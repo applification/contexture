@@ -12,7 +12,8 @@
  *     `emit_sample` tool takes a schema object directly).
  *
  * Ref handling mirrors the Zod emitter's uniform import mechanism:
- *   - Local refs → `{ $ref: '#/$defs/<Name>' }`
+ *   - Local refs to value-object types → `{ $ref: '#/$defs/<Name>' }`
+ *   - Local refs to table types → `{ type: 'string', description: '<Name> id' }`
  *   - Stdlib `alias.Name` with a matching import → points at the runtime's
  *     sibling schema: `{ $ref: '@contexture/runtime/<ns>#/$defs/<Name>' }`
  *   - Relative `alias.Name` → `{ $ref: './<alias>.schema.json#/$defs/<Name>' }`
@@ -40,6 +41,7 @@ export function emit(
   options: EmitOptions = {},
 ): object {
   const aliases = new Map<string, ImportDecl>();
+  const types = new Map(schema.types.map((type) => [type.name, type]));
   (schema.imports ?? []).forEach((imp) => {
     aliases.set(imp.alias, imp);
   });
@@ -63,7 +65,7 @@ export function emit(
   const defs: Record<string, object> = {};
   for (const type of schema.types) {
     if (type.name === rootTypeName) continue;
-    defs[type.name] = emitTypeDef(type, aliases);
+    defs[type.name] = emitTypeDef(type, { aliases, types });
   }
 
   if (rootTypeName) {
@@ -71,7 +73,7 @@ export function emit(
     if (!root) {
       throw new Error(`Root type "${rootTypeName}" not found in schema.`);
     }
-    const rootSchema = emitTypeDef(root, aliases) as Record<string, unknown>;
+    const rootSchema = emitTypeDef(root, { aliases, types }) as Record<string, unknown>;
     return {
       $schema: DRAFT,
       $contexture_generated: generatedMarker(sourcePath),
@@ -83,13 +85,18 @@ export function emit(
   return { $schema: DRAFT, $contexture_generated: generatedMarker(sourcePath), $defs: defs };
 }
 
-function emitTypeDef(type: TypeDef, aliases: Map<string, ImportDecl>): object {
+interface EmitContext {
+  aliases: Map<string, ImportDecl>;
+  types: Map<string, TypeDef>;
+}
+
+function emitTypeDef(type: TypeDef, ctx: EmitContext): object {
   switch (type.kind) {
     case 'object': {
       const properties: Record<string, object> = {};
       const required: string[] = [];
       for (const field of type.fields) {
-        properties[field.name] = emitField(field, aliases);
+        properties[field.name] = emitField(field, ctx);
         if (!field.optional) required.push(field.name);
       }
       return {
@@ -111,8 +118,8 @@ function emitTypeDef(type: TypeDef, aliases: Map<string, ImportDecl>): object {
   }
 }
 
-function emitField(field: FieldDef, aliases: Map<string, ImportDecl>): object {
-  let body = emitFieldType(field.type, aliases) as Record<string, unknown>;
+function emitField(field: FieldDef, ctx: EmitContext): object {
+  let body = emitFieldType(field.type, ctx) as Record<string, unknown>;
   if (field.nullable) {
     const current = body.type;
     if (typeof current === 'string') {
@@ -130,7 +137,7 @@ function emitField(field: FieldDef, aliases: Map<string, ImportDecl>): object {
   return body;
 }
 
-function emitFieldType(t: FieldType, aliases: Map<string, ImportDecl>): object {
+function emitFieldType(t: FieldType, ctx: EmitContext): object {
   switch (t.kind) {
     case 'string': {
       const out: Record<string, unknown> = { type: 'string' };
@@ -157,10 +164,16 @@ function emitFieldType(t: FieldType, aliases: Map<string, ImportDecl>): object {
       return { const: t.value };
     case 'ref': {
       const dot = t.typeName.indexOf('.');
-      if (dot === -1) return { $ref: `#/$defs/${t.typeName}` };
+      if (dot === -1) {
+        const target = ctx.types.get(t.typeName);
+        if (target?.kind === 'object' && target.table === true) {
+          return { type: 'string', description: `${target.name} id` };
+        }
+        return { $ref: `#/$defs/${t.typeName}` };
+      }
       const alias = t.typeName.slice(0, dot);
       const name = t.typeName.slice(dot + 1);
-      const imp = aliases.get(alias);
+      const imp = ctx.aliases.get(alias);
       if (!imp) {
         // Unresolved qualified ref — validator reports it; emit a best-effort
         // external $ref so the shape stays well-formed.
@@ -175,7 +188,7 @@ function emitFieldType(t: FieldType, aliases: Map<string, ImportDecl>): object {
     case 'array': {
       const out: Record<string, unknown> = {
         type: 'array',
-        items: emitFieldType(t.element, aliases),
+        items: emitFieldType(t.element, ctx),
       };
       if (t.min !== undefined) out.minItems = t.min;
       if (t.max !== undefined) out.maxItems = t.max;

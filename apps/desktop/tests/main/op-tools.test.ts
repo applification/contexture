@@ -140,6 +140,43 @@ describe('createOpTools', () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it('add_field forwards relationship metadata on ref field types', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const addField = toolNamed(tools, 'add_field');
+
+    await addField.handler({
+      typeName: 'MealPlanMeal',
+      field: {
+        name: 'recipeId',
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: {
+            onDelete: 'cascade',
+            ownership: { scopeField: 'householdId' },
+          },
+        },
+      },
+    });
+
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'add_field',
+      typeName: 'MealPlanMeal',
+      field: {
+        name: 'recipeId',
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: {
+            onDelete: 'cascade',
+            ownership: { scopeField: 'householdId' },
+          },
+        },
+      },
+    });
+  });
+
   it('add_field rejects malformed input before reaching the forwarder', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
@@ -158,6 +195,43 @@ describe('createOpTools', () => {
       }),
     ).rejects.toThrow();
     expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
+  it('update_field forwards relationship metadata inside type patches', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const updateField = toolNamed(tools, 'update_field');
+
+    await updateField.handler({
+      typeName: 'MealPlanMeal',
+      fieldName: 'recipeId',
+      patch: {
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: {
+            onDelete: 'restrict',
+            ownership: { scopeField: 'householdId', targetScopeField: 'householdId' },
+          },
+        },
+      },
+    });
+
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'update_field',
+      typeName: 'MealPlanMeal',
+      fieldName: 'recipeId',
+      patch: {
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: {
+            onDelete: 'restrict',
+            ownership: { scopeField: 'householdId', targetScopeField: 'householdId' },
+          },
+        },
+      },
+    });
   });
 
   it('add_type lenient tool accepts a valid TypeDef payload and forwards the op', async () => {
