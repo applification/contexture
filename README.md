@@ -5,6 +5,9 @@ Design your domain once in source-of-truth `.contexture.json`, then emit the
 Convex schema, validators, and supporting typed surfaces your products and
 agents need: Zod, JSON Schema, schema indexes, MCP tools, and opt-in AI tool
 definitions.
+Derived fields can also declare writer boundaries so generated form and agent
+input contracts do not accidentally accept values owned by backend or external
+systems.
 
 Built for engineers who want humans and agents to change the model, regenerate
 artifacts, and prove drift is gone before the code ships.
