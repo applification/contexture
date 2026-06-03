@@ -125,11 +125,15 @@ const FieldDefSchema = z.object({
       refresh: z.enum(['onWrite', 'asyncJob', 'onRead', 'manual', 'frozen', 'external']).optional(),
       driftPolicy: z.enum(['mustMatch', 'eventual', 'allowed', 'warnWhenStale']).optional(),
       owner: z.enum(['backend', 'client', 'external']).optional(),
+      writableBy: z
+        .array(z.enum(['backend', 'client', 'agent', 'external']))
+        .min(1)
+        .optional(),
       staleField: z.string().min(1).optional(),
       confidenceField: z.string().min(1).optional(),
     })
     .describe(
-      'Derivation/provenance policy for stored computed, cached, snapshot, rollup, or estimated fields. Use sources for source field paths, refresh for recompute cadence, driftPolicy for acceptable staleness, and owner for write ownership.',
+      'Derivation/provenance policy for stored computed, cached, snapshot, rollup, or estimated fields. Use sources for source field paths, refresh for recompute cadence, driftPolicy for acceptable staleness, owner for write ownership, and writableBy to constrain client/agent/backend/external inputs.',
     )
     .optional(),
   sampleData: z

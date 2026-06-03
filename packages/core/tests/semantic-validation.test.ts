@@ -638,6 +638,36 @@ describe('checkSemantic — derivations', () => {
       ]),
     );
   });
+
+  it('warns when derivation writableBy excludes the declared owner', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Invoice',
+          fields: [
+            { name: 'lineItems', type: { kind: 'array', element: { kind: 'string' } } },
+            {
+              name: 'total',
+              type: { kind: 'number' },
+              derivation: {
+                kind: 'rollup',
+                sources: ['lineItems'],
+                refresh: 'onWrite',
+                owner: 'backend',
+                writableBy: ['agent'],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).toContain(
+      'derivation_owner_not_writable',
+    );
+  });
 });
 
 describe('checkSemantic — duplicates', () => {

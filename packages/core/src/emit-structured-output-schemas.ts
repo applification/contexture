@@ -5,6 +5,7 @@
  * most LLM SDKs need for strict structured-output calls. Runtime adapters can
  * translate this document to provider-specific response-format shapes.
  */
+import { fieldAllowsWriter } from './derivation';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import type { Schema } from './ir';
 
@@ -39,7 +40,9 @@ export function emitStructuredOutputSchemas(
       name: type.name,
       description: type.description ?? `Structured output schema for ${type.name}.`,
       strict: true,
-      schema: emitJsonSchema(schema, type.name, sourcePath),
+      schema: emitJsonSchema(schema, type.name, sourcePath, {
+        omitField: (_type, field) => !fieldAllowsWriter(field, 'agent'),
+      }),
     })),
   };
 }

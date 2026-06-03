@@ -7,7 +7,7 @@
  * form code a stable `validate(value)` contract.
  */
 
-import { fieldIsRuntimeDerived } from './derivation';
+import { fieldAllowsWriter } from './derivation';
 import type { Schema, TypeDef } from './ir';
 
 function header(sourcePath?: string): string {
@@ -32,7 +32,7 @@ export function emitFormValidators(
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((type) => {
       const omitted = type.fields
-        .filter(fieldIsRuntimeDerived)
+        .filter((field) => !fieldAllowsWriter(field, 'client'))
         .map((field) => `${field.name}: true`)
         .join(', ');
       return `export const ${type.name}CreateValidator = createFormValidator(${type.name}.omit({ ${omitted} }));\n`;
@@ -90,5 +90,5 @@ ${validators}${createValidators}`;
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
 function hasServerDerivedFields(type: TypeDef): type is ObjectType {
-  return type.kind === 'object' && type.fields.some(fieldIsRuntimeDerived);
+  return type.kind === 'object' && type.fields.some((field) => !fieldAllowsWriter(field, 'client'));
 }

@@ -32,6 +32,7 @@ function generatedMarker(sourcePath?: string): string {
 export interface EmitOptions {
   /** Namespaces (e.g. `'place'`, `'money'`) treated as ambient stdlib. */
   stdlibNamespaces?: readonly string[];
+  omitField?: (type: TypeDef, field: FieldDef) => boolean;
 }
 
 export function emit(
@@ -65,7 +66,7 @@ export function emit(
   const defs: Record<string, object> = {};
   for (const type of schema.types) {
     if (type.name === rootTypeName) continue;
-    defs[type.name] = emitTypeDef(type, { aliases, types });
+    defs[type.name] = emitTypeDef(type, { aliases, types, options });
   }
 
   if (rootTypeName) {
@@ -73,7 +74,7 @@ export function emit(
     if (!root) {
       throw new Error(`Root type "${rootTypeName}" not found in schema.`);
     }
-    const rootSchema = emitTypeDef(root, { aliases, types }) as Record<string, unknown>;
+    const rootSchema = emitTypeDef(root, { aliases, types, options }) as Record<string, unknown>;
     return {
       $schema: DRAFT,
       $contexture_generated: generatedMarker(sourcePath),
@@ -88,6 +89,7 @@ export function emit(
 interface EmitContext {
   aliases: Map<string, ImportDecl>;
   types: Map<string, TypeDef>;
+  options: EmitOptions;
 }
 
 function emitTypeDef(type: TypeDef, ctx: EmitContext): object {
@@ -96,6 +98,7 @@ function emitTypeDef(type: TypeDef, ctx: EmitContext): object {
       const properties: Record<string, object> = {};
       const required: string[] = [];
       for (const field of type.fields) {
+        if (ctx.options.omitField?.(type, field)) continue;
         properties[field.name] = emitField(field, ctx);
         if (!field.optional) required.push(field.name);
       }

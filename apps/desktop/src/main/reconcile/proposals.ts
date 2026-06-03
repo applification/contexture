@@ -153,7 +153,14 @@ Contexture emit an output as close as possible to the hand-edited file.
 
 ## FieldDef
 
-\`{ name: string; type: FieldType; optional?: boolean; nullable?: boolean; description?: string }\`
+\`{ name: string; type: FieldType; optional?: boolean; nullable?: boolean; description?: string; serverDerived?: boolean; derivation?: DerivationPolicy }\`
+
+For stored computed, cached, snapshot, rollup, or estimated values, prefer a
+\`derivation\` policy over an unexplained primitive. \`DerivationPolicy\` supports
+\`kind\`, \`sources\`, \`refresh\`, \`driftPolicy\`, \`owner\`, \`writableBy\`,
+\`staleField\`, and \`confidenceField\`. Use \`writableBy\` to declare which
+boundaries may author the field: \`backend\`, \`client\`, \`agent\`, or
+\`external\`.
 
 ## FieldType
 

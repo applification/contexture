@@ -65,4 +65,38 @@ describe('emitStructuredOutputSchemas', () => {
       },
     });
   });
+
+  it('omits fields that are not writable by agents from structured output schemas', () => {
+    const doc = emitStructuredOutputSchemas({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'AccessDecision',
+          fields: [
+            { name: 'workspaceId', type: { kind: 'string' } },
+            {
+              name: 'canAccess',
+              type: { kind: 'boolean' },
+              derivation: {
+                kind: 'computed',
+                owner: 'backend',
+                writableBy: ['backend'],
+                sources: ['workspaceId'],
+                refresh: 'onRead',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(doc.schemas[0]?.schema).toMatchObject({
+      properties: {
+        workspaceId: { type: 'string' },
+      },
+      required: ['workspaceId'],
+    });
+    expect(JSON.stringify(doc.schemas[0]?.schema)).not.toContain('canAccess');
+  });
 });

@@ -137,6 +137,7 @@ describe('IRSchema', () => {
                 refresh: 'onWrite',
                 driftPolicy: 'mustMatch',
                 owner: 'backend',
+                writableBy: ['backend'],
               },
             },
           ],
@@ -159,6 +160,7 @@ describe('IRSchema', () => {
         refresh: 'onWrite',
         driftPolicy: 'mustMatch',
         owner: 'backend',
+        writableBy: ['backend'],
       },
     });
   });
