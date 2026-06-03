@@ -18,7 +18,7 @@ describe('GraphControlsPanel', () => {
 
     expect(screen.getByRole('checkbox', { name: 'Show enum nodes' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Show stdlib nodes' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Edge labels' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Edge labels' })).not.toBeChecked();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show enum nodes' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show stdlib nodes' }));
@@ -27,7 +27,7 @@ describe('GraphControlsPanel', () => {
     expect(useGraphLayoutStore.getState().graphLayout).toMatchObject({
       showEnums: true,
       showStdlib: true,
-      showEdgeLabels: false,
+      showEdgeLabels: true,
     });
   });
 

@@ -13,6 +13,15 @@ describe('GraphLegend', () => {
     expect(screen.getByText('Table')).toBeInTheDocument();
   });
 
+  it('documents quiet modeled refs and active selection separately', () => {
+    render(<GraphLegend />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
+
+    expect(screen.getByText('Modeled ref')).toBeInTheDocument();
+    expect(screen.getByText('Active selection')).toBeInTheDocument();
+  });
+
   it('documents inline enums by default and only shows enum nodes when expanded in controls', () => {
     const { rerender } = render(<GraphLegend />);
 

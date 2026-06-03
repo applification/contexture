@@ -21,12 +21,12 @@ interface EdgeItem {
 
 const EDGE_ITEMS: readonly EdgeItem[] = [
   {
-    label: 'Ref',
-    color: 'var(--graph-edge-ref)',
+    label: 'Modeled ref',
+    color: 'var(--graph-edge-fk)',
   },
   {
     label: 'Inferred table id',
-    color: 'var(--graph-edge-ref)',
+    color: 'var(--graph-edge-import)',
     dash: '6,4',
   },
   {
@@ -38,6 +38,10 @@ const EDGE_ITEMS: readonly EdgeItem[] = [
     label: 'Import (cross-boundary)',
     color: 'var(--graph-edge-import)',
     dash: '6,4',
+  },
+  {
+    label: 'Active selection',
+    color: 'var(--graph-edge-active)',
   },
 ];
 

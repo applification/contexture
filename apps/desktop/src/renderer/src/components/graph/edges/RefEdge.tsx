@@ -4,13 +4,14 @@
  * clips the node body.
  *
  * Styling:
- *   - Field refs use the property accent and label the source field.
+ *   - Field refs rest as quiet structure and label the source field.
  *   - Inferred table id relationships are dashed because they are a
  *     diagram-only convention, not an IR ref.
  *   - Union variants use the discriminated-union accent and a dotted
  *     stroke so inheritance-like membership does not read as a field.
  *   - Cross-boundary refs are dashed and muted so imported namespaces read
  *     at a glance.
+ *   - Blue/lavender is reserved for selected, hovered, and adjacent edges.
  */
 import {
   BaseEdge,
@@ -67,17 +68,19 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
       target !== selectedNodeId) ||
     isPreviewDimmed;
 
-  const stroke =
-    selected || isAdjacent || isPreviewHighlighted
-      ? 'var(--graph-node-selected)'
-      : isUnionVariant
-        ? 'var(--graph-edge-union, var(--chart-4))'
-        : crossBoundary
-          ? 'var(--graph-edge-import, var(--muted-foreground))'
-          : 'var(--graph-edge-ref, var(--graph-edge-property))';
+  const isActive = selected || isAdjacent || isPreviewHighlighted;
+  const stroke = isActive
+    ? 'var(--graph-edge-active, var(--graph-node-selected))'
+    : isUnionVariant
+      ? 'var(--graph-edge-union, var(--chart-4))'
+      : crossBoundary || isTableId
+        ? 'var(--graph-edge-import, var(--muted-foreground))'
+        : 'var(--graph-edge-fk, var(--muted-foreground))';
   const strokeWidth = selected || isAdjacent || isPreviewHighlighted ? 2 : 1.25;
   const strokeDasharray = isUnionVariant ? '2 4' : isTableId || crossBoundary ? '6 4' : undefined;
   const label = isUnionVariant ? 'variant' : data?.sourceField;
+  const baseOpacity = isUnionVariant || isTableId || crossBoundary ? 0.72 : 0.68;
+  const opacity = isDimmed ? 0.18 : isActive ? 0.95 : baseOpacity;
 
   return (
     <>
@@ -88,7 +91,7 @@ export const RefEdge = memo(function RefEdge(props: EdgeProps<RefEdgeKind>) {
           stroke,
           strokeWidth,
           strokeDasharray,
-          opacity: isDimmed ? 0.2 : isPreviewHighlighted ? 0.95 : 1,
+          opacity,
           transition: 'opacity 0.15s ease, stroke 0.1s ease',
           fill: 'none',
         }}
