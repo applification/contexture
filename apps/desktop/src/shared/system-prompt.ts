@@ -49,6 +49,10 @@ export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): st
     '',
     renderOpCatalogue(),
     '',
+    '## Convex collection modeling',
+    '',
+    COLLECTION_MODELING_RULES.trim(),
+    '',
     '## Stdlib-first modeling',
     '',
     STDLIB_RULES.trim(),
@@ -134,6 +138,16 @@ Skills are available and auto-load on topic match:
   (Email, URL, UUID, ISODate, Money, CountryCode, PhoneNumber, …).
 - \`generate-sample\` — use when the user asks for sample / fixture /
   example data for a type.
+`;
+
+const COLLECTION_MODELING_RULES = `
+For arrays of embedded child objects on a Convex table, model the tradeoff
+explicitly. Inline arrays are fine for read-mostly owned value data. Prefer a
+child table with parent and tenant refs when the collection is edited item by
+item, used from multiple app surfaces, needs stable child ids for commands,
+needs Convex indexes, or may grow with snapshots/media/generated payloads.
+Common examples include shopping list items, meal plan meals, tasks, checklist
+entries, and other collaborative lists.
 `;
 
 const STDLIB_RULES = `
