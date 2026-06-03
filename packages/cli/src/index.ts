@@ -59,6 +59,9 @@ Schema mutations:
   add-field <type> <name> <fieldTypeJson> [--optional] [--nullable]
   update-field <type> <field> <patchJson>
   delete-field <type> <field>
+  add-invariant <type> <invariantJson>
+  update-invariant <type> <name> <patchJson>
+  remove-invariant <type> <name>
   reorder-fields <type> <fieldNamesJsonOrCsv>
   add-type <typeDefJson>
   update-type <name> <patchJson>
@@ -256,6 +259,8 @@ interface InspectJsonType {
   kind: TypeDef['kind'];
   table?: boolean;
   fieldCount?: number;
+  extends?: string[];
+  invariantCount?: number;
   fields?: Array<{ name: string; type: string; optional?: boolean; nullable?: boolean }>;
   values?: string[];
   variants?: string[];
@@ -279,6 +284,8 @@ function typeToInspectJson(type: TypeDef): InspectJsonType {
       kind: 'object',
       ...(type.table ? { table: true } : {}),
       fieldCount: type.fields.length,
+      ...((type.extends?.length ?? 0) > 0 ? { extends: type.extends } : {}),
+      ...((type.invariants?.length ?? 0) > 0 ? { invariantCount: type.invariants?.length } : {}),
       fields: type.fields.map((field) => ({
         name: field.name,
         type: fieldTypeToString(field.type),
@@ -336,6 +343,12 @@ function renderInspectText(summary: InspectJson): string {
     lines.push('Objects:');
     for (const obj of objects) {
       lines.push(`  ${obj.name}${obj.table ? ' [table]' : ''}`);
+      if ((obj.extends?.length ?? 0) > 0) {
+        lines.push(`    extends: ${obj.extends?.join(', ')}`);
+      }
+      if ((obj.invariantCount ?? 0) > 0) {
+        lines.push(`    invariants: ${obj.invariantCount}`);
+      }
       for (const field of obj.fields ?? []) {
         const marks = (field.optional ? '?' : '') + (field.nullable ? ' | null' : '');
         lines.push(`    - ${field.name}: ${field.type}${marks}`);
@@ -401,6 +414,21 @@ function commandToToolInput(command: string, args: string[]): { tool: string; in
     case 'remove-field':
       requireArgs(args, 2, 'remove-field <type> <field>');
       return { tool: 'remove_field', input: { typeName: args[0], fieldName: args[1] } };
+    case 'add-invariant':
+      requireArgs(args, 2, 'add-invariant <type> <invariantJson>');
+      return {
+        tool: 'add_invariant',
+        input: { typeName: args[0], invariant: parseJsonArg(args[1], 'invariantJson') },
+      };
+    case 'update-invariant':
+      requireArgs(args, 3, 'update-invariant <type> <name> <patchJson>');
+      return {
+        tool: 'update_invariant',
+        input: { typeName: args[0], name: args[1], patch: parseJsonArg(args[2], 'patchJson') },
+      };
+    case 'remove-invariant':
+      requireArgs(args, 2, 'remove-invariant <type> <name>');
+      return { tool: 'remove_invariant', input: { typeName: args[0], name: args[1] } };
     case 'add-value':
       requireArgs(args, 2, 'add-value <type> <value> [description]');
       return {

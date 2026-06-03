@@ -32,6 +32,8 @@ const InspectTypeSchema = z.object({
   table: z.boolean().optional(),
   tableName: z.string().optional(),
   fieldCount: z.number().optional(),
+  extends: z.array(z.string()).optional(),
+  invariantCount: z.number().optional(),
   fields: z
     .array(
       z.object({
@@ -549,6 +551,8 @@ function typeToInspectJson(type: TypeDef): z.infer<typeof InspectTypeSchema> {
       ...(type.table ? { table: true } : {}),
       ...(type.table ? { tableName: type.tableName ?? convexTableName(type.name) } : {}),
       fieldCount: type.fields.length,
+      ...((type.extends?.length ?? 0) > 0 ? { extends: type.extends } : {}),
+      ...((type.invariants?.length ?? 0) > 0 ? { invariantCount: type.invariants?.length } : {}),
       fields: type.fields.map((field) => ({
         name: field.name,
         ...(field.description ? { description: field.description } : {}),

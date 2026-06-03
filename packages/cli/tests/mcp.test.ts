@@ -85,6 +85,14 @@ describe('Contexture MCP server', () => {
             }),
           }),
           expect.objectContaining({
+            name: 'add_invariant',
+            description: expect.stringContaining('object-level invariant'),
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
             name: 'rename_type',
             description: expect.stringContaining(
               'do not wrap it in the generic apply_contexture_op',
@@ -160,7 +168,12 @@ describe('Contexture MCP server', () => {
           }),
         ]),
         agent: expect.objectContaining({
-          preferredMutationTools: expect.arrayContaining(['add_field', 'rename_type', 'add_index']),
+          preferredMutationTools: expect.arrayContaining([
+            'add_field',
+            'add_invariant',
+            'rename_type',
+            'add_index',
+          ]),
         }),
         modelingHints: expect.any(Array),
       });
@@ -872,6 +885,49 @@ describe('Contexture MCP server', () => {
       await expect(
         readFile(join(irPath, '..', 'convex', 'relationships.ts'), 'utf8'),
       ).resolves.toContain('"onDelete": "restrict"');
+    });
+  });
+
+  it('adds invariants through the typed add_invariant MCP tool', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Contact',
+          fields: [
+            { name: 'email', type: { kind: 'string' }, optional: true },
+            { name: 'phone', type: { kind: 'string' }, optional: true },
+          ],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'add_invariant',
+        arguments: {
+          irPath,
+          typeName: 'Contact',
+          invariant: {
+            kind: 'exactlyOneOf',
+            name: 'one_contact_method',
+            fields: ['email', 'phone'],
+          },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_invariant',
+      });
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ name: string; invariants?: unknown[] }>;
+      };
+      expect(updatedIr.types.find((type) => type.name === 'Contact')?.invariants).toEqual([
+        { kind: 'exactlyOneOf', name: 'one_contact_method', fields: ['email', 'phone'] },
+      ]);
     });
   });
 

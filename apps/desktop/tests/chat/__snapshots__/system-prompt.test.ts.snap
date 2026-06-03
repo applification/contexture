@@ -38,6 +38,9 @@ Skills are available and auto-load on topic match:
 - \`add_field\` { typeName: string; field: FieldDef; index?: number }
 - \`update_field\` { typeName: string; fieldName: string; patch: Partial<FieldDef> }
 - \`remove_field\` { typeName: string; fieldName: string }
+- \`add_invariant\` { typeName: string; invariant: ObjectInvariant; index?: number }
+- \`update_invariant\` { typeName: string; name: string; patch: Partial<ObjectInvariant> }
+- \`remove_invariant\` { typeName: string; name: string }
 - \`reorder_fields\` { typeName: string; order: string[] }
 - \`add_value\` { typeName: string; value: string; description?: string }
 - \`update_value\` { typeName: string; value: string; patch: { value?: string; description?: string } }

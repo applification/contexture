@@ -15,7 +15,7 @@ function toolNamed(tools: OpToolDescriptor[], name: string): OpToolDescriptor {
 }
 
 describe('createOpTools', () => {
-  it('registers one SDK tool per op (22 total)', () => {
+  it('registers one SDK tool per op (25 total)', () => {
     const { tools } = makeTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
@@ -23,6 +23,7 @@ describe('createOpTools', () => {
         'add_field',
         'add_import',
         'add_index',
+        'add_invariant',
         'add_type',
         'add_value',
         'add_variant',
@@ -30,6 +31,7 @@ describe('createOpTools', () => {
         'remove_field',
         'remove_import',
         'remove_import_at',
+        'remove_invariant',
         'remove_index',
         'remove_value',
         'remove_variant',
@@ -40,6 +42,7 @@ describe('createOpTools', () => {
         'set_table_flag',
         'update_field',
         'update_index',
+        'update_invariant',
         'update_type',
         'update_value',
       ].sort(),
@@ -65,6 +68,22 @@ describe('createOpTools', () => {
     await expect(tool.handler({ typeName: '', table: true })).rejects.toThrow();
     await expect(tool.handler({ typeName: 'Post', table: 'yes' })).rejects.toThrow();
     expect(forwardSpy).not.toHaveBeenCalled();
+  });
+
+  it('add_invariant forwards a strict Op', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'add_invariant');
+    await tool.handler({
+      typeName: 'Contact',
+      invariant: { kind: 'exactlyOneOf', name: 'one_contact_method', fields: ['email', 'phone'] },
+    });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'add_invariant',
+      typeName: 'Contact',
+      invariant: { kind: 'exactlyOneOf', name: 'one_contact_method', fields: ['email', 'phone'] },
+      index: undefined,
+    });
   });
 
   it('add_index forwards a strict Op with index payload', async () => {

@@ -82,7 +82,7 @@ function buildContext(schema: Schema): RenderContext {
 }
 
 function renderTable(t: ObjectType, ctx: RenderContext): string {
-  const fields = t.fields
+  const fields = effectiveFields(t, ctx)
     .map((f) => `    ${f.name}: ${renderFieldDef(f, ctx, { preferNamedRefs: true })},`)
     .join('\n');
   const indexChain = (t.indexes ?? [])
@@ -162,7 +162,9 @@ function renderVariant(name: string, ctx: RenderContext): string {
 }
 
 function renderInlineObject(t: ObjectType, ctx: RenderContext, options: RenderOptions): string {
-  const fields = t.fields.map((f) => `${f.name}: ${renderFieldDef(f, ctx, options)}`).join(', ');
+  const fields = effectiveFields(t, ctx)
+    .map((f) => `${f.name}: ${renderFieldDef(f, ctx, options)}`)
+    .join(', ');
   return `v.object({ ${fields} })`;
 }
 
@@ -211,7 +213,11 @@ function reusableDependencyNames(t: ConvexReusableType, ctx: RenderContext): str
   const dependencies = new Set<string>();
 
   if (t.kind === 'object') {
-    for (const field of t.fields) {
+    for (const baseName of t.extends ?? []) {
+      const base = ctx.types.get(baseName);
+      if (base && isReusableValidatorType(base)) dependencies.add(base.name);
+    }
+    for (const field of effectiveFields(t, ctx)) {
       collectReusableDependenciesForType(field.type, ctx, dependencies);
     }
   }
@@ -245,7 +251,7 @@ function collectReusableDependenciesForType(
 function collectTableValidatorImports(tables: ObjectType[], ctx: RenderContext): string[] {
   const imports = new Set<string>();
   for (const table of tables) {
-    for (const field of table.fields) {
+    for (const field of effectiveFields(table, ctx)) {
       collectValidatorImportsForType(field.type, ctx, imports);
     }
   }
@@ -282,7 +288,7 @@ function validateReservedNames(schema: Schema): void {
         `emitConvexSchema: table name "${emittedTableName}" is invalid — Convex reserves names starting with "_"`,
       );
     }
-    for (const f of t.fields) {
+    for (const f of effectiveFields(t, buildContext(schema))) {
       if (f.name.startsWith('_')) {
         throw new Error(
           `emitConvexSchema: field "${t.name}.${f.name}" is invalid — Convex reserves names starting with "_" (including _id, _creationTime)`,
@@ -290,4 +296,22 @@ function validateReservedNames(schema: Schema): void {
       }
     }
   }
+}
+
+function effectiveFields(type: ObjectType, ctx: RenderContext): FieldDef[] {
+  const fields = new Map<string, FieldDef>();
+  const seen = new Set<string>();
+
+  function addFrom(current: ObjectType): void {
+    if (seen.has(current.name)) return;
+    seen.add(current.name);
+    for (const baseName of current.extends ?? []) {
+      const base = ctx.types.get(baseName);
+      if (base?.kind === 'object') addFrom(base);
+    }
+    for (const field of current.fields) fields.set(field.name, field);
+  }
+
+  addFrom(type);
+  return [...fields.values()];
 }

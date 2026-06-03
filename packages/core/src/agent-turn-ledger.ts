@@ -67,6 +67,12 @@ export function describeAgentTurnOp(op: Pick<AgentTurnOpResult, 'name' | 'op'>):
       return `Updated field ${op.op.typeName}.${op.op.fieldName}`;
     case 'remove_field':
       return `Removed field ${op.op.typeName}.${op.op.fieldName}`;
+    case 'add_invariant':
+      return `Added invariant ${op.op.typeName}.${op.op.invariant.name}`;
+    case 'update_invariant':
+      return `Updated invariant ${op.op.typeName}.${op.op.name}`;
+    case 'remove_invariant':
+      return `Removed invariant ${op.op.typeName}.${op.op.name}`;
     case 'add_value':
       return `Added value ${op.op.typeName}.${op.op.value}`;
     case 'update_value':
