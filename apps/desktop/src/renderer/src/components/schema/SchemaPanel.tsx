@@ -178,6 +178,7 @@ const AGENT_CLIENT_LABEL: Record<AgentClient, string> = {
 
 const CONTEXTURE_MCP_TOOLS = [
   'inspect_contexture',
+  'inspect_domain_brief',
   'validate_contexture',
   'apply_contexture_op',
   'emit_contexture',
@@ -915,11 +916,11 @@ function AgentSetupPopover({
   const savedPrompt =
     documentFilePath === null
       ? null
-      : `Use the Contexture MCP server to inspect ${documentFilePath}, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
+      : `Use the Contexture MCP server to inspect ${documentFilePath}, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
   const smokeTest =
     documentFilePath === null
       ? 'Ask your agent: "List the contexture MCP tools."'
-      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath} and summarize the Convex tables."`;
+      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath}, read the domain brief, and summarize the Convex tables plus unresolved decisions."`;
   const copiedLabel =
     copied === 'install'
       ? 'Copied install command'

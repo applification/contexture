@@ -81,6 +81,7 @@ describe('runEmitPipeline output config', () => {
         aiPipeline: {
           formValidators: { enabled: true, dir: 'apps/web/src/forms' },
           mcpDefinitions: { enabled: true, dir: 'packages/domain/mcp' },
+          domainBrief: { enabled: true, dir: 'packages/domain/briefs' },
         },
       },
     };
@@ -96,6 +97,7 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/domain/schema/app.schema.json',
       '/repo/packages/domain/src/indexes/index.ts',
       '/repo/packages/domain/mcp/mcp-definitions.json',
+      '/repo/packages/domain/briefs/domain-brief.json',
       '/repo/apps/web/src/forms/form-validators.ts',
     ]);
     expect(byPath.get('/repo/packages/domain/src/indexes/index.ts')).toContain(
@@ -183,6 +185,7 @@ describe('runEmitPipeline output config', () => {
         aiPipeline: {
           structuredOutputs: { enabled: true },
           mcpDefinitions: { enabled: true },
+          domainBrief: { enabled: true },
           formValidators: { enabled: true },
         },
       },
@@ -200,10 +203,14 @@ describe('runEmitPipeline output config', () => {
       '/repo/packages/contexture/.contexture/mcp-definitions.json',
     );
     expect(emitted.map((file) => file.path)).toContain(
+      '/repo/packages/contexture/.contexture/domain-brief.json',
+    );
+    expect(emitted.map((file) => file.path)).toContain(
       '/repo/packages/contexture/form-validators.ts',
     );
     expect(manifest.files).toHaveProperty('.contexture/structured-output-schemas.json');
     expect(manifest.files).toHaveProperty('.contexture/mcp-definitions.json');
+    expect(manifest.files).toHaveProperty('.contexture/domain-brief.json');
     expect(manifest.files).toHaveProperty('form-validators.ts');
   });
 

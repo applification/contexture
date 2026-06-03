@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ZodError, z } from 'zod';
+import { buildDomainBrief } from './domain-brief';
 import { createFileBackedForward, nodeFileBackedFs } from './file-forward';
 import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-writer';
 import { GENERATED_TARGETS } from './generated-targets';
@@ -133,10 +134,28 @@ const InspectOutput = {
   outputConfig: z.unknown().optional(),
   generatedTargets: z.array(GeneratedTargetInspectSchema),
   modelingHints: z.array(ModelingHintInspectSchema),
+  domainBrief: z.object({
+    summary: z.object({
+      typeCount: z.number(),
+      tableCount: z.number(),
+      invariantCount: z.number(),
+      derivationCount: z.number(),
+      relationshipCount: z.number(),
+      queryContractCount: z.number(),
+      unresolvedDecisionCount: z.number(),
+    }),
+    generatedPath: z.string(),
+  }),
   agent: z.object({
     preferredMutationTools: z.array(z.string()),
     safeLoop: z.array(z.string()),
   }),
+};
+
+const InspectDomainBriefOutput = {
+  path: z.string(),
+  generatedPath: z.string(),
+  brief: z.unknown(),
 };
 
 const ValidationIssueSchema = z.object({
@@ -249,6 +268,31 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
     async ({ irPath }) => {
       const structuredContent = await validateContextureFile(irPath, options.stdlib, version);
       return jsonToolResult(structuredContent);
+    },
+  );
+
+  server.registerTool(
+    'inspect_domain_brief',
+    {
+      title: 'Inspect Contexture Domain Brief',
+      description:
+        'Return the agent-readable domain brief: declared model contracts, unresolved decisions, modeling hints, and semantic warnings.',
+      inputSchema: IrPathInput,
+      outputSchema: InspectDomainBriefOutput,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ irPath }) => {
+      const { schema } = await readContextureFile(irPath);
+      const paths = bundlePathsFor(irPath, schema);
+      return jsonToolResult({
+        path: irPath,
+        generatedPath: paths.domainBrief,
+        brief: buildDomainBrief(schema, { stdlib: options.stdlib }),
+      });
     },
   );
 
@@ -520,6 +564,7 @@ function buildInspectSummary(
   irPath: string,
 ): z.infer<z.ZodObject<typeof InspectOutput>> {
   const paths = bundlePathsFor(irPath, schema);
+  const domainBrief = buildDomainBrief(schema);
   const preferredMutationTools = createOpTools(async () => ({ error: 'inspect only' })).map(
     (tool) => tool.name,
   );
@@ -543,10 +588,15 @@ function buildInspectSummary(
       enabled: target.enabled(schema),
     })),
     modelingHints: analyzeModelingHints(schema),
+    domainBrief: {
+      summary: domainBrief.summary,
+      generatedPath: paths.domainBrief,
+    },
     agent: {
       preferredMutationTools,
       safeLoop: [
         'inspect_contexture',
+        'inspect_domain_brief',
         'validate_contexture',
         'emit_contexture',
         'check_contexture_drift',
@@ -651,7 +701,10 @@ async function applyTypedContextureOp(
 
   try {
     const result = await tool.handler(toolArgs);
-    if ('error' in result) return { path, applied: false, opKind, error: result.error };
+    if (isToolError(result)) return { path, applied: false, opKind, error: result.error };
+    if (!isApplySuccess(result)) {
+      return { path, applied: false, opKind, error: `unexpected result from op tool: ${opKind}` };
+    }
     return {
       path,
       applied: true,
@@ -666,6 +719,33 @@ async function applyTypedContextureOp(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+function isToolError(value: unknown): value is { error: string } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error' in value &&
+    typeof (value as { error?: unknown }).error === 'string'
+  );
+}
+
+function isApplySuccess(value: unknown): value is { schema: Schema } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'schema' in value &&
+    isSchemaLike((value as { schema?: unknown }).schema)
+  );
+}
+
+function isSchemaLike(value: unknown): value is Schema {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as { version?: unknown }).version === '1' &&
+    Array.isArray((value as { types?: unknown }).types)
+  );
 }
 
 function buildIntegrationGuidance(

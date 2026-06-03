@@ -49,7 +49,7 @@ export async function invokeOpHandler(
 ): Promise<ToolResult> {
   try {
     const result = await handler(args);
-    if ('error' in result) {
+    if (isToolError(result)) {
       return {
         content: [{ type: 'text', text: result.error }],
         isError: true,
@@ -65,6 +65,15 @@ export async function invokeOpHandler(
       isError: true,
     };
   }
+}
+
+function isToolError(value: unknown): value is { error: string } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error' in value &&
+    typeof (value as { error?: unknown }).error === 'string'
+  );
 }
 
 /**

@@ -10,6 +10,7 @@ export const CHANGE_LOG_FILE = 'change-log.json';
 export const AI_TOOL_SCHEMAS_FILE = 'ai-tool-schemas.json';
 export const STRUCTURED_OUTPUT_SCHEMAS_FILE = 'structured-output-schemas.json';
 export const MCP_DEFINITIONS_FILE = 'mcp-definitions.json';
+export const DOMAIN_BRIEF_FILE = 'domain-brief.json';
 export const FORM_VALIDATORS_FILE = 'form-validators.ts';
 export const CONVEX_VALIDATORS_FILE = 'validators.ts';
 export const CONVEX_RELATIONSHIPS_FILE = 'relationships.ts';
@@ -31,6 +32,7 @@ export interface BundlePaths {
   aiToolSchemas: string;
   structuredOutputSchemas: string;
   mcpDefinitions: string;
+  domainBrief: string;
   formValidators: string;
   stdlibRuntimeDir: string;
 }
@@ -45,6 +47,7 @@ export type GeneratedTargetKind =
   | 'ai-tool-schemas'
   | 'structured-output-schemas'
   | 'mcp-definitions'
+  | 'domain-brief'
   | 'form-validators';
 
 type OutputDirTargetKind = GeneratedTargetKind | 'stdlib-runtime';
@@ -97,6 +100,7 @@ export function bundlePathsFor(irPath: string, schema?: Schema): BundlePaths {
     irDir,
   );
   const mcpDefinitionsDir = outputDirFor(schema, 'mcp-definitions', ctxDir, irDir);
+  const domainBriefDir = outputDirFor(schema, 'domain-brief', ctxDir, irDir);
   const formValidatorsDir = outputDirFor(schema, 'form-validators', layout.schemaDir, irDir);
   const stdlibRuntimeDir = outputDirFor(
     schema,
@@ -119,6 +123,7 @@ export function bundlePathsFor(irPath: string, schema?: Schema): BundlePaths {
     aiToolSchemas: `${aiToolSchemasDir}/${AI_TOOL_SCHEMAS_FILE}`,
     structuredOutputSchemas: `${structuredOutputSchemasDir}/${STRUCTURED_OUTPUT_SCHEMAS_FILE}`,
     mcpDefinitions: `${mcpDefinitionsDir}/${MCP_DEFINITIONS_FILE}`,
+    domainBrief: `${domainBriefDir}/${DOMAIN_BRIEF_FILE}`,
     formValidators: `${formValidatorsDir}/${FORM_VALIDATORS_FILE}`,
     stdlibRuntimeDir,
   };
@@ -136,6 +141,7 @@ export function generatedTargetsFor(irPath: string, schema?: Schema): GeneratedT
     { kind: 'ai-tool-schemas', path: paths.aiToolSchemas },
     { kind: 'structured-output-schemas', path: paths.structuredOutputSchemas },
     { kind: 'mcp-definitions', path: paths.mcpDefinitions },
+    { kind: 'domain-brief', path: paths.domainBrief },
     { kind: 'form-validators', path: paths.formValidators },
   ];
 }
@@ -314,6 +320,8 @@ function outputDirConfigFor(schema: Schema | undefined, kind: OutputDirTargetKin
       return schema.outputs.aiPipeline?.structuredOutputs?.dir ?? null;
     case 'mcp-definitions':
       return schema.outputs.aiPipeline?.mcpDefinitions?.dir ?? null;
+    case 'domain-brief':
+      return schema.outputs.aiPipeline?.domainBrief?.dir ?? null;
     case 'form-validators':
       return schema.outputs.aiPipeline?.formValidators?.dir ?? null;
   }

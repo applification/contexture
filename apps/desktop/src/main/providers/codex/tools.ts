@@ -36,13 +36,22 @@ export async function handleCodexDynamicToolCall(
     }
     const result = await descriptor.handler(args as Record<string, unknown>);
     return {
-      success: !('error' in result),
+      success: !isToolError(result),
       contentItems: [{ type: 'inputText', text: JSON.stringify(result) }],
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return failure(message);
   }
+}
+
+function isToolError(value: unknown): value is { error: string } {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error' in value &&
+    typeof (value as { error?: unknown }).error === 'string'
+  );
 }
 
 function failure(message: string): DynamicToolCallResponse {

@@ -27,6 +27,7 @@ import {
   SCHEMA_AGENT_TOOL_CALL_STARTED,
   SchemaAgentDriver,
 } from '../providers/schema-agent-driver';
+import { createSchemaReadTools } from '../providers/schema-read-tools';
 import { generateReconcileProposal, type ReconcileProposalInput } from '../reconcile/proposals';
 import { ChatTurnController } from './chat-turn';
 import { type BridgeTransport, makeIpcForwardOp, TurnContext } from './op-bridge';
@@ -158,7 +159,10 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
   });
 
   const forwardOp = makeIpcForwardOp(toolTransport);
-  const opToolDescriptors = createOpTools(forwardOp);
+  const opToolDescriptors = [
+    ...createSchemaReadTools(() => turnContext.current()),
+    ...createOpTools(forwardOp),
+  ];
   const runtimes: Record<ProviderKind, ProviderRuntime> = {
     codex: new CodexProviderRuntime({ opToolDescriptors }),
     claude: new ClaudeProviderRuntime({ opToolDescriptors }),

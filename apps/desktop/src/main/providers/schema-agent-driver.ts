@@ -69,7 +69,7 @@ export class SchemaAgentDriver {
         for await (const event of runtime.sendTurn({
           thread,
           schema,
-          message: buildUserMessage({ ir: schema, userMessage, attachments }),
+          message: buildUserMessage({ userMessage, attachments }),
           attachments,
           ...modelOptions,
         })) {

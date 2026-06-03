@@ -60,6 +60,7 @@ import { TYPE_NODE_EVENT, TYPE_NODE_OBJECT_EVENT } from './components/graph/node
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
+import { ReviewPanel } from './components/review/ReviewPanel';
 import {
   type SchemaOutputType,
   SchemaPanel,
@@ -589,6 +590,9 @@ export default function App(): React.JSX.Element {
               </div>
               <div className={activeTab !== 'chat' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 <ChatPanel chat={chat} />
+              </div>
+              <div className={activeTab !== 'review' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                <ReviewPanel schema={schema} />
               </div>
               <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
                 {hasSchema && (

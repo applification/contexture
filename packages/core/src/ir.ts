@@ -303,6 +303,7 @@ const AiPipelineOutputsSchema = z.object({
   toolSchemas: OutputTargetConfigSchema.optional(),
   structuredOutputs: OutputTargetConfigSchema.optional(),
   mcpDefinitions: OutputTargetConfigSchema.optional(),
+  domainBrief: OutputTargetConfigSchema.optional(),
   formValidators: OutputTargetConfigSchema.optional(),
 });
 

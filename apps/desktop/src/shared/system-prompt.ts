@@ -14,11 +14,10 @@
  *   2. Op vocabulary — every op name with a one-line shape summary.
  *   3. Stdlib enumeration — `namespace.Name — description`, alphabetised.
  *
- * The current IR is NOT in the system prompt: it's injected into each user
- * message via `buildUserMessage` so that `resume`-based sessions (which re-use
- * the original system prompt) still see the latest schema. Same inputs → same
- * bytes, with stdlib entries sorted so registry reordering doesn't churn the
- * cache key.
+ * The current IR is NOT in the system prompt or blindly pasted into user
+ * turns. Schema chat receives read-only Contexture tools and should inspect
+ * the live model on demand. Same inputs → same bytes, with stdlib entries
+ * sorted so registry reordering doesn't churn the cache key.
  */
 
 import type { Schema } from '@contexture/core/ir';
@@ -65,18 +64,19 @@ export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): st
 }
 
 export interface BuildUserMessageInput {
-  ir: Schema;
+  ir?: Schema;
   userMessage: string;
   attachments?: ChatContextAttachment[];
 }
 
 /**
- * Wraps the user's message with a `<current_ir>` block carrying the latest IR
- * snapshot. Called per turn so that even when `resume` is used (and the SDK
- * replays the original system prompt) Claude always sees the current schema.
+ * Builds the user turn without duplicating the live IR. The schema agent has
+ * read-only inspection tools (`inspect_current_schema`, `list_types`,
+ * `get_type`, and `inspect_domain_brief`) and should call them when it needs
+ * current model context.
  */
 export function buildUserMessage(input: BuildUserMessageInput): string {
-  const parts = ['<current_ir>', JSON.stringify(input.ir, null, 2), '</current_ir>', ''];
+  const parts: string[] = [];
   if (input.attachments && input.attachments.length > 0) {
     parts.push(renderAttachments(input.attachments), '');
   }
@@ -123,13 +123,22 @@ code in prose: the user will not see it applied, and the canvas will not
 update. If no tool fits, say so briefly and ask for clarification; never fake
 the edit with text.
 
-The current IR is supplied at the top of each user message inside a
-\`<current_ir>\` block — parse it directly to understand the existing
-model before proposing edits. Prefer surgical ops over
-\`replace_schema\`; the bulk rewrite is an escape hatch, not a default.
-When the user explicitly attaches files, their contents appear in an
-\`<attached_files>\` block after the IR; use them as context, but keep edits
-inside the Contexture op tools.
+Read the current model through the read-only Contexture tools:
+- \`inspect_current_schema\` for a compact schema summary.
+- \`list_types\` before choosing targeted follow-up reads.
+- \`get_type\` for exact definitions you intend to discuss or modify.
+- \`inspect_domain_brief\` for unresolved domain decisions and declared
+  contracts.
+
+Call these tools when you need current schema context. Do not ask the user to
+paste the IR. Prefer targeted reads over requesting the full schema. If the
+exact full IR is truly necessary, call \`inspect_current_schema\` with
+\`includeSchema: true\`.
+
+Prefer surgical ops over \`replace_schema\`; the bulk rewrite is an escape
+hatch, not a default. When the user explicitly attaches files, their contents
+appear in an \`<attached_files>\` block before the message; use them as context,
+but keep edits inside the Contexture op tools.
 
 Skills are available and auto-load on topic match:
 - \`model-domain\` — use when the user asks to model a new domain from

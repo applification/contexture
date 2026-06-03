@@ -27,13 +27,14 @@ describe('buildSystemPromptAppend', () => {
     expect(prompt).toContain('generate-sample');
   });
 
-  it('does NOT embed the current IR section (IR now rides in the user message)', () => {
+  it('does NOT embed the current IR section and points agents to read tools', () => {
     const prompt = buildSystemPromptAppend({ stdlibRegistry: EMPTY_STDLIB });
-    // The `## Current IR` heading + JSON block is gone — the header
-    // itself still *mentions* the <current_ir> tag so Claude knows to
-    // expect it in user messages, but there's no IR payload here.
     expect(prompt).not.toContain('## Current IR');
+    expect(prompt).not.toContain('<current_ir>');
     expect(prompt).not.toContain('```json');
+    expect(prompt).toContain('inspect_current_schema');
+    expect(prompt).toContain('get_type');
+    expect(prompt).toContain('inspect_domain_brief');
   });
 
   it('enumerates every op in the vocabulary with its shape', () => {
@@ -152,20 +153,11 @@ describe('buildUserMessage', () => {
     types: [{ kind: 'object', name: 'Plot', fields: [] }],
   };
 
-  it('wraps the IR in <current_ir> tags and appends the user message', () => {
+  it('appends the user message without embedding the IR', () => {
     const out = buildUserMessage({ ir: sampleIR, userMessage: 'add a Harvest type' });
-    expect(out).toContain('<current_ir>');
-    expect(out).toContain('</current_ir>');
-    expect(out).toContain(JSON.stringify(sampleIR, null, 2));
-    expect(out).toContain('add a Harvest type');
-  });
-
-  it('places the IR block before the user message', () => {
-    const out = buildUserMessage({ ir: sampleIR, userMessage: 'add a Harvest type' });
-    const irEnd = out.indexOf('</current_ir>');
-    const userStart = out.indexOf('add a Harvest type');
-    expect(irEnd).toBeGreaterThan(-1);
-    expect(userStart).toBeGreaterThan(irEnd);
+    expect(out).not.toContain('<current_ir>');
+    expect(out).not.toContain(JSON.stringify(sampleIR, null, 2));
+    expect(out).toBe('add a Harvest type');
   });
 
   it('preserves the user message verbatim (no transformation)', () => {
@@ -174,7 +166,7 @@ describe('buildUserMessage', () => {
     expect(out.endsWith(weird)).toBe(true);
   });
 
-  it('includes explicit attached files between the IR and user message', () => {
+  it('includes explicit attached files before the user message', () => {
     const out = buildUserMessage({
       ir: sampleIR,
       userMessage: 'model this API',
@@ -192,7 +184,6 @@ describe('buildUserMessage', () => {
     expect(out).toContain('<attached_files>');
     expect(out).toContain('<file path="/repo/src/api.ts" name="api.ts">');
     expect(out).toContain('export const api = {};');
-    expect(out.indexOf('</current_ir>')).toBeLessThan(out.indexOf('<attached_files>'));
     expect(out.indexOf('</attached_files>')).toBeLessThan(out.indexOf('model this API'));
   });
 
