@@ -7,7 +7,7 @@ const STDLIB: StdlibCatalog = {
   hasType: (ns, name) => {
     const types: Record<string, ReadonlySet<string>> = {
       common: new Set(['Email', 'URL', 'ISODateTime']),
-      place: new Set(['CountryCode', 'Address']),
+      place: new Set(['CountryCode', 'Address', 'TimeZoneId']),
       money: new Set(['Money', 'CurrencyCode']),
     };
     return types[ns]?.has(name) ?? false;
@@ -924,5 +924,143 @@ describe('checkSemantic — enums', () => {
       'enum_empty',
       'enum_duplicate_value',
     ]);
+  });
+});
+
+describe('checkSemantic — operational advice', () => {
+  it('warns when household-local temporal fields have no household timezone', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'expiresOn', type: { kind: 'date' } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB)).toEqual([
+      expect.objectContaining({
+        code: 'operational_timezone_missing',
+        severity: 'warning',
+        hint: expect.stringContaining('place.TimeZoneId'),
+      }),
+    ]);
+  });
+
+  it('does not warn for household-local temporal fields when household has a timezone', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Household',
+          table: true,
+          fields: [{ name: 'timeZoneId', type: { kind: 'ref', typeName: 'place.TimeZoneId' } }],
+        },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'expiresOn', type: { kind: 'date' } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).not.toContain(
+      'operational_timezone_missing',
+    );
+  });
+
+  it('warns when channel identities have no inbound runtime state', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ChannelIdentity',
+          table: true,
+          fields: [
+            { name: 'provider', type: { kind: 'string' } },
+            { name: 'externalId', type: { kind: 'string' } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).toContain(
+      'operational_inbound_idempotency_missing',
+    );
+  });
+
+  it('warns for likely client-facing closed enums', () => {
+    const schema: Schema = {
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        { kind: 'enum', name: 'Equipment', values: [{ value: 'oven' }] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            {
+              name: 'equipment',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'Equipment' } },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema)).toEqual([
+      expect.objectContaining({
+        code: 'operational_enum_evolution',
+        severity: 'warning',
+        hint: expect.stringContaining('unknown values'),
+      }),
+    ]);
+  });
+
+  it('warns when collaborative array edits have updatedAt but no conflict token', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ShoppingList',
+          table: true,
+          fields: [
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'items', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).toContain(
+      'operational_conflict_token_missing',
+    );
+  });
+
+  it('warns when notification notes have no outbound model', () => {
+    const schema: Schema = {
+      version: '1',
+      metadata: { description: 'Sends push reminders and expiry warnings.' },
+      types: [{ kind: 'object', name: 'Household', table: true, fields: [] }],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).toContain(
+      'operational_notification_model_missing',
+    );
   });
 });
