@@ -21,6 +21,7 @@ describe('validate', () => {
     const dup = errs.find((e) => e.code === 'duplicate_type_name');
     expect(dup).toEqual({
       code: 'duplicate_type_name',
+      severity: 'error',
       path: 'types.1',
       message: 'Duplicate type name "User".',
     });
@@ -56,6 +57,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'unresolved_ref');
     expect(err).toEqual({
       code: 'unresolved_ref',
+      severity: 'error',
       path: 'types.0.fields.0.type',
       message: 'Unresolved ref "Post".',
     });
@@ -76,6 +78,37 @@ describe('validate', () => {
     expect(validate(schema).some((e) => e.code === 'unresolved_ref')).toBe(false);
   });
 
+  it('surfaces likely missing ownership scope as a warning', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+          ],
+        },
+      ],
+    };
+
+    expect(validate(schema)).toEqual([
+      expect.objectContaining({
+        code: 'relationship_ownership_scope_missing',
+        severity: 'warning',
+      }),
+    ]);
+  });
+
   it('rule 2: qualified ref fails when no matching alias exists', () => {
     const schema: Schema = {
       version: '1',
@@ -90,6 +123,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'unresolved_ref');
     expect(err).toEqual({
       code: 'unresolved_ref',
+      severity: 'error',
       path: 'types.0.fields.0.type',
       message: 'Unresolved ref "common.Email".',
     });
@@ -163,6 +197,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'discriminator_variant_not_found');
     expect(err).toEqual({
       code: 'discriminator_variant_not_found',
+      severity: 'error',
       path: 'types.0.variants.0',
       message: 'Discriminated union variant "Click" is not defined.',
     });
@@ -184,6 +219,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'discriminator_variant_not_object');
     expect(err).toEqual({
       code: 'discriminator_variant_not_object',
+      severity: 'error',
       path: 'types.1.variants.0',
       message: 'Discriminated union variant "Color" must be an object type.',
     });
@@ -209,6 +245,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'discriminator_missing_on_variant');
     expect(err).toEqual({
       code: 'discriminator_missing_on_variant',
+      severity: 'error',
       path: 'types.1.variants.0',
       message: 'Variant "Click" is missing discriminator field "type".',
     });
@@ -223,6 +260,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'enum_empty');
     expect(err).toEqual({
       code: 'enum_empty',
+      severity: 'error',
       path: 'types.0.values',
       message: 'Enum "Role" must have at least one value.',
     });
@@ -242,6 +280,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'enum_duplicate_value');
     expect(err).toEqual({
       code: 'enum_duplicate_value',
+      severity: 'error',
       path: 'types.0.values.2',
       message: 'Duplicate enum value "admin" in "Role".',
     });
@@ -277,6 +316,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'convex_index_duplicate_field');
     expect(err).toEqual({
       code: 'convex_index_duplicate_field',
+      severity: 'error',
       path: 'types.0.indexes.0.fields.1',
       message:
         'Convex index "by_author" includes field "author" more than once. Remove the duplicate field from the index.',
@@ -297,6 +337,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'duplicate_alias');
     expect(err).toEqual({
       code: 'duplicate_alias',
+      severity: 'error',
       path: 'imports.1',
       message: 'Duplicate import alias "lib".',
     });
@@ -357,6 +398,7 @@ describe('validate', () => {
     const err = validate(schema).find((e) => e.code === 'duplicate_field_name');
     expect(err).toEqual({
       code: 'duplicate_field_name',
+      severity: 'error',
       path: 'types.0.fields.1.name',
       message:
         'Duplicate field name "title" in "Post". Rename one of the fields before editing indexes or generated outputs.',

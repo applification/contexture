@@ -47,6 +47,10 @@ export interface OpToolDescriptor {
 const RelationshipSchema = z.object({
   name: z.string().min(1).optional(),
   onDelete: z.enum(['none', 'restrict', 'cascade', 'setNull']).optional(),
+  crossScope: z
+    .boolean()
+    .describe('Set true to mark this table ref as intentionally cross-scope.')
+    .optional(),
   ownership: z
     .object({
       scopeField: z.string().min(1),
@@ -94,7 +98,7 @@ const FieldTypeSchema: z.ZodType<import('./ir').FieldType> = z.lazy(() =>
             'stdlib refs.',
         ),
       relationship: RelationshipSchema.describe(
-        'Relationship intent for refs to Convex table types. Use onDelete for delete policy and ownership.scopeField/targetScopeField for same-tenant checks.',
+        'Relationship intent for refs to Convex table types. Use onDelete for delete policy, ownership.scopeField/targetScopeField for same-tenant checks, or crossScope: true for intentional cross-scope refs.',
       ).optional(),
     }),
     z.object({

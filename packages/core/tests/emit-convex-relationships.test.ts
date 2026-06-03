@@ -53,7 +53,7 @@ describe('emitConvexRelationships', () => {
     expect(parses(out)).toBe(true);
   });
 
-  it('auto-derives ownership scope when source and target share one required scope field', () => {
+  it('does not auto-derive ownership scope when source and target share a scope field', () => {
     const schema: Schema = {
       version: '1',
       types: [
@@ -79,11 +79,11 @@ describe('emitConvexRelationships', () => {
     const out = emitConvexRelationships(schema);
 
     expect(out).toContain('"name": "MealPlanMeal.recipeId"');
-    expect(out).toContain('"ownershipScopeField": "householdId"');
-    expect(out).toContain('"targetOwnershipScopeField": "householdId"');
+    expect(out).toContain('"ownershipScopeField": null');
+    expect(out).toContain('"targetOwnershipScopeField": null');
   });
 
-  it('keeps explicit ownership metadata over auto-derived scope', () => {
+  it('emits explicit ownership metadata', () => {
     const schema: Schema = {
       version: '1',
       types: [

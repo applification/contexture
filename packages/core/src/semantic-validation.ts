@@ -48,19 +48,23 @@ export type SemanticIssueCode =
   | 'relationship_target_not_table'
   | 'relationship_scope_field_missing'
   | 'relationship_set_null_requires_nullable'
-  | 'relationship_cleanup_index_missing';
+  | 'relationship_cleanup_index_missing'
+  | 'relationship_ownership_scope_missing';
+
+export type SemanticIssueSeverity = 'error' | 'warning';
 
 export interface SemanticIssue {
   code: SemanticIssueCode;
   path: string;
   message: string;
+  severity: SemanticIssueSeverity;
   /** Remediation suggestion the chat / UI should surface verbatim. */
   hint?: string;
 }
 
 export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {
   if (!schema || schema.version !== '1') return [];
-  return [
+  return withDefaultSeverity([
     ...checkImports(schema, catalog),
     ...checkRefs(schema, catalog),
     ...checkDuplicateTypeNames(schema),
@@ -69,13 +73,21 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkConvexTableShapes(schema),
     ...checkDiscriminatedUnions(schema),
     ...checkEnums(schema),
-  ];
+  ]);
 }
 
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
-function checkDuplicateConvexTableNames(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+type SemanticIssueDraft = Omit<SemanticIssue, 'severity'> & {
+  severity?: SemanticIssueSeverity;
+};
+
+function withDefaultSeverity(issues: SemanticIssueDraft[]): SemanticIssue[] {
+  return issues.map((issue) => ({ severity: 'error', ...issue }));
+}
+
+function checkDuplicateConvexTableNames(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const seen = new Map<string, number>();
 
   schema.types.forEach((type, i) => {
@@ -100,8 +112,8 @@ function convexTableName(type: ObjectType): string {
   return type.tableName ?? `${type.name.charAt(0).toLowerCase()}${type.name.slice(1)}`;
 }
 
-function checkConvexTableShapes(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   schema.types.forEach((type, typeIndex) => {
     if (type.kind !== 'object' || type.table !== true) return;
     const tableName = convexTableName(type);
@@ -151,8 +163,8 @@ function checkConvexTableShapes(schema: Schema): SemanticIssue[] {
   return issues;
 }
 
-function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const seenAliases = new Set<string>();
   (schema.imports ?? []).forEach((imp, i) => {
     const path = `imports.${i}`;
@@ -187,8 +199,8 @@ function checkImports(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] 
   return issues;
 }
 
-function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const localTypes = new Map(schema.types.map((t) => [t.name, t]));
   const localNames = new Set(localTypes.keys());
   const aliases = new Set((schema.imports ?? []).map((i) => i.alias));
@@ -250,11 +262,11 @@ function checkRelationshipMetadata(
   fieldOptional: boolean,
   fieldNullable: boolean,
   localTypes: ReadonlyMap<string, TypeDef>,
-): SemanticIssue[] {
-  if (!ref.relationship) return [];
-  const issues: SemanticIssue[] = [];
+): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const target = localTypes.get(ref.typeName);
-  if (target?.kind !== 'object' || target.table !== true) {
+  const relationship = ref.relationship;
+  if (relationship && (target?.kind !== 'object' || target.table !== true)) {
     issues.push({
       code: 'relationship_target_not_table',
       path: `${path}.relationship`,
@@ -263,7 +275,7 @@ function checkRelationshipMetadata(
     });
   }
 
-  if (ref.relationship.onDelete === 'setNull' && !fieldOptional && !fieldNullable) {
+  if (relationship?.onDelete === 'setNull' && !fieldOptional && !fieldNullable) {
     issues.push({
       code: 'relationship_set_null_requires_nullable',
       path: `${path}.relationship.onDelete`,
@@ -272,19 +284,19 @@ function checkRelationshipMetadata(
     });
   }
 
-  if (ref.relationship.onDelete === 'cascade' || ref.relationship.onDelete === 'setNull') {
+  if (relationship?.onDelete === 'cascade' || relationship?.onDelete === 'setNull') {
     const hasCleanupIndex = (owner.indexes ?? []).some((index) => index.fields[0] === fieldName);
     if (!hasCleanupIndex) {
       issues.push({
         code: 'relationship_cleanup_index_missing',
         path: `${path}.relationship.onDelete`,
-        message: `Relationship "${fieldName}" uses ${ref.relationship.onDelete} but source table "${owner.name}" has no cleanup index starting with "${fieldName}".`,
+        message: `Relationship "${fieldName}" uses ${relationship.onDelete} but source table "${owner.name}" has no cleanup index starting with "${fieldName}".`,
         hint: `Add an index on "${owner.name}" with "${fieldName}" as the first field before relying on generated cleanup plans.`,
       });
     }
   }
 
-  const ownership = ref.relationship.ownership;
+  const ownership = relationship?.ownership;
   if (ownership && !owner.fields.some((field) => field.name === ownership.scopeField)) {
     issues.push({
       code: 'relationship_scope_field_missing',
@@ -310,7 +322,72 @@ function checkRelationshipMetadata(
     });
   }
 
+  if (
+    owner.table === true &&
+    target?.kind === 'object' &&
+    target.table === true &&
+    !ownership &&
+    relationship?.crossScope !== true
+  ) {
+    const axis = findSharedTenantAxis(owner, target, fieldName, ref.typeName);
+    if (axis) {
+      issues.push({
+        code: 'relationship_ownership_scope_missing',
+        severity: 'warning',
+        path: `${path}.relationship.ownership`,
+        message: `${owner.name}.${fieldName} -> ${convexTableName(target)}: source and target share tenant axis "${axis.fieldName}" but no ownership scope is set.`,
+        hint: `Add relationship.ownership.scopeField: "${axis.fieldName}"${
+          axis.targetFieldName === axis.fieldName
+            ? ''
+            : ` and targetScopeField: "${axis.targetFieldName}"`
+        }, or set relationship.crossScope: true to suppress this warning.`,
+      });
+    }
+  }
+
   return issues;
+}
+
+function findSharedTenantAxis(
+  owner: ObjectType,
+  target: ObjectType,
+  relationshipFieldName: string,
+  relationshipTargetTypeName: string,
+): { fieldName: string; targetFieldName: string } | null {
+  const strong = owner.fields.find((sourceField) => {
+    if (!isRequiredField(sourceField) || sourceField.name === relationshipFieldName) return false;
+    const targetField = target.fields.find((field) => field.name === sourceField.name);
+    if (!targetField || !isRequiredField(targetField)) return false;
+    if (
+      sourceField.type.kind !== 'ref' ||
+      targetField.type.kind !== 'ref' ||
+      sourceField.type.typeName !== targetField.type.typeName
+    ) {
+      return false;
+    }
+    return sourceField.type.typeName !== relationshipTargetTypeName;
+  });
+  if (strong) return { fieldName: strong.name, targetFieldName: strong.name };
+
+  const fallback = owner.fields.find((sourceField) => {
+    if (!isRequiredField(sourceField) || sourceField.name === relationshipFieldName) return false;
+    if (!isLikelyTenantAxisName(sourceField.name) || sourceField.type.kind !== 'string') {
+      return false;
+    }
+    const targetField = target.fields.find((field) => field.name === sourceField.name);
+    return Boolean(
+      targetField && isRequiredField(targetField) && targetField.type.kind === 'string',
+    );
+  });
+  return fallback ? { fieldName: fallback.name, targetFieldName: fallback.name } : null;
+}
+
+function isRequiredField(field: ObjectType['fields'][number]): boolean {
+  return field.optional !== true && field.nullable !== true;
+}
+
+function isLikelyTenantAxisName(name: string): boolean {
+  return /^(household|tenant|org|organization|workspace|account|team|project)Id$/.test(name);
 }
 
 function resolves(
@@ -339,8 +416,8 @@ function hintForUnresolvedRef(typeName: string, catalog?: StdlibCatalog): string
   return undefined;
 }
 
-function checkDuplicateTypeNames(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkDuplicateTypeNames(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const seen = new Set<string>();
   schema.types.forEach((type, i) => {
     if (seen.has(type.name)) {
@@ -356,8 +433,8 @@ function checkDuplicateTypeNames(schema: Schema): SemanticIssue[] {
   return issues;
 }
 
-function checkDuplicateFieldNames(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkDuplicateFieldNames(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   schema.types.forEach((type, typeIndex) => {
     if (type.kind !== 'object') return;
     const seen = new Set<string>();
@@ -377,8 +454,8 @@ function checkDuplicateFieldNames(schema: Schema): SemanticIssue[] {
   return issues;
 }
 
-function checkDiscriminatedUnions(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkDiscriminatedUnions(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   const byName = new Map(schema.types.map((t) => [t.name, t]));
 
   schema.types.forEach((type, ti) => {
@@ -414,8 +491,8 @@ function checkDiscriminatedUnions(schema: Schema): SemanticIssue[] {
   return issues;
 }
 
-function checkEnums(schema: Schema): SemanticIssue[] {
-  const issues: SemanticIssue[] = [];
+function checkEnums(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
   schema.types.forEach((type, ti) => {
     if (type.kind !== 'enum') return;
     if (type.values.length === 0) {
@@ -460,7 +537,7 @@ function stdlibNamespaceFromPath(path: ImportDecl['path']): string | null {
  * pre-existing issues.
  */
 export function newIssues(pre: SemanticIssue[], post: SemanticIssue[]): SemanticIssue[] {
-  const key = (i: SemanticIssue) => `${i.code}|${i.path}|${i.message}`;
+  const key = (i: SemanticIssue) => `${i.severity}|${i.code}|${i.path}|${i.message}`;
   const seen = new Set(pre.map(key));
   return post.filter((i) => !seen.has(key(i)));
 }

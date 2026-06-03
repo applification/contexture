@@ -87,13 +87,14 @@ const ValidationIssueSchema = z.object({
   code: z.string(),
   path: z.string(),
   message: z.string(),
+  severity: z.enum(['error', 'warning']).optional(),
   hint: z.string().optional(),
 });
 
 const ValidateOutput = {
   path: z.string(),
   valid: z.boolean(),
-  warnings: z.array(z.string()),
+  warnings: z.array(z.union([z.string(), ValidationIssueSchema])),
   errors: z.array(ValidationIssueSchema),
 };
 
@@ -318,13 +319,21 @@ async function validateContextureFile(
 ): Promise<z.infer<z.ZodObject<typeof ValidateOutput>>> {
   try {
     const { schema, warnings } = await readContextureFile(irPath);
-    const errors = checkSemantic(schema, catalog).map((issue) => ({
+    const semanticIssues = checkSemantic(schema, catalog).map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
+      severity: issue.severity,
       ...(issue.hint ? { hint: issue.hint } : {}),
     }));
-    return { path: irPath, valid: errors.length === 0, warnings, errors };
+    const errors = semanticIssues.filter((issue) => issue.severity === 'error');
+    const semanticWarnings = semanticIssues.filter((issue) => issue.severity === 'warning');
+    return {
+      path: irPath,
+      valid: errors.length === 0,
+      warnings: [...warnings, ...semanticWarnings],
+      errors,
+    };
   } catch (err) {
     return {
       path: irPath,
@@ -605,7 +614,7 @@ function buildIntegrationGuidance(
       'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
       'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
       'Typed op tools take irPath plus their direct arguments. The generic apply_contexture_op takes { irPath, op } where op is the closed-world operation with a kind.',
-      'For Convex table refs, put relationship intent under field.type.relationship, for example { onDelete: "restrict", ownership: { scopeField: "householdId" } }.',
+      'For Convex table refs, put relationship intent under field.type.relationship, for example { onDelete: "restrict", ownership: { scopeField: "householdId" } }. Use relationship.crossScope: true for intentional cross-scope refs.',
       'After any model mutation, validate, emit generated targets, and check drift before finishing.',
       'Wire generated outputs into the existing app architecture; Contexture does not own arbitrary application code.',
     ],

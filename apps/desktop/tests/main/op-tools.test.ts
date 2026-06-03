@@ -177,6 +177,37 @@ describe('createOpTools', () => {
     });
   });
 
+  it('add_field forwards explicit cross-scope relationship opt-outs', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const addField = toolNamed(tools, 'add_field');
+
+    await addField.handler({
+      typeName: 'MealPlanMeal',
+      field: {
+        name: 'sharedRecipeId',
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: { crossScope: true },
+        },
+      },
+    });
+
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'add_field',
+      typeName: 'MealPlanMeal',
+      field: {
+        name: 'sharedRecipeId',
+        type: {
+          kind: 'ref',
+          typeName: 'Recipe',
+          relationship: { crossScope: true },
+        },
+      },
+    });
+  });
+
   it('add_field rejects malformed input before reaching the forwarder', async () => {
     const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
     const { tools } = makeTools(forwardSpy as unknown as ForwardOp);

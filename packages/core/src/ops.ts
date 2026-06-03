@@ -210,7 +210,7 @@ export function apply(schema: Schema, op: Op, catalog?: StdlibCatalog): ApplyRes
   const introduced = newIssues(
     checkSemantic(schema, catalog),
     checkSemantic(structural.data, catalog),
-  );
+  ).filter((issue) => issue.severity === 'error');
   if (introduced.length === 0) return { schema: structural.data };
   return { error: formatSemanticErrors(op.kind, introduced) };
 }
