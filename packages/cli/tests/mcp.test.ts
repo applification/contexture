@@ -442,8 +442,8 @@ describe('Contexture MCP server', () => {
           table: true,
           fields: [
             { name: 'name', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
           ],
         },
         {
@@ -452,8 +452,8 @@ describe('Contexture MCP server', () => {
           table: true,
           fields: [
             { name: 'householdId', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
           ],
         },
         {
@@ -462,8 +462,8 @@ describe('Contexture MCP server', () => {
           table: true,
           fields: [
             { name: 'householdId', type: { kind: 'string' } },
-            { name: 'createdAt', type: { kind: 'string' } },
-            { name: 'updatedAt', type: { kind: 'string' } },
+            { name: 'createdAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
+            { name: 'updatedAt', type: { kind: 'ref', typeName: 'common.ISODateTime' } },
             { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
             { name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } },
             { name: 'householdRefId', type: { kind: 'ref', typeName: 'Household' } },
