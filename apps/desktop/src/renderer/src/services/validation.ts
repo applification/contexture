@@ -12,6 +12,7 @@ export interface ValidationError {
   code: SemanticIssueCode;
   path: string;
   message: string;
+  severity: SemanticIssue['severity'];
   hint?: string;
 }
 
@@ -35,6 +36,7 @@ function toValidationError(issue: SemanticIssue): ValidationError {
     code: issue.code,
     path: issue.path,
     message: issue.hint ? `${issue.message} ${issue.hint}` : issue.message,
+    severity: issue.severity,
     hint: issue.hint,
   };
 }

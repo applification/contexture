@@ -612,16 +612,19 @@ async function run(argv: string[]): Promise<void> {
       });
       return;
     }
-    const errors = checkSemantic(parsed.data, STDLIB_REGISTRY).map((issue) => ({
+    const semanticIssues = checkSemantic(parsed.data, STDLIB_REGISTRY).map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
+      severity: issue.severity,
       ...(issue.hint ? { hint: issue.hint } : {}),
     }));
+    const errors = semanticIssues.filter((issue) => issue.severity === 'error');
+    const warnings = semanticIssues.filter((issue) => issue.severity === 'warning');
     if (errors.length > 0) {
       process.exitCode = 1;
       if (options.json) {
-        writeJson({ ok: false, errors });
+        writeJson({ ok: false, errors, warnings });
       } else {
         process.stderr.write('Validation failed:\n');
         for (const error of errors) {
@@ -630,7 +633,7 @@ async function run(argv: string[]): Promise<void> {
       }
       return;
     }
-    writeResult({ valid: true, errors: [] }, options.json);
+    writeResult({ valid: true, errors: [], warnings }, options.json);
     return;
   }
 

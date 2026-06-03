@@ -251,6 +251,161 @@ describe('checkSemantic — refs', () => {
       'relationship_cleanup_index_missing',
     );
   });
+
+  it('warns when table refs share a tenant ref axis but ownership is missing', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+          ],
+        },
+      ],
+    };
+
+    const warnings = checkSemantic(schema, STDLIB).filter((issue) => issue.severity === 'warning');
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        code: 'relationship_ownership_scope_missing',
+        path: 'types.2.fields.1.type.relationship.ownership',
+        message: expect.stringContaining('MealPlanMeal.recipeId -> recipe'),
+        hint: expect.stringContaining('relationship.crossScope: true'),
+      }),
+    ]);
+  });
+
+  it('does not warn when ownership is explicit or cross-scope is explicit', () => {
+    const baseTypes: Schema['types'] = [
+      { kind: 'object', name: 'Household', table: true, fields: [] },
+      {
+        kind: 'object',
+        name: 'Recipe',
+        table: true,
+        fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+      },
+    ];
+    const scoped: Schema = {
+      version: '1',
+      types: [
+        ...baseTypes,
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            {
+              name: 'recipeId',
+              type: {
+                kind: 'ref',
+                typeName: 'Recipe',
+                relationship: { ownership: { scopeField: 'householdId' } },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const crossScope: Schema = {
+      version: '1',
+      types: [
+        ...baseTypes,
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            {
+              name: 'recipeId',
+              type: {
+                kind: 'ref',
+                typeName: 'Recipe',
+                relationship: { crossScope: true },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    for (const schema of [scoped, crossScope]) {
+      expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).not.toContain(
+        'relationship_ownership_scope_missing',
+      );
+    }
+  });
+
+  it('does not warn for refs to tenant roots or global tables without a shared axis', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [{ name: 'name', type: { kind: 'string' } }],
+        },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).not.toContain(
+      'relationship_ownership_scope_missing',
+    );
+  });
+
+  it('warns from shared string tenant-axis fields during string-FK migrations', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'string' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB)).toEqual([
+      expect.objectContaining({
+        code: 'relationship_ownership_scope_missing',
+        severity: 'warning',
+        message: expect.stringContaining('tenant axis "householdId"'),
+      }),
+    ]);
+  });
 });
 
 describe('checkSemantic — imports', () => {

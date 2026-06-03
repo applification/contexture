@@ -196,6 +196,49 @@ describe('@contexture/cli', () => {
     });
   });
 
+  it('returns semantic warnings as structured JSON without failing validation', async () => {
+    const { dir, irPath } = await fixtureProject();
+    await writeFile(
+      irPath,
+      `${JSON.stringify({
+        version: '1',
+        types: [
+          { kind: 'object', name: 'Household', table: true, fields: [] },
+          {
+            kind: 'object',
+            name: 'Recipe',
+            table: true,
+            fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+          },
+          {
+            kind: 'object',
+            name: 'MealPlanMeal',
+            table: true,
+            fields: [
+              { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+              { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+            ],
+          },
+        ],
+      })}\n`,
+    );
+
+    const result = await runCli(dir, ['validate', '--json']);
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: true,
+      valid: true,
+      errors: [],
+      warnings: [
+        expect.objectContaining({
+          code: 'relationship_ownership_scope_missing',
+          severity: 'warning',
+        }),
+      ],
+    });
+  });
+
   it('adds a field and re-emits generated files', async () => {
     const { dir, irPath } = await fixtureProject();
     const result = await runCli(dir, ['add-field', 'Post', 'title', '{"kind":"string"}', '--json']);

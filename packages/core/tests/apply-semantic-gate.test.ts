@@ -94,6 +94,34 @@ describe('apply() — delta semantic gate', () => {
     expect('schema' in result).toBe(true);
   });
 
+  it('accepts ops that introduce only semantic warnings', () => {
+    const start: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+      ],
+    };
+    const op: Op = {
+      kind: 'add_field',
+      typeName: 'MealPlanMeal',
+      field: { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+    };
+
+    expect(apply(start, op, STDLIB)).toMatchObject({ schema: expect.any(Object) });
+  });
+
   it('accepts update_field that rewrites a ref to a primitive (not a new issue)', () => {
     const start: Schema = {
       version: '1',

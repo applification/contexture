@@ -387,6 +387,49 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('reports semantic warnings without invalidating MCP validation', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'recipeId', type: { kind: 'ref', typeName: 'Recipe' } },
+          ],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'validate_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        valid: true,
+        errors: [],
+        warnings: [
+          expect.objectContaining({
+            code: 'relationship_ownership_scope_missing',
+            severity: 'warning',
+          }),
+        ],
+      });
+    });
+  });
+
   it('applies typed per-op MCP tools without requiring generic op JSON', async () => {
     const irPath = await fixtureIr({
       version: '1',

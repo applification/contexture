@@ -43,6 +43,7 @@ const RefFieldTypeSchema = z.object({
     .object({
       name: z.string().min(1).optional(),
       onDelete: z.enum(['none', 'restrict', 'cascade', 'setNull']).optional(),
+      crossScope: z.boolean().optional(),
       ownership: z
         .object({
           scopeField: z.string().min(1),
