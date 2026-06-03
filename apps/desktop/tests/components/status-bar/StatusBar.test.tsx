@@ -41,6 +41,31 @@ describe('StatusBar validation repairs', () => {
     });
   });
 
+  it('labels warning-only validation issues as advisories', () => {
+    seed({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'PantryItem',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'ref', typeName: 'Household' } },
+            { name: 'expiresOn', type: { kind: 'date' } },
+          ],
+        },
+      ],
+    });
+    render(<StatusBar />);
+
+    expect(screen.getByRole('button', { name: '1 advisory' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '1 error' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '1 advisory' }));
+    expect(screen.getByText(/Household-scoped field "PantryItem.expiresOn"/i)).toBeVisible();
+  });
+
   it('does not offer duplicate enum value repair without index-addressed ops', () => {
     seed({
       version: '1',
