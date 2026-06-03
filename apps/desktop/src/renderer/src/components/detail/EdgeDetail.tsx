@@ -6,6 +6,7 @@
  * union-variant edges come from discriminated-union `variants`. There is
  * no edge entity to mutate directly.
  */
+import { GitBranch, Link2, type LucideIcon, Table2 } from 'lucide-react';
 import type { RefEdgeData } from '../graph/schema-to-graph';
 
 export interface EdgeDetailProps {
@@ -14,19 +15,16 @@ export interface EdgeDetailProps {
 }
 
 export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
-  const isUnionVariant = data.relation === 'unionVariant';
-  const isTableId = data.relation === 'tableId';
-  const editableSourceField = isUnionVariant ? undefined : data.sourceField;
+  const meta = edgeKindMeta(data);
+  const editableSourceField = data.relation === 'unionVariant' ? undefined : data.sourceField;
+  const Icon = meta.icon;
 
   return (
     <div className="space-y-2 p-3 text-xs">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          {isUnionVariant
-            ? 'Union variant edge'
-            : isTableId
-              ? 'Inferred table id edge'
-              : 'Ref edge'}
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+          {meta.label}
         </span>
         {data.crossBoundary && (
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -36,7 +34,7 @@ export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
       </div>
       <dl className="space-y-1">
         <Row term="Source type" detail={data.sourceType} />
-        {isUnionVariant ? (
+        {data.relation === 'unionVariant' ? (
           <Row term="Discriminator" detail={data.discriminator ?? ''} />
         ) : (
           <Row term="Source field" detail={data.sourceField ?? ''} />
@@ -54,6 +52,16 @@ export function EdgeDetail({ data, onEditField }: EdgeDetailProps) {
       )}
     </div>
   );
+}
+
+function edgeKindMeta(data: RefEdgeData): { icon: LucideIcon; label: string } {
+  if (data.relation === 'unionVariant') {
+    return { icon: GitBranch, label: 'Union variant edge' };
+  }
+  if (data.relation === 'tableId') {
+    return { icon: Table2, label: 'Inferred table id edge' };
+  }
+  return { icon: Link2, label: 'Modeled ref edge' };
 }
 
 function Row({ term, detail }: { term: string; detail: string }) {

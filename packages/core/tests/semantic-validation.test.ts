@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Schema } from '../src/ir';
+import type { FieldType, Schema } from '../src/ir';
 import { checkSemantic, type StdlibCatalog } from '../src/semantic-validation';
 
 const STDLIB: StdlibCatalog = {
@@ -460,6 +460,65 @@ describe('checkSemantic — refs', () => {
     ]);
     expect(JSON.stringify(warnings)).not.toContain('createdAt');
     expect(JSON.stringify(warnings)).not.toContain('updatedAt');
+  });
+
+  it('warns for embedded table refs using the root table tenant axis', () => {
+    const schemaFor = (
+      relationship?: Extract<FieldType, { kind: 'ref' }>['relationship'],
+    ): Schema => ({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'string' } }],
+        },
+        {
+          kind: 'object',
+          name: 'RecipeIngredient',
+          fields: [
+            {
+              name: 'ingredientId',
+              type: { kind: 'ref', typeName: 'Ingredient', relationship },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            {
+              name: 'ingredients',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'RecipeIngredient' } },
+            },
+          ],
+        },
+      ],
+    });
+
+    const warnings = checkSemantic(schemaFor(), STDLIB).filter(
+      (issue) => issue.code === 'relationship_ownership_scope_missing',
+    );
+
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        path: 'types.2.fields.1.type.element.fields.0.type.relationship.ownership',
+        message: expect.stringContaining('Recipe.ingredientId -> ingredient'),
+        hint: expect.stringContaining('scopeField: "householdId"'),
+      }),
+    ]);
+
+    for (const relationship of [
+      { ownership: { scopeField: 'householdId' } },
+      { crossScope: true },
+    ] as const) {
+      expect(
+        checkSemantic(schemaFor(relationship), STDLIB).map((issue) => issue.code),
+      ).not.toContain('relationship_ownership_scope_missing');
+    }
   });
 });
 

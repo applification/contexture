@@ -91,7 +91,9 @@
   /* Zod-era edge tokens. `ref` is the default relationship edge;
      `union` is the discriminated-union variant edge; `import` is the
      dashed cross-boundary (stdlib / cross-project) edge. */
-  --graph-edge-ref: color-mix(in oklch, #7287fd 72%, #6c6f85);
+  --graph-edge-fk: color-mix(in oklch, #6c6f85 64%, #e6e9ef);
+  --graph-edge-ref: #1e66f5;
+  --graph-edge-active: #7287fd;
   --graph-edge-union: #40a02b;
   --graph-edge-import: #7c7f93;
   /* Background dot colour — deliberately subdued so the grid reads as
@@ -169,7 +171,9 @@
   --graph-edge-subclass: #9399b2;
   --graph-edge-restriction: #fab387;
   /* Zod-era edge tokens (dark). */
+  --graph-edge-fk: color-mix(in oklch, #9399b2 58%, #181825);
   --graph-edge-ref: #89b4fa;
+  --graph-edge-active: #89b4fa;
   --graph-edge-union: #a6e3a1;
   --graph-edge-import: #9399b2;
   /* Subdued dot grid on dark canvases too. */

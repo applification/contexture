@@ -212,9 +212,12 @@ function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[
     fieldName: string,
     fieldOptional: boolean,
     fieldNullable: boolean,
+    checkRefResolution: boolean,
+    validateRelationship: boolean,
+    visitedEmbeds: ReadonlySet<string>,
   ): void => {
     if (t.kind === 'ref') {
-      if (!resolves(t.typeName, localNames, aliases, catalog)) {
+      if (checkRefResolution && !resolves(t.typeName, localNames, aliases, catalog)) {
         issues.push({
           code: 'unresolved_ref',
           path,
@@ -222,19 +225,54 @@ function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[
           hint: hintForUnresolvedRef(t.typeName, catalog),
         });
       }
-      issues.push(
-        ...checkRelationshipMetadata(
-          t,
-          path,
-          owner,
-          fieldName,
-          fieldOptional,
-          fieldNullable,
-          localTypes,
-        ),
-      );
+      if (validateRelationship) {
+        issues.push(
+          ...checkRelationshipMetadata(
+            t,
+            path,
+            owner,
+            fieldName,
+            fieldOptional,
+            fieldNullable,
+            localTypes,
+          ),
+        );
+      }
+      const target = localTypes.get(t.typeName);
+      if (
+        validateRelationship &&
+        target?.kind === 'object' &&
+        target.table !== true &&
+        !visitedEmbeds.has(target.name)
+      ) {
+        const nextVisited = new Set(visitedEmbeds);
+        nextVisited.add(target.name);
+        target.fields.forEach((field, fieldIndex) => {
+          walk(
+            field.type,
+            `${path}.fields.${fieldIndex}.type`,
+            owner,
+            field.name,
+            fieldOptional || field.optional === true,
+            fieldNullable || field.nullable === true,
+            false,
+            true,
+            nextVisited,
+          );
+        });
+      }
     } else if (t.kind === 'array') {
-      walk(t.element, `${path}.element`, owner, fieldName, fieldOptional, fieldNullable);
+      walk(
+        t.element,
+        `${path}.element`,
+        owner,
+        fieldName,
+        fieldOptional,
+        fieldNullable,
+        checkRefResolution,
+        validateRelationship,
+        visitedEmbeds,
+      );
     }
   };
 
@@ -248,6 +286,9 @@ function checkRefs(schema: Schema, catalog?: StdlibCatalog): SemanticIssueDraft[
         f.name,
         f.optional === true,
         f.nullable === true,
+        true,
+        type.table === true,
+        new Set([type.name]),
       );
     });
   });

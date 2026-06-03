@@ -20,7 +20,7 @@ export const DEFAULT_LAYOUT: GraphLayout = {
   nodeSpacing: 180,
   showEnums: false,
   showStdlib: false,
-  showEdgeLabels: true,
+  showEdgeLabels: false,
 };
 
 interface GraphLayoutStoreShape {
