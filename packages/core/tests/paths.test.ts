@@ -63,6 +63,10 @@ describe('Contexture path policy', () => {
         kind: 'mcp-definitions',
         path: '/repo/packages/contexture/.contexture/mcp-definitions.json',
       },
+      {
+        kind: 'domain-brief',
+        path: '/repo/packages/contexture/.contexture/domain-brief.json',
+      },
       { kind: 'form-validators', path: '/repo/packages/contexture/form-validators.ts' },
     ]);
     expect(
@@ -71,6 +75,10 @@ describe('Contexture path policy', () => {
         '/repo/packages/contexture/.contexture/../.contexture/mcp-definitions.json',
       )?.kind,
     ).toBe('mcp-definitions');
+    expect(
+      generatedTargetForPath(irPath, '/repo/packages/contexture/.contexture/domain-brief.json')
+        ?.kind,
+    ).toBe('domain-brief');
     expect(generatedTargetForPath(irPath, '/repo/packages/contexture/src/index.ts')).toBeNull();
   });
 

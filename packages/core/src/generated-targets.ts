@@ -1,6 +1,7 @@
 import { emitAiToolSchemas } from './emit-ai-tool-schemas';
 import { emitConvexSchema, emitConvexValidators } from './emit-convex';
 import { emitConvexRelationships } from './emit-convex-relationships';
+import { emitDomainBrief } from './emit-domain-brief';
 import { emitFormValidators } from './emit-form-validators';
 import { emit as emitJsonSchema } from './emit-json-schema';
 import { emitMcpDefinitions } from './emit-mcp-definitions';
@@ -53,6 +54,7 @@ export interface EmitPipelineDeps {
   emitAiToolSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitStructuredOutputSchemas?: (schema: Schema, sourcePath?: string) => unknown;
   emitMcpDefinitions?: (schema: Schema, sourcePath?: string) => unknown;
+  emitDomainBrief?: (schema: Schema, sourcePath?: string) => unknown;
   emitFormValidators?: (
     schema: Schema,
     baseName: string,
@@ -82,6 +84,7 @@ const AI_TARGETS = {
   'ai-tool-schemas': 'toolSchemas',
   'structured-output-schemas': 'structuredOutputs',
   'mcp-definitions': 'mcpDefinitions',
+  'domain-brief': 'domainBrief',
   'form-validators': 'formValidators',
 } as const satisfies Record<
   string,
@@ -254,6 +257,20 @@ export const GENERATED_TARGETS: readonly GeneratedTargetDescriptor[] = [
       json((deps.emitMcpDefinitions ?? emitMcpDefinitions)(schema, irPath)),
   },
   {
+    kind: 'domain-brief',
+    group: 'agent',
+    label: 'Domain brief',
+    help: 'Agent-readable summary of declared model contracts and unresolved domain decisions.',
+    language: 'json',
+    previewable: true,
+    displayPath: () => '.contexture/domain-brief.json',
+    path: (paths) => paths.domainBrief,
+    enabled: (schema) => aiOutputEnabled(schema, 'domainBrief'),
+    enable: (schema) => enableAiOutput(schema, 'domainBrief'),
+    emit: (schema, irPath, _paths, deps) =>
+      json(deps.emitDomainBrief ? deps.emitDomainBrief(schema, irPath) : emitDomainBrief(schema)),
+  },
+  {
     kind: 'form-validators',
     group: 'agent',
     label: 'Form validators',
@@ -325,6 +342,8 @@ export function generatedTargetOutputDir(schema: Schema, kind: GeneratedTargetKi
       return schema.outputs?.aiPipeline?.structuredOutputs?.dir ?? null;
     case 'mcp-definitions':
       return schema.outputs?.aiPipeline?.mcpDefinitions?.dir ?? null;
+    case 'domain-brief':
+      return schema.outputs?.aiPipeline?.domainBrief?.dir ?? null;
     case 'form-validators':
       return schema.outputs?.aiPipeline?.formValidators?.dir ?? null;
   }
@@ -398,6 +417,17 @@ export function setGeneratedTargetOutputDir(
           aiPipeline: {
             ...(schema.outputs?.aiPipeline ?? {}),
             mcpDefinitions: nextConfig(schema.outputs?.aiPipeline?.mcpDefinitions),
+          },
+        },
+      };
+    case 'domain-brief':
+      return {
+        ...schema,
+        outputs: {
+          ...(schema.outputs ?? {}),
+          aiPipeline: {
+            ...(schema.outputs?.aiPipeline ?? {}),
+            domainBrief: nextConfig(schema.outputs?.aiPipeline?.domainBrief),
           },
         },
       };

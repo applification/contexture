@@ -25,6 +25,7 @@ export {
   CHAT_FILE,
   CONVEX_VALIDATORS_FILE,
   contextureDirFor,
+  DOMAIN_BRIEF_FILE,
   EMITTED_FILE,
   type GeneratedTarget,
   type GeneratedTargetKind,

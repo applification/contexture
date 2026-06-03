@@ -55,6 +55,13 @@ describe('Contexture MCP server', () => {
             }),
           }),
           expect.objectContaining({
+            name: 'inspect_domain_brief',
+            annotations: expect.objectContaining({
+              readOnlyHint: true,
+              destructiveHint: false,
+            }),
+          }),
+          expect.objectContaining({
             name: 'apply_contexture_op',
             description: expect.stringContaining('{ irPath, op }'),
             annotations: expect.objectContaining({
@@ -175,6 +182,7 @@ describe('Contexture MCP server', () => {
           }),
         ]),
         agent: expect.objectContaining({
+          safeLoop: expect.arrayContaining(['inspect_domain_brief']),
           preferredMutationTools: expect.arrayContaining([
             'add_field',
             'add_invariant',
@@ -183,7 +191,60 @@ describe('Contexture MCP server', () => {
             'add_search_index',
           ]),
         }),
+        domainBrief: {
+          generatedPath: expect.stringContaining('.contexture/domain-brief.json'),
+          summary: expect.objectContaining({
+            typeCount: 1,
+            tableCount: 1,
+            unresolvedDecisionCount: expect.any(Number),
+          }),
+        },
         modelingHints: expect.any(Array),
+      });
+    });
+  });
+
+  it('returns an agent-readable domain brief', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      metadata: { name: 'Garden' },
+      outputs: { aiPipeline: { domainBrief: { enabled: true } } },
+      types: [
+        {
+          kind: 'object',
+          name: 'Plot',
+          table: true,
+          fields: [
+            { name: 'name', type: { kind: 'string' } },
+            { name: 'tags', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'inspect_domain_brief',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        generatedPath: expect.stringContaining('.contexture/domain-brief.json'),
+        brief: {
+          version: 1,
+          model: { name: 'Garden' },
+          summary: expect.objectContaining({
+            typeCount: 1,
+            tableCount: 1,
+          }),
+          unresolvedDecisions: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'modeling_hint',
+              title: expect.stringMatching(/array/i),
+            }),
+          ]),
+        },
       });
     });
   });

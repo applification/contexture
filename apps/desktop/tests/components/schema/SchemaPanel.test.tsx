@@ -74,6 +74,7 @@ describe('SchemaPanel', () => {
       'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
     );
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_contexture');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_domain_brief');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('validate_contexture');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('apply_contexture_op');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('emit_contexture');
@@ -148,15 +149,15 @@ describe('SchemaPanel', () => {
 
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
     expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask your agent: "List the contexture MCP tools, then inspect /repo/garden.contexture.json and summarize the Convex tables."',
+      'Ask your agent: "List the contexture MCP tools, then inspect /repo/garden.contexture.json, read the domain brief, and summarize the Convex tables plus unresolved decisions."',
     );
 
     fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
     expect(onCopy).toHaveBeenCalledWith(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
   });
 
@@ -209,7 +210,7 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('agent-setup')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
+      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
     );
   });
 
