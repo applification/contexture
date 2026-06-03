@@ -164,8 +164,24 @@ export interface ConvexVersionInfo {
   message: string;
 }
 
+export type ConvexAgentReadinessStatus = 'ready' | 'not_ready' | 'probe_failed';
+
+export interface ConvexAgentReadinessInfo {
+  convexAiFiles: {
+    status: ConvexAgentReadinessStatus;
+    message: string;
+    command: string;
+  };
+  contextureMcp: {
+    status: ConvexAgentReadinessStatus;
+    message: string;
+    command: string;
+  };
+}
+
 export interface ContextureConvexAPI {
   versionInfo: (payload: { irPath: string }) => Promise<ConvexVersionInfo>;
+  agentReadiness: (payload: { irPath: string }) => Promise<ConvexAgentReadinessInfo>;
 }
 
 export interface DriftDetectedPayload {

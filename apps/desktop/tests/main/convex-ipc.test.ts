@@ -1,7 +1,11 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getConvexVersionInfo } from '@main/ipc/convex';
+import {
+  type ExecFileLike,
+  getConvexAgentReadinessInfo,
+  getConvexVersionInfo,
+} from '@main/ipc/convex';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -49,5 +53,74 @@ describe('Convex version IPC helpers', () => {
       targetVersion: '1.37.0',
       status: 'mismatch',
     });
+  });
+
+  it('detects enabled Convex AI files and Contexture MCP from CLI output', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
+    const appDir = join(dir, 'apps/todo');
+    await mkdir(appDir, { recursive: true });
+    await writeFile(
+      join(appDir, 'package.json'),
+      JSON.stringify({ devDependencies: { convex: '1.40.0' } }),
+      'utf8',
+    );
+    const execFile = vi.fn<ExecFileLike>(async (file) => {
+      if (file === 'bunx') {
+        return {
+          stdout: `Convex AI files: enabled
+  ✔ convex/_generated/ai/guidelines.md: installed, up to date
+  ✔ AGENTS.md: Convex section present, up to date
+  ✔ CLAUDE.md: Convex section present, up to date
+  ✔ Agent skills: installed, up to date
+`,
+        };
+      }
+      return {
+        stdout:
+          'Name        Command                                                             Args  Env  Cwd  Status   Auth\ncontexture  /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp  -     -    -    enabled  Unsupported\n',
+      };
+    });
+
+    const result = await getConvexAgentReadinessInfo(
+      { irPath: join(appDir, 'todo.contexture.json') },
+      { execFile },
+    );
+
+    expect(result.convexAiFiles.status).toBe('ready');
+    expect(result.contextureMcp.status).toBe('ready');
+    expect(execFile).toHaveBeenCalledWith(
+      'bunx',
+      ['convex', 'ai-files', 'status'],
+      expect.objectContaining({ cwd: appDir }),
+    );
+    expect(execFile).toHaveBeenCalledWith(
+      'codex',
+      ['mcp', 'list'],
+      expect.objectContaining({ env: process.env }),
+    );
+  });
+
+  it('reports not-ready agent setup when CLI output lacks installed status', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
+    const appDir = join(dir, 'apps/todo');
+    await mkdir(appDir, { recursive: true });
+    await writeFile(join(appDir, 'package.json'), JSON.stringify({}), 'utf8');
+    const execFile = vi.fn<ExecFileLike>(async (file) => {
+      if (file === 'bunx') {
+        return { stdout: 'Convex AI files: not installed\nRun npx convex ai-files install\n' };
+      }
+      return {
+        stdout:
+          'Name Command Args Env Cwd Status Auth\nnode_repl /path - - - enabled Unsupported\n',
+      };
+    });
+
+    const result = await getConvexAgentReadinessInfo(
+      { irPath: join(appDir, 'todo.contexture.json') },
+      { execFile },
+    );
+
+    expect(result.convexAiFiles.status).toBe('not_ready');
+    expect(result.contextureMcp.status).toBe('not_ready');
   });
 });

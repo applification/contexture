@@ -286,6 +286,8 @@ describe('SchemaPanel', () => {
             targetPackagePath: '/repo/apps/plantry/package.json',
             status: 'mismatch',
             message: 'Contexture emitter and target app Convex versions differ.',
+            convexAiFiles: { status: 'ready', message: 'Detected and ready.', command: null },
+            contextureMcp: { status: 'ready', message: 'Detected and ready.', command: null },
           }}
         />,
       );

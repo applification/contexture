@@ -388,8 +388,19 @@ export default function App(): React.JSX.Element {
         isDirty,
         driftedPaths.length,
         convexVersion.status,
+        convexVersion.convexAiFiles.status,
+        convexVersion.contextureMcp.status,
       ),
-    [activeTab, convexVersion.status, driftedPaths.length, filePath, isDirty, schema],
+    [
+      activeTab,
+      convexVersion.contextureMcp.status,
+      convexVersion.convexAiFiles.status,
+      convexVersion.status,
+      driftedPaths.length,
+      filePath,
+      isDirty,
+      schema,
+    ],
   );
 
   // Emit generated sources for the SchemaPanel. Only runs while the
@@ -818,6 +829,8 @@ interface OnboardingState {
   driftClean: boolean;
   convexVersionChecked: boolean;
   convexVersionReady: boolean;
+  convexAiFilesReady: boolean;
+  contextureMcpReady: boolean;
 }
 
 function buildOnboardingState(
@@ -827,6 +840,8 @@ function buildOnboardingState(
   isDirty: boolean,
   driftedCount: number,
   convexVersionStatus: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed',
+  convexAiFilesStatus: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed',
+  contextureMcpStatus: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed',
 ): OnboardingState {
   const objects = schema.types.filter((type) => type.kind === 'object');
   return {
@@ -841,6 +856,8 @@ function buildOnboardingState(
     driftClean: filePath !== null && driftedCount === 0,
     convexVersionChecked: convexVersionStatus !== 'idle' && convexVersionStatus !== 'loading',
     convexVersionReady: convexVersionStatus === 'ok',
+    convexAiFilesReady: convexAiFilesStatus === 'ready',
+    contextureMcpReady: contextureMcpStatus === 'ready',
   };
 }
 
@@ -929,17 +946,16 @@ function OnboardingLoopPanel({
     },
     {
       label: 'Agent',
-      done: false,
-      note: 'Agent setup is not auto-detected yet, so this group stays informational even after you connect Codex or install Convex AI files.',
+      done: state.convexAiFilesReady && state.contextureMcpReady,
       detail: [
         {
           label: 'Convex AI files',
-          done: false,
+          done: state.convexAiFilesReady,
           help: 'Run bunx convex ai-files install in the target repo.',
         },
         {
           label: 'Contexture MCP',
-          done: false,
+          done: state.contextureMcpReady,
           help: 'Connect Contexture MCP to your agent client, then start a fresh agent session.',
         },
       ],

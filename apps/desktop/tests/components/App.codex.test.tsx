@@ -60,6 +60,27 @@ beforeEach(() => {
       onTurnCommit: () => unsub,
       onTurnRollback: () => unsub,
     },
+    convex: {
+      versionInfo: vi.fn(async () => ({
+        emitterVersion: '1.40.0',
+        targetVersion: '1.40.0',
+        targetPackagePath: '/Users/rufus/Apps/todo/package.json',
+        status: 'ok',
+        message: 'Contexture emitter and target app Convex versions match.',
+      })),
+      agentReadiness: vi.fn(async () => ({
+        convexAiFiles: {
+          status: 'ready',
+          message: 'Convex AI files: enabled',
+          command: 'bunx convex ai-files status',
+        },
+        contextureMcp: {
+          status: 'ready',
+          message: 'contexture enabled',
+          command: 'codex mcp list',
+        },
+      })),
+    },
   };
 });
 
@@ -96,11 +117,15 @@ describe('App Codex-first copy', () => {
       name: 'by_plot',
       fields: ['plot'],
     });
+    useDocumentStore.getState().setFilePath('/Users/rufus/Apps/todo/todo.contexture.json');
     expect(useUIChromeStore.getState().sidebarTab).toBe('schema');
     expect(screen.getByTestId('onboarding-loop')).toHaveTextContent('Project readiness');
     expect(screen.getByLabelText(/Model: Table: ready/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Generated: Files visible: ready/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Saved: needs action/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Agent: Convex AI files: ready/)).toHaveTextContent('2/2');
+    });
   });
 
   it('explains readiness checks from the grouped status tiles', async () => {
@@ -108,17 +133,17 @@ describe('App Codex-first copy', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByTestId('start-load-sample'));
-    await user.click(screen.getByLabelText(/Agent: Convex AI files: needs action/));
+    useDocumentStore.getState().setFilePath('/Users/rufus/Apps/todo/todo.contexture.json');
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Agent: Convex AI files: ready/)).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(/Agent: Convex AI files: ready/));
 
     expect(screen.getByText('Agent readiness')).toBeInTheDocument();
     expect(
       screen.getByText('Run bunx convex ai-files install in the target repo.'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Agent setup is not auto-detected yet, so this group stays informational even after you connect Codex or install Convex AI files.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(2);
   });
 
   it('opens the file picker from the start screen', async () => {

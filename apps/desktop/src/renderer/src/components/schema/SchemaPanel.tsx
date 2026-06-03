@@ -131,6 +131,16 @@ export interface SchemaPanelProps {
     targetPackagePath: string | null;
     status: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
     message: string | null;
+    convexAiFiles: {
+      status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+      message: string | null;
+      command: string | null;
+    };
+    contextureMcp: {
+      status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+      message: string | null;
+      command: string | null;
+    };
   };
 }
 
@@ -930,6 +940,8 @@ function AgentSetupPopover({
 }): React.JSX.Element {
   const [activeClient, setActiveClient] = useState<AgentClient>('codex');
   const convexPackageStatus = setupConvexPackageStatus(convexVersion);
+  const convexAiFilesStatus = setupAgentReadinessStatus(convexVersion?.convexAiFiles);
+  const contextureMcpStatus = setupAgentReadinessStatus(convexVersion?.contextureMcp);
   const savedPrompt =
     documentFilePath === null
       ? null
@@ -986,15 +998,15 @@ function AgentSetupPopover({
           />
           <SetupReadinessRow
             label="Convex AI files"
-            status="needs_action"
-            description="Install or refresh the Convex-managed AI files for this project."
+            status={convexAiFilesStatus.status}
+            description={convexAiFilesStatus.description}
             actionLabel="Copy install"
             onAction={() => onCopy('convex-ai-files', CONVEX_AI_FILES_INSTALL_COMMAND)}
           />
           <SetupReadinessRow
             label="Contexture MCP"
-            status="needs_action"
-            description="Connect Contexture MCP in the agent client you use for this repo."
+            status={contextureMcpStatus.status}
+            description={contextureMcpStatus.description}
             actionLabel="Choose client"
           />
         </div>
@@ -1176,6 +1188,33 @@ function setupConvexPackageStatus(convexVersion: SchemaPanelProps['convexVersion
   return {
     status: 'unknown',
     description: convexVersion.message ?? 'Convex package status could not be checked.',
+  };
+}
+
+function setupAgentReadinessStatus(
+  check:
+    | {
+        status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+        message: string | null;
+        command: string | null;
+      }
+    | undefined,
+): { status: SetupReadinessStatus; description: string } {
+  if (!check || check.status === 'idle' || check.status === 'loading') {
+    return { status: 'unknown', description: 'Checking setup status.' };
+  }
+  if (check.status === 'ready') {
+    return { status: 'ready', description: 'Detected and ready.' };
+  }
+  if (check.status === 'not_ready') {
+    return {
+      status: 'needs_action',
+      description: check.message || 'Setup is not ready yet.',
+    };
+  }
+  return {
+    status: 'unknown',
+    description: check.message || 'Setup status could not be checked.',
   };
 }
 

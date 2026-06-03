@@ -162,6 +162,19 @@ const convex = {
       status: 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
       message: string;
     }>,
+  agentReadiness: (payload: { irPath: string }) =>
+    ipcRenderer.invoke('convex:agent-readiness', payload) as Promise<{
+      convexAiFiles: {
+        status: 'ready' | 'not_ready' | 'probe_failed';
+        message: string;
+        command: string;
+      };
+      contextureMcp: {
+        status: 'ready' | 'not_ready' | 'probe_failed';
+        message: string;
+        command: string;
+      };
+    }>,
 };
 
 const modelSync = {
