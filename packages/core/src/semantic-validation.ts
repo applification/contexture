@@ -70,7 +70,12 @@ export type SemanticIssueCode =
   | 'derivation_missing_source'
   | 'derivation_unknown_source'
   | 'derivation_missing_refresh'
-  | 'derivation_owner_not_writable';
+  | 'derivation_owner_not_writable'
+  | 'operational_timezone_missing'
+  | 'operational_inbound_idempotency_missing'
+  | 'operational_enum_evolution'
+  | 'operational_conflict_token_missing'
+  | 'operational_notification_model_missing';
 
 export type SemanticIssueSeverity = 'error' | 'warning';
 
@@ -97,6 +102,7 @@ export function checkSemantic(schema: Schema, catalog?: StdlibCatalog): Semantic
     ...checkDerivations(schema),
     ...checkDiscriminatedUnions(schema),
     ...checkEnums(schema),
+    ...checkOperationalAdvice(schema),
   ]);
 }
 
@@ -1034,6 +1040,224 @@ function checkEnums(schema: Schema): SemanticIssueDraft[] {
     });
   });
   return issues;
+}
+
+function checkOperationalAdvice(schema: Schema): SemanticIssueDraft[] {
+  return [
+    ...checkTimezoneAdvice(schema),
+    ...checkInboundIdempotencyAdvice(schema),
+    ...checkEnumEvolutionAdvice(schema),
+    ...checkConflictTokenAdvice(schema),
+    ...checkNotificationAdvice(schema),
+  ];
+}
+
+function checkTimezoneAdvice(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const objects = schema.types.filter((type): type is ObjectType => type.kind === 'object');
+  const likelyHousehold = objects.find((type) => type.name === 'Household');
+  if (!likelyHousehold || hasTimezoneField(likelyHousehold)) return issues;
+
+  const temporalField = objects
+    .flatMap((type, typeIndex) =>
+      type.fields.map((field, fieldIndex) => ({ type, typeIndex, field, fieldIndex })),
+    )
+    .find(({ type, field }) => {
+      if (type.name === likelyHousehold.name && field.name === 'timeZoneId') return false;
+      return isHouseholdScoped(type) && isHouseholdLocalTemporalField(field);
+    });
+
+  if (!temporalField) return issues;
+  issues.push({
+    code: 'operational_timezone_missing',
+    severity: 'warning',
+    path: `types.${schema.types.indexOf(likelyHousehold)}.fields`,
+    message: `Household-scoped field "${temporalField.type.name}.${temporalField.field.name}" has local calendar or scheduling semantics, but Household has no timezone field.`,
+    hint: 'Add Household.timeZoneId as a ref to place.TimeZoneId so server jobs, week boundaries, expiry checks, and travelling clients use the same household-local clock.',
+  });
+  return issues;
+}
+
+function checkInboundIdempotencyAdvice(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const objects = schema.types.filter((type): type is ObjectType => type.kind === 'object');
+  const channelIdentityIndex = objects.findIndex((type) => type.name === 'ChannelIdentity');
+  if (channelIdentityIndex === -1) return issues;
+  if (objects.some(isInboundDeliveryStateType)) return issues;
+
+  issues.push({
+    code: 'operational_inbound_idempotency_missing',
+    severity: 'warning',
+    path: `types.${schema.types.indexOf(objects[channelIdentityIndex] as TypeDef)}`,
+    message:
+      'ChannelIdentity models conversational identity, but no inbound delivery or message state is modeled.',
+    hint: 'Ensure the app runtime owns webhook idempotency and pending conversation state, or add a table such as InboundMessage/WebhookEvent with provider message ids and processing status.',
+  });
+  return issues;
+}
+
+function checkEnumEvolutionAdvice(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  const enumNames = new Set(
+    schema.types.filter((type) => type.kind === 'enum').map((type) => type.name),
+  );
+  if (enumNames.size === 0) return issues;
+
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object') return;
+    type.fields.forEach((field, fieldIndex) => {
+      const enumName = unwrapRefTarget(field.type);
+      if (!enumName || !enumNames.has(enumName)) return;
+      if (!isLikelyClientSurfaceEnum(enumName, field, type, schema)) return;
+      issues.push({
+        code: 'operational_enum_evolution',
+        severity: 'warning',
+        path: `types.${typeIndex}.fields.${fieldIndex}.type`,
+        message: `${type.name}.${field.name} uses closed enum "${enumName}" in a likely client-facing surface.`,
+        hint: 'Keep the enum closed for internal safety, but make web/mobile/API clients render unknown values gracefully or map them at the compatibility boundary.',
+      });
+    });
+  });
+
+  return dedupeIssues(issues);
+}
+
+function checkConflictTokenAdvice(schema: Schema): SemanticIssueDraft[] {
+  const issues: SemanticIssueDraft[] = [];
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'object' || type.table !== true) return;
+    if (!hasUpdatedAtField(type) || hasConflictTokenField(type)) return;
+    const arrayFieldIndex = type.fields.findIndex(isCollaborativeArrayField);
+    if (arrayFieldIndex === -1) return;
+    const arrayField = type.fields[arrayFieldIndex];
+    if (!arrayField) return;
+    issues.push({
+      code: 'operational_conflict_token_missing',
+      severity: 'warning',
+      path: `types.${typeIndex}.fields.${arrayFieldIndex}`,
+      message: `${type.name}.${arrayField.name} is a shared-looking array on a table with updatedAt but no conflict token.`,
+      hint: 'For offline or optimistic edits, add a version/revision/etag field or move independently edited array items into scoped child rows.',
+    });
+  });
+  return issues;
+}
+
+function checkNotificationAdvice(schema: Schema): SemanticIssueDraft[] {
+  if (!mentionsNotificationCapability(schema)) return [];
+  const objects = schema.types.filter((type): type is ObjectType => type.kind === 'object');
+  if (objects.some(isNotificationStateType) && objects.some(isNotificationEndpointType)) return [];
+
+  return [
+    {
+      code: 'operational_notification_model_missing',
+      severity: 'warning',
+      path: 'types',
+      message:
+        'The model notes mention outbound reminders, notifications, or push, but notification state is incomplete.',
+      hint: 'If outbound notifications are in scope, model delivery endpoints and preferences, such as UserDevice, NotificationPreference, ScheduledNotification, or NotificationDelivery.',
+    },
+  ];
+}
+
+function hasTimezoneField(type: ObjectType): boolean {
+  return type.fields.some((field) => {
+    if (/^(timeZoneId|timezone|timeZone)$/u.test(field.name)) return true;
+    return field.type.kind === 'ref' && field.type.typeName === 'place.TimeZoneId';
+  });
+}
+
+function isHouseholdScoped(type: ObjectType): boolean {
+  if (type.name === 'Household') return true;
+  return type.fields.some((field) => field.name === 'householdId');
+}
+
+function isHouseholdLocalTemporalField(field: ObjectType['fields'][number]): boolean {
+  const haystack = `${field.name} ${field.description ?? ''}`.toLowerCase();
+  if (field.name === 'createdAt' || field.name === 'updatedAt') return false;
+  return (
+    /(expires|expiry|expired|suppresseduntil|scheduled|reminder|notify|planned|weekstart|weekboundary|today|localdate)/u.test(
+      haystack,
+    ) ||
+    (field.type.kind === 'date' && /(expires|planned|scheduled|week|reminder)/u.test(haystack))
+  );
+}
+
+function isInboundDeliveryStateType(type: ObjectType): boolean {
+  return /(InboundMessage|WebhookEvent|WebhookDelivery|MessageDelivery|ConversationSession|PendingIntent|PendingConfirmation)/u.test(
+    type.name,
+  );
+}
+
+function isLikelyClientSurfaceEnum(
+  enumName: string,
+  field: ObjectType['fields'][number],
+  owner: ObjectType,
+  schema: Schema,
+): boolean {
+  const surfaceText = `${schema.metadata?.description ?? ''} ${owner.description ?? ''} ${
+    field.description ?? ''
+  }`.toLowerCase();
+  const names = `${owner.name} ${field.name} ${enumName}`;
+  const clientSurface = /\b(client|mobile|web|api|surface)\b/u.test(surfaceText);
+  if (
+    clientSurface &&
+    /^(.*Status|Equipment|CookingMethod|Allergen|DietaryProfile)$/u.test(enumName)
+  ) {
+    return true;
+  }
+  return /^(Equipment|CookingMethod|Allergen|DietaryProfile)$/u.test(names);
+}
+
+function hasUpdatedAtField(type: ObjectType): boolean {
+  return type.fields.some((field) => field.name === 'updatedAt');
+}
+
+function hasConflictTokenField(type: ObjectType): boolean {
+  return type.fields.some((field) =>
+    /^(version|revision|etag|rowVersion|lockVersion)$/u.test(field.name),
+  );
+}
+
+function isCollaborativeArrayField(field: ObjectType['fields'][number]): boolean {
+  if (field.type.kind !== 'array') return false;
+  return /^(items|listItems|meals|tasks|todos|entries|shoppingItems|planMeals)$/u.test(field.name);
+}
+
+function mentionsNotificationCapability(schema: Schema): boolean {
+  const text = [
+    schema.metadata?.name,
+    schema.metadata?.description,
+    ...schema.types.map((type) => type.description),
+    ...schema.types.flatMap((type) =>
+      type.kind === 'object' ? type.fields.map((field) => field.description) : [],
+    ),
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join(' ')
+    .toLowerCase();
+  return /\b(push|notification|notifications|notify|reminder|reminders|expiry warning|expiry warnings)\b/u.test(
+    text,
+  );
+}
+
+function isNotificationStateType(type: ObjectType): boolean {
+  return /(ScheduledNotification|NotificationDelivery|NotificationJob|Reminder)/u.test(type.name);
+}
+
+function isNotificationEndpointType(type: ObjectType): boolean {
+  return /(UserDevice|DeviceToken|PushSubscription|NotificationPreference|OutboundChannel)/u.test(
+    type.name,
+  );
+}
+
+function dedupeIssues(issues: SemanticIssueDraft[]): SemanticIssueDraft[] {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = `${issue.code}:${issue.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function stdlibNamespaceFromPath(path: ImportDecl['path']): string | null {

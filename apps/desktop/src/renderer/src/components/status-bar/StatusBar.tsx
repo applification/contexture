@@ -12,13 +12,15 @@ import { getAnalyticsOptOut, setAnalyticsOptOut } from '@renderer/lib/analytics'
 import { estimateTokenCount } from '@renderer/services/tokens';
 import { type ValidationError, validate } from '@renderer/services/validation';
 import { parseTypePath, repairForValidationError } from '@renderer/services/validation-repairs';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useConvexVersionStore } from '@renderer/store/convex-version';
 import { useDocumentStore } from '@renderer/store/document';
 import { sourceLabel, useModelSyncStore } from '@renderer/store/model-sync';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
 import { STDLIB_REGISTRY } from '@shared/stdlib-registry';
-import { BarChart3, Circle, CircleAlert } from 'lucide-react';
+import { BarChart3, Circle, CircleAlert, Lightbulb, MessageSquare } from 'lucide-react';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -71,8 +73,17 @@ export function StatusBar(): React.JSX.Element {
     }
   }, [schema, filePath, typeCount]);
 
-  const errors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
-  const errorCount = errors.length;
+  const validationIssues = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
+  const validationErrors = useMemo(
+    () => validationIssues.filter((issue) => issue.severity === 'error'),
+    [validationIssues],
+  );
+  const validationWarnings = useMemo(
+    () => validationIssues.filter((issue) => issue.severity === 'warning'),
+    [validationIssues],
+  );
+  const errorCount = validationErrors.length;
+  const warningCount = validationWarnings.length;
 
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [analyticsOff, setAnalyticsOff] = useState(() => getAnalyticsOptOut());
@@ -119,8 +130,22 @@ export function StatusBar(): React.JSX.Element {
     setPopoverOpen(false);
   }
 
+  function handleFixInChat(error: ValidationError): void {
+    useChatComposerStore.getState().setPendingChatMessage({
+      message: validationChatPrompt(error),
+      context: ['## Current IR', '```json', JSON.stringify(schema, null, 2), '```'].join('\n'),
+    });
+    useUIChromeStore.getState().setSidebarTab('chat');
+    useUIChromeStore.getState().setSidebarVisible(true);
+    setPopoverOpen(false);
+  }
+
   const tokenDisplay = tokenCount > 0 ? `~${tokenCount.toLocaleString()} tokens` : '0 tokens';
-  const hasIssues = errorCount > 0;
+  const hasIssues = validationIssues.length > 0;
+  const statusLabel =
+    errorCount > 0
+      ? `${errorCount} ${errorCount === 1 ? 'error' : 'errors'}`
+      : `${warningCount} ${warningCount === 1 ? 'advisory' : 'advisories'}`;
 
   return (
     <div
@@ -219,46 +244,74 @@ export function StatusBar(): React.JSX.Element {
                 type="button"
                 className={cn(
                   'flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted transition-colors',
-                  'text-destructive',
+                  errorCount > 0 ? 'text-destructive' : 'text-warning',
                 )}
+                aria-label={statusLabel}
               >
-                <CircleAlert className="size-3" />
-                <span>
-                  {errorCount} {errorCount === 1 ? 'error' : 'errors'}
-                </span>
+                {errorCount > 0 ? (
+                  <CircleAlert className="size-3" />
+                ) : (
+                  <Lightbulb className="size-3" />
+                )}
+                <span>{statusLabel}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-96 p-0" align="end">
-              <div className="max-h-64 overflow-y-auto">
-                {errors.map((err) => {
+              <div className="max-h-96 overflow-y-auto">
+                {validationIssues.map((err) => {
                   const repair = repairForValidationError(schema, err);
+                  const Icon = err.severity === 'error' ? CircleAlert : Lightbulb;
                   return (
                     <div
                       key={`${err.code}:${err.path}`}
-                      className="flex gap-2 border-b border-border px-3 py-2 text-xs last:border-b-0 hover:bg-muted"
+                      className="space-y-2 border-b border-border px-3 py-2 text-xs last:border-b-0 hover:bg-muted"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleErrorClick(err)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <div className="flex items-start gap-2">
-                          <CircleAlert className="size-3 shrink-0 mt-0.5 text-destructive" />
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{err.message}</div>
-                            <div className="text-muted-foreground/70 truncate">{err.path}</div>
-                          </div>
-                        </div>
-                      </button>
-                      {repair && (
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => handleRepair(err)}
-                          className="self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                          onClick={() => handleErrorClick(err)}
+                          className="min-w-0 flex-1 text-left"
                         >
-                          {repair.label}
+                          <div className="flex items-start gap-2">
+                            <Icon
+                              className={cn(
+                                'size-3 shrink-0 mt-0.5',
+                                err.severity === 'error' ? 'text-destructive' : 'text-warning',
+                              )}
+                            />
+                            <div className="min-w-0">
+                              <div className="mb-0.5 font-mono text-[10px] text-muted-foreground/80">
+                                {err.code}
+                              </div>
+                              <div className="font-medium whitespace-normal break-words">
+                                {err.message}
+                              </div>
+                              <div className="text-muted-foreground/70 whitespace-normal break-all">
+                                {err.path}
+                              </div>
+                            </div>
+                          </div>
                         </button>
-                      )}
+                        {repair && (
+                          <button
+                            type="button"
+                            onClick={() => handleRepair(err)}
+                            className="self-start rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                          >
+                            {repair.label}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleFixInChat(err)}
+                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-background"
+                        >
+                          <MessageSquare aria-hidden="true" className="size-3" />
+                          Discuss in chat
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -288,6 +341,22 @@ export function StatusBar(): React.JSX.Element {
       </TooltipProvider>
     </div>
   );
+}
+
+function validationChatPrompt(error: ValidationError): string {
+  return [
+    'Help me resolve this Contexture validation issue.',
+    '',
+    `Code: ${error.code}`,
+    `Severity: ${error.severity}`,
+    `Path: ${error.path}`,
+    `Message: ${error.message}`,
+    error.hint ? `Hint: ${error.hint}` : null,
+    '',
+    'Please review the current IR and suggest the smallest safe model change. If the fix should be app-runtime owned instead of modeled, explain the runtime contract to document.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 function convexVersionStatusLabel(version: {

@@ -40,12 +40,18 @@ export function ValidationIssues({
                   className="h-auto min-h-8 min-w-0 flex-1 justify-start px-1.5 py-1 text-left text-xs hover:bg-destructive/10"
                 >
                   <span className="whitespace-normal">
+                    <span className="block font-mono text-[10px] text-muted-foreground/80">
+                      {error.code}
+                    </span>
                     <span>{error.message}</span>
                     <span className="ml-1 text-muted-foreground/70">{error.path}</span>
                   </span>
                 </Button>
               ) : (
                 <span className="min-w-0 flex-1">
+                  <span className="block font-mono text-[10px] text-muted-foreground/80">
+                    {error.code}
+                  </span>
                   <span>{error.message}</span>
                   <span className="ml-1 text-muted-foreground/70">{error.path}</span>
                 </span>

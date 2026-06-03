@@ -254,6 +254,7 @@ describe('DetailPanel', () => {
     render(<DetailPanel selection={{ typeName: 'Role' }} />);
 
     const issues = screen.getByRole('region', { name: 'Validation issues' });
+    expect(within(issues).getByText('enum_empty')).toBeInTheDocument();
     expect(within(issues).getByText(/must have at least one value/i)).toBeInTheDocument();
     expect(within(issues).getByText('types.0.values')).toBeInTheDocument();
   });
@@ -303,6 +304,7 @@ describe('DetailPanel', () => {
     render(<DetailPanel selection={{ typeName: 'Post', fieldName: 'author' }} />);
 
     const issues = screen.getByRole('region', { name: 'Validation issues' });
+    expect(within(issues).getByText('unresolved_ref')).toBeInTheDocument();
     expect(within(issues).getByText(/Unresolved ref "Author"/i)).toBeInTheDocument();
     expect(within(issues).getByText('types.0.fields.0.type')).toBeInTheDocument();
   });
