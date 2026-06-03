@@ -6,6 +6,8 @@
  * dependencies while still giving React Hook Form, TanStack Form, and custom
  * form code a stable `validate(value)` contract.
  */
+
+import { fieldIsRuntimeDerived } from './derivation';
 import type { Schema, TypeDef } from './ir';
 
 function header(sourcePath?: string): string {
@@ -30,7 +32,7 @@ export function emitFormValidators(
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((type) => {
       const omitted = type.fields
-        .filter((field) => field.serverDerived === true)
+        .filter(fieldIsRuntimeDerived)
         .map((field) => `${field.name}: true`)
         .join(', ');
       return `export const ${type.name}CreateValidator = createFormValidator(${type.name}.omit({ ${omitted} }));\n`;
@@ -88,5 +90,5 @@ ${validators}${createValidators}`;
 type ObjectType = Extract<TypeDef, { kind: 'object' }>;
 
 function hasServerDerivedFields(type: TypeDef): type is ObjectType {
-  return type.kind === 'object' && type.fields.some((field) => field.serverDerived === true);
+  return type.kind === 'object' && type.fields.some(fieldIsRuntimeDerived);
 }

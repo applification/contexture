@@ -117,6 +117,21 @@ const FieldDefSchema = z.object({
   optional: z.boolean().optional(),
   nullable: z.boolean().optional(),
   default: z.unknown().optional(),
+  serverDerived: z.boolean().optional(),
+  derivation: z
+    .object({
+      kind: z.enum(['computed', 'cachedHandle', 'snapshot', 'rollup', 'estimate']),
+      sources: z.array(z.string().min(1)).optional(),
+      refresh: z.enum(['onWrite', 'asyncJob', 'onRead', 'manual', 'frozen', 'external']).optional(),
+      driftPolicy: z.enum(['mustMatch', 'eventual', 'allowed', 'warnWhenStale']).optional(),
+      owner: z.enum(['backend', 'client', 'external']).optional(),
+      staleField: z.string().min(1).optional(),
+      confidenceField: z.string().min(1).optional(),
+    })
+    .describe(
+      'Derivation/provenance policy for stored computed, cached, snapshot, rollup, or estimated fields. Use sources for source field paths, refresh for recompute cadence, driftPolicy for acceptable staleness, and owner for write ownership.',
+    )
+    .optional(),
   sampleData: z
     .object({
       category: z.string().min(1).optional(),
@@ -305,6 +320,8 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
           optional: z.boolean().optional(),
           nullable: z.boolean().optional(),
           default: z.unknown().optional(),
+          serverDerived: z.boolean().optional(),
+          derivation: FieldDefSchema.shape.derivation,
         }),
       },
       ({ typeName, fieldName, patch }) => ({ kind: 'update_field', typeName, fieldName, patch }),

@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./agent-turn-ledger": "./src/agent-turn-ledger.ts",
     "./change-log": "./src/change-log.ts",
+    "./derivation": "./src/derivation.ts",
     "./emit-ai-tool-schemas": "./src/emit-ai-tool-schemas.ts",
     "./emit-convex": "./src/emit-convex.ts",
     "./emit-form-validators": "./src/emit-form-validators.ts",

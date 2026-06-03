@@ -13,6 +13,7 @@
  * `blur` (not `change`) to avoid a history entry per keystroke.
  */
 
+import { derivationKindLabel } from '@contexture/core/derivation';
 import { listFixtureModules } from '@contexture/core/fixture-generators';
 import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
@@ -637,7 +638,10 @@ function ObjectBody({
                   />
                 </TableCell>
                 <TableCell className="px-2 py-1.5 text-right">
-                  <FieldKindPill fieldType={f.type} />
+                  <div className="inline-flex items-center justify-end gap-1">
+                    {f.derivation && <FieldDerivationPill field={f} />}
+                    <FieldKindPill fieldType={f.type} />
+                  </div>
                 </TableCell>
                 {showAdviceColumn && (
                   <TableCell className="w-14 px-1 py-1.5 text-center">
@@ -1427,6 +1431,7 @@ function suggestionReason(suggestion: SuggestedIndex): string {
 
 function isIndexSuggestionField(field: FieldDef): boolean {
   if (hasRef(field.type)) return true;
+  if (field.derivation?.kind === 'cachedHandle') return true;
   if (/(^|_)(kind|state|status|slug|key)$|name$|searchtext$|date$|at$|year$/iu.test(field.name)) {
     return true;
   }
@@ -1873,6 +1878,36 @@ function FieldKindPill({ fieldType }: { fieldType: FieldType }): React.JSX.Eleme
       {summariseKind(fieldType.kind)}
     </span>
   );
+}
+
+function FieldDerivationPill({ field }: { field: FieldDef }): React.JSX.Element | null {
+  if (!field.derivation) return null;
+  const color =
+    field.derivation.kind !== 'snapshot' &&
+    (field.derivation.sources?.length ?? 0) > 0 &&
+    !field.derivation.refresh &&
+    !field.derivation.driftPolicy
+      ? 'var(--warning)'
+      : 'var(--inspector-advisory)';
+  return (
+    <span
+      className="inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium leading-none"
+      title={derivationPillTitle(field)}
+      style={toneSurfaceStyle(color, 13, 46)}
+    >
+      {derivationKindLabel(field.derivation.kind)}
+    </span>
+  );
+}
+
+function derivationPillTitle(field: FieldDef): string {
+  const derivation = field.derivation;
+  if (!derivation) return '';
+  if (derivation.kind === 'snapshot') return 'Copied at write time and intentionally frozen.';
+  if ((derivation.sources?.length ?? 0) > 0 && !derivation.refresh && !derivation.driftPolicy) {
+    return 'Drift risk: source data can change without a refresh or drift policy.';
+  }
+  return 'Derivation policy declared.';
 }
 
 function inspectorTypeColor(type: TypeDef): string {

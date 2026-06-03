@@ -55,4 +55,36 @@ describe('emitFormValidators', () => {
       'export const ArtworkCreateValidator = createFormValidator(Artwork.omit({ sourceSearchText: true }));',
     );
   });
+
+  it('emits create validators that omit backend-owned derivation fields', () => {
+    const source = emitFormValidators(
+      {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Recipe',
+            fields: [
+              { name: 'title', type: { kind: 'string' } },
+              {
+                name: 'nutrition',
+                type: { kind: 'string' },
+                derivation: {
+                  kind: 'computed',
+                  owner: 'backend',
+                  sources: ['ingredients[].grams'],
+                  refresh: 'onWrite',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      'recipe',
+    );
+
+    expect(source).toContain(
+      'export const RecipeCreateValidator = createFormValidator(Recipe.omit({ nutrition: true }));',
+    );
+  });
 });

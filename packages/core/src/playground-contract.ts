@@ -1,3 +1,4 @@
+import { fieldIsRuntimeDerived } from './derivation';
 import type { FieldDef, FieldType, SampleDataHint, Schema, TypeDef } from './ir';
 
 export type PlaygroundControlKind =
@@ -207,10 +208,10 @@ function buildControl(
     fieldName: field.name,
     label: labelFor(field.name),
     description: field.description,
-    required: field.optional !== true && field.serverDerived !== true,
+    required: field.optional !== true && !fieldIsRuntimeDerived(field),
     nullable: field.nullable === true,
     defaultValue: field.default,
-    serverDerived: field.serverDerived === true,
+    serverDerived: fieldIsRuntimeDerived(field),
     sampleData: field.sampleData,
   };
   return { ...base, ...buildControlShape(field.type, typeByName, stack) } as PlaygroundControl;

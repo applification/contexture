@@ -572,6 +572,74 @@ describe('checkSemantic — imports', () => {
   });
 });
 
+describe('checkSemantic — derivations', () => {
+  it('warns when stored derived fields have sources but no freshness policy', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          fields: [
+            { name: 'ingredients', type: { kind: 'array', element: { kind: 'string' } } },
+            {
+              name: 'nutrition',
+              type: { kind: 'string' },
+              derivation: {
+                kind: 'computed',
+                sources: ['ingredients'],
+                owner: 'backend',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).toContain(
+      'derivation_missing_refresh',
+    );
+  });
+
+  it('warns when derivation sources do not resolve to known field paths', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          fields: [{ name: 'allergens', type: { kind: 'array', element: { kind: 'string' } } }],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          fields: [
+            {
+              name: 'containsAllergens',
+              type: { kind: 'boolean' },
+              derivation: {
+                kind: 'rollup',
+                sources: ['Ingredient.unknownAllergens'],
+                refresh: 'asyncJob',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'derivation_unknown_source',
+          severity: 'warning',
+          message: expect.stringContaining('Ingredient.unknownAllergens'),
+        }),
+      ]),
+    );
+  });
+});
+
 describe('checkSemantic — duplicates', () => {
   it('rejects duplicate type names', () => {
     const schema: Schema = {

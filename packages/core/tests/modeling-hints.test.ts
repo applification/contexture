@@ -84,6 +84,75 @@ describe('analyzeModelingHints', () => {
     );
   });
 
+  it('surfaces incomplete derivation policy on stored computed fields', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'ingredients', type: { kind: 'array', element: { kind: 'string' } } },
+            {
+              name: 'nutrition',
+              type: { kind: 'string' },
+              derivation: { kind: 'computed', sources: ['ingredients'], owner: 'backend' },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'derivation_policy',
+          fieldName: 'nutrition',
+          title: 'Drift policy missing',
+          message: expect.stringContaining('without a refresh or drift policy'),
+        }),
+      ]),
+    );
+  });
+
+  it('treats declared snapshots as intentional context rather than drift warnings', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [
+            {
+              name: 'recipeTitle',
+              type: { kind: 'string' },
+              derivation: { kind: 'snapshot', sources: ['Recipe.title'], refresh: 'frozen' },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'title', type: { kind: 'string' } }],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'derivation_policy',
+          fieldName: 'recipeTitle',
+          title: 'Snapshot field',
+          message: expect.stringContaining('frozen snapshot'),
+        }),
+      ]),
+    );
+  });
+
   it('identifies embedded collections and explains when the shape can remain embedded', () => {
     const hints = analyzeModelingHints(misprintSlice);
 
