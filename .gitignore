@@ -47,6 +47,3 @@ apps/desktop/build/bin/
 
 # Sensitive docs migrated to Paperclip issue documents (ONT-49)
 Marketing/
-
-# Scatch files for testing
-Scratch
