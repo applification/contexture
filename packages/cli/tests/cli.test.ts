@@ -101,6 +101,58 @@ describe('@contexture/cli', () => {
       kind: 'enum',
       values: ['draft', 'live'],
     });
+    expect(parsed.modelingHints).toEqual(expect.any(Array));
+  });
+
+  it('includes modeling advisories in inspect output for agents', async () => {
+    const { dir, irPath } = await fixtureProject();
+    await writeFile(
+      irPath,
+      `${JSON.stringify({
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'ShoppingList',
+            table: true,
+            fields: [
+              {
+                name: 'items',
+                type: { kind: 'array', element: { kind: 'ref', typeName: 'ShoppingListItem' } },
+              },
+            ],
+          },
+          {
+            kind: 'object',
+            name: 'ShoppingListItem',
+            fields: [
+              { name: 'ingredientName', type: { kind: 'string' } },
+              { name: 'checked', type: { kind: 'boolean' } },
+            ],
+          },
+        ],
+      })}\n`,
+    );
+
+    const jsonResult = await runCli(dir, ['inspect', '--json']);
+    expect(jsonResult.exitCode).toBe(0);
+    const parsed = JSON.parse(jsonResult.stdout);
+    expect(parsed.modelingHints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'embedded_collection',
+          typeName: 'ShoppingList',
+          fieldName: 'items',
+          title: 'Collaborative embedded collection',
+          signals: expect.arrayContaining(['concurrency_pressure']),
+        }),
+      ]),
+    );
+
+    const textResult = await runCli(dir, ['inspect']);
+    expect(textResult.exitCode).toBe(0);
+    expect(textResult.stdout).toContain('Modeling advisories:');
+    expect(textResult.stdout).toContain('ShoppingList.items: Collaborative embedded collection');
   });
 
   it('inspects schema as human-readable text', async () => {

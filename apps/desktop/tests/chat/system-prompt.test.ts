@@ -90,6 +90,15 @@ describe('buildSystemPromptAppend', () => {
     expect(prompt).toContain('{ kind: "ref", typeName: "namespace.Type" }');
   });
 
+  it('instructs agents to split collaborative embedded collections into child tables', () => {
+    const prompt = buildSystemPromptAppend({ stdlibRegistry: EMPTY_STDLIB });
+    expect(prompt).toContain('## Convex collection modeling');
+    expect(prompt).toContain('used from multiple app surfaces');
+    expect(prompt).toContain('stable child ids');
+    expect(prompt).toContain('shopping list items');
+    expect(prompt).toContain('meal plan meals');
+  });
+
   it('is deterministic across stdlib-entry orderings', () => {
     const a: StdlibRegistry = {
       entries: [

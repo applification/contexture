@@ -19,13 +19,16 @@ import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import {
   ChevronDown,
   ChevronUp,
   Hash,
   Lightbulb,
+  MessageSquare,
   Play,
   Plus,
   SlidersHorizontal,
@@ -645,7 +648,11 @@ function ObjectBody({
                 </TableCell>
                 {showAdviceColumn && (
                   <TableCell className="w-14 px-1 py-1.5 text-center">
-                    <FieldAdvicePopover fieldName={f.name} hints={fieldHints} />
+                    <FieldAdvicePopover
+                      typeName={type.name}
+                      fieldName={f.name}
+                      hints={fieldHints}
+                    />
                   </TableCell>
                 )}
                 <TableCell className="w-36 px-1 py-1.5 text-right">
@@ -730,9 +737,11 @@ function ObjectBody({
 }
 
 function FieldAdvicePopover({
+  typeName,
   fieldName,
   hints,
 }: {
+  typeName: string;
   fieldName: string;
   hints: readonly ModelingHint[];
 }) {
@@ -740,6 +749,15 @@ function FieldAdvicePopover({
 
   const [primary, ...secondary] = hints;
   if (!primary) return null;
+  const toneColor = advisoryToneColor(hints);
+  const openInChat = () => {
+    useChatComposerStore.getState().setPendingChatMessage({
+      message: advisoryChatPrompt({ typeName, fieldName, primary, hints }),
+      context: '',
+    });
+    useUIChromeStore.getState().setSidebarTab('chat');
+    useUIChromeStore.getState().setSidebarVisible(true);
+  };
 
   return (
     <Popover>
@@ -749,15 +767,20 @@ function FieldAdvicePopover({
           variant="ghost"
           size="icon"
           aria-label={`Modeling advice for ${fieldName}`}
-          className="relative h-7 w-7 border border-transparent text-muted-foreground hover:text-primary data-[state=open]:text-primary"
-          style={toneSurfaceStyle('var(--inspector-advisory)', 12, 0)}
+          className="relative h-7 w-7 border shadow-[0_0_0_1px_color-mix(in_oklch,currentColor_10%,transparent)] transition-colors hover:bg-accent/70 data-[state=open]:bg-accent"
+          style={toneSurfaceStyle(toneColor, 18, 48)}
         >
-          <LightbulbIcon />
-          {secondary.length > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent px-1 text-[9px] leading-none text-accent-foreground">
-              {hints.length}
-            </span>
-          )}
+          <LightbulbIcon color={toneColor} />
+          <span
+            className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full border border-background px-1 text-[9px] font-semibold leading-none"
+            style={{
+              background: toneColor,
+              color:
+                toneColor === 'var(--warning)' ? 'var(--warning-foreground)' : 'var(--background)',
+            }}
+          >
+            {hints.length}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" side="left" className="w-80 p-3 text-xs">
@@ -770,14 +793,62 @@ function FieldAdvicePopover({
               ))}
             </div>
           )}
+          <div className="border-t border-border/70 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-full justify-start gap-1.5 text-xs"
+              onClick={openInChat}
+            >
+              <MessageSquare aria-hidden="true" className="size-3.5" />
+              Ask in chat
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
   );
 }
 
-function LightbulbIcon(): React.JSX.Element {
-  return <Lightbulb aria-hidden="true" className="size-3.5" />;
+function advisoryChatPrompt({
+  typeName,
+  fieldName,
+  primary,
+  hints,
+}: {
+  typeName: string;
+  fieldName: string;
+  primary: ModelingHint;
+  hints: readonly ModelingHint[];
+}): string {
+  const signals = [...new Set(hints.flatMap((hint) => hint.signals))].join(', ');
+  return [
+    `Help me resolve this Contexture modeling advisory for ${typeName}.${fieldName}.`,
+    '',
+    `Primary advisory: ${primary.title}`,
+    `Message: ${primary.message}`,
+    `Rationale: ${primary.rationale}`,
+    signals ? `Signals: ${signals}` : null,
+    '',
+    'Please review the current IR and guide me through the smallest safe resolution. If extracting a child table is appropriate, explain the table, refs, ownership scope, and indexes before applying changes.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+}
+
+function LightbulbIcon({ color }: { color: string }): React.JSX.Element {
+  return <Lightbulb aria-hidden="true" className="size-3.5" style={{ color }} />;
+}
+
+function advisoryToneColor(hints: readonly ModelingHint[]): string {
+  return hints.some((hint) =>
+    hint.signals.some(
+      (signal) => signal === 'concurrency_pressure' || signal === 'document_size_pressure',
+    ),
+  )
+    ? 'var(--warning)'
+    : 'var(--inspector-advisory)';
 }
 
 function FieldIndexPopover({

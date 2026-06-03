@@ -38,6 +38,7 @@ import type {
   SchemaAgentModelOptionDescriptor,
 } from '@renderer/chat/useSchemaAgentChat';
 import { useAgentTurnsStore } from '@renderer/store/agent-turns';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useDocumentStore } from '@renderer/store/document';
 import { useUndoStore } from '@renderer/store/undo';
 import { code } from '@streamdown/code';
@@ -137,6 +138,8 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
   const desynced = chat.desynced;
   const recentAgentTurn = useAgentTurnsStore((s) => s.turns[0] ?? null);
   const agentTurns = useAgentTurnsStore((s) => s.turns);
+  const pendingChatMessage = useChatComposerStore((s) => s.pendingChatMessage);
+  const setPendingChatMessage = useChatComposerStore((s) => s.setPendingChatMessage);
   const hasUsableModel = providerModels.some((option) => option.id === modelSelectValue);
   const canCompose =
     isReady && !isStreaming && hasUsableModel && !modelsLoading && !modelsUnavailable;
@@ -241,6 +244,50 @@ export function ChatPanel({ chat }: ChatPanelProps): React.JSX.Element {
     if (!desynced || !activeThreadId) return;
     markThreadDesynced(activeThreadId);
   }, [desynced, activeThreadId, markThreadDesynced]);
+
+  useEffect(() => {
+    if (!pendingChatMessage) return;
+    if (filePath === null) {
+      enterDocumentScope(null);
+    } else {
+      if (activeThreadId && messages.length === 0) {
+        deleteThread(activeThreadId, filePath);
+      }
+      createFileThread({
+        provider,
+        model,
+        effort: thinkingBudget,
+        modelOptions: currentModelOptions,
+        filePath,
+      });
+    }
+
+    hydrateHistory({ version: '1', messages: [] });
+    setInput(
+      [pendingChatMessage.message, pendingChatMessage.context]
+        .filter((part) => part.trim().length > 0)
+        .join('\n\n'),
+    );
+    prevMessagesRef.current = [];
+    prevAgentTurnsRef.current = [];
+    setShowThreadList(false);
+    setPendingChatMessage(null);
+  }, [
+    activeThreadId,
+    createFileThread,
+    currentModelOptions,
+    deleteThread,
+    enterDocumentScope,
+    filePath,
+    hydrateHistory,
+    messages.length,
+    model,
+    pendingChatMessage,
+    provider,
+    setPendingChatMessage,
+    setShowThreadList,
+    thinkingBudget,
+  ]);
 
   useEffect(() => {
     if (!isStreaming) setResponsePending(false);

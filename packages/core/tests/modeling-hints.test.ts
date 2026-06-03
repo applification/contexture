@@ -162,11 +162,107 @@ describe('analyzeModelingHints', () => {
           kind: 'embedded_collection',
           typeName: 'Artwork',
           fieldName: 'media',
-          signals: ['embedded_collection_pressure', 'relationship_pressure'],
+          signals: expect.arrayContaining([
+            'embedded_collection_pressure',
+            'relationship_pressure',
+          ]),
         }),
       ]),
     );
     expect(hints.find((hint) => hint.fieldName === 'media')?.message).toMatch(/Keep it embedded/i);
+  });
+
+  it('warns when collaborative child rows are embedded in a table document', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ShoppingList',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            {
+              name: 'items',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'ShoppingListItem' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'ShoppingListItem',
+          fields: [
+            { name: 'ingredientName', type: { kind: 'string' } },
+            { name: 'quantity', type: { kind: 'number' } },
+            { name: 'checked', type: { kind: 'boolean' } },
+          ],
+        },
+      ],
+    });
+
+    const itemsHint = hints.find(
+      (hint) => hint.kind === 'embedded_collection' && hint.fieldName === 'items',
+    );
+
+    expect(itemsHint).toEqual(
+      expect.objectContaining({
+        title: 'Collaborative embedded collection',
+        signals: ['embedded_collection_pressure', 'relationship_pressure', 'concurrency_pressure'],
+        message: expect.stringContaining('whole-array lost updates'),
+        rationale: expect.stringContaining('not independently addressable or indexable'),
+      }),
+    );
+    expect(itemsHint?.message).toContain('stable child id');
+    expect(itemsHint?.message).toContain('Convex indexes');
+  });
+
+  it('surfaces document-size pressure for embedded meal snapshots', () => {
+    const hints = analyzeModelingHints({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'MealPlan',
+          table: true,
+          fields: [
+            { name: 'weekStartDate', type: { kind: 'string' } },
+            {
+              name: 'meals',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'MealPlanMeal' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          fields: [
+            { name: 'date', type: { kind: 'string' } },
+            { name: 'slot', type: { kind: 'string' } },
+            {
+              name: 'nutritionSnapshot',
+              type: { kind: 'string' },
+              derivation: { kind: 'snapshot', sources: ['Recipe.nutrition'], refresh: 'frozen' },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'embedded_collection',
+          fieldName: 'meals',
+          signals: [
+            'embedded_collection_pressure',
+            'relationship_pressure',
+            'concurrency_pressure',
+            'document_size_pressure',
+          ],
+          message: expect.stringContaining('multiple surfaces'),
+        }),
+      ]),
+    );
   });
 
   it('emits positive owned value object guidance for embedded owned structure', () => {

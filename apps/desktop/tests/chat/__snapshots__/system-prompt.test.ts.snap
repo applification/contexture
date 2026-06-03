@@ -54,6 +54,16 @@ Skills are available and auto-load on topic match:
 - \`remove_index\` { typeName: string; name: string }
 - \`replace_schema\` { schema: Schema }   # escape hatch; full IR
 
+## Convex collection modeling
+
+For arrays of embedded child objects on a Convex table, model the tradeoff
+explicitly. Inline arrays are fine for read-mostly owned value data. Prefer a
+child table with parent and tenant refs when the collection is edited item by
+item, used from multiple app surfaces, needs stable child ids for commands,
+needs Convex indexes, or may grow with snapshots/media/generated payloads.
+Common examples include shopping list items, meal plan meals, tasks, checklist
+entries, and other collaborative lists.
+
 ## Stdlib-first modeling
 
 Before creating or leaving a primitive field for a common value format, check

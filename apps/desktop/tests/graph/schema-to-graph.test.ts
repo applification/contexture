@@ -184,6 +184,54 @@ describe('buildGraph', () => {
     ]);
   });
 
+  it('passes field modeling hint summaries into node data', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ShoppingList',
+          table: true,
+          fields: [
+            {
+              name: 'items',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'ShoppingListItem' } },
+            },
+          ],
+        },
+        { kind: 'object', name: 'ShoppingListItem', fields: [] },
+      ],
+    };
+
+    const { nodes } = buildGraph({
+      schema,
+      modelingHints: [
+        {
+          id: 'v1:embedded_collection:ShoppingList:items:ShoppingListItem',
+          kind: 'embedded_collection',
+          signals: [
+            'embedded_collection_pressure',
+            'relationship_pressure',
+            'concurrency_pressure',
+          ],
+          path: 'types.0.fields.0',
+          typeName: 'ShoppingList',
+          fieldName: 'items',
+          title: 'Collaborative embedded collection',
+          message: 'Row identity avoids whole-array lost updates.',
+          rationale: 'Collaborative item edits are safer as scoped child table rows.',
+          fieldNames: ['items'],
+        },
+      ],
+    });
+
+    expect(nodes[0].data.fields[0]).toMatchObject({
+      name: 'items',
+      modelingHintCount: 1,
+      modelingHintTone: 'warning',
+    });
+  });
+
   it('can apply validation highlights to affected nodes and fields', () => {
     const schema: Schema = {
       version: '1',

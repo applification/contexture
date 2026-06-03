@@ -17,6 +17,8 @@ export type ModelingSignal =
   | 'query_pressure'
   | 'derivation_pressure'
   | 'embedded_collection_pressure'
+  | 'concurrency_pressure'
+  | 'document_size_pressure'
   | 'lifecycle_pressure'
   | 'relationship_pressure';
 
@@ -52,7 +54,27 @@ interface TypeUsage {
   collection: boolean;
 }
 
+interface EmbeddedCollectionPressure {
+  concurrentEditing: boolean;
+  documentSize: boolean;
+}
+
 const QUERY_HANDLE_NAME = /(^|_)(kind|state|status|slug|key)$|name$|searchtext$|date$|at$|year$/i;
+
+const COLLABORATIVE_COLLECTION_FIELD_NAMES = new Set([
+  'entries',
+  'items',
+  'listItems',
+  'meals',
+  'planMeals',
+  'tasks',
+  'todos',
+]);
+
+const MUTABLE_CHILD_FIELD_NAME = /(^|_)(checked|completed|done|status|state|cooked|purchased)$/i;
+
+const HEAVY_CHILD_FIELD_NAME =
+  /(^|_)(audio|audioUrl|storageId|media|image|imageUrl|snapshot|nutrition|transcript|payload|content)$/i;
 
 const IDENTITY_FIELD_NAMES = new Set([
   'id',
@@ -274,19 +296,68 @@ function embeddedCollectionHint(
   path: string,
   elementType: ObjectType,
 ): ModelingHint {
+  const pressure = embeddedCollectionPressure(ownerType, field, elementType);
+  const signals: ModelingSignal[] = ['embedded_collection_pressure', 'relationship_pressure'];
+  if (pressure.concurrentEditing) signals.push('concurrency_pressure');
+  if (pressure.documentSize) signals.push('document_size_pressure');
+
   return {
     id: hintId('embedded_collection', ownerType.name, field.name, [elementType.name]),
     kind: 'embedded_collection',
-    signals: ['embedded_collection_pressure', 'relationship_pressure'],
+    signals,
     path,
     typeName: ownerType.name,
     fieldName: field.name,
-    title: 'Embedded collection',
-    message: `This field stores a collection of ${elementType.name} objects. Keep it embedded if the items only belong to ${ownerType.name}. Consider a table if items need independent lifecycle, reuse, or querying.`,
-    rationale:
-      'Arrays are a good fit for owned child data, but shared or independently queried items often want table identity.',
+    title: pressure.concurrentEditing ? 'Collaborative embedded collection' : 'Embedded collection',
+    message: embeddedCollectionMessage(ownerType, field, elementType, pressure),
+    rationale: embeddedCollectionRationale(pressure),
     fieldNames: [field.name],
   };
+}
+
+function embeddedCollectionMessage(
+  ownerType: ObjectType,
+  field: FieldDef,
+  elementType: ObjectType,
+  pressure: EmbeddedCollectionPressure,
+): string {
+  if (pressure.concurrentEditing) {
+    return `This field stores mutable ${elementType.name} rows inside ${ownerType.name}. Consider a table when people may edit individual ${field.name} from multiple surfaces: row identity avoids whole-array lost updates, gives commands a stable child id, and makes Convex indexes possible.`;
+  }
+
+  if (pressure.documentSize) {
+    return `This field stores a potentially heavy collection of ${elementType.name} objects. Keep it embedded if the items are read-mostly and owned by ${ownerType.name}; consider a table if snapshots, media, or generated payloads could push document size or need targeted queries.`;
+  }
+
+  return `This field stores a collection of ${elementType.name} objects. Keep it embedded if the items only belong to ${ownerType.name}. Consider a table if items need independent lifecycle, stable ids, concurrent edits, reuse, or querying.`;
+}
+
+function embeddedCollectionRationale(pressure: EmbeddedCollectionPressure): string {
+  if (pressure.concurrentEditing) {
+    return 'Convex array elements are not independently addressable or indexable, so collaborative item edits are safer as scoped child table rows.';
+  }
+  if (pressure.documentSize) {
+    return 'Embedded arrays are convenient, but repeated snapshots, media, and generated payloads can grow the parent document and limit query handles.';
+  }
+  return 'Arrays are a good fit for owned child data, but shared or independently queried items often want table identity.';
+}
+
+function embeddedCollectionPressure(
+  ownerType: ObjectType,
+  field: FieldDef,
+  elementType: ObjectType,
+): EmbeddedCollectionPressure {
+  const concurrentEditing =
+    ownerType.table === true &&
+    (COLLABORATIVE_COLLECTION_FIELD_NAMES.has(field.name) ||
+      elementType.fields.some((childField) => MUTABLE_CHILD_FIELD_NAME.test(childField.name)));
+
+  const documentSize = elementType.fields.some((childField) => {
+    if (childField.derivation?.kind === 'snapshot') return true;
+    return HEAVY_CHILD_FIELD_NAME.test(childField.name);
+  });
+
+  return { concurrentEditing, documentSize };
 }
 
 function queryHandleHint(type: ObjectType, field: FieldDef, path: string): ModelingHint {

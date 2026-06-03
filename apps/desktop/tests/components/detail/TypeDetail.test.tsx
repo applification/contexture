@@ -7,8 +7,10 @@ import type { TypeDef } from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { FOCUS_TYPE_NAME_EVENT, TypeDetail } from '@renderer/components/detail/TypeDetail';
 import type { ValidationError } from '@renderer/services/validation';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import type { Op } from '@renderer/store/ops';
 import { useGraphSelectionStore } from '@renderer/store/selection';
+import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,6 +38,8 @@ function setup(
 describe('TypeDetail', () => {
   afterEach(() => {
     useGraphSelectionStore.getState().clear();
+    useChatComposerStore.getState().setPendingChatMessage(null);
+    useUIChromeStore.getState().setSidebarTab('properties');
     cleanup();
   });
 
@@ -315,6 +319,36 @@ describe('TypeDetail', () => {
 
       expect(screen.getByText('Query handle')).toBeInTheDocument();
       expect(screen.getByText(/useful for filtering/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ask in chat' }));
+
+      expect(useUIChromeStore.getState().sidebarTab).toBe('chat');
+      expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain('Post.title');
+      expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain('Query handle');
+    });
+
+    it('uses warning emphasis for high-pressure field modeling advice', () => {
+      setup({ ...base, table: true }, [
+        {
+          id: 'v1:embedded_collection:Post:title:PostTitle',
+          kind: 'embedded_collection',
+          signals: [
+            'embedded_collection_pressure',
+            'relationship_pressure',
+            'concurrency_pressure',
+          ],
+          path: 'types.0.fields.1',
+          typeName: 'Post',
+          fieldName: 'title',
+          title: 'Collaborative embedded collection',
+          message: 'Row identity avoids whole-array lost updates.',
+          rationale: 'Collaborative item edits are safer as scoped child table rows.',
+          fieldNames: ['title'],
+        },
+      ]);
+
+      const trigger = screen.getByRole('button', { name: /modeling advice for title/i });
+      expect(trigger.getAttribute('style')).toContain('var(--warning)');
+      expect(trigger).toHaveTextContent('1');
     });
 
     it('shows and edits the emitted Convex table name when table:true', () => {
