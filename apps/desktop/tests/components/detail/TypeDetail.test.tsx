@@ -587,6 +587,83 @@ describe('TypeDetail', () => {
       expect(screen.queryByRole('button', { name: 'by_author' })).not.toBeInTheDocument();
     });
 
+    it('shows editable search indexes and does not suggest a duplicate plain index for the search field', () => {
+      const { dispatch } = setup({
+        kind: 'object',
+        name: 'Recipe',
+        table: true,
+        fields: [
+          { name: 'householdId', type: { kind: 'string' } },
+          { name: 'searchText', type: { kind: 'string' } },
+        ],
+        indexes: [{ name: 'by_household', fields: ['householdId'] }],
+        searchIndexes: [
+          {
+            name: 'search_recipes',
+            searchField: 'searchText',
+            filterFields: ['householdId'],
+          },
+        ],
+      });
+
+      expect(screen.getByText('Search indexes')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('search_recipes')).toBeInTheDocument();
+      expect(
+        screen.getByRole('combobox', { name: 'Search field for search_recipes' }),
+      ).toHaveTextContent('searchText');
+      expect(screen.getAllByText('householdId').length).toBeGreaterThan(0);
+      expect(screen.queryByText('by_searchText')).not.toBeInTheDocument();
+
+      const nameInput = screen.getByLabelText('Search index name for search_recipes');
+      fireEvent.change(nameInput, { target: { value: 'search_library' } });
+      fireEvent.blur(nameInput);
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_search_index',
+        typeName: 'Recipe',
+        name: 'search_recipes',
+        patch: { name: 'search_library' },
+      });
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Remove householdId from search index search_recipes',
+        }),
+      );
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'update_search_index',
+        typeName: 'Recipe',
+        name: 'search_recipes',
+        patch: { filterFields: [] },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete search index search_recipes' }));
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'remove_search_index',
+        typeName: 'Recipe',
+        name: 'search_recipes',
+      });
+    });
+
+    it('dispatches add_search_index from the search indexes section', () => {
+      const { dispatch } = setup({
+        kind: 'object',
+        name: 'Recipe',
+        table: true,
+        fields: [
+          { name: 'searchText', type: { kind: 'string' } },
+          { name: 'servings', type: { kind: 'number' } },
+        ],
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add search index' }));
+
+      expect(dispatch).toHaveBeenCalledWith({
+        kind: 'add_search_index',
+        typeName: 'Recipe',
+        searchIndex: { name: 'search1', searchField: 'searchText' },
+      });
+    });
+
     it('flags type name starting with "_" as reserved when table:true', () => {
       setup({ ...base, name: '_Post', table: true });
       const nameInput = screen.getByLabelText('Name') as HTMLInputElement;

@@ -49,7 +49,7 @@ export function StatusBar(): React.JSX.Element {
       if (type.kind !== 'object') continue;
       if (type.table === true) {
         tables += 1;
-        indexes += type.indexes?.length ?? 0;
+        indexes += (type.indexes?.length ?? 0) + (type.searchIndexes?.length ?? 0);
       }
       for (const field of type.fields) refs += countRefs(field.type);
     }

@@ -101,11 +101,14 @@ function toneForHint(kind: ModelingHint['kind']): CSSProperties {
       };
     case 'query_handle':
     case 'derivation_policy':
+    case 'bounded_scan':
+    case 'alias_lookup':
       return {
         background: 'color-mix(in oklch, var(--graph-node-selected) 14%, transparent)',
         borderColor: 'color-mix(in oklch, var(--graph-node-selected) 55%, var(--foreground))',
         color: 'color-mix(in oklch, var(--graph-node-selected) 52%, var(--foreground))',
       };
+    case 'merge_semantics':
     case 'embedded_collection':
       return {
         background: 'color-mix(in oklch, var(--graph-edge-union) 14%, transparent)',
@@ -134,7 +137,10 @@ function hintRank(hint: ModelingHint): number {
       return 1;
     case 'query_handle':
     case 'derivation_policy':
+    case 'bounded_scan':
+    case 'alias_lookup':
       return 2;
+    case 'merge_semantics':
     case 'embedded_collection':
       return 3;
     case 'owned_value_object':

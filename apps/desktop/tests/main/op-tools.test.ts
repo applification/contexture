@@ -15,7 +15,7 @@ function toolNamed(tools: OpToolDescriptor[], name: string): OpToolDescriptor {
 }
 
 describe('createOpTools', () => {
-  it('registers one SDK tool per op (25 total)', () => {
+  it('registers one SDK tool per op (28 total)', () => {
     const { tools } = makeTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
@@ -24,6 +24,7 @@ describe('createOpTools', () => {
         'add_import',
         'add_index',
         'add_invariant',
+        'add_search_index',
         'add_type',
         'add_value',
         'add_variant',
@@ -34,6 +35,7 @@ describe('createOpTools', () => {
         'remove_invariant',
         'remove_index',
         'remove_value',
+        'remove_search_index',
         'remove_variant',
         'rename_type',
         'reorder_fields',
@@ -43,6 +45,7 @@ describe('createOpTools', () => {
         'update_field',
         'update_index',
         'update_invariant',
+        'update_search_index',
         'update_type',
         'update_value',
       ].sort(),
@@ -137,6 +140,31 @@ describe('createOpTools', () => {
       typeName: 'Post',
       name: 'by_author',
       patch: { fields: ['author', 'title'] },
+    });
+  });
+
+  it('add_search_index forwards a strict Op with search index payload', async () => {
+    const forwardSpy = vi.fn(async (_op: Op) => ({ ok: true }) as const);
+    const { tools } = makeTools(forwardSpy as unknown as ForwardOp);
+    const tool = toolNamed(tools, 'add_search_index');
+    await tool.handler({
+      typeName: 'Recipe',
+      searchIndex: {
+        name: 'search_recipes',
+        searchField: 'searchText',
+        filterFields: ['householdId'],
+        staged: false,
+      },
+    });
+    expect(forwardSpy.mock.calls[0][0]).toEqual({
+      kind: 'add_search_index',
+      typeName: 'Recipe',
+      searchIndex: {
+        name: 'search_recipes',
+        searchField: 'searchText',
+        filterFields: ['householdId'],
+        staged: false,
+      },
     });
   });
 

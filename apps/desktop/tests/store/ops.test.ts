@@ -193,7 +193,7 @@ describe('apply', () => {
     expect(f.type).toEqual({ kind: 'number' });
   });
 
-  it('update_field: renaming a table field cascades through indexes', () => {
+  it('update_field: renaming a table field cascades through indexes and search indexes', () => {
     const base: Schema = {
       version: '1',
       types: [
@@ -208,6 +208,9 @@ describe('apply', () => {
           indexes: [
             { name: 'by_author', fields: ['author'] },
             { name: 'by_author_created', fields: ['author', 'createdAt'] },
+          ],
+          searchIndexes: [
+            { name: 'search_author', searchField: 'author', filterFields: ['createdAt'] },
           ],
         },
       ],
@@ -225,6 +228,9 @@ describe('apply', () => {
     expect(post.indexes).toEqual([
       { name: 'by_author', fields: ['authorId'] },
       { name: 'by_author_created', fields: ['authorId', 'createdAt'] },
+    ]);
+    expect(post.searchIndexes).toEqual([
+      { name: 'search_author', searchField: 'authorId', filterFields: ['createdAt'] },
     ]);
   });
 
@@ -294,6 +300,40 @@ describe('apply', () => {
     const post = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
     expect(post.fields.map((field) => field.name)).toEqual(['title']);
     expect(post.indexes).toEqual([{ name: 'by_author_title', fields: ['title'] }]);
+  });
+
+  it('remove_field: prunes search indexes that mention the removed field', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Post',
+          table: true,
+          fields: [
+            { name: 'title', type: { kind: 'string' } },
+            { name: 'body', type: { kind: 'string' } },
+            { name: 'author', type: { kind: 'string' } },
+          ],
+          searchIndexes: [
+            { name: 'search_body', searchField: 'body', filterFields: ['author'] },
+            { name: 'search_title', searchField: 'title', filterFields: ['author'] },
+          ],
+        },
+      ],
+    };
+
+    const s1 = ok(apply(base, { kind: 'remove_field', typeName: 'Post', fieldName: 'body' }));
+    const post = s1.types[0] as Extract<(typeof s1.types)[number], { kind: 'object' }>;
+    expect(post.searchIndexes).toEqual([
+      { name: 'search_title', searchField: 'title', filterFields: ['author'] },
+    ]);
+
+    const s2 = ok(apply(s1, { kind: 'remove_field', typeName: 'Post', fieldName: 'author' }));
+    const postWithoutFilter = s2.types[0] as Extract<(typeof s2.types)[number], { kind: 'object' }>;
+    expect(postWithoutFilter.searchIndexes).toEqual([
+      { name: 'search_title', searchField: 'title', filterFields: [] },
+    ]);
   });
 
   // 8. reorder_fields
@@ -674,6 +714,121 @@ describe('apply', () => {
     expect('error' in duplicateField && duplicateField.error).toContain(
       'field "author" appears more than once',
     );
+  });
+
+  it('add_search_index: appends and rejects invalid search index shapes', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'searchText', type: { kind: 'string' } },
+            { name: 'servings', type: { kind: 'number' } },
+          ],
+          indexes: [{ name: 'by_household', fields: ['householdId'] }],
+        },
+      ],
+    };
+
+    const added = ok(
+      apply(base, {
+        kind: 'add_search_index',
+        typeName: 'Recipe',
+        searchIndex: {
+          name: 'search_recipes',
+          searchField: 'searchText',
+          filterFields: ['householdId'],
+          staged: true,
+        },
+      }),
+    );
+    const recipe = added.types[0] as Extract<(typeof added.types)[number], { kind: 'object' }>;
+    expect(recipe.searchIndexes).toEqual([
+      {
+        name: 'search_recipes',
+        searchField: 'searchText',
+        filterFields: ['householdId'],
+        staged: true,
+      },
+    ]);
+
+    expect(
+      'error' in
+        apply(base, {
+          kind: 'add_search_index',
+          typeName: 'Recipe',
+          searchIndex: { name: 'by_household', searchField: 'searchText' },
+        }),
+    ).toBe(true);
+    expect(
+      'error' in
+        apply(base, {
+          kind: 'add_search_index',
+          typeName: 'Recipe',
+          searchIndex: { name: 'search_missing', searchField: 'missing' },
+        }),
+    ).toBe(true);
+    expect(
+      'error' in
+        apply(base, {
+          kind: 'add_search_index',
+          typeName: 'Recipe',
+          searchIndex: { name: 'search_servings', searchField: 'servings' },
+        }),
+    ).toBe(true);
+  });
+
+  it('update_search_index and remove_search_index mutate by name', () => {
+    const base: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'searchText', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
+          ],
+          searchIndexes: [{ name: 'search_recipes', searchField: 'searchText' }],
+        },
+      ],
+    };
+
+    const updated = ok(
+      apply(base, {
+        kind: 'update_search_index',
+        typeName: 'Recipe',
+        name: 'search_recipes',
+        patch: {
+          name: 'search_titles',
+          searchField: 'title',
+          filterFields: ['householdId'],
+        },
+      }),
+    );
+    const recipe = updated.types[0] as Extract<(typeof updated.types)[number], { kind: 'object' }>;
+    expect(recipe.searchIndexes).toEqual([
+      { name: 'search_titles', searchField: 'title', filterFields: ['householdId'] },
+    ]);
+
+    const removed = ok(
+      apply(updated, {
+        kind: 'remove_search_index',
+        typeName: 'Recipe',
+        name: 'search_titles',
+      }),
+    );
+    const withoutSearch = removed.types[0] as Extract<
+      (typeof removed.types)[number],
+      { kind: 'object' }
+    >;
+    expect(withoutSearch.searchIndexes).toBeUndefined();
   });
 
   // 13. replace_schema — structural pre-flight

@@ -522,6 +522,113 @@ describe('checkSemantic — refs', () => {
   });
 });
 
+describe('checkSemantic — Convex search indexes', () => {
+  it('accepts a valid search index on a table string field', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'searchText', type: { kind: 'string' } },
+          ],
+          searchIndexes: [
+            { name: 'search_recipes', searchField: 'searchText', filterFields: ['householdId'] },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB)).toEqual([]);
+  });
+
+  it('rejects search indexes on non-table objects', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          fields: [{ name: 'searchText', type: { kind: 'string' } }],
+          searchIndexes: [{ name: 'search_recipes', searchField: 'searchText' }],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB)).toEqual([
+      expect.objectContaining({
+        code: 'convex_search_index_on_non_table',
+        path: 'types.0.searchIndexes',
+      }),
+    ]);
+  });
+
+  it('rejects unknown and non-string search fields', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'servings', type: { kind: 'number' } },
+            { name: 'searchText', type: { kind: 'array', element: { kind: 'string' } } },
+          ],
+          searchIndexes: [
+            { name: 'search_missing', searchField: 'missing' },
+            { name: 'search_array', searchField: 'searchText' },
+            { name: 'search_number', searchField: 'servings' },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).toEqual([
+      'convex_search_index_unknown_search_field',
+      'convex_search_index_non_string_search_field',
+      'convex_search_index_non_string_search_field',
+    ]);
+  });
+
+  it('rejects duplicate search-index names, duplicate filter fields, and name collisions', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            { name: 'householdId', type: { kind: 'string' } },
+            { name: 'searchText', type: { kind: 'string' } },
+          ],
+          indexes: [{ name: 'search_recipes', fields: ['householdId'] }],
+          searchIndexes: [
+            {
+              name: 'search_recipes',
+              searchField: 'searchText',
+              filterFields: ['householdId', 'householdId', 'missing'],
+            },
+            { name: 'search_recipes', searchField: 'searchText' },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).toEqual([
+      'convex_index_name_collision',
+      'convex_search_index_duplicate_filter_field',
+      'convex_search_index_unknown_filter_field',
+      'convex_search_index_duplicate_name',
+      'convex_index_name_collision',
+    ]);
+  });
+});
+
 describe('checkSemantic — imports', () => {
   it('rejects an unknown stdlib namespace', () => {
     const schema: Schema = {

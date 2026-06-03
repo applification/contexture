@@ -63,6 +63,9 @@ describe('buildSystemPromptAppend', () => {
       'add_index',
       'update_index',
       'remove_index',
+      'add_search_index',
+      'update_search_index',
+      'remove_search_index',
       'replace_schema',
     ]) {
       expect(prompt).toContain(op);

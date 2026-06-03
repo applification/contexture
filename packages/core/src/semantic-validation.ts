@@ -53,6 +53,15 @@ export type SemanticIssueCode =
   | 'convex_reserved_field_name'
   | 'convex_index_duplicate_field'
   | 'convex_index_unknown_field'
+  | 'convex_index_name_collision'
+  | 'convex_index_limit_exceeded'
+  | 'convex_search_index_on_non_table'
+  | 'convex_search_index_duplicate_name'
+  | 'convex_search_index_duplicate_filter_field'
+  | 'convex_search_index_unknown_search_field'
+  | 'convex_search_index_non_string_search_field'
+  | 'convex_search_index_unknown_filter_field'
+  | 'convex_search_index_filter_field_limit_exceeded'
   | 'relationship_target_not_table'
   | 'relationship_scope_field_missing'
   | 'relationship_set_null_requires_nullable'
@@ -130,7 +139,18 @@ function convexTableName(type: ObjectType): string {
 function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
   const issues: SemanticIssueDraft[] = [];
   schema.types.forEach((type, typeIndex) => {
-    if (type.kind !== 'object' || type.table !== true) return;
+    if (type.kind !== 'object') return;
+    if (type.table !== true) {
+      if ((type.searchIndexes ?? []).length > 0) {
+        issues.push({
+          code: 'convex_search_index_on_non_table',
+          path: `types.${typeIndex}.searchIndexes`,
+          message: `Only Convex table types can define search indexes.`,
+          hint: 'Mark the object as a table or remove searchIndexes.',
+        });
+      }
+      return;
+    }
     const tableName = convexTableName(type);
     if (tableName.startsWith('_')) {
       issues.push({
@@ -142,6 +162,7 @@ function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
     }
 
     const fieldNames = new Set(type.fields.map((field) => field.name));
+    const fieldsByName = new Map(type.fields.map((field) => [field.name, field]));
     type.fields.forEach((field, fieldIndex) => {
       if (!field.name.startsWith('_')) return;
       issues.push({
@@ -174,6 +195,87 @@ function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
         });
       });
     });
+
+    const plainIndexNames = new Set((type.indexes ?? []).map((index) => index.name));
+    const searchIndexNames = new Set<string>();
+    (type.searchIndexes ?? []).forEach((index, indexIndex) => {
+      if (searchIndexNames.has(index.name)) {
+        issues.push({
+          code: 'convex_search_index_duplicate_name',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.name`,
+          message: `Convex search index "${index.name}" is already used on "${type.name}".`,
+          hint: 'Rename the search index so each index name is unique per table.',
+        });
+      } else {
+        searchIndexNames.add(index.name);
+      }
+
+      if (plainIndexNames.has(index.name)) {
+        issues.push({
+          code: 'convex_index_name_collision',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.name`,
+          message: `Convex search index "${index.name}" conflicts with a plain index on "${type.name}".`,
+          hint: 'Use a distinct name; Convex index names must be unique per table.',
+        });
+      }
+
+      const searchField = fieldsByName.get(index.searchField);
+      if (!searchField) {
+        issues.push({
+          code: 'convex_search_index_unknown_search_field',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.searchField`,
+          message: `Convex search index "${index.name}" references unknown search field "${index.searchField}".`,
+          hint: 'Use an existing string field as the searchField.',
+        });
+      } else if (searchField.type.kind !== 'string') {
+        issues.push({
+          code: 'convex_search_index_non_string_search_field',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.searchField`,
+          message: `Convex search index "${index.name}" searchField "${index.searchField}" must be a string field.`,
+          hint: 'Choose a string field such as searchText or add a denormalized string search handle.',
+        });
+      }
+
+      const filterFields = index.filterFields ?? [];
+      if (filterFields.length > 16) {
+        issues.push({
+          code: 'convex_search_index_filter_field_limit_exceeded',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.filterFields`,
+          message: `Convex search index "${index.name}" has ${filterFields.length} filter fields; Convex allows up to 16.`,
+          hint: 'Keep only fields used for equality filters in withSearchIndex queries.',
+        });
+      }
+      const seenFilterFields = new Set<string>();
+      filterFields.forEach((fieldName, fieldIndex) => {
+        if (seenFilterFields.has(fieldName)) {
+          issues.push({
+            code: 'convex_search_index_duplicate_filter_field',
+            path: `types.${typeIndex}.searchIndexes.${indexIndex}.filterFields.${fieldIndex}`,
+            message: `Convex search index "${index.name}" includes filter field "${fieldName}" more than once.`,
+            hint: 'Remove the duplicate filter field from the search index.',
+          });
+        } else {
+          seenFilterFields.add(fieldName);
+        }
+        if (fieldNames.has(fieldName)) return;
+        issues.push({
+          code: 'convex_search_index_unknown_filter_field',
+          path: `types.${typeIndex}.searchIndexes.${indexIndex}.filterFields.${fieldIndex}`,
+          message: `Convex search index "${index.name}" references unknown filter field "${fieldName}".`,
+          hint: 'Use an existing table field or remove it from filterFields.',
+        });
+      });
+    });
+
+    const totalIndexes = (type.indexes ?? []).length + (type.searchIndexes ?? []).length;
+    if (totalIndexes > 32) {
+      issues.push({
+        code: 'convex_index_limit_exceeded',
+        path: `types.${typeIndex}.indexes`,
+        message: `Convex table "${type.name}" defines ${totalIndexes} indexes; Convex allows up to 32 indexes per table.`,
+        hint: 'Remove low-value plain or search indexes before emitting convex/schema.ts.',
+      });
+    }
   });
   return issues;
 }

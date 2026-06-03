@@ -818,7 +818,9 @@ function buildOnboardingState(
     hasTable: objects.some((type) => type.table === true),
     hasField: objects.some((type) => type.fields.length > 0),
     hasRef: objects.some((type) => type.fields.some((field) => field.type.kind === 'ref')),
-    hasIndex: objects.some((type) => (type.indexes ?? []).length > 0),
+    hasIndex: objects.some(
+      (type) => (type.indexes ?? []).length > 0 || (type.searchIndexes ?? []).length > 0,
+    ),
     outputsVisible: activeTab === 'schema',
     hasSavedOutputs: filePath !== null && !isDirty,
     driftClean: filePath !== null && driftedCount === 0,

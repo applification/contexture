@@ -1,4 +1,4 @@
-import type { IndexDef, Schema, TypeDef } from './ir';
+import type { IndexDef, Schema, SearchIndexDef, TypeDef } from './ir';
 import type { Op } from './ops';
 
 export type AgentTurnStatus = 'running' | 'committed' | 'rolled_back';
@@ -46,6 +46,9 @@ export interface AgentTurnSchemaDiff {
   addedIndexes: string[];
   removedIndexes: string[];
   changedIndexes: string[];
+  addedSearchIndexes: string[];
+  removedSearchIndexes: string[];
+  changedSearchIndexes: string[];
   importChanged: boolean;
   outputChanged: boolean;
 }
@@ -103,6 +106,12 @@ export function describeAgentTurnOp(op: Pick<AgentTurnOpResult, 'name' | 'op'>):
       return `Removed index ${op.op.typeName}.${op.op.name}`;
     case 'update_index':
       return `Updated index ${op.op.typeName}.${op.op.name}`;
+    case 'add_search_index':
+      return `Added search index ${op.op.typeName}.${op.op.searchIndex.name}`;
+    case 'remove_search_index':
+      return `Removed search index ${op.op.typeName}.${op.op.name}`;
+    case 'update_search_index':
+      return `Updated search index ${op.op.typeName}.${op.op.name}`;
     case 'replace_schema':
       return 'Replaced schema';
   }
@@ -150,6 +159,9 @@ export function diffAgentTurnSchema(before?: Schema, after?: Schema): AgentTurnS
     addedIndexes: [],
     removedIndexes: [],
     changedIndexes: [],
+    addedSearchIndexes: [],
+    removedSearchIndexes: [],
+    changedSearchIndexes: [],
     importChanged: false,
     outputChanged: false,
   };
@@ -185,6 +197,9 @@ export function summarizeAgentTurnSchemaDiff(diff: AgentTurnSchemaDiff): string[
   rows.push(...diff.addedIndexes.map((name) => `Added index ${name}`));
   rows.push(...diff.removedIndexes.map((name) => `Removed index ${name}`));
   rows.push(...diff.changedIndexes.map((name) => `Changed index ${name}`));
+  rows.push(...diff.addedSearchIndexes.map((name) => `Added search index ${name}`));
+  rows.push(...diff.removedSearchIndexes.map((name) => `Removed search index ${name}`));
+  rows.push(...diff.changedSearchIndexes.map((name) => `Changed search index ${name}`));
   if (diff.importChanged) rows.push('Changed imports');
   if (diff.outputChanged) rows.push('Changed outputs');
   return rows;
@@ -232,6 +247,14 @@ function diffType(
       diff.removedIndexes,
       diff.changedIndexes,
     );
+    diffNamedChildren(
+      name,
+      beforeType.searchIndexes ?? [],
+      afterType.searchIndexes ?? [],
+      diff.addedSearchIndexes,
+      diff.removedSearchIndexes,
+      diff.changedSearchIndexes,
+    );
     return;
   }
 
@@ -264,15 +287,17 @@ function diffNamedChildren<T extends { name: string }>(
   }
 }
 
-function stripTypeChildren(type: TypeDef): Omit<TypeDef, 'fields' | 'indexes'> {
+function stripTypeChildren(type: TypeDef): Omit<TypeDef, 'fields' | 'indexes' | 'searchIndexes'> {
   if (type.kind === 'object') {
-    const { fields: _fields, indexes: _indexes, ...rest } = type;
+    const { fields: _fields, indexes: _indexes, searchIndexes: _searchIndexes, ...rest } = type;
     return rest;
   }
   return type;
 }
 
-function byName<T extends { name: string } | IndexDef>(items: T[]): Map<string, T> {
+function byName<T extends { name: string } | IndexDef | SearchIndexDef>(
+  items: T[],
+): Map<string, T> {
   return new Map(items.map((item) => [item.name, item]));
 }
 

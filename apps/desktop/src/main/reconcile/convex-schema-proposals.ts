@@ -1,4 +1,11 @@
-import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core';
+import type {
+  FieldDef,
+  FieldType,
+  IndexDef,
+  Schema,
+  SearchIndexDef,
+  TypeDef,
+} from '@contexture/core';
 import type { Op } from '@contexture/core/ops';
 import * as ts from 'typescript';
 
@@ -19,6 +26,7 @@ interface ParsedTable {
   tableName: string;
   fields: FieldDef[];
   indexes: IndexDef[];
+  searchIndexes: SearchIndexDef[];
 }
 
 interface ParseContext {
@@ -49,6 +57,7 @@ export function proposeConvexSchemaOps(schema: Schema, source: string): ConvexSc
             tableName: table.tableName,
             fields: table.fields,
             ...(table.indexes.length > 0 ? { indexes: table.indexes } : {}),
+            ...(table.searchIndexes.length > 0 ? { searchIndexes: table.searchIndexes } : {}),
           },
         },
         label: `Add Convex table "${table.tableName}"`,
@@ -60,6 +69,7 @@ export function proposeConvexSchemaOps(schema: Schema, source: string): ConvexSc
 
     addFieldOps(ops, existing, table);
     addIndexOps(ops, existing, table);
+    addSearchIndexOps(ops, existing, table);
   }
 
   return { ok: true, ops };
@@ -147,6 +157,57 @@ function addIndexOps(
   }
 }
 
+function addSearchIndexOps(
+  ops: DeterministicReconcileEntry[],
+  existing: ObjectType,
+  table: ParsedTable,
+): void {
+  const existingIndexes = new Map(
+    (existing.searchIndexes ?? []).map((index) => [index.name, index]),
+  );
+  const parsedIndexNames = new Set(table.searchIndexes.map((index) => index.name));
+  const parsedFieldNames = new Set(table.fields.map((field) => field.name));
+  for (const index of table.searchIndexes) {
+    const prior = existingIndexes.get(index.name);
+    if (!prior) {
+      ops.push({
+        op: { kind: 'add_search_index', typeName: existing.name, searchIndex: index },
+        label: `Add search index "${index.name}" to "${existing.name}"`,
+        lossy: false,
+        provenance: 'deterministic',
+      });
+      continue;
+    }
+    if (stableJson(prior) === stableJson(index)) continue;
+    ops.push({
+      op: {
+        kind: 'update_search_index',
+        typeName: existing.name,
+        name: prior.name,
+        patch: searchIndexPatch(prior, index),
+      },
+      label: `Update search index "${index.name}" on "${existing.name}"`,
+      lossy: false,
+      provenance: 'deterministic',
+    });
+  }
+  for (const index of existing.searchIndexes ?? []) {
+    if (parsedIndexNames.has(index.name)) continue;
+    if (
+      !parsedFieldNames.has(index.searchField) ||
+      (index.filterFields ?? []).some((field) => !parsedFieldNames.has(field))
+    ) {
+      continue;
+    }
+    ops.push({
+      op: { kind: 'remove_search_index', typeName: existing.name, name: index.name },
+      label: `Remove search index "${index.name}" from "${existing.name}"`,
+      lossy: false,
+      provenance: 'deterministic',
+    });
+  }
+}
+
 function parseConvexSchema(
   source: string,
   ctx: ParseContext,
@@ -204,17 +265,29 @@ function parseTableExpression(
   ctx: ParseContext,
 ): { ok: true; table: ParsedTable } | { ok: false; error: string } {
   const indexes: IndexDef[] = [];
+  const searchIndexes: SearchIndexDef[] = [];
   let current = expr;
 
   while (ts.isCallExpression(current) && ts.isPropertyAccessExpression(current.expression)) {
     const access = current.expression;
-    if (access.name.text !== 'index') {
-      return { ok: false, error: 'Only `.index(...)` chains are supported on tables.' };
+    if (access.name.text === 'index') {
+      const index = parseIndexCall(current);
+      if (!index.ok) return index;
+      indexes.unshift(index.index);
+      current = access.expression;
+      continue;
     }
-    const index = parseIndexCall(current);
-    if (!index.ok) return index;
-    indexes.unshift(index.index);
-    current = access.expression;
+    if (access.name.text === 'searchIndex') {
+      const index = parseSearchIndexCall(current);
+      if (!index.ok) return index;
+      searchIndexes.unshift(index.searchIndex);
+      current = access.expression;
+      continue;
+    }
+    return {
+      ok: false,
+      error: 'Only `.index(...)` and `.searchIndex(...)` chains are supported on tables.',
+    };
   }
 
   if (!ts.isCallExpression(current) || identifierText(current.expression) !== 'defineTable') {
@@ -226,7 +299,7 @@ function parseTableExpression(
   }
   const fields = parseFields(fieldsArg, ctx);
   if (!fields.ok) return fields;
-  return { ok: true, table: { tableName, fields: fields.fields, indexes } };
+  return { ok: true, table: { tableName, fields: fields.fields, indexes, searchIndexes } };
 }
 
 function parseFields(
@@ -350,6 +423,57 @@ function parseIndexCall(
   return { ok: true, index: { name: nameArg.text, fields: fields.values } };
 }
 
+function parseSearchIndexCall(
+  call: ts.CallExpression,
+): { ok: true; searchIndex: SearchIndexDef } | { ok: false; error: string } {
+  const [nameArg, configArg] = call.arguments;
+  if (!nameArg || !ts.isStringLiteral(nameArg)) {
+    return { ok: false, error: 'Search index names must be string literals.' };
+  }
+  if (!configArg || !ts.isObjectLiteralExpression(configArg)) {
+    return { ok: false, error: 'Search index config must be an object literal.' };
+  }
+
+  let searchField: string | undefined;
+  let filterFields: string[] | undefined;
+  let staged: boolean | undefined;
+  for (const prop of configArg.properties) {
+    if (!ts.isPropertyAssignment(prop)) {
+      return { ok: false, error: 'Only search index config property assignments are supported.' };
+    }
+    const name = propertyNameText(prop.name);
+    if (name === 'searchField') {
+      if (!ts.isStringLiteral(prop.initializer)) {
+        return { ok: false, error: 'searchField must be a string literal.' };
+      }
+      searchField = prop.initializer.text;
+    } else if (name === 'filterFields') {
+      const parsed = parseStringArray(prop.initializer, {
+        label: 'Search index filter fields',
+        allowEmpty: true,
+      });
+      if (!parsed.ok) return parsed;
+      filterFields = parsed.values;
+    } else if (name === 'staged') {
+      if (prop.initializer.kind === ts.SyntaxKind.TrueKeyword) staged = true;
+      else if (prop.initializer.kind === ts.SyntaxKind.FalseKeyword) staged = false;
+      else return { ok: false, error: 'staged must be a boolean literal.' };
+    } else {
+      return { ok: false, error: `Unsupported search index config property "${name ?? '?'}".` };
+    }
+  }
+  if (!searchField) return { ok: false, error: 'Search index config must include searchField.' };
+  return {
+    ok: true,
+    searchIndex: {
+      name: nameArg.text,
+      searchField,
+      ...(filterFields !== undefined ? { filterFields } : {}),
+      ...(staged !== undefined ? { staged } : {}),
+    },
+  };
+}
+
 function onlyArgument(
   call: ts.CallExpression,
   label: string,
@@ -367,18 +491,21 @@ function isVNullCall(expr: ts.Expression): boolean {
 
 function parseStringArray(
   expr: ts.Expression | undefined,
+  options: { label?: string; allowEmpty?: boolean } = {},
 ): { ok: true; values: string[] } | { ok: false; error: string } {
   if (!expr || !ts.isArrayLiteralExpression(expr)) {
-    return { ok: false, error: 'Index fields must be an array literal.' };
+    return { ok: false, error: `${options.label ?? 'Index fields'} must be an array literal.` };
   }
   const values: string[] = [];
   for (const element of expr.elements) {
     if (!ts.isStringLiteral(element)) {
-      return { ok: false, error: 'Index fields must be string literals.' };
+      return { ok: false, error: `${options.label ?? 'Index fields'} must be string literals.` };
     }
     values.push(element.text);
   }
-  if (values.length === 0) return { ok: false, error: 'Indexes must include at least one field.' };
+  if (values.length === 0 && options.allowEmpty !== true) {
+    return { ok: false, error: 'Indexes must include at least one field.' };
+  }
   return { ok: true, values };
 }
 
@@ -434,8 +561,23 @@ function fieldPatch(before: FieldDef, after: FieldDef): Partial<FieldDef> {
   return patch;
 }
 
+function searchIndexPatch(before: SearchIndexDef, after: SearchIndexDef): Partial<SearchIndexDef> {
+  const patch: Partial<SearchIndexDef> = {};
+  if (before.name !== after.name) patch.name = after.name;
+  if (before.searchField !== after.searchField) patch.searchField = after.searchField;
+  if (!sameStringArray(before.filterFields ?? [], after.filterFields ?? [])) {
+    patch.filterFields = after.filterFields;
+  }
+  if (before.staged !== after.staged) patch.staged = after.staged;
+  return patch;
+}
+
 function isLossyFieldChange(before: FieldDef, after: FieldDef): boolean {
   return JSON.stringify(before.type) !== JSON.stringify(after.type);
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value);
 }
 
 function sameStringArray(a: readonly string[], b: readonly string[]): boolean {

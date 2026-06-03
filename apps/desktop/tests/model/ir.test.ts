@@ -289,7 +289,7 @@ describe('IRSchema', () => {
     expect(path).toContain('types.0.fields.0.type');
   });
 
-  it('accepts an object TypeDef with table:true, tableName, and indexes', () => {
+  it('accepts an object TypeDef with table:true, tableName, indexes, and search indexes', () => {
     const input = {
       version: '1',
       types: [
@@ -302,8 +302,17 @@ describe('IRSchema', () => {
             { name: 'by_author', fields: ['author'] },
             { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },
           ],
+          searchIndexes: [
+            {
+              name: 'search_title',
+              searchField: 'title',
+              filterFields: ['author'],
+              staged: true,
+            },
+          ],
           fields: [
             { name: 'author', type: { kind: 'string' } },
+            { name: 'title', type: { kind: 'string' } },
             { name: 'publishedAt', type: { kind: 'date' } },
           ],
         },
@@ -317,6 +326,14 @@ describe('IRSchema', () => {
     expect(td.indexes).toEqual([
       { name: 'by_author', fields: ['author'] },
       { name: 'by_author_and_date', fields: ['author', 'publishedAt'] },
+    ]);
+    expect(td.searchIndexes).toEqual([
+      {
+        name: 'search_title',
+        searchField: 'title',
+        filterFields: ['author'],
+        staged: true,
+      },
     ]);
   });
 

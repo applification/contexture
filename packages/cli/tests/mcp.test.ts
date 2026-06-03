@@ -110,6 +110,13 @@ describe('Contexture MCP server', () => {
             }),
           }),
           expect.objectContaining({
+            name: 'add_search_index',
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
             name: 'get_contexture_integration_guidance',
             annotations: expect.objectContaining({
               readOnlyHint: true,
@@ -173,6 +180,7 @@ describe('Contexture MCP server', () => {
             'add_invariant',
             'rename_type',
             'add_index',
+            'add_search_index',
           ]),
         }),
         modelingHints: expect.any(Array),
@@ -276,6 +284,7 @@ describe('Contexture MCP server', () => {
             { name: 'growerId', type: { kind: 'string' } },
           ],
           indexes: [{ name: 'by_grower', fields: ['growerId'] }],
+          searchIndexes: [{ name: 'search_name', searchField: 'name', filterFields: ['growerId'] }],
         },
       ],
     });
@@ -298,6 +307,9 @@ describe('Contexture MCP server', () => {
             description: 'A rentable garden plot.',
             tableName: 'plots',
             indexes: [{ name: 'by_grower', fields: ['growerId'] }],
+            searchIndexes: [
+              { name: 'search_name', searchField: 'name', filterFields: ['growerId'] },
+            ],
             fields: [
               expect.objectContaining({
                 name: 'name',

@@ -194,7 +194,10 @@ function buildEntity(
     description: type.description,
     sampleData: type.sampleData,
     fields: type.fields.map((field) => buildControl(field, typeByName, stack)),
-    indexes: (type.indexes ?? []).map((index) => index.name),
+    indexes: [
+      ...(type.indexes ?? []).map((index) => index.name),
+      ...(type.searchIndexes ?? []).map((index) => `${index.name} (search)`),
+    ],
     displayFieldName: displayFieldName(type),
   };
 }

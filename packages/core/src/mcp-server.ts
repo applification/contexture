@@ -53,6 +53,16 @@ const InspectTypeSchema = z.object({
       }),
     )
     .optional(),
+  searchIndexes: z
+    .array(
+      z.object({
+        name: z.string(),
+        searchField: z.string(),
+        filterFields: z.array(z.string()).optional(),
+        staged: z.boolean().optional(),
+      }),
+    )
+    .optional(),
   values: z.array(z.string()).optional(),
   variants: z.array(z.string()).optional(),
   discriminator: z.string().optional(),
@@ -76,6 +86,9 @@ const ModelingHintInspectSchema = z.object({
     'embedded_collection',
     'stdlib_type',
     'stringly_ref',
+    'bounded_scan',
+    'alias_lookup',
+    'merge_semantics',
   ]),
   signals: z.array(
     z.enum([
@@ -568,6 +581,16 @@ function typeToInspectJson(type: TypeDef): z.infer<typeof InspectTypeSchema> {
             })),
           }
         : {}),
+      ...((type.searchIndexes?.length ?? 0) > 0
+        ? {
+            searchIndexes: type.searchIndexes?.map((index) => ({
+              name: index.name,
+              searchField: index.searchField,
+              ...(index.filterFields ? { filterFields: index.filterFields } : {}),
+              ...(index.staged !== undefined ? { staged: index.staged } : {}),
+            })),
+          }
+        : {}),
     };
   }
   if (type.kind === 'enum') {
@@ -665,7 +688,7 @@ function buildIntegrationGuidance(
     rules: [
       'Treat the .contexture.json IR as the source of truth for domain-model changes.',
       'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
-      'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, and add_index over apply_contexture_op when possible.',
+      'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, add_index, and add_search_index over apply_contexture_op when possible.',
       'Typed op tools take irPath plus their direct arguments. The generic apply_contexture_op takes { irPath, op } where op is the closed-world operation with a kind.',
       'For Convex table refs, put relationship intent under field.type.relationship, for example { onDelete: "restrict", ownership: { scopeField: "householdId" } }. Use relationship.crossScope: true for intentional cross-scope refs.',
       'After any model mutation, validate, emit generated targets, and check drift before finishing.',

@@ -134,6 +134,15 @@ export const IndexDefSchema = z.object({
 
 export type IndexDef = z.infer<typeof IndexDefSchema>;
 
+export const SearchIndexDefSchema = z.object({
+  name: z.string().min(1),
+  searchField: z.string().min(1),
+  filterFields: z.array(z.string().min(1)).optional(),
+  staged: z.boolean().optional(),
+});
+
+export type SearchIndexDef = z.infer<typeof SearchIndexDefSchema>;
+
 const FieldConditionSchema = z.object({
   field: z.string().min(1),
   equals: z.union([z.string(), z.number(), z.boolean()]),
@@ -207,6 +216,7 @@ const ObjectTypeDefSchema = z.object({
   table: z.boolean().optional(),
   tableName: z.string().min(1).optional(),
   indexes: z.array(IndexDefSchema).optional(),
+  searchIndexes: z.array(SearchIndexDefSchema).optional(),
   sampleData: SampleDataHintSchema.optional(),
 });
 
