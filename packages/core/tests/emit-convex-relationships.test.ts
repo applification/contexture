@@ -7,6 +7,19 @@ function parses(source: string): boolean {
   return (sf as unknown as { parseDiagnostics: ts.Diagnostic[] }).parseDiagnostics.length === 0;
 }
 
+function emittedRelationships(source: string): Array<{
+  name: string;
+  fromTable: string;
+  fromField: string;
+  fromPath: string[];
+  toTable: string;
+}> {
+  const match = source.match(/export const relationships = (\[[\s\S]*?\]) as const/);
+  const json = match?.[1];
+  if (!json) return [];
+  return JSON.parse(json);
+}
+
 describe('emitConvexRelationships', () => {
   it('emits relationship metadata and generic app-layer helpers for table refs', () => {
     const schema: Schema = {
@@ -104,6 +117,70 @@ describe('emitConvexRelationships', () => {
     expect(out).toContain('"name": "PantryItem.ingredient.ingredientId"');
     expect(out).toContain('"fromPath": [\n      "ingredient",\n      "ingredientId"\n    ]');
     expect(out).toContain('collectContexturePathValues(input, relationship.fromPath)');
+    expect(parses(out)).toBe(true);
+  });
+
+  it('keeps reused embedded ref occurrences distinct by name and path', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Ingredient',
+          table: true,
+          fields: [],
+        },
+        {
+          kind: 'object',
+          name: 'FoodPreference',
+          fields: [{ name: 'ingredientId', type: { kind: 'ref', typeName: 'Ingredient' } }],
+        },
+        {
+          kind: 'object',
+          name: 'Household',
+          table: true,
+          fields: [
+            {
+              name: 'preferences',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'FoodPreference' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'HouseholdMember',
+          table: true,
+          fields: [
+            {
+              name: 'preferences',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'FoodPreference' } },
+            },
+          ],
+        },
+      ],
+    };
+
+    const out = emitConvexRelationships(schema);
+    const relationships = emittedRelationships(out);
+
+    expect(relationships).toEqual([
+      expect.objectContaining({
+        name: 'Household.preferences.[].ingredientId',
+        fromTable: 'household',
+        fromField: 'ingredientId',
+        fromPath: ['preferences', '[]', 'ingredientId'],
+        toTable: 'ingredient',
+      }),
+      expect.objectContaining({
+        name: 'HouseholdMember.preferences.[].ingredientId',
+        fromTable: 'householdMember',
+        fromField: 'ingredientId',
+        fromPath: ['preferences', '[]', 'ingredientId'],
+        toTable: 'ingredient',
+      }),
+    ]);
+    expect(new Set(relationships.map((relationship) => relationship.name)).size).toBe(2);
+    expect(new Set(relationships.map((relationship) => relationship.fromField)).size).toBe(1);
     expect(parses(out)).toBe(true);
   });
 

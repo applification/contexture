@@ -18,6 +18,11 @@ interface Relationship {
   targetOwnershipScopeField: string | null;
 }
 
+// Relationship identity is occurrence-based, not local-field-based.
+// Reused embedded object types can produce multiple relationships with the
+// same fromField. Consumers should key on relationship.name, or on
+// fromTable + fromPath + toTable.
+
 function banner(sourcePath?: string): string {
   const base = '// @contexture-generated — do not edit by hand. Regenerated on every IR save.';
   return sourcePath ? `${base} Source: ${sourcePath}` : base;
