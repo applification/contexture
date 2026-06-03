@@ -8,6 +8,6 @@ describe('ActivityBar', () => {
 
     expect(
       screen.getAllByRole('button').map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Properties', 'Chat', 'Changes', 'Schema', 'Playground', 'Stdlib']);
+    ).toEqual(['Properties', 'Chat', 'Review', 'Changes', 'Schema', 'Playground', 'Stdlib']);
   });
 });

@@ -9,7 +9,14 @@ import { create } from 'zustand';
 
 export type Theme = 'dark' | 'light';
 export type ThemePreference = Theme | 'system';
-export type SidebarTab = 'properties' | 'chat' | 'schema' | 'playground' | 'stdlib' | 'changes';
+export type SidebarTab =
+  | 'properties'
+  | 'chat'
+  | 'review'
+  | 'schema'
+  | 'playground'
+  | 'stdlib'
+  | 'changes';
 
 const THEME_STORAGE_KEY = 'theme';
 
