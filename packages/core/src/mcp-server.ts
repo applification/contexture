@@ -6,6 +6,7 @@ import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-w
 import { GENERATED_TARGETS } from './generated-targets';
 import type { FieldType, Schema, TypeDef } from './ir';
 import { load } from './load';
+import { analyzeModelingHints } from './modeling-hints';
 import { createOpTools } from './op-tools';
 import { OpSchema } from './ops';
 import { assertContextureIrPath, bundlePathsFor } from './paths';
@@ -63,6 +64,44 @@ const GeneratedTargetInspectSchema = z.object({
   enabled: z.boolean(),
 });
 
+const ModelingHintInspectSchema = z.object({
+  id: z.string(),
+  kind: z.enum([
+    'owned_value_object',
+    'possible_entity',
+    'query_handle',
+    'derivation_policy',
+    'embedded_collection',
+    'stdlib_type',
+    'stringly_ref',
+  ]),
+  signals: z.array(
+    z.enum([
+      'identity_pressure',
+      'query_pressure',
+      'derivation_pressure',
+      'embedded_collection_pressure',
+      'concurrency_pressure',
+      'document_size_pressure',
+      'lifecycle_pressure',
+      'relationship_pressure',
+    ]),
+  ),
+  path: z.string(),
+  typeName: z.string(),
+  fieldName: z.string().optional(),
+  title: z.string(),
+  message: z.string(),
+  rationale: z.string(),
+  fieldNames: z.array(z.string()),
+  action: z
+    .union([
+      z.object({ kind: z.literal('use_stdlib_type'), typeName: z.string() }),
+      z.object({ kind: z.literal('convert_to_ref'), typeName: z.string() }),
+    ])
+    .optional(),
+});
+
 const InspectOutput = {
   path: z.string(),
   version: z.literal('1'),
@@ -78,6 +117,7 @@ const InspectOutput = {
   ),
   outputConfig: z.unknown().optional(),
   generatedTargets: z.array(GeneratedTargetInspectSchema),
+  modelingHints: z.array(ModelingHintInspectSchema),
   agent: z.object({
     preferredMutationTools: z.array(z.string()),
     safeLoop: z.array(z.string()),
@@ -487,6 +527,7 @@ function buildInspectSummary(
       path: target.path(paths),
       enabled: target.enabled(schema),
     })),
+    modelingHints: analyzeModelingHints(schema),
     agent: {
       preferredMutationTools,
       safeLoop: [

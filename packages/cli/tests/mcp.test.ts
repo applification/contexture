@@ -162,6 +162,53 @@ describe('Contexture MCP server', () => {
         agent: expect.objectContaining({
           preferredMutationTools: expect.arrayContaining(['add_field', 'rename_type', 'add_index']),
         }),
+        modelingHints: expect.any(Array),
+      });
+    });
+  });
+
+  it('includes modeling advisories in MCP inspect output', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'ShoppingList',
+          table: true,
+          fields: [
+            {
+              name: 'items',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'ShoppingListItem' } },
+            },
+          ],
+        },
+        {
+          kind: 'object',
+          name: 'ShoppingListItem',
+          fields: [
+            { name: 'ingredientName', type: { kind: 'string' } },
+            { name: 'checked', type: { kind: 'boolean' } },
+          ],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'inspect_contexture',
+        arguments: { irPath },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        modelingHints: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'embedded_collection',
+            typeName: 'ShoppingList',
+            fieldName: 'items',
+            title: 'Collaborative embedded collection',
+            signals: expect.arrayContaining(['concurrency_pressure']),
+          }),
+        ]),
       });
     });
   });

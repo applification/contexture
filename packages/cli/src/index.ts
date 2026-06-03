@@ -2,6 +2,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
+  analyzeModelingHints,
   assertContextureIrPath,
   buildConvexCapabilityManifest,
   checkGeneratedBundle,
@@ -268,6 +269,7 @@ interface InspectJson {
   typeCount: number;
   types: InspectJsonType[];
   imports: Array<{ kind: ImportDecl['kind']; alias: string; path: string }>;
+  modelingHints: ReturnType<typeof analyzeModelingHints>;
 }
 
 function typeToInspectJson(type: TypeDef): InspectJsonType {
@@ -317,6 +319,7 @@ function buildInspectJson(schema: Schema, irPath: string): InspectJson {
       alias: imp.alias,
       path: imp.path,
     })),
+    modelingHints: analyzeModelingHints(schema),
   };
 }
 
@@ -366,6 +369,16 @@ function renderInspectText(summary: InspectJson): string {
     lines.push('Imports:');
     for (const imp of summary.imports) {
       lines.push(`  ${imp.alias} -> ${imp.path}`);
+    }
+  }
+
+  if (summary.modelingHints.length > 0) {
+    lines.push('Modeling advisories:');
+    for (const hint of summary.modelingHints) {
+      const location = hint.fieldName ? `${hint.typeName}.${hint.fieldName}` : hint.typeName;
+      const signals = hint.signals.length > 0 ? ` [${hint.signals.join(', ')}]` : '';
+      lines.push(`  ${location}: ${hint.title}${signals}`);
+      lines.push(`    ${hint.message}`);
     }
   }
 
