@@ -192,9 +192,64 @@ describe('checkSemantic — refs', () => {
     expect(checkSemantic(schema, STDLIB).map((issue) => issue.code)).toEqual([
       'relationship_target_not_table',
       'relationship_set_null_requires_nullable',
+      'relationship_cleanup_index_missing',
       'relationship_scope_field_missing',
       'relationship_scope_field_missing',
     ]);
+  });
+
+  it('requires cleanup indexes for cascade and setNull delete policies', () => {
+    const baseTypes: Schema['types'] = [
+      { kind: 'object', name: 'Household', table: true, fields: [] },
+      {
+        kind: 'object',
+        name: 'Recipe',
+        table: true,
+        fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+      },
+    ];
+    const withoutIndex: Schema = {
+      version: '1',
+      types: [
+        ...baseTypes,
+        {
+          kind: 'object',
+          name: 'Leftover',
+          table: true,
+          fields: [
+            {
+              name: 'recipeId',
+              type: { kind: 'ref', typeName: 'Recipe', relationship: { onDelete: 'cascade' } },
+            },
+          ],
+        },
+      ],
+    };
+    const withIndex: Schema = {
+      version: '1',
+      types: [
+        ...baseTypes,
+        {
+          kind: 'object',
+          name: 'Leftover',
+          table: true,
+          fields: [
+            {
+              name: 'recipeId',
+              type: { kind: 'ref', typeName: 'Recipe', relationship: { onDelete: 'cascade' } },
+            },
+          ],
+          indexes: [{ name: 'by_recipe', fields: ['recipeId'] }],
+        },
+      ],
+    };
+
+    expect(checkSemantic(withoutIndex, STDLIB).map((issue) => issue.code)).toContain(
+      'relationship_cleanup_index_missing',
+    );
+    expect(checkSemantic(withIndex, STDLIB).map((issue) => issue.code)).not.toContain(
+      'relationship_cleanup_index_missing',
+    );
   });
 });
 

@@ -44,6 +44,17 @@ export interface OpToolDescriptor {
 
 // ---- Field-type + field-def schemas (shared across strict ops) ---------
 
+const RelationshipSchema = z.object({
+  name: z.string().min(1).optional(),
+  onDelete: z.enum(['none', 'restrict', 'cascade', 'setNull']).optional(),
+  ownership: z
+    .object({
+      scopeField: z.string().min(1),
+      targetScopeField: z.string().min(1).optional(),
+    })
+    .optional(),
+});
+
 // Using z.lazy keeps the recursive `array.element` case honest (the
 // inner FieldType needs the outer FieldType's schema); but we cast the
 // whole expression to the hand-written `FieldType` so downstream
@@ -82,6 +93,9 @@ const FieldTypeSchema: z.ZodType<import('./ir').FieldType> = z.lazy(() =>
             'by the op layer — the namespace prefix is mandatory for ' +
             'stdlib refs.',
         ),
+      relationship: RelationshipSchema.describe(
+        'Relationship intent for refs to Convex table types. Use onDelete for delete policy and ownership.scopeField/targetScopeField for same-tenant checks.',
+      ).optional(),
     }),
     z.object({
       kind: z.literal('array'),

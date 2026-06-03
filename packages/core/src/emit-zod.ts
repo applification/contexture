@@ -15,7 +15,9 @@
  *     validator, which treats stdlib namespaces as ambient.
  *   - Relative aliases map to `./<alias>.schema` (the emitted sibling of the
  *     referenced `.contexture.json`), importing only the names used.
- *   - Local refs emit as bare identifiers.
+ *   - Local refs to value-object types emit as bare identifiers.
+ *   - Local refs to table types emit as branded string ids, matching the
+ *     stored Convex document shape.
  *   - `raw` TypeDefs with an `import` hint emit an import from that module
  *     and re-export the name; otherwise the `zod` expression is inlined.
  *
@@ -221,7 +223,13 @@ function emitFieldType(t: FieldType, ctx: EmitContext): string {
       return `z.literal(${renderLiteral(t.value)})`;
     case 'ref': {
       const dot = t.typeName.indexOf('.');
-      if (dot === -1) return t.typeName;
+      if (dot === -1) {
+        const target = ctx.types.get(t.typeName);
+        if (target?.kind === 'object' && target.table === true) {
+          return `z.string().brand<'${target.name}Id'>()`;
+        }
+        return t.typeName;
+      }
       // Qualified: render as the bare imported name (import line already emitted).
       return t.typeName.slice(dot + 1);
     }
@@ -287,5 +295,7 @@ function collectLocalDependenciesForType(
     return;
   }
   if (t.kind !== 'ref') return;
+  const target = ctx.types.get(t.typeName);
+  if (target?.kind === 'object' && target.table === true) return;
   if (ctx.types.has(t.typeName)) dependencies.add(t.typeName);
 }

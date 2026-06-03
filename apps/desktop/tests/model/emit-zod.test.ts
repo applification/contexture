@@ -208,6 +208,32 @@ describe('emit (Zod)', () => {
     expect(src).toContain(`on: Post,`);
   });
 
+  it('emits a table ref as a branded id string instead of embedding the table object', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [
+            {
+              name: 'householdId',
+              optional: true,
+              type: { kind: 'ref', typeName: 'Household' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const src = emit(schema, 'x.contexture.json');
+
+    expect(src).toContain(`householdId: z.string().brand<'HouseholdId'>().optional(),`);
+    expect(src).not.toContain(`householdId: Household`);
+  });
+
   it('emits local dependencies before consumers', () => {
     const schema: Schema = {
       version: '1',

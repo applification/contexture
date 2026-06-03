@@ -656,6 +656,69 @@ describe('Contexture MCP server', () => {
     });
   });
 
+  it('preserves relationship metadata through the typed add_field MCP tool', async () => {
+    const irPath = await fixtureIr({
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Household', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Recipe',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+        {
+          kind: 'object',
+          name: 'MealPlanMeal',
+          table: true,
+          fields: [{ name: 'householdId', type: { kind: 'ref', typeName: 'Household' } }],
+        },
+      ],
+    });
+
+    await withClient(async (client) => {
+      const result = await client.callTool({
+        name: 'add_field',
+        arguments: {
+          irPath,
+          typeName: 'MealPlanMeal',
+          field: {
+            name: 'recipeId',
+            type: {
+              kind: 'ref',
+              typeName: 'Recipe',
+              relationship: {
+                onDelete: 'restrict',
+                ownership: { scopeField: 'householdId' },
+              },
+            },
+          },
+        },
+      });
+
+      expect(result.structuredContent).toMatchObject({
+        path: irPath,
+        applied: true,
+        opKind: 'add_field',
+      });
+      const updatedIr = JSON.parse(await readFile(irPath, 'utf8')) as {
+        types: Array<{ name: string; fields?: Array<{ name: string; type: unknown }> }>;
+      };
+      const mealPlanMeal = updatedIr.types.find((type) => type.name === 'MealPlanMeal');
+      expect(mealPlanMeal?.fields?.find((field) => field.name === 'recipeId')?.type).toEqual({
+        kind: 'ref',
+        typeName: 'Recipe',
+        relationship: {
+          onDelete: 'restrict',
+          ownership: { scopeField: 'householdId' },
+        },
+      });
+      await expect(
+        readFile(join(irPath, '..', 'convex', 'relationships.ts'), 'utf8'),
+      ).resolves.toContain('"onDelete": "restrict"');
+    });
+  });
+
   it('returns generated drift preflight failures as structured apply results', async () => {
     const irPath = await fixtureIr({
       version: '1',
