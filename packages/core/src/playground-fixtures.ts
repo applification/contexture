@@ -218,17 +218,9 @@ function generateControlValue(control: PlaygroundControl, ctx: GenerateValueCont
       if (fieldLooksLike(control.fieldName, ['quantity', 'amount', 'count'])) {
         return entityCategoryUsesFood(ctx.entityCategory)
           ? ctx.random.number({ min: 1, max: 12, int: true })
-          : ctx.random.number({
-              min: control.constraints.min ?? 1,
-              max: control.constraints.max ?? 20,
-              int: true,
-            });
+          : ctx.random.number(numberRange(control.constraints, { min: 1, max: 20, int: true }));
       }
-      return ctx.random.number({
-        min: control.constraints.min ?? 1,
-        max: control.constraints.max ?? 100,
-        int: control.constraints.int,
-      });
+      return ctx.random.number(numberRange(control.constraints, { min: 1, max: 100 }));
     case 'boolean':
       return ctx.random.boolean();
     case 'date':
@@ -284,11 +276,7 @@ function generateArrayElement(
     case 'text':
       return generateText(arrayScalarControl(element, fieldName), ctx);
     case 'number':
-      return ctx.random.number({
-        min: element.constraints.min ?? 1,
-        max: element.constraints.max ?? 20,
-        int: element.constraints.int,
-      });
+      return ctx.random.number(numberRange(element.constraints, { min: 1, max: 20 }));
     case 'boolean':
       return ctx.random.boolean();
     case 'date':
@@ -806,6 +794,15 @@ function isNameField(field: string, label: string): boolean {
 function fieldLooksLike(fieldName: string, needles: readonly string[]): boolean {
   const field = fieldName.toLowerCase();
   return needles.some((needle) => field.includes(needle));
+}
+
+function numberRange(
+  constraints: PlaygroundFieldConstraints,
+  fallback: { min: number; max: number; int?: boolean },
+): { min: number; max: number; int?: boolean } {
+  const min = constraints.min ?? fallback.min;
+  const max = constraints.max ?? Math.max(fallback.max, min + fallback.max - fallback.min);
+  return { min, max, int: constraints.int ?? fallback.int };
 }
 
 function singularFieldName(fieldName: string): string {
