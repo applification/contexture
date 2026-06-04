@@ -39,7 +39,6 @@ import {
   FolderOpen,
   GitCompareArrows,
   MousePointer2,
-  Save,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -62,8 +61,10 @@ import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
 import { ReviewPanel } from './components/review/ReviewPanel';
 import {
+  AgentSetupContent,
   type SchemaOutputType,
   SchemaPanel,
+  type SchemaPanelProps,
   type SchemaPanelSource,
 } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
@@ -111,6 +112,10 @@ export default function App(): React.JSX.Element {
     [setLayout],
   );
   const [showGraphControls, setShowGraphControls] = useState(false);
+  const [agentSetupCopied, setAgentSetupCopied] = useState<'install' | 'convex-ai-files' | null>(
+    null,
+  );
+  const agentSetupCopyTimeoutRef = useRef<number | null>(null);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const selectedField = useGraphSelectionStore((s) => s.state.selectedField);
@@ -326,6 +331,27 @@ export default function App(): React.JSX.Element {
     },
   });
 
+  useEffect(
+    () => () => {
+      if (agentSetupCopyTimeoutRef.current !== null) {
+        window.clearTimeout(agentSetupCopyTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const copyAgentSetupText = useCallback((key: 'install' | 'convex-ai-files', text: string) => {
+    copyToClipboard(text);
+    setAgentSetupCopied(key);
+    if (agentSetupCopyTimeoutRef.current !== null) {
+      window.clearTimeout(agentSetupCopyTimeoutRef.current);
+    }
+    agentSetupCopyTimeoutRef.current = window.setTimeout(() => {
+      setAgentSetupCopied(null);
+      agentSetupCopyTimeoutRef.current = null;
+    }, 2000);
+  }, []);
+
   useProjectAutoSave({
     getChat: chat.toHistory,
   });
@@ -380,8 +406,27 @@ export default function App(): React.JSX.Element {
       : undefined;
   const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
   const onboardingState = useMemo(
-    () => buildOnboardingState(schema, activeTab, filePath, isDirty, driftedPaths.length),
-    [activeTab, driftedPaths.length, filePath, isDirty, schema],
+    () =>
+      buildOnboardingState(
+        schema,
+        activeTab,
+        filePath,
+        isDirty,
+        driftedPaths.length,
+        convexVersion.status,
+        convexVersion.convexAiFiles.status,
+        convexVersion.contextureMcp.status,
+      ),
+    [
+      activeTab,
+      convexVersion.contextureMcp.status,
+      convexVersion.convexAiFiles.status,
+      convexVersion.status,
+      driftedPaths.length,
+      filePath,
+      isDirty,
+      schema,
+    ],
   );
 
   // Emit generated sources for the SchemaPanel. Only runs while the
@@ -598,11 +643,9 @@ export default function App(): React.JSX.Element {
                 {hasSchema && (
                   <OnboardingLoopPanel
                     state={onboardingState}
-                    onSave={() => void fileMenu.handleSave()}
-                    onShowAgent={() => {
-                      useUIChromeStore.getState().setSidebarVisible(true);
-                      useUIChromeStore.getState().setSidebarTab('chat');
-                    }}
+                    convexVersion={convexVersion}
+                    agentSetupCopied={agentSetupCopied}
+                    onCopyAgentSetup={copyAgentSetupText}
                   />
                 )}
                 <SchemaPanel
@@ -614,10 +657,10 @@ export default function App(): React.JSX.Element {
                   onOutputDirChange={updateSchemaOutputDir}
                   documentFilePath={filePath}
                   onOpenGeneratedFile={openGeneratedFile}
-                  onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                   schema={schema}
                   convexVersion={convexVersion}
+                  showAgentSetup={!hasSchema}
                 />
               </div>
               <div
@@ -808,6 +851,10 @@ interface OnboardingState {
   outputsVisible: boolean;
   hasSavedOutputs: boolean;
   driftClean: boolean;
+  convexVersionChecked: boolean;
+  convexVersionReady: boolean;
+  convexAiFilesReady: boolean;
+  contextureMcpReady: boolean;
 }
 
 function buildOnboardingState(
@@ -816,6 +863,9 @@ function buildOnboardingState(
   filePath: string | null,
   isDirty: boolean,
   driftedCount: number,
+  convexVersionStatus: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed',
+  convexAiFilesStatus: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed',
+  contextureMcpStatus: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed',
 ): OnboardingState {
   const objects = schema.types.filter((type) => type.kind === 'object');
   return {
@@ -828,37 +878,125 @@ function buildOnboardingState(
     outputsVisible: activeTab === 'schema',
     hasSavedOutputs: filePath !== null && !isDirty,
     driftClean: filePath !== null && driftedCount === 0,
+    convexVersionChecked: convexVersionStatus !== 'idle' && convexVersionStatus !== 'loading',
+    convexVersionReady: convexVersionStatus === 'ok',
+    convexAiFilesReady: convexAiFilesStatus === 'ready',
+    contextureMcpReady: contextureMcpStatus === 'ready',
   };
 }
 
 function OnboardingLoopPanel({
   state,
-  onSave,
-  onShowAgent,
+  convexVersion,
+  agentSetupCopied,
+  onCopyAgentSetup,
 }: {
   state: OnboardingState;
-  onSave: () => void;
-  onShowAgent: () => void;
+  convexVersion: SchemaPanelProps['convexVersion'];
+  agentSetupCopied: 'install' | 'convex-ai-files' | null;
+  onCopyAgentSetup: (key: 'install' | 'convex-ai-files', text: string) => void;
 }): React.JSX.Element {
-  const steps = [
-    { label: 'Table', done: state.hasTable },
-    { label: 'Fields', done: state.hasField },
-    { label: 'Ref', done: state.hasRef },
-    { label: 'Index', done: state.hasIndex },
-    { label: 'Outputs', done: state.outputsVisible },
-    { label: 'Saved', done: state.hasSavedOutputs },
-    { label: 'Drift clean', done: state.driftClean },
+  interface ReadinessDetail {
+    label: string;
+    done: boolean;
+    help: string;
+  }
+  const groups: {
+    label: string;
+    done: boolean;
+    note?: string;
+    detail: ReadinessDetail[];
+  }[] = [
+    {
+      label: 'Model',
+      done: state.hasTable && state.hasField && state.hasRef && state.hasIndex,
+      detail: [
+        {
+          label: 'Table',
+          done: state.hasTable,
+          help: 'Mark at least one object type as a Convex table.',
+        },
+        {
+          label: 'Fields',
+          done: state.hasField,
+          help: 'Add at least one field to an object type.',
+        },
+        {
+          label: 'Ref',
+          done: state.hasRef,
+          help: 'Add a ref field that points at another model type.',
+        },
+        {
+          label: 'Index',
+          done: state.hasIndex,
+          help: 'Add an index or search index to a table.',
+        },
+      ],
+    },
+    {
+      label: 'Generated',
+      done: state.outputsVisible && state.hasSavedOutputs && state.driftClean,
+      detail: [
+        {
+          label: 'Files visible',
+          done: state.outputsVisible,
+          help: 'Open the generated output preview in this panel.',
+        },
+        {
+          label: 'Saved',
+          done: state.hasSavedOutputs,
+          help: 'Save and emit this model so generated files are written to disk.',
+        },
+        {
+          label: 'Drift clean',
+          done: state.driftClean,
+          help: 'Resolve generated-file drift, then emit or check drift again.',
+        },
+      ],
+    },
+    {
+      label: 'Convex',
+      done: state.convexVersionChecked && state.convexVersionReady,
+      detail: [
+        {
+          label: 'Package checked',
+          done: state.convexVersionChecked,
+          help: 'Open a saved project so Contexture can inspect the target app package.',
+        },
+        {
+          label: 'Version match',
+          done: state.convexVersionReady,
+          help: 'Install or update Convex so the target app matches the Contexture emitter version.',
+        },
+      ],
+    },
+    {
+      label: 'Agent',
+      done: state.convexAiFilesReady && state.contextureMcpReady,
+      detail: [
+        {
+          label: 'Convex AI files',
+          done: state.convexAiFilesReady,
+          help: 'Run bunx convex ai-files install in the target repo.',
+        },
+        {
+          label: 'Contexture MCP',
+          done: state.contextureMcpReady,
+          help: 'Connect Contexture MCP to your agent client, then start a fresh agent session.',
+        },
+      ],
+    },
   ];
 
   return (
     <aside
-      className="border-b border-border bg-background p-3 text-xs"
-      aria-label="First Contexture loop"
+      className="border-b border-border bg-background px-3 py-2.5 text-xs"
+      aria-label="Project readiness"
       data-testid="onboarding-loop"
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">First Convex loop</h2>
+          <h2 className="text-sm font-semibold text-foreground">Project readiness</h2>
           <p className="mt-0.5 text-muted-foreground">
             The IR is the source; generated files can be replaced any time.
           </p>
@@ -866,57 +1004,103 @@ function OnboardingLoopPanel({
         <GitCompareArrows className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
 
-      <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        {steps.map((step) => (
-          <li
-            key={step.label}
-            className="flex min-h-8 items-center gap-1.5 rounded border border-border/70 bg-card/70 px-2"
-            aria-label={`${step.label} ${step.done ? 'complete' : 'incomplete'}`}
-          >
-            {step.done ? (
-              <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
-            ) : (
-              <span
-                className="size-3.5 shrink-0 rounded-full border border-muted-foreground/40"
-                aria-hidden="true"
-              />
-            )}
-            <span className={step.done ? 'text-foreground' : 'text-muted-foreground'}>
-              {step.label}
-            </span>
-          </li>
-        ))}
+      <ul className="mt-2 grid grid-cols-2 gap-1.5 min-[720px]:grid-cols-4">
+        {groups.map((group) => {
+          const completeCount = group.detail.filter((detail) => detail.done).length;
+          const detailText = group.detail
+            .map((detail) => `${detail.label}: ${detail.done ? 'ready' : 'needs action'}`)
+            .join(', ');
+          return (
+            <li key={group.label}>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="grid min-h-11 w-full grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-0.5 rounded border border-border/70 bg-card/60 px-2 py-1.5 text-left transition-colors hover:border-reference/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+                    aria-label={`${group.label}: ${detailText}. Open readiness details.`}
+                  >
+                    {group.done ? (
+                      <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+                    ) : (
+                      <span
+                        className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span
+                      className={`truncate ${group.done ? 'text-foreground' : 'text-muted-foreground'}`}
+                    >
+                      {group.label}
+                    </span>
+                    <span className="col-start-2 text-[10px] leading-none text-muted-foreground/80">
+                      {completeCount}/{group.detail.length}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className={group.label === 'Agent' ? 'w-[430px] p-2' : 'w-80 p-2'}
+                  align="start"
+                >
+                  {group.label === 'Agent' ? (
+                    <AgentSetupContent
+                      convexVersion={convexVersion}
+                      copied={agentSetupCopied}
+                      onCopy={onCopyAgentSetup}
+                    />
+                  ) : (
+                    <>
+                      <div className="px-1 pb-1">
+                        <h3 className="text-xs font-semibold text-foreground">
+                          {group.label} readiness
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground">
+                          {completeCount}/{group.detail.length} checks ready.
+                        </p>
+                      </div>
+                      <ul className="space-y-1">
+                        {group.detail.map((detail) => (
+                          <li
+                            key={detail.label}
+                            className="rounded border border-border/60 bg-background/70 px-2 py-1.5"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              {detail.done ? (
+                                <CheckCircle2
+                                  className="size-3.5 shrink-0 text-success"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <span
+                                  className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span className="text-[11px] font-medium text-foreground">
+                                {detail.label}
+                              </span>
+                              <span className="ml-auto text-[10px] text-muted-foreground">
+                                {detail.done ? 'Ready' : 'Needs action'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                              {detail.help}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                      {group.note ? (
+                        <p className="mt-2 rounded border border-warning/30 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                          {group.note}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </li>
+          );
+        })}
       </ul>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div
-          className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-secondary px-2 text-xs text-secondary-foreground"
-          aria-current="page"
-        >
-          <FileCode2 className="size-3.5" />
-          Generated files visible
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="h-8 gap-1.5 px-2 text-xs"
-          onClick={onSave}
-        >
-          <Save className="size-3.5" />
-          Save and emit
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 gap-1.5 px-2 text-xs"
-          onClick={onShowAgent}
-        >
-          <Bot className="size-3.5" />
-          Supervise agent ops
-        </Button>
-      </div>
     </aside>
   );
 }

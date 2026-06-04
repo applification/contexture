@@ -43,10 +43,10 @@ import {
   AArrowDown,
   AArrowUp,
   Check,
+  CheckCircle2,
   Copy,
   ExternalLink,
   FileBracesCorner,
-  FileCode,
   PlugZap,
   RotateCcw,
   Settings2,
@@ -122,8 +122,6 @@ export interface SchemaPanelProps {
   schema?: Schema;
   /** Open the selected generated file in an external editor. */
   onOpenGeneratedFile?: (path: string) => void;
-  /** Prompt the app save flow when agent setup needs a stable IR path. */
-  onRequestSave?: () => void;
   /** Local Convex support and target app version information. */
   convexVersion?: {
     emitterVersion: string | null;
@@ -131,7 +129,19 @@ export interface SchemaPanelProps {
     targetPackagePath: string | null;
     status: 'idle' | 'loading' | 'ok' | 'mismatch' | 'target_missing' | 'probe_failed';
     message: string | null;
+    convexAiFiles: {
+      status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+      message: string | null;
+      command: string | null;
+    };
+    contextureMcp: {
+      status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+      message: string | null;
+      command: string | null;
+    };
   };
+  /** Hide the agent setup trigger when a parent surface renders it nearby. */
+  showAgentSetup?: boolean;
 }
 
 /**
@@ -155,6 +165,8 @@ const CONTEXTURE_MCP_BIN_PATH =
 
 const CODEX_MCP_INSTALL_COMMAND = `codex mcp add contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
 
+const CONVEX_AI_FILES_INSTALL_COMMAND = 'bunx convex ai-files install';
+
 const CLAUDE_CODE_MCP_INSTALL_COMMAND = `claude mcp add --transport stdio --scope user contexture -- ${CONTEXTURE_MCP_BIN_PATH}`;
 
 const CLAUDE_DESKTOP_CONFIG_PATH =
@@ -176,16 +188,7 @@ const AGENT_CLIENT_LABEL: Record<AgentClient, string> = {
   'claude-desktop': 'Claude Desktop',
 };
 
-const CONTEXTURE_MCP_TOOLS = [
-  'inspect_contexture',
-  'inspect_domain_brief',
-  'validate_contexture',
-  'apply_contexture_op',
-  'emit_contexture',
-  'check_contexture_drift',
-] as const;
-
-type AgentSetupCopyKey = 'install' | 'prompt' | 'smoke';
+type AgentSetupCopyKey = 'install' | 'convex-ai-files';
 
 interface OutputOption {
   type: SchemaOutputType;
@@ -220,8 +223,8 @@ export function SchemaPanel({
   documentFilePath = null,
   schema,
   onOpenGeneratedFile,
-  onRequestSave,
   convexVersion,
+  showAgentSetup = true,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<GeneratedTargetKind>('convex');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -413,10 +416,10 @@ export function SchemaPanel({
         </Empty>
         <div className="px-3 pb-3">
           <AgentSetupPopover
-            documentFilePath={documentFilePath}
+            convexVersion={convexVersion}
             copied={agentCopied}
             onCopy={handleAgentCopy}
-            onRequestSave={onRequestSave}
+            className="w-full"
           />
         </div>
       </div>
@@ -434,24 +437,35 @@ export function SchemaPanel({
             Couldn't emit schema: {error}
           </p>
         </div>
-        <div className="pt-2">
-          <AgentSetupPopover
-            documentFilePath={documentFilePath}
-            copied={agentCopied}
-            onCopy={handleAgentCopy}
-            onRequestSave={onRequestSave}
-          />
-        </div>
+        {showAgentSetup ? (
+          <div className="pt-2">
+            <AgentSetupPopover
+              convexVersion={convexVersion}
+              copied={agentCopied}
+              onCopy={handleAgentCopy}
+              className="w-full"
+            />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
+      {showAgentSetup ? (
+        <div className="mb-2">
+          <AgentSetupPopover
+            convexVersion={convexVersion}
+            copied={agentCopied}
+            onCopy={handleAgentCopy}
+            className="w-full"
+          />
+        </div>
+      ) : null}
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            <FileCode className="size-3.5 shrink-0" />
+        <div className="border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-1.5">
                 <OutputSelect
@@ -473,86 +487,83 @@ export function SchemaPanel({
                   }}
                   onOutputDirChange={onOutputDirChange}
                 />
-                <AgentSetupPopover
-                  documentFilePath={documentFilePath}
-                  copied={agentCopied}
-                  onCopy={handleAgentCopy}
-                  onRequestSave={onRequestSave}
-                  compact
-                />
               </div>
-              <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
-                {selectedOutputDisplayPath}
-              </div>
-              <div
-                className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80"
-                data-testid="schema-output-boundary"
-              >
-                Read-only generated output
-              </div>
-              {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
-                <div
-                  className="mt-0.5 truncate text-[10px] text-muted-foreground"
-                  title={convexVersionTooltip(convexVersion)}
-                  data-testid="schema-convex-version"
-                >
-                  {convexVersionLabel(convexVersion)}
-                </div>
-              ) : null}
             </div>
-          </div>
-          <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={() => setFontSizeIndex((i) => Math.max(0, i - 1))}
-              disabled={!canShrink}
-              aria-label="Decrease font size"
-              title="Decrease font size"
-              data-testid="schema-font-decrease"
-            >
-              <AArrowDown className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={() => setFontSizeIndex((i) => Math.min(FONT_SIZE_STEPS.length - 1, i + 1))}
-              disabled={!canGrow}
-              aria-label="Increase font size"
-              title="Increase font size"
-              data-testid="schema-font-increase"
-            >
-              <AArrowUp className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={handleCopy}
-              aria-label={copied ? 'Copied' : 'Copy schema source'}
-              title={copied ? 'Copied' : 'Copy schema source'}
-              data-testid="schema-copy"
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </Button>
-            {selectedOutputPath && onOpenGeneratedFile ? (
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 size="icon"
                 type="button"
                 variant="ghost"
                 className="size-7"
-                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
-                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
-                title={`Open ${selectedOutput.fileName} in VS Code`}
-                data-testid="schema-open-generated"
+                onClick={() => setFontSizeIndex((i) => Math.max(0, i - 1))}
+                disabled={!canShrink}
+                aria-label="Decrease font size"
+                title="Decrease font size"
+                data-testid="schema-font-decrease"
               >
-                <ExternalLink className="size-3.5" />
+                <AArrowDown className="size-3.5" />
               </Button>
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={() => setFontSizeIndex((i) => Math.min(FONT_SIZE_STEPS.length - 1, i + 1))}
+                disabled={!canGrow}
+                aria-label="Increase font size"
+                title="Increase font size"
+                data-testid="schema-font-increase"
+              >
+                <AArrowUp className="size-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={handleCopy}
+                aria-label={copied ? 'Copied' : 'Copy schema source'}
+                title={copied ? 'Copied' : 'Copy schema source'}
+                data-testid="schema-copy"
+              >
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              </Button>
+              {selectedOutputPath && onOpenGeneratedFile ? (
+                <Button
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                  className="size-7"
+                  onClick={() => onOpenGeneratedFile(selectedOutputPath)}
+                  aria-label={`Open ${selectedOutput.fileName} in VS Code`}
+                  title={`Open ${selectedOutput.fileName} in VS Code`}
+                  data-testid="schema-open-generated"
+                >
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-[10px] leading-snug text-muted-foreground">
+            <span className="min-w-0 truncate font-mono" data-testid="schema-filename">
+              {selectedOutputDisplayPath}
+            </span>
+            {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
+              <span
+                className={`shrink-0 ${
+                  convexVersion.status === 'mismatch' || convexVersion.status === 'target_missing'
+                    ? 'text-warning'
+                    : 'text-muted-foreground'
+                }`}
+                title={convexVersionTooltip(convexVersion)}
+                data-testid="schema-convex-version"
+              >
+                {convexVersion.status === 'mismatch'
+                  ? 'Convex mismatch'
+                  : convexVersion.status === 'target_missing'
+                    ? 'Convex missing'
+                    : convexVersionLabel(convexVersion)}
+              </span>
             ) : null}
           </div>
         </div>
@@ -576,7 +587,7 @@ function convexVersionLabel(version: NonNullable<SchemaPanelProps['convexVersion
   if (version.status === 'loading') return 'Checking Convex version...';
   if (version.targetVersion) {
     if (version.status === 'ok') {
-      return `Convex ${version.emitterVersion} · emitter and target app`;
+      return `Convex ${version.emitterVersion}`;
     }
     return `Emitter Convex ${version.emitterVersion} · target app ${version.targetVersion}`;
   }
@@ -899,213 +910,297 @@ function dirname(path: string): string {
   return path.slice(0, slash);
 }
 
-function AgentSetupPopover({
-  documentFilePath,
+export function AgentSetupPopover({
+  convexVersion,
   copied,
   onCopy,
-  onRequestSave,
-  compact = false,
+  className = '',
 }: {
-  documentFilePath: string | null;
+  convexVersion?: SchemaPanelProps['convexVersion'];
   copied: AgentSetupCopyKey | null;
   onCopy: (key: AgentSetupCopyKey, text: string) => void;
-  onRequestSave?: () => void;
-  compact?: boolean;
+  className?: string;
 }): React.JSX.Element {
-  const [activeClient, setActiveClient] = useState<AgentClient>('codex');
-  const savedPrompt =
-    documentFilePath === null
-      ? null
-      : `Use the Contexture MCP server to inspect ${documentFilePath}, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.`;
-  const smokeTest =
-    documentFilePath === null
-      ? 'Ask your agent: "List the contexture MCP tools."'
-      : `Ask your agent: "List the contexture MCP tools, then inspect ${documentFilePath}, read the domain brief, and summarize the Convex tables plus unresolved decisions."`;
-  const copiedLabel =
-    copied === 'install'
-      ? 'Copied install command'
-      : copied === 'prompt'
-        ? 'Copied saved-document prompt'
-        : copied === 'smoke'
-          ? 'Copied smoke test'
-          : '';
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant={compact ? 'ghost' : 'secondary'}
-          className={
-            compact
-              ? 'h-7 shrink-0 gap-1.5 px-2 text-xs'
-              : 'h-auto w-full justify-start gap-2 px-2 py-2 text-left'
-          }
-          aria-label="Open Agent setup"
+          variant="secondary"
+          className={`h-auto justify-start gap-2 px-2 py-2 text-left ${className}`}
+          aria-label="Open agent setup"
           data-testid="agent-setup"
         >
           <PlugZap className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          <span className={compact ? 'sr-only' : 'min-w-0'}>
+          <span className="min-w-0">
             <span className="block text-xs font-semibold">Agent setup</span>
             <span className="block text-[11px] font-normal text-muted-foreground">
-              {savedPrompt === null ? 'Save for prompt handoff' : 'Saved prompt ready'}
+              Convex AI files and MCP
             </span>
           </span>
-          {compact ? <span className="text-xs">Agent</span> : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-2" align="end" data-testid="agent-setup-content">
-        <div className="mb-2 px-1">
-          <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
-            Agent setup
-          </h3>
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            Connect Contexture's MCP server to your agent and evolve this Convex model.
-          </p>
-        </div>
-
-        <Tabs
-          value={activeClient}
-          onValueChange={(value) => setActiveClient(value as AgentClient)}
-          className="mb-2"
-        >
-          <TabsList
-            className="grid h-8 w-full grid-cols-3 p-0.5"
-            aria-label="MCP client install instructions"
-          >
-            <TabsTrigger
-              value="codex"
-              className="h-7 px-1 text-[11px]"
-              data-testid="agent-setup-tab-codex"
-            >
-              {AGENT_CLIENT_LABEL.codex}
-            </TabsTrigger>
-            <TabsTrigger
-              value="claude-code"
-              className="h-7 px-1 text-[11px]"
-              data-testid="agent-setup-tab-claude-code"
-            >
-              {AGENT_CLIENT_LABEL['claude-code']}
-            </TabsTrigger>
-            <TabsTrigger
-              value="claude-desktop"
-              className="h-7 px-1 text-[11px]"
-              data-testid="agent-setup-tab-claude-desktop"
-            >
-              {AGENT_CLIENT_LABEL['claude-desktop']}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="codex" className="mt-2">
-            <AgentCopyRow
-              label="Codex install command"
-              value={CODEX_MCP_INSTALL_COMMAND}
-              copied={copied === 'install'}
-              onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
-              copyLabel="Copy Codex MCP install command"
-              testId="agent-setup-install"
-            />
-            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
-              Run in a terminal. Codex picks the server up on the next session.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="claude-code" className="mt-2">
-            <AgentCopyRow
-              label="Claude Code install command"
-              value={CLAUDE_CODE_MCP_INSTALL_COMMAND}
-              copied={copied === 'install'}
-              onCopy={() => onCopy('install', CLAUDE_CODE_MCP_INSTALL_COMMAND)}
-              copyLabel="Copy Claude Code MCP install command"
-              testId="agent-setup-claude-code-install"
-            />
-            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
-              Run in a terminal. <code className="font-mono">--scope user</code> makes the server
-              available in every project; drop it to scope to the current directory. Verify with{' '}
-              <code className="font-mono">/mcp</code> inside Claude Code.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="claude-desktop" className="mt-2">
-            <AgentCopyRow
-              label="claude_desktop_config.json"
-              value={CLAUDE_DESKTOP_CONFIG_SNIPPET}
-              copied={copied === 'install'}
-              onCopy={() => onCopy('install', CLAUDE_DESKTOP_CONFIG_SNIPPET)}
-              copyLabel="Copy Claude Desktop MCP config"
-              testId="agent-setup-claude-desktop-install"
-            />
-            <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
-              Merge into{' '}
-              <code
-                className="font-mono break-all"
-                data-testid="agent-setup-claude-desktop-config-path"
-              >
-                {CLAUDE_DESKTOP_CONFIG_PATH}
-              </code>{' '}
-              (Settings → Developer → Edit Config), then restart Claude Desktop.
-            </p>
-          </TabsContent>
-        </Tabs>
-
-        <div className="space-y-1.5">
-          {savedPrompt === null ? (
-            <div
-              className="rounded border border-dashed border-border/80 bg-background/60 p-2 text-[11px] leading-snug text-muted-foreground"
-              data-testid="agent-setup-unsaved"
-            >
-              <p>
-                Save this document to create a stable .contexture.json path before handing it to an
-                agent.
-              </p>
-              {onRequestSave ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="mt-2 h-7 text-xs"
-                  onClick={onRequestSave}
-                >
-                  Save first
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <AgentCopyRow
-              label="Saved-document prompt"
-              value={savedPrompt}
-              copied={copied === 'prompt'}
-              onCopy={() => onCopy('prompt', savedPrompt)}
-              copyLabel="Copy saved-document prompt"
-              testId="agent-setup-prompt"
-            />
-          )}
-
-          <AgentCopyRow
-            label="Smoke test"
-            value={smokeTest}
-            copied={copied === 'smoke'}
-            onCopy={() => onCopy('smoke', smokeTest)}
-            copyLabel="Copy MCP smoke test"
-            testId="agent-setup-smoke"
-          />
-        </div>
-
-        <ul className="mt-2 flex flex-wrap gap-1 text-[10px]" aria-label="Contexture MCP tools">
-          {CONTEXTURE_MCP_TOOLS.map((tool) => (
-            <li key={tool}>
-              <code className="rounded border border-border/70 bg-background/70 px-1.5 py-0.5 font-mono text-muted-foreground">
-                {tool}
-              </code>
-            </li>
-          ))}
-        </ul>
-        <p className="sr-only" aria-live="polite">
-          {copiedLabel}
-        </p>
+      <PopoverContent className="w-[430px] p-2" align="end" data-testid="agent-setup-content">
+        <AgentSetupContent convexVersion={convexVersion} copied={copied} onCopy={onCopy} />
       </PopoverContent>
     </Popover>
   );
+}
+
+export function AgentSetupContent({
+  convexVersion,
+  copied,
+  onCopy,
+}: {
+  convexVersion?: SchemaPanelProps['convexVersion'];
+  copied: AgentSetupCopyKey | null;
+  onCopy: (key: AgentSetupCopyKey, text: string) => void;
+}): React.JSX.Element {
+  const [activeClient, setActiveClient] = useState<AgentClient>('codex');
+  const convexAiFilesStatus = setupAgentReadinessStatus(convexVersion?.convexAiFiles);
+  const contextureMcpStatus = setupAgentReadinessStatus(convexVersion?.contextureMcp);
+  const checks: AgentSetupCheck[] = [
+    {
+      label: 'Convex AI files',
+      status: convexAiFilesStatus.status,
+      description: convexAiFilesStatus.description,
+      command: CONVEX_AI_FILES_INSTALL_COMMAND,
+    },
+    {
+      label: 'Contexture MCP',
+      status: contextureMcpStatus.status,
+      description: contextureMcpStatus.description,
+      actionLabel: 'Choose client',
+    },
+  ];
+  const readyCount = checks.filter((check) => check.status === 'ready').length;
+  const copiedLabel =
+    copied === 'install'
+      ? 'Copied install command'
+      : copied === 'convex-ai-files'
+        ? 'Copied Convex AI files command'
+        : '';
+
+  return (
+    <>
+      <div className="mb-2 px-1">
+        <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
+          Agent readiness
+        </h3>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {readyCount}/{checks.length} checks ready.
+        </p>
+      </div>
+
+      <div className="mb-2 space-y-1.5">
+        {checks.map((check) => (
+          <AgentSetupCheckRow
+            key={check.label}
+            label={check.label}
+            status={check.status}
+            description={check.description}
+            actionLabel={check.actionLabel}
+            onAction={check.onAction}
+            command={check.command}
+            commandCopied={copied === 'convex-ai-files'}
+            onCommandCopy={
+              check.command ? () => onCopy('convex-ai-files', check.command as string) : undefined
+            }
+          />
+        ))}
+      </div>
+
+      <Tabs value={activeClient} onValueChange={(value) => setActiveClient(value as AgentClient)}>
+        <TabsList
+          className="grid h-8 w-full grid-cols-3 p-0.5"
+          aria-label="MCP client install instructions"
+        >
+          <TabsTrigger
+            value="codex"
+            className="h-7 px-1 text-[11px]"
+            data-testid="agent-setup-tab-codex"
+          >
+            {AGENT_CLIENT_LABEL.codex}
+          </TabsTrigger>
+          <TabsTrigger
+            value="claude-code"
+            className="h-7 px-1 text-[11px]"
+            data-testid="agent-setup-tab-claude-code"
+          >
+            {AGENT_CLIENT_LABEL['claude-code']}
+          </TabsTrigger>
+          <TabsTrigger
+            value="claude-desktop"
+            className="h-7 px-1 text-[11px]"
+            data-testid="agent-setup-tab-claude-desktop"
+          >
+            {AGENT_CLIENT_LABEL['claude-desktop']}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="codex" className="mt-2">
+          <AgentCopyRow
+            label="Codex MCP command"
+            value={CODEX_MCP_INSTALL_COMMAND}
+            copied={copied === 'install'}
+            onCopy={() => onCopy('install', CODEX_MCP_INSTALL_COMMAND)}
+            copyLabel="Copy Codex MCP install command"
+            testId="agent-setup-install"
+          />
+          <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+            Run in a terminal. Codex picks the server up on the next session.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="claude-code" className="mt-2">
+          <AgentCopyRow
+            label="Claude Code install command"
+            value={CLAUDE_CODE_MCP_INSTALL_COMMAND}
+            copied={copied === 'install'}
+            onCopy={() => onCopy('install', CLAUDE_CODE_MCP_INSTALL_COMMAND)}
+            copyLabel="Copy Claude Code MCP install command"
+            testId="agent-setup-claude-code-install"
+          />
+          <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+            Run in a terminal. <code className="font-mono">--scope user</code> makes the server
+            available in every project; drop it to scope to the current directory. Verify with{' '}
+            <code className="font-mono">/mcp</code> inside Claude Code.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="claude-desktop" className="mt-2">
+          <AgentCopyRow
+            label="claude_desktop_config.json"
+            value={CLAUDE_DESKTOP_CONFIG_SNIPPET}
+            copied={copied === 'install'}
+            onCopy={() => onCopy('install', CLAUDE_DESKTOP_CONFIG_SNIPPET)}
+            copyLabel="Copy Claude Desktop MCP config"
+            testId="agent-setup-claude-desktop-install"
+          />
+          <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+            Merge into{' '}
+            <code
+              className="font-mono break-all"
+              data-testid="agent-setup-claude-desktop-config-path"
+            >
+              {CLAUDE_DESKTOP_CONFIG_PATH}
+            </code>{' '}
+            (Settings → Developer → Edit Config), then restart Claude Desktop.
+          </p>
+        </TabsContent>
+      </Tabs>
+      <p className="sr-only" aria-live="polite">
+        {copiedLabel}
+      </p>
+    </>
+  );
+}
+
+interface AgentSetupCheck {
+  label: string;
+  status: SetupReadinessStatus;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  command?: string;
+}
+
+function AgentSetupCheckRow({
+  label,
+  status,
+  description,
+  actionLabel,
+  onAction,
+  command,
+  commandCopied = false,
+  onCommandCopy,
+}: {
+  label: string;
+  status: SetupReadinessStatus;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  command?: string;
+  commandCopied?: boolean;
+  onCommandCopy?: () => void;
+}): React.JSX.Element {
+  const done = status === 'ready';
+  const statusLabel = done ? 'Ready' : status === 'needs_action' ? 'Needs action' : 'Not checked';
+
+  return (
+    <div className="rounded border border-border/60 bg-background/70 px-2 py-1.5">
+      <div className="flex items-center gap-1.5">
+        {done ? (
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+        ) : (
+          <span
+            className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+            aria-hidden="true"
+          />
+        )}
+        <span className="text-[11px] font-medium text-foreground">{label}</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">{statusLabel}</span>
+      </div>
+      <div className="mt-1 flex items-start gap-2">
+        <p className="min-w-0 flex-1 text-[10px] leading-snug text-muted-foreground">
+          {description}
+        </p>
+        {actionLabel && onAction ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-6 shrink-0 px-2 text-[11px]"
+            onClick={onAction}
+          >
+            {actionLabel}
+          </Button>
+        ) : actionLabel ? (
+          <span className="shrink-0 text-[10px] text-muted-foreground">{actionLabel}</span>
+        ) : null}
+      </div>
+      {command && !done ? (
+        <div className="mt-1.5">
+          <AgentCopyRow
+            label="Install command"
+            value={command}
+            copied={commandCopied}
+            onCopy={onCommandCopy ?? (() => undefined)}
+            copyLabel="Copy Convex AI files install command"
+            testId="agent-setup-convex-ai-files-install"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type SetupReadinessStatus = 'ready' | 'needs_action' | 'unknown';
+
+function setupAgentReadinessStatus(
+  check:
+    | {
+        status: 'idle' | 'loading' | 'ready' | 'not_ready' | 'probe_failed';
+        message: string | null;
+        command: string | null;
+      }
+    | undefined,
+): { status: SetupReadinessStatus; description: string } {
+  if (!check || check.status === 'idle' || check.status === 'loading') {
+    return { status: 'unknown', description: 'Checking setup status.' };
+  }
+  if (check.status === 'ready') {
+    return { status: 'ready', description: 'Detected and ready.' };
+  }
+  if (check.status === 'not_ready') {
+    return {
+      status: 'needs_action',
+      description: check.message || 'Setup is not ready yet.',
+    };
+  }
+  return {
+    status: 'needs_action',
+    description: check.message || 'Setup status could not be checked.',
+  };
 }
 
 function AgentCopyRow({

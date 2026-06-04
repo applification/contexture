@@ -50,11 +50,24 @@ describe('SchemaPanel', () => {
     expect(code.textContent).toContain('export const Foo = z.object({})');
   });
 
-  it('labels generated previews as read-only output', () => {
-    render(<SchemaPanel {...DEFAULT_PROPS} convexSource="export default {};\n" />);
-    expect(screen.getByTestId('schema-output-boundary')).toHaveTextContent(
-      'Read-only generated output',
+  it('shows generated output path and Convex metadata in the compact header', () => {
+    render(
+      <SchemaPanel
+        {...DEFAULT_PROPS}
+        convexSource="export default {};\n"
+        convexVersion={{
+          emitterVersion: '1.39.1',
+          targetVersion: '1.39.1',
+          targetPackagePath: '/repo/package.json',
+          status: 'ok',
+          message: 'Contexture emitter and target app Convex versions match.',
+          convexAiFiles: { status: 'ready', message: 'Detected and ready.', command: null },
+          contextureMcp: { status: 'ready', message: 'Detected and ready.', command: null },
+        }}
+      />,
     );
+    expect(screen.getByTestId('schema-filename')).toHaveTextContent('convex/schema.ts');
+    expect(screen.getByTestId('schema-convex-version')).toHaveTextContent('Convex 1.39.1');
   });
 
   it('invokes onCopy with the zod source when Copy is clicked on the Zod tab', () => {
@@ -65,20 +78,27 @@ describe('SchemaPanel', () => {
     expect(onCopy).toHaveBeenCalledWith(source);
   });
 
-  it('shows Agent setup with the packaged Codex MCP install command', () => {
+  it('shows agent setup readiness with Convex AI files and packaged Codex MCP commands', () => {
     render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" />);
 
     expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
     fireEvent.click(screen.getByTestId('agent-setup'));
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Agent readiness');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('0/2 checks ready.');
+    expect(screen.getByTestId('agent-setup-content')).not.toHaveTextContent('Convex package');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
+    expect(screen.getByTestId('agent-setup-convex-ai-files-install-value')).toHaveTextContent(
+      'bunx convex ai-files install',
+    );
+    fireEvent.click(screen.getByTestId('agent-setup-convex-ai-files-install-copy'));
+    expect(screen.getByText('Copied Convex AI files command')).toBeInTheDocument();
     expect(screen.getByTestId('agent-setup-install-value')).toHaveTextContent(
       'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
     );
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_contexture');
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('inspect_domain_brief');
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('validate_contexture');
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('apply_contexture_op');
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('emit_contexture');
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('check_contexture_drift');
+    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prompt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Smoke test')).not.toBeInTheDocument();
   });
 
   it('copies the Agent setup install command with announced feedback', () => {
@@ -136,53 +156,13 @@ describe('SchemaPanel', () => {
     );
   });
 
-  it('uses the saved document path in the Agent setup prompt and smoke test', () => {
-    const onCopy = vi.fn();
-    render(
-      <SchemaPanel
-        {...DEFAULT_PROPS}
-        zodSource="zod"
-        documentFilePath="/repo/garden.contexture.json"
-        onCopy={onCopy}
-      />,
-    );
+  it('keeps Agent setup focused on install checks before the document has a path', () => {
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" documentFilePath={null} />);
 
     fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
-    );
-    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask your agent: "List the contexture MCP tools, then inspect /repo/garden.contexture.json, read the domain brief, and summarize the Convex tables plus unresolved decisions."',
-    );
-
-    fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
-    expect(onCopy).toHaveBeenCalledWith(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
-    );
-  });
-
-  it('shows a save-first Agent setup state before the document has a path', () => {
-    const onRequestSave = vi.fn();
-    render(
-      <SchemaPanel
-        {...DEFAULT_PROPS}
-        zodSource="zod"
-        documentFilePath={null}
-        onRequestSave={onRequestSave}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-unsaved')).toHaveTextContent(
-      'Save this document to create a stable .contexture.json path before handing it to an agent.',
-    );
-    expect(screen.queryByLabelText('Saved-document prompt')).not.toBeInTheDocument();
-    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask your agent: "List the contexture MCP tools."',
-    );
-
-    fireEvent.click(screen.getByText('Save first'));
-    expect(onRequestSave).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
+    expect(screen.queryByText('Save first')).not.toBeInTheDocument();
   });
 
   it('renders an error message when `error` is non-null and hides the code/copy controls', () => {
@@ -209,9 +189,8 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('schema-error')).toBeInTheDocument();
     expect(screen.getByTestId('agent-setup')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing.',
-    );
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
   });
 
   it('prefers the empty state over the error state when the schema is empty', () => {
@@ -273,7 +252,7 @@ describe('SchemaPanel', () => {
       expect(screen.queryByTestId('schema-group-agent')).not.toBeInTheDocument();
     });
 
-    it('shows the Convex emitter and target app version for Convex outputs', () => {
+    it('warns about Convex version mismatches for Convex outputs', () => {
       const convexSrc = 'import { defineSchema } from "convex/server";\n';
       render(
         <SchemaPanel
@@ -286,13 +265,13 @@ describe('SchemaPanel', () => {
             targetPackagePath: '/repo/apps/plantry/package.json',
             status: 'mismatch',
             message: 'Contexture emitter and target app Convex versions differ.',
+            convexAiFiles: { status: 'ready', message: 'Detected and ready.', command: null },
+            contextureMcp: { status: 'ready', message: 'Detected and ready.', command: null },
           }}
         />,
       );
 
-      expect(screen.getByTestId('schema-convex-version')).toHaveTextContent(
-        'Emitter Convex 1.40.0 · target app 1.37.0',
-      );
+      expect(screen.getByTestId('schema-convex-version')).toHaveTextContent('Convex mismatch');
     });
 
     it('switches to JSON Schema source when the JSON output is selected', async () => {

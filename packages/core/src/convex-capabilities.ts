@@ -1,5 +1,9 @@
+import rootPackageJson from '../../../package.json' with { type: 'json' };
+
 export const CONVEX_CAPABILITY_MANIFEST_VERSION = 1;
-export const CONTEXTURE_SUPPORTED_CONVEX_VERSION = '1.40.0';
+export const CONTEXTURE_SUPPORTED_CONVEX_VERSION = normalizeConvexPackageVersion(
+  rootPackageJson.devDependencies.convex,
+);
 
 export interface ConvexCapabilityManifest {
   version: typeof CONVEX_CAPABILITY_MANIFEST_VERSION;
@@ -53,4 +57,12 @@ export function parseConvexCliCommands(help: string): string[] {
 
 function sortedUnique(values: Iterable<string>): string[] {
   return [...new Set([...values].filter((value) => value.length > 0))].sort();
+}
+
+function normalizeConvexPackageVersion(version: string): string {
+  return version
+    .trim()
+    .replace(/^npm:/u, '')
+    .replace(/^convex@/u, '')
+    .replace(/^[~^=<> ]+/u, '');
 }

@@ -139,8 +139,7 @@ test.describe('Contexture CRUD', () => {
     await expect(source).toContainText('.index("by_email", ["email"])');
     await expect(source).toContainText('post: defineTable');
     await expect(source).toContainText('.index("by_author", ["author"])');
-    await expect(page.getByTestId('schema-output-boundary')).toContainText(
-      'Read-only generated output',
-    );
+    await expect(page.getByTestId('schema-output-selector')).toContainText('Convex schema');
+    await expect(page.getByTestId('schema-filename')).toContainText('convex/schema.ts');
   });
 });
