@@ -4,17 +4,13 @@
  * Primary desktop layout:
  *
  *   ┌───────────────────────── Toolbar ─────────────────────────┐
- *   ├──────────────────────────────────────────┬────────────────┤
- *   │                                          │ SidePanel      │
- *   │             GraphCanvas                  │  (Detail /     │
- *   │                                          │   Chat /       │
- *   │                                          │   Schema)      │
- *   │                                          │  + ActivityBar │
+ *   ├────────────────────────────────┬──────────────────────────┤
+ *   │   GraphCanvas + Inspector      │ Activity drawer + rail   │
  *   ├──────────────────────────── StatusBar ───┴────────────────┤
  *   └───────────────────────────────────────────────────────────┘
  *
- * Canvas and side panel sit inside a `ResizablePanelGroup` so the
- * split is drag-adjustable and the side panel can collapse when
+ * Canvas and right workspace sit inside a `ResizablePanelGroup` so the
+ * split is drag-adjustable and the workspace can collapse when
  * `useUIChromeStore.sidebarVisible` is false (toggled by the Toolbar's
  * sidebar button).
  */
@@ -26,7 +22,7 @@ import {
   previewableGeneratedTargets,
   setGeneratedTargetOutputDir,
 } from '@contexture/core/generated-targets';
-import type { Schema } from '@contexture/core/ir';
+import type { Schema, TypeDef } from '@contexture/core/ir';
 import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
   Bot,
@@ -38,8 +34,13 @@ import {
   FilePlus2,
   FolderOpen,
   GitCompareArrows,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
   MousePointer2,
+  Play,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
@@ -55,7 +56,7 @@ import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
 import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/graph/interactions';
-import { TYPE_NODE_EVENT, TYPE_NODE_OBJECT_EVENT } from './components/graph/nodes/TypeNode';
+import { TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
 import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
@@ -71,6 +72,7 @@ import { StatusBar } from './components/status-bar/StatusBar';
 import { StdlibPanel } from './components/stdlib/StdlibPanel';
 import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
+import { TypeKindBadge, type TypeKindLabel } from './components/toolbar/type-kind-badge';
 import { UpdateBanner } from './components/UpdateBanner';
 import { Button } from './components/ui/button';
 import {
@@ -89,6 +91,7 @@ import { useModelSync } from './hooks/useModelSync';
 import { useProjectAutoSave } from './hooks/useProjectAutoSave';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import allotment from './samples/allotment.contexture.json' with { type: 'json' };
+import { useChatComposerStore } from './store/chat-composer';
 import { useConvexVersionStore } from './store/convex-version';
 import { useDocumentStore } from './store/document';
 import { useDriftStore } from './store/drift';
@@ -112,6 +115,7 @@ export default function App(): React.JSX.Element {
     [setLayout],
   );
   const [showGraphControls, setShowGraphControls] = useState(false);
+  const [inspectorCompact, setInspectorCompact] = useState(false);
   const [agentSetupCopied, setAgentSetupCopied] = useState<'install' | 'convex-ai-files' | null>(
     null,
   );
@@ -123,7 +127,10 @@ export default function App(): React.JSX.Element {
   const highlightedNodeIds = useModelSyncStore((s) => s.highlightedNodeIds);
   const activeTab = useUIChromeStore((s) => s.sidebarTab);
   const setActiveTab = useUIChromeStore((s) => s.setSidebarTab);
+  const playgroundScope = useUIChromeStore((s) => s.playgroundScope);
+  const setPlaygroundScope = useUIChromeStore((s) => s.setPlaygroundScope);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
+  const pendingChatMessage = useChatComposerStore((s) => s.pendingChatMessage);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
   const isDirty = useDocumentStore((s) => s.isDirty);
   const filePath = useDocumentStore((s) => s.filePath);
@@ -151,8 +158,6 @@ export default function App(): React.JSX.Element {
       useGraphSelectionStore
         .getState()
         .selectField({ typeName: detail.typeName, fieldName: detail.fieldName });
-      useUIChromeStore.getState().setSidebarVisible(true);
-      useUIChromeStore.getState().setSidebarTab('properties');
     }
     document.addEventListener(TYPE_NODE_EVENT, onFieldSelect);
     return () => document.removeEventListener(TYPE_NODE_EVENT, onFieldSelect);
@@ -163,23 +168,10 @@ export default function App(): React.JSX.Element {
   }, [filePath]);
 
   useEffect(() => {
-    function onTypeSelect(event: Event): void {
-      const detail = (event as CustomEvent<{ typeName?: unknown }>).detail;
-      if (typeof detail?.typeName !== 'string') return;
-      useUIChromeStore.getState().setSidebarVisible(true);
-      useUIChromeStore.getState().setSidebarTab('properties');
-    }
-    document.addEventListener(TYPE_NODE_OBJECT_EVENT, onTypeSelect);
-    return () => document.removeEventListener(TYPE_NODE_OBJECT_EVENT, onTypeSelect);
-  }, []);
-
-  useEffect(() => {
     function onEdgeSelect(event: Event): void {
       const detail = (event as CustomEvent<EdgeSelection>).detail;
       if (typeof detail?.edgeId !== 'string' || !detail.data) return;
       useGraphSelectionStore.getState().selectEdge(detail);
-      useUIChromeStore.getState().setSidebarVisible(true);
-      useUIChromeStore.getState().setSidebarTab('properties');
     }
     document.addEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
     return () => document.removeEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
@@ -193,8 +185,6 @@ export default function App(): React.JSX.Element {
     if (kind === 'enum') useGraphLayoutStore.getState().setGraphLayout({ showEnums: true });
     useGraphSelectionStore.getState().click(typeName, 'replace');
     useGraphSelectionStore.getState().focus(typeName);
-    useUIChromeStore.getState().setSidebarVisible(true);
-    useUIChromeStore.getState().setSidebarTab('properties');
     window.setTimeout(() => {
       document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
     }, 0);
@@ -209,16 +199,12 @@ export default function App(): React.JSX.Element {
     if ('error' in result) return;
     useGraphSelectionStore.getState().selectField({ typeName, fieldName: op.field.name });
     useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
-    useUIChromeStore.getState().setSidebarVisible(true);
-    useUIChromeStore.getState().setSidebarTab('properties');
   }, []);
 
   const focusSelectedTypeName = useCallback((): void => {
     const typeName = useGraphSelectionStore.getState().state.primaryNodeId;
     if (!typeName) return;
     useGraphSelectionStore.getState().click(typeName, 'replace');
-    useUIChromeStore.getState().setSidebarVisible(true);
-    useUIChromeStore.getState().setSidebarTab('properties');
     window.setTimeout(() => {
       document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
     }, 0);
@@ -364,7 +350,6 @@ export default function App(): React.JSX.Element {
   const startNewModel = useCallback((): void => {
     fileMenu.handleNew();
     useUIChromeStore.getState().setSidebarVisible(true);
-    useUIChromeStore.getState().setSidebarTab('properties');
   }, [fileMenu]);
 
   const openExistingModel = useCallback((): void => {
@@ -400,6 +385,52 @@ export default function App(): React.JSX.Element {
   }, []);
 
   const detailTypeName = selectedField?.typeName ?? selectedEdge?.data.sourceType ?? selectedNodeId;
+  const detailType =
+    typeof detailTypeName === 'string'
+      ? schema.types.find((type) => type.name === detailTypeName)
+      : undefined;
+  const inspectorKind = detailType ? typeKindLabel(detailType) : selectedEdge ? 'ref' : null;
+  const inspectorTitle =
+    selectedField && selectedField.typeName === detailTypeName
+      ? selectedField.fieldName
+      : selectedEdge
+        ? edgeSelectionLabel(selectedEdge)
+        : detailTypeName;
+  const inspectorLinkedToChat = activeTab === 'chat' && pendingChatMessage !== null;
+  const backToSelectedType = useCallback((): void => {
+    if (!selectedField) return;
+    useGraphSelectionStore.getState().selectField(null);
+    useGraphSelectionStore.getState().focus(selectedField.typeName);
+  }, [selectedField]);
+  const deleteInspectorSelection = useCallback((): void => {
+    if (selectedField) {
+      const result = useUndoStore.getState().apply({
+        kind: 'remove_field',
+        typeName: selectedField.typeName,
+        fieldName: selectedField.fieldName,
+      });
+      if ('error' in result) return;
+      useGraphSelectionStore.getState().selectField(null);
+      return;
+    }
+    if (!detailTypeName || !detailType) return;
+    const result = useUndoStore.getState().apply({ kind: 'delete_type', name: detailTypeName });
+    if ('error' in result) return;
+    useGraphSelectionStore.getState().clear();
+  }, [detailType, detailTypeName, selectedField]);
+  const openSelectedTypeInPlayground = useCallback((): void => {
+    if (!detailTypeName) return;
+    setPlaygroundScope({ mode: 'selected', typeName: detailTypeName });
+    useUIChromeStore.getState().setSidebarVisible(true);
+    setActiveTab('playground');
+  }, [detailTypeName, setActiveTab, setPlaygroundScope]);
+  const selectActivityTab = useCallback(
+    (tab: typeof activeTab): void => {
+      if (tab === 'playground') setPlaygroundScope({ mode: 'all' });
+      setActiveTab(tab);
+    },
+    [setActiveTab, setPlaygroundScope],
+  );
   const selectedStdlibTypeName =
     typeof selectedNodeId === 'string' && STDLIB_TYPE_DEFINITIONS.has(selectedNodeId)
       ? selectedNodeId
@@ -565,11 +596,164 @@ export default function App(): React.JSX.Element {
                 </div>
               )}
               {hasSchema ? (
-                <GraphCanvas
-                  positions={positions}
-                  onPositionsChange={setPositions}
-                  highlightedNodeIds={highlightedNodeIds}
-                />
+                <>
+                  <GraphCanvas
+                    positions={positions}
+                    onPositionsChange={setPositions}
+                    highlightedNodeIds={highlightedNodeIds}
+                  />
+                  <aside
+                    aria-label="Properties inspector"
+                    className={`absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[0_12px_28px_rgba(0,0,0,0.18)] backdrop-blur transition-[width,max-height,box-shadow] duration-150 ease-out ${
+                      inspectorCompact
+                        ? 'w-[min(18rem,calc(100%-1.5rem))]'
+                        : 'w-[min(24rem,calc(100%-1.5rem))]'
+                    }`}
+                  >
+                    <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="mb-0.5 flex h-5 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          {selectedField && selectedField.typeName === detailTypeName ? (
+                            <>
+                              <span className="truncate">Canvas</span>
+                              <span aria-hidden="true" className="text-border">
+                                /
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="-ml-1 h-5 max-w-32 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={backToSelectedType}
+                                aria-label={`Back to ${selectedField.typeName} fields`}
+                              >
+                                <span className="truncate">{selectedField.typeName}</span>
+                              </Button>
+                              <span aria-hidden="true" className="text-border">
+                                /
+                              </span>
+                              <span className="truncate">{selectedField.fieldName}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="truncate">Canvas</span>
+                              {detailTypeName && (
+                                <>
+                                  <span aria-hidden="true" className="text-border">
+                                    /
+                                  </span>
+                                  <span className="truncate">{detailTypeName}</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="truncate text-sm font-semibold text-foreground">
+                            {inspectorTitle ?? 'Inspector'}
+                          </div>
+                          {inspectorKind && inspectorKind !== 'ref' && (
+                            <TypeKindBadge kind={inspectorKind} />
+                          )}
+                          {inspectorKind === 'ref' && (
+                            <span className="shrink-0 rounded border border-reference/35 bg-reference/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-reference-text">
+                              edge
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {inspectorLinkedToChat && (
+                          <span className="inline-flex h-6 items-center gap-1 rounded-full border border-reference/25 bg-reference/10 px-2 text-[10px] font-medium text-reference-text">
+                            <MessageSquare className="size-3" aria-hidden="true" />
+                            Linked
+                          </span>
+                        )}
+                        {hasSelection && detailTypeName && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={openSelectedTypeInPlayground}
+                          >
+                            <Play aria-hidden="true" className="size-3.5" />
+                            Try
+                          </Button>
+                        )}
+                        {detailType && !selectedEdge && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            aria-label={
+                              selectedField
+                                ? `Delete field ${selectedField.fieldName}`
+                                : `Delete type ${detailTypeName}`
+                            }
+                            onClick={deleteInspectorSelection}
+                          >
+                            <Trash2 aria-hidden="true" className="size-3.5" />
+                          </Button>
+                        )}
+                        <button
+                          type="button"
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          aria-label={inspectorCompact ? 'Expand inspector' : 'Collapse inspector'}
+                          title={inspectorCompact ? 'Expand inspector' : 'Collapse inspector'}
+                          onClick={() => setInspectorCompact((compact) => !compact)}
+                        >
+                          {inspectorCompact ? (
+                            <Maximize2 className="size-3.5" aria-hidden="true" />
+                          ) : (
+                            <Minimize2 className="size-3.5" aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    {!inspectorCompact && (
+                      <div className="min-h-0 flex-1 overflow-y-auto">
+                        {hasSelection ? (
+                          <DetailPanel
+                            selection={{
+                              edge: selectedEdge?.data,
+                              typeName: detailTypeName ?? undefined,
+                              fieldName:
+                                selectedField && selectedField.typeName === detailTypeName
+                                  ? selectedField.fieldName
+                                  : undefined,
+                            }}
+                            onClearSelection={() => {
+                              useGraphSelectionStore.getState().selectField(null);
+                              useGraphSelectionStore.getState().selectEdge(null);
+                            }}
+                            onClearSelectedField={() =>
+                              useGraphSelectionStore.getState().selectField(null)
+                            }
+                            onSelectField={(typeName, fieldName) => {
+                              useGraphSelectionStore
+                                .getState()
+                                .selectField({ typeName, fieldName });
+                            }}
+                          />
+                        ) : (
+                          <Empty className="border-0 p-4">
+                            <EmptyHeader>
+                              <EmptyMedia variant="icon">
+                                <MousePointer2 />
+                              </EmptyMedia>
+                              <EmptyTitle className="text-sm font-medium">No selection</EmptyTitle>
+                              <EmptyDescription className="text-xs">
+                                Select a type on the canvas to view and edit its properties.
+                              </EmptyDescription>
+                            </EmptyHeader>
+                          </Empty>
+                        )}
+                      </div>
+                    )}
+                  </aside>
+                </>
               ) : (
                 <EmptyState
                   onNewModel={startNewModel}
@@ -598,84 +782,59 @@ export default function App(): React.JSX.Element {
           panelRef={sidebarRef}
         >
           <div className="flex h-full bg-background">
-            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-              <div className={activeTab !== 'properties' ? 'hidden' : 'flex-1 overflow-y-auto'}>
-                {hasSelection ? (
-                  <DetailPanel
-                    selection={{
-                      edge: selectedEdge?.data,
-                      typeName: detailTypeName ?? undefined,
-                      fieldName:
-                        selectedField && selectedField.typeName === detailTypeName
-                          ? selectedField.fieldName
-                          : undefined,
-                    }}
-                    onClearSelection={() => {
-                      useGraphSelectionStore.getState().selectField(null);
-                      useGraphSelectionStore.getState().selectEdge(null);
-                    }}
-                    onClearSelectedField={() => useGraphSelectionStore.getState().selectField(null)}
-                    onSelectField={(typeName, fieldName) => {
-                      useGraphSelectionStore.getState().selectField({ typeName, fieldName });
-                    }}
-                  />
-                ) : (
-                  <Empty className="border-0 p-4">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <MousePointer2 />
-                      </EmptyMedia>
-                      <EmptyTitle className="text-sm font-medium">No selection</EmptyTitle>
-                      <EmptyDescription className="text-xs">
-                        Select a type on the canvas to view and edit its properties.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-              </div>
-              <div className={activeTab !== 'chat' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <ChatPanel chat={chat} />
-              </div>
-              <div className={activeTab !== 'review' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <ReviewPanel schema={schema} />
-              </div>
-              <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                {hasSchema && (
-                  <OnboardingLoopPanel
-                    state={onboardingState}
+            <div className="flex min-w-0 flex-1 overflow-hidden border-l border-border/70 bg-background">
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div className={activeTab !== 'chat' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                  <ChatPanel chat={chat} />
+                </div>
+                <div className={activeTab !== 'review' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                  <ReviewPanel schema={schema} />
+                </div>
+                <div className={activeTab !== 'schema' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                  {hasSchema && (
+                    <OnboardingLoopPanel
+                      state={onboardingState}
+                      convexVersion={convexVersion}
+                      agentSetupCopied={agentSetupCopied}
+                      onCopyAgentSetup={copyAgentSetupText}
+                    />
+                  )}
+                  <SchemaPanel
+                    sources={schemaEmissions.sources}
+                    isEmpty={!hasSchema}
+                    error={schemaEmissions.error}
+                    onCopy={copyToClipboard}
+                    onEnableOutput={enableSchemaOutput}
+                    onOutputDirChange={updateSchemaOutputDir}
+                    documentFilePath={filePath}
+                    onOpenGeneratedFile={openGeneratedFile}
+                    schemaFileName={schemaFileName}
+                    schema={schema}
                     convexVersion={convexVersion}
-                    agentSetupCopied={agentSetupCopied}
-                    onCopyAgentSetup={copyAgentSetupText}
+                    showAgentSetup={!hasSchema}
                   />
-                )}
-                <SchemaPanel
-                  sources={schemaEmissions.sources}
-                  isEmpty={!hasSchema}
-                  error={schemaEmissions.error}
-                  onCopy={copyToClipboard}
-                  onEnableOutput={enableSchemaOutput}
-                  onOutputDirChange={updateSchemaOutputDir}
-                  documentFilePath={filePath}
-                  onOpenGeneratedFile={openGeneratedFile}
-                  schemaFileName={schemaFileName}
-                  schema={schema}
-                  convexVersion={convexVersion}
-                  showAgentSetup={!hasSchema}
-                />
-              </div>
-              <div
-                className={activeTab !== 'playground' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}
-              >
-                <PlaygroundPanel schema={schema} />
-              </div>
-              <div className={activeTab !== 'stdlib' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <StdlibPanel schema={schema} focusedTypeName={selectedStdlibTypeName} />
-              </div>
-              <div className={activeTab !== 'changes' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
-                <ChangesPanel />
+                </div>
+                <div
+                  className={activeTab !== 'playground' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}
+                >
+                  <PlaygroundPanel
+                    schema={schema}
+                    highlightedTypeName={
+                      playgroundScope.mode === 'selected' ? playgroundScope.typeName : null
+                    }
+                  />
+                </div>
+                <div className={activeTab !== 'stdlib' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>
+                  <StdlibPanel schema={schema} focusedTypeName={selectedStdlibTypeName} />
+                </div>
+                <div
+                  className={activeTab !== 'changes' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}
+                >
+                  <ChangesPanel />
+                </div>
               </div>
             </div>
-            <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
+            <ActivityBar activeTab={activeTab} onTabChange={selectActivityTab} />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -685,6 +844,19 @@ export default function App(): React.JSX.Element {
       <ReconcileModal />
     </div>
   );
+}
+
+function typeKindLabel(type: TypeDef): TypeKindLabel {
+  if (type.kind === 'object') return type.table ? 'table' : 'object';
+  if (type.kind === 'enum') return 'enum';
+  if (type.kind === 'discriminatedUnion') return 'union';
+  return 'raw';
+}
+
+function edgeSelectionLabel(edge: EdgeSelection): string {
+  if (edge.data.sourceField) return edge.data.sourceField;
+  if (edge.data.relation === 'unionVariant') return edge.data.targetType;
+  return `${edge.data.sourceType} edge`;
 }
 
 function edgeSelectionExists(schema: Schema, edge: EdgeSelection['data']): boolean {

@@ -129,7 +129,8 @@ describe('App global keyboard', () => {
       new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: 'Plot', fieldName: 'name' } }),
     );
 
-    expect(await screen.findByTestId('field-detail')).toHaveTextContent('name');
+    expect(await screen.findByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('name');
   });
 
   it('Delete removes a selected field before deleting the selected type', async () => {
@@ -149,7 +150,8 @@ describe('App global keyboard', () => {
     document.dispatchEvent(
       new CustomEvent(TYPE_NODE_EVENT, { detail: { typeName: 'Plot', fieldName: 'name' } }),
     );
-    expect(await screen.findByTestId('field-detail')).toHaveTextContent('name');
+    expect(await screen.findByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('name');
     fireEvent.keyDown(document, { key: 'Delete' });
 
     expect(useUndoStore.getState().schema.types[0]).toMatchObject({
@@ -255,7 +257,8 @@ describe('App global keyboard', () => {
       name: 'Plot',
       fields: [{ name: 'field1', type: { kind: 'string' } }],
     });
-    expect(await screen.findByTestId('field-detail')).toHaveTextContent('field1');
+    expect(await screen.findByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('field1');
   });
 
   it('Cmd+Shift+F does nothing when the selected type cannot have fields', () => {
@@ -310,7 +313,8 @@ describe('App global keyboard', () => {
     expect(await screen.findByText('Modeled ref edge')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Edit field' }));
 
-    expect(await screen.findByTestId('field-detail')).toHaveTextContent('harvest');
+    expect(await screen.findByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('harvest');
     expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
     expect(useGraphSelectionStore.getState().state.edgeId).toBeNull();
   });

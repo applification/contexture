@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 describe('ActivityBar', () => {
   it('orders tabs by the model-building workflow', () => {
-    render(<ActivityBar activeTab="properties" onTabChange={vi.fn()} />);
+    render(<ActivityBar activeTab="chat" onTabChange={vi.fn()} />);
 
     expect(
       screen.getAllByRole('button').map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Properties', 'Chat', 'Review', 'Changes', 'Schema', 'Playground', 'Stdlib']);
+    ).toEqual(['Chat', 'Review', 'Changes', 'Schema', 'Playground', 'Stdlib']);
   });
 });

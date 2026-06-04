@@ -39,7 +39,7 @@ describe('TypeDetail', () => {
   afterEach(() => {
     useGraphSelectionStore.getState().clear();
     useChatComposerStore.getState().setPendingChatMessage(null);
-    useUIChromeStore.getState().setSidebarTab('properties');
+    useUIChromeStore.getState().setSidebarTab('chat');
     cleanup();
   });
 
@@ -55,31 +55,18 @@ describe('TypeDetail', () => {
 
     it('renders name, kind, and each field summary', () => {
       setup(type);
-      const header = screen.getByTestId('type-detail-header');
-      expect(header).toContainElement(screen.getByRole('heading', { name: 'Plot' }));
-      expect(header).toHaveTextContent('object');
-      expect(header).toHaveClass('border-b');
-      expect(header).toHaveClass('min-h-20');
-      expect(header.querySelector('[aria-hidden="true"]')).toHaveClass('h-[1.25rem]');
+      expect(screen.getByLabelText('Name')).toHaveValue('Plot');
+      expect(screen.queryByTestId('type-detail-header')).not.toBeInTheDocument();
       const rows = screen.getAllByTestId('object-field-summary');
       expect(rows).toHaveLength(2);
       expect(screen.getByDisplayValue('area')).toBeInTheDocument();
       expect(rows[1]).not.toHaveTextContent('?');
     });
 
-    it('renders field optionality as editable checkboxes', () => {
+    it('renders field optionality as editable switches', () => {
       setup(type);
       expect(screen.getByLabelText('name optional')).not.toBeChecked();
       expect(screen.getByLabelText('area optional')).toBeChecked();
-    });
-
-    it('dispatches delete_type when the type delete action is clicked', () => {
-      const { dispatch } = setup(type);
-      fireEvent.click(screen.getByRole('button', { name: 'Delete type Plot' }));
-      expect(dispatch).toHaveBeenCalledWith({
-        kind: 'delete_type',
-        name: 'Plot',
-      });
     });
 
     it('dispatches add_field when Add field is clicked', () => {
@@ -177,9 +164,21 @@ describe('TypeDetail', () => {
       });
     });
 
-    it('dispatches reorder_fields when a field is moved later', () => {
+    it('dispatches reorder_fields when a field is dragged later', () => {
       const { dispatch } = setup(type);
-      fireEvent.click(screen.getByRole('button', { name: 'Move field name later' }));
+      const rows = screen.getAllByTestId('object-field-summary');
+      const nameHandle = screen.getByLabelText('Drag field name to reorder');
+      const dataTransfer = {
+        effectAllowed: '',
+        dropEffect: '',
+        getData: vi.fn(() => 'name'),
+        setData: vi.fn(),
+      };
+      fireEvent.dragStart(nameHandle, { dataTransfer });
+      fireEvent.dragEnter(rows[1]);
+      expect(rows[1]).toHaveClass('bg-reference/10');
+      fireEvent.dragOver(rows[1]);
+      fireEvent.drop(rows[1], { dataTransfer });
       expect(dispatch).toHaveBeenCalledWith({
         kind: 'reorder_fields',
         typeName: 'Plot',
@@ -187,10 +186,15 @@ describe('TypeDetail', () => {
       });
     });
 
-    it('disables field move buttons at the list boundaries', () => {
+    it('uses compact drag handles instead of visible move buttons', () => {
       setup(type);
-      expect(screen.getByRole('button', { name: 'Move field name earlier' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Move field area later' })).toBeDisabled();
+      expect(screen.getByLabelText('Drag field name to reorder')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Move field name earlier' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Move field area later' }),
+      ).not.toBeInTheDocument();
     });
 
     it('dispatches rename_type when the name input blurs with a new value', () => {

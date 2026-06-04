@@ -1,4 +1,4 @@
-import type { SidebarTab } from '@renderer/store/ui-chrome';
+import type { SidebarToolTab } from '@renderer/store/ui-chrome';
 import {
   BookOpen,
   FileBracesCorner,
@@ -6,17 +6,15 @@ import {
   History,
   ListChecks,
   MessageSquare,
-  MousePointer2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityBarProps {
-  activeTab: SidebarTab;
-  onTabChange: (tab: SidebarTab) => void;
+  activeTab: SidebarToolTab;
+  onTabChange: (tab: SidebarToolTab) => void;
 }
 
-const TABS: Array<{ id: SidebarTab; icon: React.ReactNode; label: string }> = [
-  { id: 'properties', icon: <MousePointer2 className="size-4" />, label: 'Properties' },
+const TABS: Array<{ id: SidebarToolTab; icon: React.ReactNode; label: string }> = [
   { id: 'chat', icon: <MessageSquare className="size-4" />, label: 'Chat' },
   { id: 'review', icon: <ListChecks className="size-4" />, label: 'Review' },
   { id: 'changes', icon: <History className="size-4" />, label: 'Changes' },
