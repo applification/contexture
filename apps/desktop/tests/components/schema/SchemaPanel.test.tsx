@@ -52,9 +52,7 @@ describe('SchemaPanel', () => {
 
   it('labels generated previews as read-only output', () => {
     render(<SchemaPanel {...DEFAULT_PROPS} convexSource="export default {};\n" />);
-    expect(screen.getByTestId('schema-output-boundary')).toHaveTextContent(
-      'read-only generated output',
-    );
+    expect(screen.getByTestId('schema-output-boundary')).toHaveTextContent('read-only');
   });
 
   it('invokes onCopy with the zod source when Copy is clicked on the Zod tab', () => {
@@ -255,9 +253,7 @@ describe('SchemaPanel', () => {
         />,
       );
 
-      expect(screen.getByTestId('schema-convex-version')).toHaveTextContent(
-        'Convex version mismatch',
-      );
+      expect(screen.getByTestId('schema-convex-version')).toHaveTextContent('Convex mismatch');
     });
 
     it('switches to JSON Schema source when the JSON output is selected', async () => {

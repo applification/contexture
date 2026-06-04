@@ -47,7 +47,6 @@ import {
   Copy,
   ExternalLink,
   FileBracesCorner,
-  FileCode,
   PlugZap,
   RotateCcw,
   Settings2,
@@ -465,9 +464,8 @@ export function SchemaPanel({
         </div>
       ) : null}
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
-        <div className="flex items-start justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
-          <div className="flex min-w-0 flex-1 items-start gap-2">
-            <FileCode className="size-3.5 shrink-0" />
+        <div className="border-b border-border bg-muted/80 px-2 py-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-1.5">
                 <OutputSelect
@@ -490,89 +488,93 @@ export function SchemaPanel({
                   onOutputDirChange={onOutputDirChange}
                 />
               </div>
-              <div className="mt-1 truncate font-mono text-[10px]" data-testid="schema-filename">
-                {selectedOutputDisplayPath}
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                <span
-                  className="font-medium text-muted-foreground/80"
-                  data-testid="schema-output-boundary"
-                >
-                  read-only generated output
-                </span>
-                {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
-                  <span
-                    className={`truncate ${
-                      convexVersion.status === 'mismatch' ||
-                      convexVersion.status === 'target_missing'
-                        ? 'text-warning'
-                        : 'text-muted-foreground'
-                    }`}
-                    title={convexVersionTooltip(convexVersion)}
-                    data-testid="schema-convex-version"
-                  >
-                    {convexVersion.status === 'mismatch'
-                      ? 'Convex version mismatch'
-                      : convexVersion.status === 'target_missing'
-                        ? 'Convex package missing'
-                        : convexVersionLabel(convexVersion)}
-                  </span>
-                ) : null}
-              </div>
             </div>
-          </div>
-          <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={() => setFontSizeIndex((i) => Math.max(0, i - 1))}
-              disabled={!canShrink}
-              aria-label="Decrease font size"
-              title="Decrease font size"
-              data-testid="schema-font-decrease"
-            >
-              <AArrowDown className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={() => setFontSizeIndex((i) => Math.min(FONT_SIZE_STEPS.length - 1, i + 1))}
-              disabled={!canGrow}
-              aria-label="Increase font size"
-              title="Increase font size"
-              data-testid="schema-font-increase"
-            >
-              <AArrowUp className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="size-7"
-              onClick={handleCopy}
-              aria-label={copied ? 'Copied' : 'Copy schema source'}
-              title={copied ? 'Copied' : 'Copy schema source'}
-              data-testid="schema-copy"
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </Button>
-            {selectedOutputPath && onOpenGeneratedFile ? (
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 size="icon"
                 type="button"
                 variant="ghost"
                 className="size-7"
-                onClick={() => onOpenGeneratedFile(selectedOutputPath)}
-                aria-label={`Open ${selectedOutput.fileName} in VS Code`}
-                title={`Open ${selectedOutput.fileName} in VS Code`}
-                data-testid="schema-open-generated"
+                onClick={() => setFontSizeIndex((i) => Math.max(0, i - 1))}
+                disabled={!canShrink}
+                aria-label="Decrease font size"
+                title="Decrease font size"
+                data-testid="schema-font-decrease"
               >
-                <ExternalLink className="size-3.5" />
+                <AArrowDown className="size-3.5" />
               </Button>
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={() => setFontSizeIndex((i) => Math.min(FONT_SIZE_STEPS.length - 1, i + 1))}
+                disabled={!canGrow}
+                aria-label="Increase font size"
+                title="Increase font size"
+                data-testid="schema-font-increase"
+              >
+                <AArrowUp className="size-3.5" />
+              </Button>
+              <Button
+                size="icon"
+                type="button"
+                variant="ghost"
+                className="size-7"
+                onClick={handleCopy}
+                aria-label={copied ? 'Copied' : 'Copy schema source'}
+                title={copied ? 'Copied' : 'Copy schema source'}
+                data-testid="schema-copy"
+              >
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              </Button>
+              {selectedOutputPath && onOpenGeneratedFile ? (
+                <Button
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                  className="size-7"
+                  onClick={() => onOpenGeneratedFile(selectedOutputPath)}
+                  aria-label={`Open ${selectedOutput.fileName} in VS Code`}
+                  title={`Open ${selectedOutput.fileName} in VS Code`}
+                  data-testid="schema-open-generated"
+                >
+                  <ExternalLink className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] leading-none text-muted-foreground">
+            <span className="truncate font-mono" data-testid="schema-filename">
+              {selectedOutputDisplayPath}
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground/50">
+              ·
+            </span>
+            <span className="shrink-0" data-testid="schema-output-boundary">
+              read-only
+            </span>
+            {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
+              <>
+                <span aria-hidden="true" className="text-muted-foreground/50">
+                  ·
+                </span>
+                <span
+                  className={`truncate ${
+                    convexVersion.status === 'mismatch' || convexVersion.status === 'target_missing'
+                      ? 'text-warning'
+                      : 'text-muted-foreground'
+                  }`}
+                  title={convexVersionTooltip(convexVersion)}
+                  data-testid="schema-convex-version"
+                >
+                  {convexVersion.status === 'mismatch'
+                    ? 'Convex mismatch'
+                    : convexVersion.status === 'target_missing'
+                      ? 'Convex missing'
+                      : convexVersionLabel(convexVersion)}
+                </span>
+              </>
             ) : null}
           </div>
         </div>
@@ -596,7 +598,7 @@ function convexVersionLabel(version: NonNullable<SchemaPanelProps['convexVersion
   if (version.status === 'loading') return 'Checking Convex version...';
   if (version.targetVersion) {
     if (version.status === 'ok') {
-      return `Convex ${version.emitterVersion} · emitter and target app`;
+      return `Convex ${version.emitterVersion}`;
     }
     return `Emitter Convex ${version.emitterVersion} · target app ${version.targetVersion}`;
   }
