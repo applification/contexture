@@ -187,6 +187,15 @@ const MutuallyExclusiveInvariantSchema = z.object({
   fields: z.array(z.string().min(1)).min(2),
 });
 
+const FieldComparisonInvariantSchema = z.object({
+  kind: z.literal('fieldComparison'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  left: z.string().min(1),
+  operator: z.enum(['<', '<=', '>', '>=', '===', '!==']),
+  right: z.string().min(1),
+});
+
 const FieldPredicateSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('weekday'),
@@ -216,6 +225,7 @@ export const ObjectInvariantSchema = z.discriminatedUnion('kind', [
   RequiresWhenInvariantSchema,
   ExactlyOneOfInvariantSchema,
   MutuallyExclusiveInvariantSchema,
+  FieldComparisonInvariantSchema,
   FieldPredicateInvariantSchema,
   UniqueInArrayInvariantSchema,
 ]);

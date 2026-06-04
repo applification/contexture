@@ -141,6 +141,8 @@ function invariantStatement(invariant: ObjectInvariant): string {
       return `Exactly one of ${invariant.fields.join(', ')} must be present.`;
     case 'mutuallyExclusive':
       return `${invariant.fields.join(', ')} are mutually exclusive.`;
+    case 'fieldComparison':
+      return `${invariant.left} must be ${invariant.operator} ${invariant.right}.`;
     case 'fieldPredicate':
       return `${invariant.field} must satisfy ${invariant.predicate.kind}.`;
     case 'uniqueInArray':

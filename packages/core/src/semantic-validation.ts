@@ -46,6 +46,7 @@ export type SemanticIssueCode =
   | 'invariant_unknown_field'
   | 'invariant_unknown_array_field'
   | 'invariant_array_target_not_object'
+  | 'invariant_incompatible_field_types'
   | 'enum_empty'
   | 'enum_duplicate_value'
   | 'duplicate_convex_table_name'
@@ -897,6 +898,21 @@ function checkObjectInvariants(schema: Schema): SemanticIssueDraft[] {
         case 'fieldPredicate':
           checkField(invariant.field, 'field');
           break;
+        case 'fieldComparison': {
+          checkField(invariant.left, 'left');
+          checkField(invariant.right, 'right');
+          const left = fields.get(invariant.left);
+          const right = fields.get(invariant.right);
+          if (left && right && !fieldTypesComparable(left.type, right.type)) {
+            issues.push({
+              code: 'invariant_incompatible_field_types',
+              path: `${path}.operator`,
+              message: `Invariant "${invariant.name}" compares incompatible fields "${invariant.left}" and "${invariant.right}" on "${type.name}".`,
+              hint: 'Compare fields with compatible primitive/date-like types, or enforce this rule in application logic.',
+            });
+          }
+          break;
+        }
         case 'uniqueInArray': {
           const arrayField = fields.get(invariant.arrayField);
           if (!arrayField) {
@@ -939,6 +955,31 @@ function checkObjectInvariants(schema: Schema): SemanticIssueDraft[] {
   });
 
   return issues;
+}
+
+type ComparableFieldKind = 'number' | 'dateLike' | 'string' | 'unknown';
+
+function fieldTypesComparable(left: FieldType, right: FieldType): boolean {
+  const leftKind = comparableFieldKind(left);
+  const rightKind = comparableFieldKind(right);
+  if (leftKind === 'unknown' || rightKind === 'unknown') return true;
+  return leftKind === rightKind;
+}
+
+function comparableFieldKind(type: FieldType): ComparableFieldKind {
+  if (type.kind === 'number') return 'number';
+  if (type.kind === 'date') return 'dateLike';
+  if (type.kind === 'string') {
+    return type.format === 'datetime' ? 'dateLike' : 'string';
+  }
+  if (type.kind === 'ref') {
+    const parts = type.typeName.split('.');
+    const name = parts[parts.length - 1];
+    if (name === 'ISODate' || name === 'ISODateTime') return 'dateLike';
+    if (name === 'PositiveInt' || name === 'PositiveNumber') return 'number';
+    return 'unknown';
+  }
+  return 'unknown';
 }
 
 function effectiveFields(

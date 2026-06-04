@@ -649,6 +649,12 @@ function renameInvariantField(
       };
     case 'fieldPredicate':
       return { ...invariant, field: invariant.field === from ? to : invariant.field };
+    case 'fieldComparison':
+      return {
+        ...invariant,
+        left: invariant.left === from ? to : invariant.left,
+        right: invariant.right === from ? to : invariant.right,
+      };
     case 'uniqueInArray':
       return {
         ...invariant,
@@ -668,6 +674,8 @@ function removeInvariantField(invariant: ObjectInvariant, fieldName: string): Ob
     case 'exactlyOneOf':
     case 'mutuallyExclusive':
       return { ...invariant, fields: invariant.fields.filter((field) => field !== fieldName) };
+    case 'fieldComparison':
+      return invariant;
     case 'fieldPredicate':
     case 'uniqueInArray':
       return invariant;

@@ -127,4 +127,36 @@ describe('domain brief', () => {
       summary: { typeCount: 1, tableCount: 1 },
     });
   });
+
+  it('describes field comparison invariants as declared contracts', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'Batch',
+          fields: [
+            { name: 'acquiredDate', type: { kind: 'string' } },
+            { name: 'expiryDate', type: { kind: 'string' } },
+          ],
+          invariants: [
+            {
+              kind: 'fieldComparison',
+              name: 'expiry_after_acquired',
+              left: 'expiryDate',
+              operator: '>=',
+              right: 'acquiredDate',
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(buildDomainBrief(schema).declaredDecisions).toEqual([
+      expect.objectContaining({
+        id: 'invariant:Batch:expiry_after_acquired',
+        statement: 'expiryDate must be >= acquiredDate.',
+      }),
+    ]);
+  });
 });

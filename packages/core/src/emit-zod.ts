@@ -38,10 +38,11 @@ export function emit(schema: Schema, sourcePath: string, options: EmitOptions = 
   const header = `// @contexture-generated — do not edit by hand. Regenerated on every IR save. Source: ${sourcePath}\n`;
   const zodImport = `import { z } from 'zod';\n`;
   const externalImports = renderExternalImports(ctx);
+  const helpers = schemaHasFieldComparisons(schema) ? `${renderFieldComparisonHelper()}\n` : '';
   const body = sortTypeDefs(schema.types, ctx)
     .map((t) => emitTypeDef(t, ctx))
     .join('');
-  return header + zodImport + externalImports + body;
+  return header + zodImport + externalImports + helpers + body;
 }
 
 interface EmitContext {
@@ -223,11 +224,29 @@ function emitInvariantCheck(invariant: ObjectInvariant): string {
       const fields = invariant.fields.map((field) => `'${field}'`).join(', ');
       return `  if ([${fields}].filter((field) => (value as Record<string, unknown>)[field] !== undefined && (value as Record<string, unknown>)[field] !== null).length > 1) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [], message: 'Invariant "${invariant.name}" allows at most one of: ${invariant.fields.join(', ')}.' });`;
     }
+    case 'fieldComparison':
+      return emitFieldComparisonCheck(invariant);
     case 'fieldPredicate':
       return emitFieldPredicateCheck(invariant);
     case 'uniqueInArray':
       return emitUniqueInArrayCheck(invariant);
   }
+}
+
+function emitFieldComparisonCheck(
+  invariant: Extract<ObjectInvariant, { kind: 'fieldComparison' }>,
+): string {
+  return [
+    `  {`,
+    `    const left = (value as Record<string, unknown>)['${invariant.left}'];`,
+    `    const right = (value as Record<string, unknown>)['${invariant.right}'];`,
+    `    if (left !== undefined && left !== null && right !== undefined && right !== null) {`,
+    `      const leftComparable = comparableInvariantValue(left);`,
+    `      const rightComparable = comparableInvariantValue(right);`,
+    `      if (leftComparable === null || rightComparable === null || !(leftComparable ${invariant.operator} rightComparable)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['${invariant.left}'], message: 'Invariant "${invariant.name}" requires ${invariant.left} ${invariant.operator} ${invariant.right}.' });`,
+    `    }`,
+    `  }`,
+  ].join('\n');
 }
 
 function emitFieldPredicateCheck(
@@ -273,6 +292,24 @@ function weekdayIndex(value: string): number {
   return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(
     String(value),
   );
+}
+
+function schemaHasFieldComparisons(schema: Schema): boolean {
+  return schema.types.some(
+    (type) =>
+      type.kind === 'object' &&
+      (type.invariants ?? []).some((invariant) => invariant.kind === 'fieldComparison'),
+  );
+}
+
+function renderFieldComparisonHelper(): string {
+  return [
+    `function comparableInvariantValue(value: unknown): number | string | null {`,
+    `  if (typeof value === 'number' || typeof value === 'string') return value;`,
+    `  if (value instanceof Date) return value.getTime();`,
+    `  return null;`,
+    `}`,
+  ].join('\n');
 }
 
 function emitField(field: FieldDef, ctx: EmitContext): string {

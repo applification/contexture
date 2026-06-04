@@ -344,7 +344,7 @@ export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
     ),
     strictTool(
       'add_invariant',
-      'Add an object-level invariant such as requiresWhen, exactlyOneOf, mutuallyExclusive, fieldPredicate, or uniqueInArray.',
+      'Add an object-level invariant such as requiresWhen, exactlyOneOf, mutuallyExclusive, fieldComparison, fieldPredicate, or uniqueInArray.',
       {
         typeName: z.string().min(1),
         invariant: ObjectInvariantSchema,
