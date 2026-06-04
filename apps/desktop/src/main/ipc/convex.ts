@@ -2,7 +2,12 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, parse } from 'node:path';
 import { promisify } from 'node:util';
-import { CONTEXTURE_SUPPORTED_CONVEX_VERSION, projectDirFor } from '@contexture/core';
+import {
+  CONTEXTURE_SUPPORTED_CONVEX_VERSION,
+  load as loadIR,
+  projectDirFor,
+} from '@contexture/core';
+import { bundlePathsFor } from '@contexture/core/paths';
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 import { IpcString, parseIpcPayload } from './validation';
@@ -54,7 +59,7 @@ const ConvexVersionInputSchema = z.object({ irPath: IpcString }).strict();
 export async function getConvexVersionInfo(input: unknown): Promise<ConvexVersionInfo> {
   const { irPath } = parseIpcPayload('convex:version-info', ConvexVersionInputSchema, input);
   try {
-    const packagePath = await findPackageJson(projectDirFor(irPath));
+    const packagePath = await targetPackageJsonFor(irPath);
     if (!packagePath) {
       return {
         emitterVersion: CONTEXTURE_SUPPORTED_CONVEX_VERSION,
@@ -107,7 +112,7 @@ export async function getConvexAgentReadinessInfo(
   const { irPath } = parseIpcPayload('convex:agent-readiness', ConvexVersionInputSchema, input);
   const run = deps.execFile ?? execFileAsync;
   const env = deps.env ?? process.env;
-  const appDir = await targetAppDirFor(irPath);
+  const appDir = projectDirFor(irPath);
   const convexAiFiles = await probeConvexAiFiles(run, env, appDir);
   const contextureMcp = await probeContextureMcp(run, env);
   return { convexAiFiles, contextureMcp };
@@ -137,9 +142,23 @@ async function findPackageJson(startDir: string): Promise<string | null> {
   return null;
 }
 
-async function targetAppDirFor(irPath: string): Promise<string> {
-  const packagePath = await findPackageJson(projectDirFor(irPath));
-  return packagePath ? dirname(packagePath) : projectDirFor(irPath);
+async function targetPackageJsonFor(irPath: string): Promise<string | null> {
+  const configuredPackagePath = await findPackageJson(await convexOutputAppDirFor(irPath));
+  if (configuredPackagePath) return configuredPackagePath;
+  return findPackageJson(projectDirFor(irPath));
+}
+
+async function convexOutputAppDirFor(irPath: string): Promise<string> {
+  const schema = await readOptionalSchema(irPath);
+  return dirname(bundlePathsFor(irPath, schema).convex);
+}
+
+async function readOptionalSchema(irPath: string) {
+  try {
+    return loadIR(await readFile(irPath, 'utf8')).schema;
+  } catch {
+    return undefined;
+  }
 }
 
 async function probeConvexAiFiles(

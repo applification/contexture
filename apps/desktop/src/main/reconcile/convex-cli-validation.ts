@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, parse } from 'node:path';
 import { promisify } from 'node:util';
 import type { Schema } from '@contexture/core';
 import { bundlePathsFor, generatedTargetForPath } from '@contexture/core/paths';
@@ -57,7 +57,11 @@ export async function validateReconciledConvexProject(
     return { status: 'skipped', reason: 'Target is not a Convex generated file.' };
   }
 
-  const projectDir = dirname(dirname(bundlePathsFor(input.irPath, input.schema).convex));
+  const projectDir = await findPackageDir(
+    dirname(bundlePathsFor(input.irPath, input.schema).convex),
+  );
+  if (!projectDir) return { status: 'skipped', reason: 'No project package.json found.' };
+
   const configured = await hasConvexCliValidationConfig(projectDir, deps.env ?? process.env);
   if (!configured.ok) return { status: 'skipped', reason: configured.reason };
 
@@ -82,6 +86,21 @@ export async function validateReconciledConvexProject(
       output: outputFromThrownExecError(err),
     };
   }
+}
+
+async function findPackageDir(startDir: string): Promise<string | null> {
+  let dir = startDir;
+  const root = parse(dir).root;
+  while (dir !== root) {
+    const candidate = join(dir, 'package.json');
+    try {
+      await readFile(candidate, 'utf8');
+      return dir;
+    } catch {
+      dir = dirname(dir);
+    }
+  }
+  return null;
 }
 
 async function hasConvexCliValidationConfig(
