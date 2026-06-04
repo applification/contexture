@@ -204,6 +204,32 @@ describe('generatePlaygroundFixtures', () => {
     );
   });
 
+  it('generates high-minimum numbers without an explicit max', () => {
+    const result = generatePlaygroundFixtures(
+      {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Planting',
+            table: true,
+            fields: [
+              { name: 'cropName', type: { kind: 'string', min: 1 } },
+              { name: 'year', type: { kind: 'number', min: 2026, int: true } },
+            ],
+          },
+        ],
+      },
+      { seed: 'planting-year', count: 3 },
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.recordsByType.Planting?.map((record) => record.value.year)).toSatisfy(
+      (years: unknown) =>
+        Array.isArray(years) && years.every((year) => typeof year === 'number' && year >= 2026),
+    );
+  });
+
   it('uses entity-aware semantics for pantry and household records', () => {
     const result = generatePlaygroundFixtures(pantrySchema, {
       seed: 'pantry-demo',
