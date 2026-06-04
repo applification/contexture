@@ -430,6 +430,12 @@ export default function App(): React.JSX.Element {
       : selectedEdge
         ? edgeSelectionLabel(selectedEdge)
         : detailTypeName;
+  const inspectorSelectionKind =
+    selectedField && selectedField.typeName === detailTypeName
+      ? 'field'
+      : selectedEdge
+        ? 'edge'
+        : inspectorKind;
   const inspectorDeleteLabel = selectedField
     ? `field ${selectedField.fieldName}`
     : detailTypeName
@@ -748,10 +754,22 @@ export default function App(): React.JSX.Element {
                                 {inspectorTitle ?? 'Inspector'}
                               </div>
                               <div className="shrink-0">
-                                {inspectorKind && inspectorKind !== 'ref' && (
-                                  <TypeKindBadge kind={inspectorKind} />
+                                {inspectorSelectionKind === 'field' && (
+                                  <span
+                                    className="w-fit rounded border border-border bg-muted/40 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+                                    data-testid="inspector-selection-badge"
+                                  >
+                                    field
+                                  </span>
                                 )}
-                                {inspectorKind === 'ref' && (
+                                {inspectorSelectionKind &&
+                                  inspectorSelectionKind !== 'field' &&
+                                  inspectorSelectionKind !== 'edge' &&
+                                  inspectorSelectionKind !== 'ref' && (
+                                    <TypeKindBadge kind={inspectorSelectionKind} />
+                                  )}
+                                {(inspectorSelectionKind === 'edge' ||
+                                  inspectorSelectionKind === 'ref') && (
                                   <span className="w-fit rounded border border-reference/35 bg-reference/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-reference-text">
                                     edge
                                   </span>

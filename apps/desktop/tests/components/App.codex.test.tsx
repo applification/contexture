@@ -179,6 +179,7 @@ describe('App Codex-first copy', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('plot');
     });
+    expect(screen.getByTestId('inspector-selection-badge')).toHaveTextContent('field');
     expect(screen.queryByTestId('field-detail-header')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back to Sowing fields' })).toBeInTheDocument();
 
