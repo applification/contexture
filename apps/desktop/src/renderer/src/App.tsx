@@ -62,8 +62,10 @@ import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
 import { ReviewPanel } from './components/review/ReviewPanel';
 import {
+  AgentSetupPopover,
   type SchemaOutputType,
   SchemaPanel,
+  type SchemaPanelProps,
   type SchemaPanelSource,
 } from './components/schema/SchemaPanel';
 import { StatusBar } from './components/status-bar/StatusBar';
@@ -111,6 +113,10 @@ export default function App(): React.JSX.Element {
     [setLayout],
   );
   const [showGraphControls, setShowGraphControls] = useState(false);
+  const [agentSetupCopied, setAgentSetupCopied] = useState<
+    'install' | 'convex-ai-files' | 'prompt' | 'smoke' | null
+  >(null);
+  const agentSetupCopyTimeoutRef = useRef<number | null>(null);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
   const selectedField = useGraphSelectionStore((s) => s.state.selectedField);
@@ -325,6 +331,30 @@ export default function App(): React.JSX.Element {
       chat.hydrateHistory({ version: '1', messages: [] });
     },
   });
+
+  useEffect(
+    () => () => {
+      if (agentSetupCopyTimeoutRef.current !== null) {
+        window.clearTimeout(agentSetupCopyTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const copyAgentSetupText = useCallback(
+    (key: 'install' | 'convex-ai-files' | 'prompt' | 'smoke', text: string) => {
+      copyToClipboard(text);
+      setAgentSetupCopied(key);
+      if (agentSetupCopyTimeoutRef.current !== null) {
+        window.clearTimeout(agentSetupCopyTimeoutRef.current);
+      }
+      agentSetupCopyTimeoutRef.current = window.setTimeout(() => {
+        setAgentSetupCopied(null);
+        agentSetupCopyTimeoutRef.current = null;
+      }, 2000);
+    },
+    [],
+  );
 
   useProjectAutoSave({
     getChat: chat.toHistory,
@@ -617,11 +647,13 @@ export default function App(): React.JSX.Element {
                 {hasSchema && (
                   <OnboardingLoopPanel
                     state={onboardingState}
+                    isDirty={isDirty}
+                    documentFilePath={filePath}
+                    convexVersion={convexVersion}
+                    agentSetupCopied={agentSetupCopied}
                     onSave={() => void fileMenu.handleSave()}
-                    onShowAgent={() => {
-                      useUIChromeStore.getState().setSidebarVisible(true);
-                      useUIChromeStore.getState().setSidebarTab('chat');
-                    }}
+                    onRequestSave={() => void fileMenu.handleSave()}
+                    onCopyAgentSetup={copyAgentSetupText}
                   />
                 )}
                 <SchemaPanel
@@ -637,6 +669,7 @@ export default function App(): React.JSX.Element {
                   schemaFileName={schemaFileName}
                   schema={schema}
                   convexVersion={convexVersion}
+                  showAgentSetup={!hasSchema}
                 />
               </div>
               <div
@@ -863,12 +896,22 @@ function buildOnboardingState(
 
 function OnboardingLoopPanel({
   state,
+  isDirty,
+  documentFilePath,
+  convexVersion,
+  agentSetupCopied,
   onSave,
-  onShowAgent,
+  onRequestSave,
+  onCopyAgentSetup,
 }: {
   state: OnboardingState;
+  isDirty: boolean;
+  documentFilePath: string | null;
+  convexVersion: SchemaPanelProps['convexVersion'];
+  agentSetupCopied: 'install' | 'convex-ai-files' | 'prompt' | 'smoke' | null;
   onSave: () => void;
-  onShowAgent: () => void;
+  onRequestSave: () => void;
+  onCopyAgentSetup: (key: 'install' | 'convex-ai-files' | 'prompt' | 'smoke', text: string) => void;
 }): React.JSX.Element {
   interface ReadinessDetail {
     label: string;
@@ -978,7 +1021,7 @@ function OnboardingLoopPanel({
         <GitCompareArrows className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
 
-      <ul className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <ul className="mt-2 grid grid-cols-2 gap-1.5 min-[720px]:grid-cols-4">
         {groups.map((group) => {
           const completeCount = group.detail.filter((detail) => detail.done).length;
           const detailText = group.detail
@@ -990,7 +1033,7 @@ function OnboardingLoopPanel({
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="flex min-h-8 w-full items-center gap-1.5 rounded border border-border/70 bg-card/60 px-2 text-left transition-colors hover:border-reference/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+                    className="grid min-h-11 w-full grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-0.5 rounded border border-border/70 bg-card/60 px-2 py-1.5 text-left transition-colors hover:border-reference/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
                     aria-label={`${group.label}: ${detailText}. Open readiness details.`}
                   >
                     {group.done ? (
@@ -1001,10 +1044,12 @@ function OnboardingLoopPanel({
                         aria-hidden="true"
                       />
                     )}
-                    <span className={group.done ? 'text-foreground' : 'text-muted-foreground'}>
+                    <span
+                      className={`truncate ${group.done ? 'text-foreground' : 'text-muted-foreground'}`}
+                    >
                       {group.label}
                     </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground/80">
+                    <span className="col-start-2 text-[10px] leading-none text-muted-foreground/80">
                       {completeCount}/{group.detail.length}
                     </span>
                   </button>
@@ -1068,20 +1113,27 @@ function OnboardingLoopPanel({
           variant="secondary"
           className="h-8 gap-1.5 px-2 text-xs"
           onClick={onSave}
+          disabled={state.hasSavedOutputs && state.driftClean && !isDirty}
+          title={
+            state.hasSavedOutputs && state.driftClean && !isDirty
+              ? 'Generated files are already saved and drift clean.'
+              : 'Save this model and emit generated files.'
+          }
         >
           <Save className="size-3.5" />
-          Save and emit
+          {state.hasSavedOutputs && state.driftClean && !isDirty
+            ? 'Saved and emitted'
+            : 'Save and emit'}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 gap-1.5 px-2 text-xs"
-          onClick={onShowAgent}
-        >
-          <Bot className="size-3.5" />
-          Agent setup
-        </Button>
+        <AgentSetupPopover
+          documentFilePath={documentFilePath}
+          convexVersion={convexVersion}
+          copied={agentSetupCopied}
+          onCopy={onCopyAgentSetup}
+          onRequestSave={onRequestSave}
+          className="h-8 w-auto px-2 py-0"
+          compact
+        />
       </div>
     </aside>
   );

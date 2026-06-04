@@ -142,6 +142,8 @@ export interface SchemaPanelProps {
       command: string | null;
     };
   };
+  /** Hide the agent setup trigger when a parent surface renders it nearby. */
+  showAgentSetup?: boolean;
 }
 
 /**
@@ -236,6 +238,7 @@ export function SchemaPanel({
   onOpenGeneratedFile,
   onRequestSave,
   convexVersion,
+  showAgentSetup = true,
 }: SchemaPanelProps): React.JSX.Element {
   const [activeOutput, setActiveOutput] = useState<GeneratedTargetKind>('convex');
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
@@ -432,6 +435,7 @@ export function SchemaPanel({
             copied={agentCopied}
             onCopy={handleAgentCopy}
             onRequestSave={onRequestSave}
+            className="w-full"
           />
         </div>
       </div>
@@ -449,33 +453,39 @@ export function SchemaPanel({
             Couldn't emit schema: {error}
           </p>
         </div>
-        <div className="pt-2">
-          <AgentSetupPopover
-            documentFilePath={documentFilePath}
-            convexVersion={convexVersion}
-            copied={agentCopied}
-            onCopy={handleAgentCopy}
-            onRequestSave={onRequestSave}
-          />
-        </div>
+        {showAgentSetup ? (
+          <div className="pt-2">
+            <AgentSetupPopover
+              documentFilePath={documentFilePath}
+              convexVersion={convexVersion}
+              copied={agentCopied}
+              onCopy={handleAgentCopy}
+              onRequestSave={onRequestSave}
+              className="w-full"
+            />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col p-3" data-testid="schema-panel">
-      <div className="mb-2">
-        <AgentSetupPopover
-          documentFilePath={documentFilePath}
-          convexVersion={convexVersion}
-          copied={agentCopied}
-          onCopy={handleAgentCopy}
-          onRequestSave={onRequestSave}
-        />
-      </div>
+      {showAgentSetup ? (
+        <div className="mb-2">
+          <AgentSetupPopover
+            documentFilePath={documentFilePath}
+            convexVersion={convexVersion}
+            copied={agentCopied}
+            onCopy={handleAgentCopy}
+            onRequestSave={onRequestSave}
+            className="w-full"
+          />
+        </div>
+      ) : null}
       <div className="group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-background text-foreground shadow-sm">
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <div className="flex items-start justify-between gap-2 border-b border-border bg-muted/80 px-2 py-2 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
             <FileCode className="size-3.5 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -499,32 +509,35 @@ export function SchemaPanel({
                   onOutputDirChange={onOutputDirChange}
                 />
               </div>
-              <div className="truncate font-mono text-[10px]" data-testid="schema-filename">
+              <div className="mt-1 truncate font-mono text-[10px]" data-testid="schema-filename">
                 {selectedOutputDisplayPath}
               </div>
-              <div
-                className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80"
-                data-testid="schema-output-boundary"
-              >
-                Read-only generated output
-              </div>
-              {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
-                <div
-                  className={`mt-0.5 truncate text-[10px] ${
-                    convexVersion.status === 'mismatch' || convexVersion.status === 'target_missing'
-                      ? 'text-warning'
-                      : 'text-muted-foreground'
-                  }`}
-                  title={convexVersionTooltip(convexVersion)}
-                  data-testid="schema-convex-version"
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                <span
+                  className="font-medium text-muted-foreground/80"
+                  data-testid="schema-output-boundary"
                 >
-                  {convexVersion.status === 'mismatch'
-                    ? 'Convex version mismatch'
-                    : convexVersion.status === 'target_missing'
-                      ? 'Convex package missing'
-                      : convexVersionLabel(convexVersion)}
-                </div>
-              ) : null}
+                  read-only generated output
+                </span>
+                {selectedOutput?.group === 'convex' && convexVersion?.emitterVersion ? (
+                  <span
+                    className={`truncate ${
+                      convexVersion.status === 'mismatch' ||
+                      convexVersion.status === 'target_missing'
+                        ? 'text-warning'
+                        : 'text-muted-foreground'
+                    }`}
+                    title={convexVersionTooltip(convexVersion)}
+                    data-testid="schema-convex-version"
+                  >
+                    {convexVersion.status === 'mismatch'
+                      ? 'Convex version mismatch'
+                      : convexVersion.status === 'target_missing'
+                        ? 'Convex package missing'
+                        : convexVersionLabel(convexVersion)}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
           <div className="-my-1 -mr-1 flex shrink-0 items-center gap-1">
@@ -925,18 +938,22 @@ function dirname(path: string): string {
   return path.slice(0, slash);
 }
 
-function AgentSetupPopover({
+export function AgentSetupPopover({
   documentFilePath,
   convexVersion,
   copied,
   onCopy,
   onRequestSave,
+  className = '',
+  compact = false,
 }: {
   documentFilePath: string | null;
   convexVersion?: SchemaPanelProps['convexVersion'];
   copied: AgentSetupCopyKey | null;
   onCopy: (key: AgentSetupCopyKey, text: string) => void;
   onRequestSave?: () => void;
+  className?: string;
+  compact?: boolean;
 }): React.JSX.Element {
   const [activeClient, setActiveClient] = useState<AgentClient>('codex');
   const convexPackageStatus = setupConvexPackageStatus(convexVersion);
@@ -967,23 +984,27 @@ function AgentSetupPopover({
         <Button
           type="button"
           variant="secondary"
-          className="h-auto w-full justify-start gap-2 px-2 py-2 text-left"
-          aria-label="Open setup readiness"
+          className={`h-auto justify-start gap-2 px-2 py-2 text-left ${className}`}
+          aria-label="Open agent setup"
           data-testid="agent-setup"
         >
           <PlugZap className="size-3.5 shrink-0 text-accent" aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="block text-xs font-semibold">Setup readiness</span>
-            <span className="block text-[11px] font-normal text-muted-foreground">
-              {savedPrompt === null ? 'Save to create agent prompt' : 'Prompt ready'}
+          {compact ? (
+            <span className="text-xs font-semibold">Agent setup</span>
+          ) : (
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold">Agent setup</span>
+              <span className="block text-[11px] font-normal text-muted-foreground">
+                {savedPrompt === null ? 'Save to create agent prompt' : 'Prompt ready'}
+              </span>
             </span>
-          </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[430px] p-2" align="end" data-testid="agent-setup-content">
         <div className="mb-2 px-1">
           <h3 id="agent-setup-title" className="text-xs font-semibold text-foreground">
-            Setup readiness
+            Agent setup
           </h3>
           <p className="text-[11px] leading-snug text-muted-foreground">
             Connect an agent to inspect, edit, emit, and check drift through Contexture MCP.

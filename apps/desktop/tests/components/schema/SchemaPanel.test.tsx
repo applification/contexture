@@ -53,7 +53,7 @@ describe('SchemaPanel', () => {
   it('labels generated previews as read-only output', () => {
     render(<SchemaPanel {...DEFAULT_PROPS} convexSource="export default {};\n" />);
     expect(screen.getByTestId('schema-output-boundary')).toHaveTextContent(
-      'Read-only generated output',
+      'read-only generated output',
     );
   });
 
@@ -65,10 +65,10 @@ describe('SchemaPanel', () => {
     expect(onCopy).toHaveBeenCalledWith(source);
   });
 
-  it('shows setup readiness with Convex AI files and packaged Codex MCP commands', () => {
+  it('shows agent setup readiness with Convex AI files and packaged Codex MCP commands', () => {
     render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" />);
 
-    expect(screen.getByTestId('agent-setup')).toHaveTextContent('Setup readiness');
+    expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
     fireEvent.click(screen.getByTestId('agent-setup'));
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex package');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
