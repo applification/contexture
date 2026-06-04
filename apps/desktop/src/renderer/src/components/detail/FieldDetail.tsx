@@ -11,7 +11,7 @@
  * nothing here mutates the store directly.
  */
 
-import { type DerivationWriter, derivationKindLabel } from '@contexture/core/derivation';
+import type { DerivationWriter } from '@contexture/core/derivation';
 import {
   type FixtureValueType,
   listFixtureGenerators,
@@ -22,17 +22,8 @@ import type { ModelingHint } from '@contexture/core/modeling-hints';
 import { TYPE_NODE_REF_PREVIEW_EVENT } from '@renderer/components/graph/ref-preview-event';
 import type { ValidationError } from '@renderer/services/validation';
 import { STDLIB_TYPE_OPTIONS, type StdlibTypeOption } from '@shared/stdlib-registry';
-import {
-  ArrowLeft,
-  ChevronDown,
-  ChevronsUpDown,
-  CircleHelp,
-  Lightbulb,
-  MoreHorizontal,
-  Trash2,
-} from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, CircleHelp, Lightbulb } from 'lucide-react';
 import type React from 'react';
-import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import type { Op } from '../../store/ops';
 import { Badge } from '../ui/badge';
@@ -47,12 +38,6 @@ import {
   CommandItem,
   CommandList,
 } from '../ui/command';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
 import { Field, FieldGroup, FieldLabel } from '../ui/field';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -105,7 +90,6 @@ export interface FieldDetailProps {
   tableIndexes?: readonly IndexDef[];
   onCreateRefTarget?: () => string | undefined;
   onCreateAndSelectRefTarget?: (selectTarget: (typeName: string) => void) => void;
-  onBackToType?: () => void;
 }
 
 export function FieldDetail({
@@ -120,7 +104,6 @@ export function FieldDetail({
   tableIndexes,
   onCreateRefTarget,
   onCreateAndSelectRefTarget,
-  onBackToType,
 }: FieldDetailProps) {
   const update = (patch: Partial<FieldDef>) =>
     dispatch({ kind: 'update_field', typeName, fieldName: field.name, patch });
@@ -131,9 +114,6 @@ export function FieldDetail({
     tableIndexes
       ?.filter((index) => index.fields.includes(field.name))
       .map((index) => ({ index, position: index.fields.indexOf(field.name) })) ?? [];
-  const primaryIndex = indexMemberships[0];
-  const parentKindLabel = tableIndexes ? 'table' : 'object';
-  const sampleLabel = sampleDataLabel(field);
   const addIndex = () => {
     if (!tableIndexes || hasSingleFieldIndex) return;
     dispatch({
@@ -145,104 +125,6 @@ export function FieldDetail({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="field-detail">
-      <header
-        className="flex min-h-20 shrink-0 items-start justify-between gap-3 border-b bg-muted/20 px-3 py-3"
-        style={inspectorHeaderStyle(fieldKindColor(field.type))}
-        data-testid="field-detail-header"
-      >
-        <div className="min-w-0 space-y-2">
-          <div
-            className="truncate text-[11px] font-medium uppercase tracking-wide"
-            style={{ color: fieldKindColor(field.type) }}
-          >
-            {parentKindLabel} / {typeName}
-          </div>
-          <div className="flex min-w-0 items-center gap-2">
-            {onBackToType && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onBackToType}
-                className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                aria-label="Back to table fields"
-              >
-                <ArrowLeft aria-hidden="true" className="size-3.5" />
-                Fields
-              </Button>
-            )}
-            <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
-              {field.name}
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge
-              variant="outline"
-              className="h-5 rounded-md px-1.5 text-[11px]"
-              style={toneSurfaceStyle(fieldKindColor(field.type), 14, 50)}
-            >
-              {fieldTypeSummary(field.type)}
-            </Badge>
-            <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[11px]">
-              {field.optional ? 'optional' : 'required'}
-            </Badge>
-            {field.nullable && (
-              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
-                nullable
-              </Badge>
-            )}
-            {field.serverDerived && !field.derivation && (
-              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
-                server derived
-              </Badge>
-            )}
-            {field.derivation && (
-              <Badge
-                variant="outline"
-                className="h-5 rounded-md px-1.5 text-[11px]"
-                style={toneSurfaceStyle(derivationTone(field.derivation), 14, 50)}
-              >
-                {derivationKindLabel(field.derivation.kind)}
-              </Badge>
-            )}
-            {primaryIndex && (
-              <Badge
-                variant="outline"
-                className="h-5 rounded-md px-1.5 text-[11px]"
-                style={toneSurfaceStyle('var(--inspector-index)', 14, 50)}
-              >
-                indexed
-              </Badge>
-            )}
-            <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
-              sample: {sampleLabel}
-            </Badge>
-          </div>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Field actions for ${field.name}`}
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <MoreHorizontal aria-hidden="true" className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={() => dispatch({ kind: 'remove_field', typeName, fieldName: field.name })}
-            >
-              <Trash2 aria-hidden="true" />
-              Delete field
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
-
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="space-y-3">
           <ValidationIssues
@@ -958,22 +840,6 @@ function fixtureValueTypeForField(fieldType: FieldType): FixtureValueType {
     case 'array':
       return 'unknown';
   }
-}
-
-function fieldTypeSummary(fieldType: FieldType): string {
-  if (fieldType.kind === 'array') return `list<${fieldTypeSummary(fieldType.element)}>`;
-  if (fieldType.kind === 'ref') return `ref ${fieldType.typeName}`;
-  return fieldType.kind;
-}
-
-function sampleDataLabel(field: FieldDef): string {
-  const generatorId = field.sampleData?.generator;
-  if (!generatorId) return 'Auto';
-  return (
-    listFixtureGenerators({ valueType: fixtureValueTypeForField(field.type) }).find(
-      (generator) => generator.id === generatorId,
-    )?.label ?? generatorId
-  );
 }
 
 /**
@@ -1725,53 +1591,6 @@ function parseSourceList(value: string): string[] | undefined {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return sources.length > 0 ? sources : undefined;
-}
-
-function derivationTone(derivation: DerivationPolicy): string {
-  if (
-    derivation.kind !== 'snapshot' &&
-    (derivation.sources?.length ?? 0) > 0 &&
-    !derivation.refresh &&
-    !derivation.driftPolicy
-  ) {
-    return 'var(--warning)';
-  }
-  return derivation.kind === 'snapshot' ? 'var(--success)' : 'var(--inspector-advisory)';
-}
-
-function fieldKindColor(fieldType: FieldType): string {
-  switch (fieldType.kind) {
-    case 'string':
-      return 'var(--inspector-field-string)';
-    case 'number':
-      return 'var(--inspector-field-number)';
-    case 'boolean':
-      return 'var(--inspector-field-boolean)';
-    case 'date':
-      return 'var(--inspector-field-date)';
-    case 'literal':
-      return 'var(--inspector-field-literal)';
-    case 'ref':
-      return 'var(--inspector-field-ref)';
-    case 'array':
-      return 'var(--inspector-field-array)';
-  }
-}
-
-function inspectorHeaderStyle(color: string): CSSProperties {
-  return {
-    background: 'var(--background)',
-    borderColor: `color-mix(in oklch, ${color} 34%, var(--border))`,
-    boxShadow: `inset 0 -2px 0 color-mix(in oklch, ${color} 24%, transparent)`,
-  };
-}
-
-function toneSurfaceStyle(color: string, background = 12, border = 44): CSSProperties {
-  return {
-    background: `color-mix(in oklch, ${color} ${background}%, transparent)`,
-    borderColor: `color-mix(in oklch, ${color} ${border}%, var(--border))`,
-    color: `color-mix(in oklch, ${color} 78%, var(--foreground))`,
-  };
 }
 
 function nextFieldIndexName(indexes: readonly IndexDef[], fieldName: string): string {

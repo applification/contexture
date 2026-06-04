@@ -184,10 +184,7 @@ function GraphCanvasInner({
   const setAdjacencyResolver = useGraphSelectionStore((s) => s.setAdjacencyResolver);
   const focusTarget = useGraphSelectionStore((s) => s.state.focusTarget);
   const consumeFocus = useGraphSelectionStore((s) => s.consumeFocus);
-  const sidebarTab = useUIChromeStore((s) => s.sidebarTab);
   const sidebarVisible = useUIChromeStore((s) => s.sidebarVisible);
-  const setSidebarTab = useUIChromeStore((s) => s.setSidebarTab);
-  const setSidebarVisible = useUIChromeStore((s) => s.setSidebarVisible);
 
   const validationErrors = useMemo(() => validate(schema, { stdlib: STDLIB_REGISTRY }), [schema]);
   const modelingHints = useMemo(() => analyzeModelingHints(schema), [schema]);
@@ -302,7 +299,7 @@ function GraphCanvasInner({
 
   useEffect(() => {
     if ((showEnums && showStdlib) || !selectedNodeId) return;
-    if (sidebarVisible && sidebarTab === 'properties') return;
+    if (sidebarVisible) return;
     const selectedNode = builtNodes.find((node) => node.id === selectedNodeId);
     if (
       selectedNode &&
@@ -311,7 +308,7 @@ function GraphCanvasInner({
     ) {
       clearNodes();
     }
-  }, [builtNodes, clearNodes, selectedNodeId, showEnums, showStdlib, sidebarTab, sidebarVisible]);
+  }, [builtNodes, clearNodes, selectedNodeId, showEnums, showStdlib, sidebarVisible]);
 
   // ELK once the nodes have measured DOM dimensions.
   const { runLayout } = useELKLayout();
@@ -492,32 +489,18 @@ function GraphCanvasInner({
       if ('error' in result) return;
       click(typeName, 'replace');
       useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
-      setSidebarVisible(true);
-      setSidebarTab('properties');
     },
-    [click, setSidebarTab, setSidebarVisible],
+    [click],
   );
 
   const focusSelectedTypeName = useCallback((): void => {
     if (!selectedNodeId) return;
-    setSidebarVisible(true);
-    setSidebarTab('properties');
     setTimeout(() => {
       document.dispatchEvent(
         new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName: selectedNodeId } }),
       );
     }, 0);
-  }, [selectedNodeId, setSidebarTab, setSidebarVisible]);
-
-  // Double-click a node → focus its properties in the sidebar.
-  const onNodeDoubleClick: ReactFlowProps['onNodeDoubleClick'] = useCallback(
-    (_event, node) => {
-      click(node.id, 'replace');
-      setSidebarVisible(true);
-      setSidebarTab('properties');
-    },
-    [click, setSidebarVisible, setSidebarTab],
-  );
+  }, [selectedNodeId]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -561,12 +544,10 @@ function GraphCanvasInner({
       const detail = (ev as CustomEvent<{ typeName?: unknown }>).detail;
       if (typeof detail?.typeName !== 'string') return;
       click(detail.typeName, 'replace');
-      setSidebarVisible(true);
-      setSidebarTab('properties');
     };
     document.addEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler);
     return () => document.removeEventListener(TYPE_NODE_TARGET_PROPERTIES_EVENT, handler);
-  }, [click, setSidebarTab, setSidebarVisible]);
+  }, [click]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -630,7 +611,6 @@ function GraphCanvasInner({
         onNodeClick={(evt, node) => {
           click(node.id, clickModeFromEvent(evt));
         }}
-        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={() => clearNodes()}
         onEdgeClick={(_, edge) => {
           const data = edge.data as RefEdgeData | undefined;

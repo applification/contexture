@@ -6,7 +6,7 @@ const meta = {
   title: 'Components/ActivityBar',
   component: ActivityBar,
   args: {
-    activeTab: 'properties',
+    activeTab: 'chat',
     onTabChange: fn(),
   },
   parameters: {
@@ -16,10 +16,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-export const Properties: Story = {
-  args: { activeTab: 'properties' },
-};
 
 export const Chat: Story = {
   args: { activeTab: 'chat' },

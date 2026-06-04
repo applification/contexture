@@ -46,9 +46,13 @@ import { Textarea } from '../ui/textarea';
 
 interface PlaygroundPanelProps {
   schema: Schema;
+  highlightedTypeName?: string | null;
 }
 
-export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Element {
+export function PlaygroundPanel({
+  schema,
+  highlightedTypeName = null,
+}: PlaygroundPanelProps): React.JSX.Element {
   const [panelRef, isCompact] = useCompactPanel();
   const [formOpen, setFormOpen] = useState(false);
   const contract = useMemo(
@@ -66,14 +70,22 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
   const clearType = usePlaygroundStore((state) => state.clearType);
   const setScope = usePlaygroundStore((state) => state.setScope);
   const scopeId = useMemo(() => schemaScopeId(schema), [schema]);
+  const highlightedEntity = highlightedTypeName
+    ? contract.entities.find((entity) => entity.typeName === highlightedTypeName)
+    : undefined;
+  const highlightedUnavailable = highlightedTypeName !== null && !highlightedEntity;
 
   useEffect(() => {
     const typeNames = contract.entities.map((entity) => entity.typeName);
     setScope(scopeId, typeNames);
+    if (highlightedEntity && selectedTypeName !== highlightedEntity.typeName) {
+      selectType(highlightedEntity.typeName);
+      return;
+    }
     if (typeNames.length > 0 && (!selectedTypeName || !typeNames.includes(selectedTypeName))) {
       selectType(typeNames[0] ?? null);
     }
-  }, [contract.entities, scopeId, selectType, selectedTypeName, setScope]);
+  }, [contract.entities, highlightedEntity, scopeId, selectType, selectedTypeName, setScope]);
 
   const selectedEntity =
     contract.entities.find((entity) => entity.typeName === selectedTypeName) ??
@@ -139,12 +151,23 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
 
   return (
     <div ref={panelRef} className="flex h-full min-h-0 flex-col overflow-hidden">
-      <PanelHeader recordCount={recordCount} />
+      <PanelHeader
+        recordCount={recordCount}
+        highlightedTypeName={highlightedEntity?.typeName ?? highlightedTypeName}
+        highlightedUnavailable={highlightedUnavailable}
+        onSeedAll={() => seedRecords('all')}
+      />
+      {highlightedUnavailable && (
+        <div className="border-t border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning">
+          {highlightedTypeName} is not available in Playground. Choose a table from the entity list.
+        </div>
+      )}
       {isCompact ? (
         <div className="flex min-h-0 flex-1 flex-col border-t">
           <EntityNav
             entities={contract.entities}
             selectedTypeName={selectedEntity?.typeName ?? null}
+            highlightedTypeName={highlightedEntity?.typeName ?? null}
             recordsByType={recordsByType}
             onSelect={selectType}
             compact
@@ -156,7 +179,6 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
                 records={records}
                 onNew={openNewRecord}
                 onSeedCurrent={() => seedRecords('current')}
-                onSeedAll={() => seedRecords('all')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
               {seedNotice && (
@@ -202,6 +224,7 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
           <EntityNav
             entities={contract.entities}
             selectedTypeName={selectedEntity?.typeName ?? null}
+            highlightedTypeName={highlightedEntity?.typeName ?? null}
             recordsByType={recordsByType}
             onSelect={selectType}
           />
@@ -212,7 +235,6 @@ export function PlaygroundPanel({ schema }: PlaygroundPanelProps): React.JSX.Ele
                 records={records}
                 onNew={openNewRecord}
                 onSeedCurrent={() => seedRecords('current')}
-                onSeedAll={() => seedRecords('all')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
               {seedNotice && (
@@ -338,7 +360,6 @@ export function ScopedPlaygroundWorkbench({
         records={records}
         onNew={openNewRecord}
         onSeedCurrent={seedRecords}
-        onSeedAll={seedRecords}
         onClear={() => clearType(entity.typeName)}
         scoped
       />
@@ -410,12 +431,14 @@ function useCompactPanel(threshold = 760): readonly [RefObject<HTMLDivElement | 
 function EntityNav({
   entities,
   selectedTypeName,
+  highlightedTypeName,
   recordsByType,
   onSelect,
   compact = false,
 }: {
   entities: PlaygroundEntity[];
   selectedTypeName: string | null;
+  highlightedTypeName?: string | null;
   recordsByType: Record<string, PlaygroundRecord[]>;
   onSelect: (typeName: string | null) => void;
   compact?: boolean;
@@ -453,6 +476,7 @@ function EntityNav({
 
   const buttons = entities.map((entity) => {
     const count = recordsByType[entity.typeName]?.length ?? 0;
+    const highlighted = highlightedTypeName === entity.typeName;
     return (
       <button
         type="button"
@@ -462,10 +486,19 @@ function EntityNav({
           'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition-colors',
           selectedTypeName === entity.typeName
             ? 'bg-primary/10 text-primary'
-            : 'text-foreground hover:bg-muted',
+            : highlighted
+              ? 'bg-reference/10 text-reference-text hover:bg-reference/15'
+              : 'text-foreground hover:bg-muted',
         )}
       >
-        <span className="min-w-0 truncate">{entity.typeName}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate">{entity.typeName}</span>
+          {highlighted && (
+            <span className="shrink-0 rounded-full bg-reference/15 px-1.5 py-0 text-[9px] font-medium text-reference-text">
+              current
+            </span>
+          )}
+        </span>
         <Badge variant="secondary" className="ml-2 shrink-0">
           {count}
         </Badge>
@@ -483,16 +516,50 @@ function EntityNav({
   );
 }
 
-function PanelHeader({ recordCount }: { recordCount: number }): React.JSX.Element {
+function PanelHeader({
+  recordCount,
+  highlightedTypeName,
+  highlightedUnavailable,
+  onSeedAll,
+}: {
+  recordCount: number;
+  highlightedTypeName?: string | null;
+  highlightedUnavailable?: boolean;
+  onSeedAll?: () => void;
+}): React.JSX.Element {
   return (
     <header className="flex h-14 items-center justify-between px-3">
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold">Playground</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">Playground</h2>
+          {highlightedTypeName && (
+            <Badge variant={highlightedUnavailable ? 'outline' : 'secondary'} className="max-w-36">
+              <span className="truncate">{highlightedTypeName}</span>
+            </Badge>
+          )}
+        </div>
         <p className="truncate text-xs text-muted-foreground">
-          Create sample records from the model.
+          {highlightedTypeName
+            ? 'Inspector selection is highlighted in the model.'
+            : 'Create sample records from the model.'}
         </p>
       </div>
-      <Badge variant="outline">{recordCount} records</Badge>
+      <div className="flex shrink-0 items-center gap-2">
+        <Badge variant="outline">{recordCount} records</Badge>
+        {onSeedAll && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            aria-label="Seed all entities"
+            onClick={onSeedAll}
+          >
+            <Sparkles aria-hidden="true" />
+            All
+          </Button>
+        )}
+      </div>
     </header>
   );
 }
@@ -502,7 +569,6 @@ function EntityToolbar({
   records,
   onNew,
   onSeedCurrent,
-  onSeedAll,
   onClear,
   scoped = false,
 }: {
@@ -510,7 +576,6 @@ function EntityToolbar({
   records: PlaygroundRecord[];
   onNew: () => void;
   onSeedCurrent: () => void;
-  onSeedAll: () => void;
   onClear: () => void;
   scoped?: boolean;
 }): React.JSX.Element {
@@ -609,19 +674,6 @@ function EntityToolbar({
         >
           <Sparkles aria-hidden="true" />
         </Button>
-        {!scoped && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2"
-            aria-label="Seed all entities"
-            onClick={onSeedAll}
-          >
-            <Sparkles aria-hidden="true" />
-            All
-          </Button>
-        )}
         <Button
           type="button"
           variant="ghost"

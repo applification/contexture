@@ -18,6 +18,12 @@ const schema: Schema = {
         { name: 'tagIds', type: { kind: 'array', element: { kind: 'string' } } },
       ],
     },
+    {
+      kind: 'object',
+      name: 'Team',
+      table: true,
+      fields: [{ name: 'name', type: { kind: 'string' } }],
+    },
   ],
 };
 
@@ -95,6 +101,24 @@ describe('PlaygroundPanel', () => {
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Country' })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/Unknown reference target/u)).not.toBeInTheDocument();
+  });
+
+  it('highlights an inspector-selected type while keeping all entities available', () => {
+    render(<PlaygroundPanel schema={schema} highlightedTypeName="Team" />);
+
+    expect(
+      screen.getByText('Inspector selection is highlighted in the model.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Select entity' })).toHaveTextContent('Team');
+  });
+
+  it('places the all-entities seed action in the Playground header', () => {
+    render(<PlaygroundPanel schema={schema} />);
+
+    const header = screen.getByRole('banner');
+    expect(header).toHaveTextContent('0 records');
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Seed all entities' }));
+    expect(screen.getByRole('button', { name: 'Seed current entity' })).toBeInTheDocument();
   });
 
   it('packs record form fields at the top of the scroll area', async () => {

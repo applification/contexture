@@ -279,7 +279,6 @@ function focusPath(schema: Schema, path: string): void {
     useGraphSelectionStore.getState().selectField(null);
     useGraphSelectionStore.getState().focus(target.typeName);
   }
-  useUIChromeStore.getState().setSidebarTab('properties');
   useUIChromeStore.getState().setSidebarVisible(true);
 }
 

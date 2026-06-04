@@ -27,16 +27,14 @@ import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
 import { useChatComposerStore } from '@renderer/store/chat-composer';
-import { usePlaygroundStore } from '@renderer/store/playground';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import {
   ChevronDown,
   ChevronUp,
-  Hash,
+  GripVertical,
   Lightbulb,
   MessageSquare,
-  Play,
   Plus,
   SlidersHorizontal,
   Trash2,
@@ -46,10 +44,8 @@ import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from 
 import { cn } from '@/lib/utils';
 import type { Op } from '../../store/ops';
 import { nextFieldName } from '../graph/interactions';
-import { ScopedPlaygroundWorkbench } from '../playground/PlaygroundPanel';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { ButtonGroup } from '../ui/button-group';
 import { Checkbox } from '../ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import {
@@ -64,8 +60,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { HintBody, ModelShapeHints } from './ModelShapeHints';
 import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues';
@@ -73,7 +69,6 @@ import { type ValidationIssueRepair, ValidationIssues } from './ValidationIssues
 const CONVEX_RESERVED_PREFIX_MSG = "Convex reserves names starting with '_'";
 export const FOCUS_TYPE_NAME_EVENT = 'contexture:focus-type-name';
 const AUTO_SAMPLE_DATA = '__auto__';
-const EMPTY_TABLE_RECORDS: readonly unknown[] = [];
 
 function isConvexReservedName(name: string): boolean {
   return name.startsWith('_');
@@ -105,7 +100,6 @@ export interface TypeDetailProps {
 
 export function TypeDetail({
   type,
-  schema,
   dispatch,
   dispatchBatch,
   modelingHints = [],
@@ -117,63 +111,23 @@ export function TypeDetail({
 }: TypeDetailProps) {
   const isTable = type.kind === 'object' && type.table === true;
   const nameReserved = isTable && isConvexReservedName(type.name);
-  const recordsByType = usePlaygroundStore((state) => state.recordsByType);
-  const tableRecords = isTable
-    ? (recordsByType[type.name] ?? EMPTY_TABLE_RECORDS)
-    : EMPTY_TABLE_RECORDS;
 
   if (isTable && type.kind === 'object') {
     return (
       <TableTypeDetail
         type={type}
-        schema={schema}
         dispatch={dispatch}
         modelingHints={modelingHints}
         validationErrors={validationErrors}
         validationRepairForIssue={validationRepairForIssue}
         onDiscussValidationIssue={onDiscussValidationIssue}
-        recordsCount={tableRecords.length}
         reserved={nameReserved}
       />
     );
   }
 
   return (
-    <div className="space-y-4 p-3 pt-0">
-      <header
-        className="-mx-3 flex min-h-20 items-center justify-between border-b bg-muted/20 px-3 py-3"
-        style={inspectorHeaderStyle(inspectorTypeColor(type))}
-        data-testid="type-detail-header"
-      >
-        <div className="min-w-0">
-          <div
-            className="truncate text-[11px] font-medium uppercase tracking-wide"
-            style={{ color: inspectorTypeColor(type) }}
-          >
-            {isTable ? 'table' : type.kind}
-          </div>
-          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
-            {type.name}
-          </h2>
-          <div
-            aria-hidden="true"
-            className="h-[1.25rem] truncate text-sm font-medium leading-snug text-muted-foreground"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete type ${type.name}`}
-            onClick={() => dispatch({ kind: 'delete_type', name: type.name })}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
-        </div>
-      </header>
-
+    <div className="space-y-4 p-3">
       <ValidationIssues
         errors={validationErrors}
         onDiscussIssue={onDiscussValidationIssue}
@@ -206,26 +160,21 @@ export function TypeDetail({
 
 function TableTypeDetail({
   type,
-  schema,
   dispatch,
   modelingHints,
   validationErrors,
   validationRepairForIssue,
   onDiscussValidationIssue,
-  recordsCount,
   reserved,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
-  schema?: Schema;
   dispatch: (op: Op) => void;
   modelingHints: readonly ModelingHint[];
   validationErrors: readonly ValidationError[];
   validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
   onDiscussValidationIssue?: (error: ValidationError) => void;
-  recordsCount: number;
   reserved: boolean;
 }) {
-  const defaultMode = recordsCount > 0 ? 'try' : 'shape';
   const { tableHints, fieldHintsByName } = useMemo(
     () => splitTableModelingHints(modelingHints),
     [modelingHints],
@@ -239,56 +188,8 @@ function TableTypeDetail({
   const suggestionCount = suggestedIndexes(type).length;
 
   return (
-    <Tabs key={type.name} defaultValue={defaultMode} className="flex h-full min-h-0 flex-col">
-      <header
-        className="flex min-h-20 shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-3"
-        style={inspectorHeaderStyle('var(--inspector-type-table)')}
-        data-testid="type-detail-header"
-      >
-        <div className="min-w-0">
-          <div
-            className="truncate text-[11px] font-medium uppercase tracking-wide"
-            style={{ color: 'var(--inspector-type-table)' }}
-          >
-            table
-          </div>
-          <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
-            {type.name}
-          </h2>
-          <div className="mt-2">
-            <TabsList asChild>
-              <ButtonGroup aria-label="Table inspector mode">
-                <TabsTrigger
-                  value="shape"
-                  className="h-8 gap-1.5 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                >
-                  <SlidersHorizontal aria-hidden="true" className="size-3.5" />
-                  Shape
-                </TabsTrigger>
-                <TabsTrigger
-                  value="try"
-                  className="h-8 gap-1.5 rounded-none border-0 px-3 text-xs first:rounded-l-md last:rounded-r-md data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-                >
-                  <Play aria-hidden="true" className="size-3.5" />
-                  Try
-                </TabsTrigger>
-              </ButtonGroup>
-            </TabsList>
-          </div>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete type ${type.name}`}
-          onClick={() => dispatch({ kind: 'delete_type', name: type.name })}
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 aria-hidden="true" />
-        </Button>
-      </header>
-
-      <TabsContent value="shape" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="space-y-4">
           <ValidationIssues
             errors={validationErrors}
@@ -302,7 +203,6 @@ function TableTypeDetail({
           <ObjectBody
             type={type}
             dispatch={dispatch}
-            quietControls
             fieldHintsByName={fieldHintsByName}
             fieldHintCount={fieldHintCount}
             fieldIndexInsights={fieldIndexInsights}
@@ -340,34 +240,8 @@ function TableTypeDetail({
             </CollapsibleContent>
           </Collapsible>
         </div>
-      </TabsContent>
-
-      <TabsContent value="try" className="m-0 min-h-0 flex-1 overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col">
-          <ValidationIssues
-            errors={validationErrors}
-            onDiscussIssue={onDiscussValidationIssue}
-            onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
-            repairForIssue={validationRepairForIssue}
-          />
-          <details className="shrink-0 border-b bg-muted/10 px-3 py-2">
-            <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-              Generation settings
-            </summary>
-            <div className="mt-2">
-              <SampleDataSection type={type} dispatch={dispatch} compact />
-            </div>
-          </details>
-          {schema ? (
-            <ScopedPlaygroundWorkbench schema={schema} typeName={type.name} className="flex-1" />
-          ) : (
-            <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground">
-              Sample records need a schema context.
-            </div>
-          )}
-        </div>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   );
 }
 
@@ -524,19 +398,19 @@ function DescriptionField({ type, dispatch }: TypeDetailProps) {
 function ObjectBody({
   type,
   dispatch,
-  quietControls = false,
   fieldHintsByName,
   fieldHintCount = 0,
   fieldIndexInsights,
 }: {
   type: Extract<TypeDef, { kind: 'object' }>;
   dispatch: (op: Op) => void;
-  quietControls?: boolean;
   fieldHintsByName?: ReadonlyMap<string, readonly ModelingHint[]>;
   fieldHintCount?: number;
   fieldIndexInsights?: ReadonlyMap<string, FieldIndexInsight>;
 }) {
   const fieldOrder = type.fields.map((field) => field.name);
+  const [draggedFieldName, setDraggedFieldName] = useState<string | null>(null);
+  const [dropTargetFieldName, setDropTargetFieldName] = useState<string | null>(null);
   const addField = () => {
     const field: FieldDef = { name: nextFieldName(type.fields), type: { kind: 'string' } };
     dispatch({
@@ -553,6 +427,13 @@ function ObjectBody({
     if (!fieldName) return;
     nextOrder.splice(toIndex, 0, fieldName);
     dispatch({ kind: 'reorder_fields', typeName: type.name, order: nextOrder });
+  };
+  const moveFieldByName = (fromFieldName: string, toFieldName: string) => {
+    if (fromFieldName === toFieldName) return;
+    const fromIndex = fieldOrder.indexOf(fromFieldName);
+    const toIndex = fieldOrder.indexOf(toFieldName);
+    if (fromIndex === -1 || toIndex === -1) return;
+    moveField(fromIndex, toIndex);
   };
 
   if (type.fields.length === 0) {
@@ -578,7 +459,6 @@ function ObjectBody({
     );
   }
   const isTable = type.table === true;
-  const showAdviceColumn = Boolean(fieldHintsByName && fieldHintsByName.size > 0);
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
@@ -595,55 +475,117 @@ function ObjectBody({
           Add field
         </Button>
       </div>
-      <Table className="text-xs">
+      <Table className="table-fixed text-xs">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="h-7 px-2">Name</TableHead>
-            <TableHead className="h-7 w-20 px-2 text-center">Optional</TableHead>
-            <TableHead className="h-7 px-2 text-right">Type</TableHead>
-            {showAdviceColumn && (
-              <TableHead className="h-7 w-14 px-1 text-center">
-                <span className="sr-only">Advice</span>
-              </TableHead>
-            )}
-            <TableHead className="h-7 w-36 px-1 text-right">
+            <TableHead className="h-7 w-7 px-0">
+              <span className="sr-only">Order</span>
+            </TableHead>
+            <TableHead className="h-7 min-w-36 px-1">Name</TableHead>
+            <TableHead className="h-7 w-[4.75rem] px-1 text-center">Optional</TableHead>
+            <TableHead className="h-7 w-[4.5rem] px-1 text-right">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {type.fields.map((f, fieldIndex) => {
+          {type.fields.map((f) => {
             const reserved = isTable && isConvexReservedName(f.name);
             const fieldHints = fieldHintsByName?.get(f.name) ?? [];
             const fieldIndexInsight = fieldIndexInsights?.get(f.name);
+            const isDropTarget = dropTargetFieldName === f.name && draggedFieldName !== f.name;
             return (
               <TableRow
                 key={f.name}
                 data-testid="object-field-summary"
                 data-reserved={reserved || undefined}
                 title={reserved ? CONVEX_RESERVED_PREFIX_MSG : undefined}
-                className={cn('group', reserved && 'text-destructive')}
+                onDragEnter={() => {
+                  if (draggedFieldName) setDropTargetFieldName(f.name);
+                }}
+                onDragOver={(ev) => {
+                  ev.preventDefault();
+                  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={(ev) => {
+                  ev.preventDefault();
+                  const source = draggedFieldName ?? ev.dataTransfer?.getData('text/plain');
+                  if (!source) return;
+                  moveFieldByName(source, f.name);
+                  setDraggedFieldName(null);
+                  setDropTargetFieldName(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedFieldName(null);
+                  setDropTargetFieldName(null);
+                }}
+                className={cn(
+                  'group',
+                  isDropTarget &&
+                    'bg-reference/10 shadow-[inset_0_2px_0_var(--reference)] hover:bg-reference/10',
+                  draggedFieldName === f.name && 'opacity-45',
+                  reserved && 'text-destructive',
+                )}
               >
-                <TableCell className="px-2 py-1.5 font-medium">
-                  <Input
-                    aria-label={`Field name ${f.name}`}
-                    defaultValue={f.name}
-                    className="h-7 px-2 text-xs font-medium"
-                    onBlur={(ev) => {
-                      const next = ev.target.value.trim();
-                      if (next && next !== f.name) {
-                        dispatch({
-                          kind: 'update_field',
-                          typeName: type.name,
-                          fieldName: f.name,
-                          patch: { name: next },
-                        });
-                      }
+                <TableCell className="px-0 py-1.5 align-middle">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 cursor-grab text-muted-foreground/65 hover:text-foreground active:cursor-grabbing"
+                    aria-label={`Drag field ${f.name} to reorder`}
+                    draggable
+                    onDragStart={(ev) => {
+                      setDraggedFieldName(f.name);
+                      setDropTargetFieldName(null);
+                      ev.dataTransfer.effectAllowed = 'move';
+                      ev.dataTransfer.setData('text/plain', f.name);
                     }}
-                  />
+                    title="Drag to reorder"
+                  >
+                    <GripVertical aria-hidden="true" className="size-3.5" />
+                  </Button>
                 </TableCell>
-                <TableCell className="px-2 py-1.5 text-center">
-                  <Checkbox
+                <TableCell className="px-1 py-1.5 font-medium">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex min-w-0 flex-wrap items-center gap-1">
+                      <FieldKindPill fieldType={f.type} />
+                      {f.derivation && <FieldDerivationPill field={f} />}
+                      {fieldIndexInsight && fieldIndexInsight.memberships.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="h-4 rounded px-1 text-[10px]"
+                          style={toneSurfaceStyle('var(--inspector-index)', 12, 50)}
+                        >
+                          indexed
+                        </Badge>
+                      )}
+                      <FieldAdvicePopover
+                        typeName={type.name}
+                        fieldName={f.name}
+                        hints={fieldHints}
+                      />
+                    </div>
+                    <Input
+                      aria-label={`Field name ${f.name}`}
+                      defaultValue={f.name}
+                      className="h-7 min-w-0 px-2 text-xs font-medium"
+                      onBlur={(ev) => {
+                        const next = ev.target.value.trim();
+                        if (next && next !== f.name) {
+                          dispatch({
+                            kind: 'update_field',
+                            typeName: type.name,
+                            fieldName: f.name,
+                            patch: { name: next },
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                </TableCell>
+                <TableCell className="px-1 py-1.5 text-center">
+                  <Switch
                     aria-label={`${f.name} optional`}
                     checked={f.optional === true}
                     onCheckedChange={(v) =>
@@ -656,38 +598,9 @@ function ObjectBody({
                     }
                   />
                 </TableCell>
-                <TableCell className="px-2 py-1.5 text-right">
-                  <div className="inline-flex items-center justify-end gap-1">
-                    {f.derivation && <FieldDerivationPill field={f} />}
-                    <FieldKindPill fieldType={f.type} />
-                  </div>
-                </TableCell>
-                {showAdviceColumn && (
-                  <TableCell className="w-14 px-1 py-1.5 text-center">
-                    <FieldAdvicePopover
-                      typeName={type.name}
-                      fieldName={f.name}
-                      hints={fieldHints}
-                    />
-                  </TableCell>
-                )}
-                <TableCell className="w-36 px-1 py-1.5 text-right">
+                <TableCell className="w-[4.5rem] px-1 py-1.5 text-right">
                   <div className="inline-flex items-center justify-end gap-0.5">
-                    {fieldIndexInsight && (
-                      <FieldIndexPopover
-                        typeName={type.name}
-                        fieldName={f.name}
-                        insight={fieldIndexInsight}
-                        dispatch={dispatch}
-                      />
-                    )}
-                    <div
-                      className={cn(
-                        'inline-flex items-center gap-0.5 transition-opacity',
-                        quietControls &&
-                          'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-                      )}
-                    >
+                    <div className="inline-flex items-center gap-0.5">
                       <Button
                         type="button"
                         variant="ghost"
@@ -701,28 +614,6 @@ function ObjectBody({
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       >
                         <SlidersHorizontal aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move field ${f.name} earlier`}
-                        disabled={fieldIndex === 0}
-                        onClick={() => moveField(fieldIndex, fieldIndex - 1)}
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      >
-                        <ChevronUp aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move field ${f.name} later`}
-                        disabled={fieldIndex === type.fields.length - 1}
-                        onClick={() => moveField(fieldIndex, fieldIndex + 1)}
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      >
-                        <ChevronDown aria-hidden="true" />
                       </Button>
                       <Button
                         type="button"
@@ -761,7 +652,7 @@ function FieldAdvicePopover({
   fieldName: string;
   hints: readonly ModelingHint[];
 }) {
-  if (hints.length === 0) return <span aria-hidden="true" className="inline-block h-7 w-7" />;
+  if (hints.length === 0) return null;
 
   const [primary, ...secondary] = hints;
   if (!primary) return null;
@@ -783,12 +674,12 @@ function FieldAdvicePopover({
           variant="ghost"
           size="icon"
           aria-label={`Modeling advice for ${fieldName}`}
-          className="relative h-7 w-7 border shadow-[0_0_0_1px_color-mix(in_oklch,currentColor_10%,transparent)] transition-colors hover:bg-accent/70 data-[state=open]:bg-accent"
+          className="relative h-4 w-4 shrink-0 rounded p-0 shadow-[0_0_0_1px_color-mix(in_oklch,currentColor_10%,transparent)] transition-colors hover:bg-accent/70 data-[state=open]:bg-accent"
           style={toneSurfaceStyle(toneColor, 18, 48)}
         >
           <LightbulbIcon color={toneColor} />
           <span
-            className="absolute -right-0.5 -top-0.5 grid h-3.5 min-w-3.5 place-items-center rounded-full border border-background px-1 text-[9px] font-semibold leading-none"
+            className="absolute -right-1 -top-1 grid h-3 min-w-3 place-items-center rounded-full border border-background px-0.5 text-[8px] font-semibold leading-none"
             style={{
               background: toneColor,
               color:
@@ -854,7 +745,7 @@ function advisoryChatPrompt({
 }
 
 function LightbulbIcon({ color }: { color: string }): React.JSX.Element {
-  return <Lightbulb aria-hidden="true" className="size-3.5" style={{ color }} />;
+  return <Lightbulb aria-hidden="true" className="size-3" style={{ color }} />;
 }
 
 function advisoryToneColor(hints: readonly ModelingHint[]): string {
@@ -865,104 +756,6 @@ function advisoryToneColor(hints: readonly ModelingHint[]): string {
   )
     ? 'var(--warning)'
     : 'var(--inspector-advisory)';
-}
-
-function FieldIndexPopover({
-  typeName,
-  fieldName,
-  insight,
-  dispatch,
-}: {
-  typeName: string;
-  fieldName: string;
-  insight: FieldIndexInsight;
-  dispatch: (op: Op) => void;
-}) {
-  const isIndexed = insight.memberships.length > 0;
-  const suggestion = insight.suggestion;
-  if (!isIndexed && !suggestion) return null;
-
-  const triggerLabel = isIndexed ? `Index details for ${fieldName}` : `Add index for ${fieldName}`;
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={triggerLabel}
-          className={cn(
-            'h-7 w-7 border border-transparent text-muted-foreground hover:text-primary data-[state=open]:text-primary',
-            !isIndexed &&
-              'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
-          )}
-          style={isIndexed ? toneSurfaceStyle('var(--inspector-index)', 14, 0) : undefined}
-        >
-          {isIndexed ? (
-            <Hash aria-hidden="true" className="size-3.5" />
-          ) : (
-            <Plus aria-hidden="true" />
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" side="left" className="w-72 p-3 text-xs">
-        <div className="space-y-3">
-          {isIndexed && (
-            <div className="space-y-2">
-              <div className="font-medium text-foreground">Indexed field</div>
-              <div className="space-y-1.5">
-                {insight.memberships.map((membership) => (
-                  <div
-                    key={membership.indexName}
-                    className="rounded-md border px-2 py-1.5"
-                    style={toneSurfaceStyle('var(--inspector-index)', 14, 50)}
-                  >
-                    <div className="font-mono text-[11px] text-foreground">
-                      {membership.indexName}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                      {membership.total === 1
-                        ? 'Single-field index'
-                        : `Position ${membership.position + 1} of ${membership.total}: ${membership.fields.join(
-                            ' -> ',
-                          )}`}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {suggestion && (
-            <div className={cn('space-y-2', isIndexed && 'border-t border-border/70 pt-2')}>
-              <div>
-                <div className="font-medium text-foreground">Suggested index</div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Useful for lookups, filtering, or sorting on this field.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  dispatch({
-                    kind: 'add_index',
-                    typeName,
-                    index: { name: suggestion.name, fields: suggestion.fields },
-                  })
-                }
-                className="h-7 px-2 text-xs"
-              >
-                <Plus aria-hidden="true" />
-                Add {suggestion.name}
-              </Button>
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 // TODO(#119): gate on output config mode once Contexture supports multiple emit targets.
@@ -1091,29 +884,18 @@ function ConvexSection({
               <p className="text-[11px] text-muted-foreground">
                 Field order affects Convex query prefixes.
               </p>
-              <Table className="text-xs">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="h-7 px-2">Index</TableHead>
-                    <TableHead className="h-7 px-2">Fields</TableHead>
-                    <TableHead className="h-7 w-9 px-1 text-right">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {indexes.map((idx, indexIndex) => (
-                    <IndexRow
-                      key={idx.name}
-                      typeName={type.name}
-                      index={idx}
-                      validationErrors={validationErrorsForIndex(validationErrors, indexIndex)}
-                      fieldNames={fieldNames}
-                      dispatch={dispatch}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="space-y-2">
+                {indexes.map((idx, indexIndex) => (
+                  <IndexRow
+                    key={idx.name}
+                    typeName={type.name}
+                    index={idx}
+                    validationErrors={validationErrorsForIndex(validationErrors, indexIndex)}
+                    fieldNames={fieldNames}
+                    dispatch={dispatch}
+                  />
+                ))}
+              </div>
             </div>
           )}
           <div className="space-y-1.5 pt-1">
@@ -1139,30 +921,18 @@ function ConvexSection({
             {searchIndexes.length === 0 ? (
               <p className="text-xs text-muted-foreground">No search indexes yet.</p>
             ) : (
-              <Table className="text-xs">
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="h-7 px-2">Search index</TableHead>
-                    <TableHead className="h-7 px-2">Search field</TableHead>
-                    <TableHead className="h-7 px-2">Filter fields</TableHead>
-                    <TableHead className="h-7 w-9 px-1 text-right">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {searchIndexes.map((index) => (
-                    <SearchIndexRow
-                      key={index.name}
-                      typeName={type.name}
-                      index={index}
-                      stringFieldNames={stringFieldNames}
-                      fieldNames={fieldNames}
-                      dispatch={dispatch}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="space-y-2">
+                {searchIndexes.map((index) => (
+                  <SearchIndexRow
+                    key={index.name}
+                    typeName={type.name}
+                    index={index}
+                    stringFieldNames={stringFieldNames}
+                    fieldNames={fieldNames}
+                    dispatch={dispatch}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -1199,44 +969,61 @@ function SearchIndexRow({
   };
 
   return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell className="px-2 py-1.5 align-top">
-        <Input
-          aria-label={`Search index name for ${index.name}`}
-          defaultValue={index.name}
-          className="h-8 px-2 text-xs"
-          onBlur={(ev) => {
-            const next = ev.target.value.trim();
-            if (next && next !== index.name) patchSearchIndex({ name: next });
-          }}
-        />
-        {index.staged !== undefined && (
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            {index.staged ? 'staged backfill' : 'active'}
+    <div className="space-y-2 rounded-md border border-border/70 px-2 py-2 text-xs">
+      <div className="flex items-start gap-2">
+        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Search index</Label>
+            <Input
+              aria-label={`Search index name for ${index.name}`}
+              defaultValue={index.name}
+              className="h-8 px-2 text-xs"
+              onBlur={(ev) => {
+                const next = ev.target.value.trim();
+                if (next && next !== index.name) patchSearchIndex({ name: next });
+              }}
+            />
+            {index.staged !== undefined && (
+              <div className="text-[11px] text-muted-foreground">
+                {index.staged ? 'staged backfill' : 'active'}
+              </div>
+            )}
           </div>
-        )}
-      </TableCell>
-      <TableCell className="px-2 py-1.5 align-top">
-        <Select
-          value={index.searchField}
-          onValueChange={(searchField) => patchSearchIndex({ searchField })}
+          <div className="min-w-0 space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Search field</Label>
+            <Select
+              value={index.searchField}
+              onValueChange={(searchField) => patchSearchIndex({ searchField })}
+            >
+              <SelectTrigger
+                aria-label={`Search field for ${index.name}`}
+                className="h-8 min-w-0 px-2 font-mono text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {stringFieldNames.map((fieldName) => (
+                  <SelectItem key={fieldName} value={fieldName}>
+                    {fieldName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete search index ${index.name}`}
+          onClick={() => dispatch({ kind: 'remove_search_index', typeName, name: index.name })}
+          className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
         >
-          <SelectTrigger
-            aria-label={`Search field for ${index.name}`}
-            className="h-8 min-w-36 px-2 font-mono text-xs"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {stringFieldNames.map((fieldName) => (
-              <SelectItem key={fieldName} value={fieldName}>
-                {fieldName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TableCell>
-      <TableCell className="px-2 py-1.5 align-top">
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[11px] text-muted-foreground">Filter fields</Label>
         <div className="flex flex-wrap items-center gap-1.5">
           {filterFields.length === 0 ? (
             <span className="text-[11px] text-muted-foreground">None</span>
@@ -1276,20 +1063,8 @@ function SearchIndexRow({
             ariaLabel={`Add filter field to search index ${index.name}`}
           />
         </div>
-      </TableCell>
-      <TableCell className="w-9 px-1 py-1.5 text-right align-top">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete search index ${index.name}`}
-          onClick={() => dispatch({ kind: 'remove_search_index', typeName, name: index.name })}
-          className="h-8 w-8 text-destructive hover:text-destructive"
-        >
-          <Trash2 aria-hidden="true" />
-        </Button>
-      </TableCell>
-    </TableRow>
+      </div>
+    </div>
   );
 }
 
@@ -1404,64 +1179,35 @@ function IndexRow({
   };
 
   return (
-    <TableRow
+    <div
       data-testid="convex-index-row"
       data-validation-issues={hasValidationIssues || undefined}
-      className={hasValidationIssues ? 'bg-destructive/10' : undefined}
+      className={cn(
+        'space-y-2 rounded-md border border-border/70 px-2 py-2 text-xs',
+        hasValidationIssues && 'bg-destructive/10',
+      )}
     >
-      <TableCell className="w-32 px-2 py-1.5 align-top">
-        <Input
-          aria-label={`Index name for ${index.name}`}
-          defaultValue={index.name}
-          aria-invalid={hasValidationIssues || undefined}
-          className="h-8 px-2 text-xs"
-          onBlur={(ev) => {
-            const next = ev.target.value.trim();
-            if (next && next !== index.name) {
-              dispatch({
-                kind: 'update_index',
-                typeName,
-                name: index.name,
-                patch: { name: next },
-              });
-            }
-          }}
-        />
-      </TableCell>
-      <TableCell className="px-2 py-1.5 align-top">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {index.fields.map((fieldName, fieldIndex) => (
-              <IndexFieldChip
-                key={fieldName}
-                indexName={index.name}
-                fieldName={fieldName}
-                position={fieldIndex}
-                total={index.fields.length}
-                onMoveEarlier={() => moveField(fieldIndex, fieldIndex - 1)}
-                onMoveLater={() => moveField(fieldIndex, fieldIndex + 1)}
-                onRemove={() => removeField(fieldName)}
-              />
-            ))}
-            <IndexFieldPicker
-              indexName={index.name}
-              availableFieldNames={availableFieldNames}
-              onSelect={appendField}
-            />
-          </div>
-          {hasValidationIssues && (
-            <ul
-              className="space-y-0.5 text-[11px] text-destructive"
-              aria-label={`Validation issues for index ${index.name}`}
-            >
-              {validationErrors.map((error) => (
-                <li key={`${error.code}:${error.path}`}>{error.message}</li>
-              ))}
-            </ul>
-          )}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
+          <Label className="text-[11px] text-muted-foreground">Index</Label>
+          <Input
+            aria-label={`Index name for ${index.name}`}
+            defaultValue={index.name}
+            aria-invalid={hasValidationIssues || undefined}
+            className="h-8 px-2 text-xs"
+            onBlur={(ev) => {
+              const next = ev.target.value.trim();
+              if (next && next !== index.name) {
+                dispatch({
+                  kind: 'update_index',
+                  typeName,
+                  name: index.name,
+                  patch: { name: next },
+                });
+              }
+            }}
+          />
         </div>
-      </TableCell>
-      <TableCell className="w-9 px-1 py-1.5 text-right align-top">
         <Button
           type="button"
           variant="ghost"
@@ -1472,8 +1218,40 @@ function IndexRow({
         >
           <Trash2 aria-hidden="true" />
         </Button>
-      </TableCell>
-    </TableRow>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[11px] text-muted-foreground">Fields</Label>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {index.fields.map((fieldName, fieldIndex) => (
+            <IndexFieldChip
+              key={fieldName}
+              indexName={index.name}
+              fieldName={fieldName}
+              position={fieldIndex}
+              total={index.fields.length}
+              onMoveEarlier={() => moveField(fieldIndex, fieldIndex - 1)}
+              onMoveLater={() => moveField(fieldIndex, fieldIndex + 1)}
+              onRemove={() => removeField(fieldName)}
+            />
+          ))}
+          <IndexFieldPicker
+            indexName={index.name}
+            availableFieldNames={availableFieldNames}
+            onSelect={appendField}
+          />
+        </div>
+        {hasValidationIssues && (
+          <ul
+            className="space-y-0.5 text-[11px] text-destructive"
+            aria-label={`Validation issues for index ${index.name}`}
+          >
+            {validationErrors.map((error) => (
+              <li key={`${error.code}:${error.path}`}>{error.message}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2253,20 +2031,6 @@ function derivationPillTitle(field: FieldDef): string {
   return 'Derivation policy declared.';
 }
 
-function inspectorTypeColor(type: TypeDef): string {
-  if (type.kind === 'object' && type.table === true) return 'var(--inspector-type-table)';
-  switch (type.kind) {
-    case 'object':
-      return 'var(--inspector-type-object)';
-    case 'enum':
-      return 'var(--inspector-type-enum)';
-    case 'discriminatedUnion':
-      return 'var(--inspector-type-union)';
-    case 'raw':
-      return 'var(--inspector-type-raw)';
-  }
-}
-
 function fieldKindColor(fieldType: FieldType): string {
   switch (fieldType.kind) {
     case 'string':
@@ -2284,14 +2048,6 @@ function fieldKindColor(fieldType: FieldType): string {
     case 'array':
       return 'var(--inspector-field-array)';
   }
-}
-
-function inspectorHeaderStyle(color: string): CSSProperties {
-  return {
-    background: 'var(--background)',
-    borderColor: `color-mix(in oklch, ${color} 34%, var(--border))`,
-    boxShadow: `inset 0 -2px 0 color-mix(in oklch, ${color} 24%, transparent)`,
-  };
 }
 
 function toneSurfaceStyle(color: string, background = 12, border = 44): CSSProperties {

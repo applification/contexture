@@ -16,7 +16,8 @@ beforeEach(() => {
   useDocumentStore.getState().resetForNewBundle();
   useGraphSelectionStore.getState().clear();
   useUIChromeStore.getState().setSidebarVisible(true);
-  useUIChromeStore.getState().setSidebarTab('properties');
+  useUIChromeStore.getState().setSidebarTab('chat');
+  useUIChromeStore.getState().setPlaygroundScope({ mode: 'all' });
   (window as unknown as { contexture: unknown }).contexture = {
     file: {
       openDialog: vi.fn(async () => null),
@@ -126,6 +127,105 @@ describe('App Codex-first copy', () => {
     await waitFor(() => {
       expect(screen.getByLabelText(/Agent: Convex AI files: ready/)).toHaveTextContent('2/2');
     });
+  });
+
+  it('keeps the inspector floating on the canvas with compact chrome', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+
+    const inspector = await screen.findByLabelText('Properties inspector');
+    expect(inspector).toHaveTextContent('Inspector');
+    expect(inspector).toHaveTextContent('Select a type on the canvas');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse inspector' }));
+    expect(screen.getByRole('button', { name: 'Expand inspector' })).toBeInTheDocument();
+    expect(inspector).not.toHaveTextContent('Select a type on the canvas');
+    expect(useUIChromeStore.getState().sidebarTab).toBe('schema');
+  });
+
+  it('opens the selected type in the Playground drawer from the inspector', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+    useGraphSelectionStore.getState().click('Sowing', 'replace');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('Sowing');
+    });
+    await user.click(screen.getByRole('button', { name: 'Try' }));
+
+    expect(useUIChromeStore.getState().sidebarTab).toBe('playground');
+    expect(useUIChromeStore.getState().playgroundScope).toEqual({
+      mode: 'selected',
+      typeName: 'Sowing',
+    });
+    expect(
+      screen.getByText('Inspector selection is highlighted in the model.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Select entity' })).toHaveTextContent('Sowing');
+  });
+
+  it('uses the floating inspector header as field breadcrumb navigation', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+    useGraphSelectionStore.getState().click('Sowing', 'replace');
+    useGraphSelectionStore.getState().selectField({ typeName: 'Sowing', fieldName: 'plot' });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('plot');
+    });
+    expect(screen.queryByTestId('field-detail-header')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to Sowing fields' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back to Sowing fields' }));
+
+    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Sowing');
+  });
+
+  it('deletes the selected field from the floating inspector header', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+    useGraphSelectionStore.getState().click('Sowing', 'replace');
+    useGraphSelectionStore.getState().selectField({ typeName: 'Sowing', fieldName: 'plot' });
+
+    await user.click(await screen.findByRole('button', { name: 'Delete field plot' }));
+
+    const sowing = useUndoStore.getState().schema.types.find((type) => type.name === 'Sowing');
+    expect(sowing).toMatchObject({
+      kind: 'object',
+      fields: expect.not.arrayContaining([expect.objectContaining({ name: 'plot' })]),
+    });
+    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
+  });
+
+  it('keeps the activity drawer closed when selecting a canvas table', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId('start-load-sample'));
+    useUIChromeStore.getState().setSidebarVisible(false);
+
+    const headers = await screen.findAllByTestId('type-node-header');
+    const sowingHeader = headers.find((header) => header.textContent?.includes('Sowing'));
+    expect(sowingHeader).toBeDefined();
+    fireEvent.click(sowingHeader as HTMLElement);
+
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Sowing');
+    expect(useUIChromeStore.getState().sidebarVisible).toBe(false);
+    await waitFor(() => {
+      expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('Sowing');
+    });
+
+    fireEvent.doubleClick(sowingHeader as HTMLElement);
+
+    expect(useUIChromeStore.getState().sidebarVisible).toBe(false);
   });
 
   it('explains readiness checks from the grouped status tiles', async () => {

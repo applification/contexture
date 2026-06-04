@@ -128,7 +128,6 @@ export const FieldProperties: Story = {
         modelingHints={hints.filter((hint) => hint.fieldName === 'status')}
         availableTypeNames={['Customer', 'Venue', 'Payment']}
         tableIndexes={tableType.indexes}
-        onBackToType={fn()}
       />
     </StoryFrame>
   ),

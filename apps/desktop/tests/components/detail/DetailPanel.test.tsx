@@ -81,7 +81,7 @@ describe('DetailPanel', () => {
     seed({ version: '1', types: [] });
     useGraphSelectionStore.getState().clear();
     useUIChromeStore.getState().setSidebarVisible(true);
-    useUIChromeStore.getState().setSidebarTab('properties');
+    useUIChromeStore.getState().setSidebarTab('chat');
     useChatComposerStore.getState().setPendingChatMessage(null);
   });
   afterEach(cleanup);
@@ -94,50 +94,13 @@ describe('DetailPanel', () => {
   it('renders TypeDetail when a type is selected', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot' }} />);
-    const header = screen.getByTestId('type-detail-header');
-    expect(header).toContainElement(screen.getByRole('heading', { name: 'Plot' }));
-    expect(header).toHaveTextContent('object');
-  });
-
-  it('shows the scoped sample-record workbench when a table type is selected', async () => {
-    const user = userEvent.setup();
-    seed(artworkSchema);
-    render(<DetailPanel selection={{ typeName: 'Artwork' }} />);
-
-    expect(screen.getByRole('tab', { name: 'Shape' })).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Try' }));
-
-    const workbench = screen.getByRole('region', { name: 'Artwork sample records' });
-    expect(
-      within(workbench).getByRole('button', { name: 'Generate 5 records' }),
-    ).toBeInTheDocument();
-    expect(within(workbench).getByRole('button', { name: 'Add manually' })).toBeInTheDocument();
-    expect(within(workbench).getByText('No sample records yet')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Plot');
   });
 
   it('renders FieldDetail when a type + field are selected', () => {
     seed(plotSchema);
     render(<DetailPanel selection={{ typeName: 'Plot', fieldName: 'name' }} />);
     expect(screen.getByTestId('field-detail')).toBeInTheDocument();
-  });
-
-  it('returns from field detail to the selected type when Back to table fields is clicked', () => {
-    seed(plotSchema);
-    useGraphSelectionStore.getState().selectField({ typeName: 'Plot', fieldName: 'name' });
-    const onClearSelectedField = vi.fn();
-
-    render(
-      <DetailPanel
-        selection={{ typeName: 'Plot', fieldName: 'name' }}
-        onClearSelectedField={onClearSelectedField}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Back to table fields' }));
-
-    expect(useGraphSelectionStore.getState().state.selectedField).toBeNull();
-    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
-    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Plot' });
-    expect(onClearSelectedField).toHaveBeenCalledOnce();
   });
 
   it('keeps field detail focused on the field after it is renamed', async () => {
@@ -434,44 +397,6 @@ describe('DetailPanel', () => {
     expect(useUndoStore.getState().schema.types).toEqual(
       expect.arrayContaining([expect.objectContaining({ kind: 'object', name: 'Author' })]),
     );
-  });
-
-  it('clears graph and app selection after deleting the selected type from details', () => {
-    seed(plotSchema);
-    useGraphSelectionStore.getState().click('Plot', 'replace');
-    const onClearSelection = vi.fn();
-
-    render(<DetailPanel selection={{ typeName: 'Plot' }} onClearSelection={onClearSelection} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete type Plot' }));
-
-    expect(useUndoStore.getState().schema.types).toEqual([]);
-    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBeNull();
-    expect(onClearSelection).toHaveBeenCalledOnce();
-  });
-
-  it('returns to the type selection after deleting the selected field from details', async () => {
-    const user = userEvent.setup();
-    seed(plotSchema);
-    useGraphSelectionStore.getState().click('Plot', 'replace');
-    const onClearSelectedField = vi.fn();
-
-    render(
-      <DetailPanel
-        selection={{ typeName: 'Plot', fieldName: 'name' }}
-        onClearSelectedField={onClearSelectedField}
-      />,
-    );
-    await user.click(screen.getByRole('button', { name: 'Field actions for name' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete field' }));
-
-    expect(useUndoStore.getState().schema.types[0]).toMatchObject({
-      kind: 'object',
-      name: 'Plot',
-      fields: [],
-    });
-    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('Plot');
-    expect(useGraphSelectionStore.getState().state.focusTarget).toEqual({ nodeId: 'Plot' });
-    expect(onClearSelectedField).toHaveBeenCalledOnce();
   });
 
   it('renders EdgeDetail when an edge is selected', () => {

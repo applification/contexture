@@ -9,14 +9,8 @@ import { create } from 'zustand';
 
 export type Theme = 'dark' | 'light';
 export type ThemePreference = Theme | 'system';
-export type SidebarTab =
-  | 'properties'
-  | 'chat'
-  | 'review'
-  | 'schema'
-  | 'playground'
-  | 'stdlib'
-  | 'changes';
+export type SidebarToolTab = 'chat' | 'review' | 'schema' | 'playground' | 'stdlib' | 'changes';
+export type PlaygroundScope = { mode: 'all' } | { mode: 'selected'; typeName: string };
 
 const THEME_STORAGE_KEY = 'theme';
 
@@ -25,14 +19,16 @@ interface UIChromeStoreShape {
   resolvedTheme: Theme;
   chatOpen: boolean;
   sidebarVisible: boolean;
-  sidebarTab: SidebarTab;
+  sidebarTab: SidebarToolTab;
+  playgroundScope: PlaygroundScope;
 
   setTheme(theme: ThemePreference): void;
   toggleTheme(): void;
   setChatOpen(open: boolean): void;
   toggleSidebar(): void;
   setSidebarVisible(visible: boolean): void;
-  setSidebarTab(tab: SidebarTab): void;
+  setSidebarTab(tab: SidebarToolTab): void;
+  setPlaygroundScope(scope: PlaygroundScope): void;
 }
 
 function systemTheme(): Theme {
@@ -70,6 +66,7 @@ export const useUIChromeStore = create<UIChromeStoreShape>((set) => ({
   chatOpen: true,
   sidebarVisible: true,
   sidebarTab: 'chat',
+  playgroundScope: { mode: 'all' },
 
   setTheme: (theme) => {
     const resolvedTheme = resolveTheme(theme);
@@ -88,6 +85,7 @@ export const useUIChromeStore = create<UIChromeStoreShape>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
   setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
+  setPlaygroundScope: (scope) => set({ playgroundScope: scope }),
 }));
 
 if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {

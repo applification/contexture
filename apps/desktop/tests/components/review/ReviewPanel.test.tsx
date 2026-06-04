@@ -70,7 +70,8 @@ describe('ReviewPanel', () => {
       typeName: 'Project',
       fieldName: 'tags',
     });
-    expect(useUIChromeStore.getState().sidebarTab).toBe('properties');
+    expect(useUIChromeStore.getState().sidebarTab).toBe('review');
+    expect(useUIChromeStore.getState().sidebarVisible).toBe(true);
   });
 
   it('seeds chat with review context', () => {

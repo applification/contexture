@@ -168,11 +168,6 @@ export function DetailPanel({
         onCreateAndSelectRefTarget={(selectTarget) =>
           createReferencedObjectTypeAndSelect(field.name, selectTarget)
         }
-        onBackToType={() => {
-          onClearSelectedField?.();
-          useGraphSelectionStore.getState().selectField(null);
-          useGraphSelectionStore.getState().focus(type.name);
-        }}
         validationErrors={validationErrorsForField(validationErrors, typeIndex, fieldIndex)}
         validationRepairForIssue={repairForIssue}
         onDiscussValidationIssue={discussIssue}
@@ -218,7 +213,6 @@ export function DetailPanel({
       useGraphSelectionStore.getState().click(typeName, 'replace');
       useGraphSelectionStore.getState().focus(typeName);
       useUIChromeStore.getState().setSidebarVisible(true);
-      useUIChromeStore.getState().setSidebarTab('properties');
       document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
     }, 0);
 
@@ -259,7 +253,6 @@ export function DetailPanel({
       useGraphSelectionStore.getState().click(typeName, 'replace');
       useGraphSelectionStore.getState().focus(typeName);
       useUIChromeStore.getState().setSidebarVisible(true);
-      useUIChromeStore.getState().setSidebarTab('properties');
       document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
     }, 0);
   }

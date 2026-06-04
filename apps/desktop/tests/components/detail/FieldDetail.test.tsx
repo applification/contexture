@@ -18,7 +18,6 @@ function setup(
   availableTypeNames: readonly string[] = [],
   onCreateRefTarget?: () => string | undefined,
   tableIndexes?: readonly IndexDef[],
-  onBackToType?: () => void,
 ) {
   const dispatch = vi.fn<(op: Op) => void>();
   render(
@@ -30,7 +29,6 @@ function setup(
       availableTypeNames={availableTypeNames}
       onCreateRefTarget={onCreateRefTarget}
       tableIndexes={tableIndexes}
-      onBackToType={onBackToType}
     />,
   );
   return { dispatch };
@@ -45,39 +43,16 @@ async function chooseSelectOption(label: string, option: string) {
 describe('FieldDetail', () => {
   afterEach(cleanup);
 
-  it('renders the selected field title as a panel header', () => {
-    setup({ name: 'showPrice', type: { kind: 'boolean' } }, [], [], undefined, undefined, vi.fn());
+  it('renders the selected field editor content without its own header', () => {
+    setup({ name: 'showPrice', type: { kind: 'boolean' } });
 
-    const header = screen.getByTestId('field-detail-header');
-    expect(header).toContainElement(screen.getByRole('heading', { name: 'showPrice' }));
-    expect(header).toHaveTextContent('object / Plot');
-    expect(screen.getByRole('button', { name: 'Back to table fields' })).toHaveTextContent(
-      'Fields',
-    );
-    expect(screen.getByRole('heading', { name: 'showPrice' })).toHaveClass('text-lg');
+    expect(screen.getByTestId('field-detail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('showPrice');
     expect(screen.getAllByText('boolean').length).toBeGreaterThan(0);
-    expect(screen.getByText('required')).toBeInTheDocument();
-    expect(screen.getByText(/sample:/)).toBeInTheDocument();
-    expect(header).toHaveClass('border-b');
-    expect(header).toHaveClass('bg-muted/20');
     expect(screen.getByText('Presence')).toBeInTheDocument();
     expect(screen.getByText('Default value')).toBeInTheDocument();
     expect(screen.getByText('Sample data')).toBeInTheDocument();
-  });
-
-  it('calls the back handler from the field sub-view header', () => {
-    const onBackToType = vi.fn();
-    setup(
-      { name: 'showPrice', type: { kind: 'boolean' } },
-      [],
-      [],
-      undefined,
-      undefined,
-      onBackToType,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back to table fields' }));
-    expect(onBackToType).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId('field-detail-header')).not.toBeInTheDocument();
   });
 
   it('string: min/max/regex/format controls; blur dispatches update_field', () => {
@@ -143,18 +118,6 @@ describe('FieldDetail', () => {
       typeName: 'Plot',
       fieldName: 'name',
       patch: { name: 'title' },
-    });
-  });
-
-  it('dispatches remove_field when the field delete action is clicked', async () => {
-    const user = userEvent.setup();
-    const { dispatch } = setup({ name: 'name', type: { kind: 'string' } });
-    await user.click(screen.getByRole('button', { name: 'Field actions for name' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete field' }));
-    expect(dispatch).toHaveBeenCalledWith({
-      kind: 'remove_field',
-      typeName: 'Plot',
-      fieldName: 'name',
     });
   });
 
@@ -250,7 +213,6 @@ describe('FieldDetail', () => {
     setup({ name: 'author', type: { kind: 'ref', typeName: 'User' } }, [], [], undefined, [
       { name: 'by_author', fields: ['author'] },
     ]);
-    expect(screen.getByText('indexed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'by_author' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add index for author' })).not.toBeInTheDocument();
   });
