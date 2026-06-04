@@ -53,7 +53,6 @@ import { useUndoStore } from '../../store/undo';
 import { FOCUS_TYPE_NAME_EVENT } from '../detail/TypeDetail';
 import { TYPE_EDGE_SELECT_EVENT } from './edge-select-event';
 import { RefEdge } from './edges/RefEdge';
-import { GraphLegend } from './GraphLegend';
 import { filterGraphView } from './graph-view';
 import {
   type ConnectPayload,
@@ -627,7 +626,6 @@ function GraphCanvasInner({
             pattern reads as texture not noise on both light and dark. */}
         <Background gap={28} size={0.8} color="var(--graph-dot)" />
         <Controls showInteractive={false} />
-        <GraphLegend showEnumNodes={showEnums} showStdlibNodes={showStdlib} />
       </ReactFlow>
     </div>
   );

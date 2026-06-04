@@ -3,7 +3,7 @@ import { PlaygroundPanel } from '@renderer/components/playground/PlaygroundPanel
 import { usePlaygroundStore } from '@renderer/store/playground';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const schema: Schema = {
   version: '1',
@@ -22,6 +22,11 @@ const schema: Schema = {
       kind: 'object',
       name: 'Team',
       table: true,
+      fields: [{ name: 'name', type: { kind: 'string' } }],
+    },
+    {
+      kind: 'object',
+      name: 'RecipeDietarySuitability',
       fields: [{ name: 'name', type: { kind: 'string' } }],
     },
   ],
@@ -103,13 +108,65 @@ describe('PlaygroundPanel', () => {
     expect(screen.queryByDisplayValue(/Unknown reference target/u)).not.toBeInTheDocument();
   });
 
-  it('highlights an inspector-selected type while keeping all entities available', () => {
+  it('highlights an inspector-selected type without replacing the current entity', () => {
     render(<PlaygroundPanel schema={schema} highlightedTypeName="Team" />);
 
     expect(
       screen.getByText('Inspector selection is highlighted in the model.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Select entity' })).toHaveTextContent('Team');
+    expect(screen.getByText('Team')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Select entity' })).toHaveTextContent('User');
+  });
+
+  it('reports manual entity selection so the canvas can focus the type', async () => {
+    const user = userEvent.setup();
+    const onSelectEntity = vi.fn();
+    render(<PlaygroundPanel schema={schema} onSelectEntity={onSelectEntity} />);
+
+    await user.click(screen.getByRole('combobox', { name: 'Select entity' }));
+    await user.click(screen.getByRole('option', { name: 'Team (0)' }));
+
+    expect(onSelectEntity).toHaveBeenCalledWith('Team');
+  });
+
+  it('dismisses an unavailable Try target after choosing a table entity', async () => {
+    const user = userEvent.setup();
+    render(<PlaygroundPanel schema={schema} highlightedTypeName="RecipeDietarySuitability" />);
+
+    expect(
+      screen.getByText(
+        'RecipeDietarySuitability is not available in Playground. Choose a table from the entity list.',
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Select entity' }));
+    await user.click(screen.getByRole('option', { name: 'Team (0)' }));
+
+    expect(
+      screen.queryByText(
+        'RecipeDietarySuitability is not available in Playground. Choose a table from the entity list.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears an unavailable Try target when the highlight is removed', () => {
+    const { rerender } = render(
+      <PlaygroundPanel schema={schema} highlightedTypeName="RecipeDietarySuitability" />,
+    );
+
+    expect(
+      screen.getByText(
+        'RecipeDietarySuitability is not available in Playground. Choose a table from the entity list.',
+      ),
+    ).toBeInTheDocument();
+
+    rerender(<PlaygroundPanel schema={schema} highlightedTypeName={null} />);
+
+    expect(
+      screen.queryByText(
+        'RecipeDietarySuitability is not available in Playground. Choose a table from the entity list.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it('places the all-entities seed action in the Playground header', () => {

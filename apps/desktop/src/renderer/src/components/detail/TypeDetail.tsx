@@ -139,7 +139,7 @@ export function TypeDetail({
       <ModelShapeHints hints={modelingHints} />
 
       {type.kind === 'object' && <ObjectBody type={type} dispatch={dispatch} />}
-      <SampleDataSection type={type} dispatch={dispatch} />
+      {type.kind !== 'enum' && <SampleDataSection type={type} dispatch={dispatch} />}
       {type.kind === 'object' && (
         <ConvexSection type={type} dispatch={dispatch} validationErrors={validationErrors} />
       )}

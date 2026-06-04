@@ -66,9 +66,11 @@ function edgeKindMeta(data: RefEdgeData): { icon: LucideIcon; label: string } {
 
 function Row({ term, detail }: { term: string; detail: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3">
       <dt className="text-muted-foreground">{term}</dt>
-      <dd>{detail}</dd>
+      <dd className="min-w-0 truncate text-right" title={detail}>
+        {detail}
+      </dd>
     </div>
   );
 }

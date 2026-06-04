@@ -8,7 +8,10 @@ import {
   type PlaygroundEntity,
   type PlaygroundRefControl,
 } from '@contexture/core/playground-contract';
-import { generatePlaygroundFixtures } from '@contexture/core/playground-fixtures';
+import {
+  generatePlaygroundFixtures,
+  type PlaygroundFixtureWarning,
+} from '@contexture/core/playground-fixtures';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
@@ -39,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../ui/field';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -47,14 +51,24 @@ import { Textarea } from '../ui/textarea';
 interface PlaygroundPanelProps {
   schema: Schema;
   highlightedTypeName?: string | null;
+  onSelectEntity?: (typeName: string) => void;
+}
+
+interface SeedNoticeState {
+  generatedCount: number;
+  warnings: PlaygroundFixtureWarning[];
 }
 
 export function PlaygroundPanel({
   schema,
   highlightedTypeName = null,
+  onSelectEntity,
 }: PlaygroundPanelProps): React.JSX.Element {
   const [panelRef, isCompact] = useCompactPanel();
   const [formOpen, setFormOpen] = useState(false);
+  const [dismissedUnavailableTypeName, setDismissedUnavailableTypeName] = useState<string | null>(
+    null,
+  );
   const contract = useMemo(
     () => buildPlaygroundContract(schema, { externalTypes: STDLIB_TYPE_DEFINITIONS }),
     [schema],
@@ -74,18 +88,22 @@ export function PlaygroundPanel({
     ? contract.entities.find((entity) => entity.typeName === highlightedTypeName)
     : undefined;
   const highlightedUnavailable = highlightedTypeName !== null && !highlightedEntity;
+  const showHighlightedUnavailable =
+    highlightedUnavailable && dismissedUnavailableTypeName !== highlightedTypeName;
 
   useEffect(() => {
     const typeNames = contract.entities.map((entity) => entity.typeName);
     setScope(scopeId, typeNames);
-    if (highlightedEntity && selectedTypeName !== highlightedEntity.typeName) {
-      selectType(highlightedEntity.typeName);
-      return;
-    }
     if (typeNames.length > 0 && (!selectedTypeName || !typeNames.includes(selectedTypeName))) {
       selectType(typeNames[0] ?? null);
     }
-  }, [contract.entities, highlightedEntity, scopeId, selectType, selectedTypeName, setScope]);
+  }, [contract.entities, scopeId, selectType, selectedTypeName, setScope]);
+
+  const selectEntity = (typeName: string | null) => {
+    selectType(typeName);
+    if (highlightedUnavailable) setDismissedUnavailableTypeName(highlightedTypeName);
+    if (typeName) onSelectEntity?.(typeName);
+  };
 
   const selectedEntity =
     contract.entities.find((entity) => entity.typeName === selectedTypeName) ??
@@ -95,7 +113,7 @@ export function PlaygroundPanel({
   const selectedRecord = records.find((record) => record.id === selectedRecordId) ?? null;
   const recordCount = Object.values(recordsByType).reduce((sum, list) => sum + list.length, 0);
   const formRecord = formOpen ? selectedRecord : null;
-  const [seedNotice, setSeedNotice] = useState<string | null>(null);
+  const [seedNotice, setSeedNotice] = useState<SeedNoticeState | null>(null);
 
   const openNewRecord = () => {
     if (!selectedEntity) return;
@@ -125,11 +143,7 @@ export function PlaygroundPanel({
       (sum, list) => sum + list.length,
       0,
     );
-    setSeedNotice(
-      result.warnings.length > 0
-        ? `Seeded ${generatedCount} records with ${result.warnings.length} warnings.`
-        : `Seeded ${generatedCount} records.`,
-    );
+    setSeedNotice({ generatedCount, warnings: result.warnings });
   };
 
   if (contract.entities.length === 0) {
@@ -154,10 +168,12 @@ export function PlaygroundPanel({
       <PanelHeader
         recordCount={recordCount}
         highlightedTypeName={highlightedEntity?.typeName ?? highlightedTypeName}
-        highlightedUnavailable={highlightedUnavailable}
+        highlightedUnavailable={showHighlightedUnavailable}
         onSeedAll={() => seedRecords('all')}
+        seedNotice={seedNotice}
+        onDismissSeedNotice={() => setSeedNotice(null)}
       />
-      {highlightedUnavailable && (
+      {showHighlightedUnavailable && (
         <div className="border-t border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning">
           {highlightedTypeName} is not available in Playground. Choose a table from the entity list.
         </div>
@@ -169,7 +185,7 @@ export function PlaygroundPanel({
             selectedTypeName={selectedEntity?.typeName ?? null}
             highlightedTypeName={highlightedEntity?.typeName ?? null}
             recordsByType={recordsByType}
-            onSelect={selectType}
+            onSelect={selectEntity}
             compact
           />
           {selectedEntity && (
@@ -181,9 +197,6 @@ export function PlaygroundPanel({
                 onSeedCurrent={() => seedRecords('current')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
-              {seedNotice && (
-                <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />
-              )}
               <div className="relative min-h-0 flex-1">
                 <RecordTable
                   entity={selectedEntity}
@@ -220,13 +233,13 @@ export function PlaygroundPanel({
           )}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[12rem_minmax(0,1fr)] border-t">
+        <div className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(0,1fr)] border-t">
           <EntityNav
             entities={contract.entities}
             selectedTypeName={selectedEntity?.typeName ?? null}
             highlightedTypeName={highlightedEntity?.typeName ?? null}
             recordsByType={recordsByType}
-            onSelect={selectType}
+            onSelect={selectEntity}
           />
           {selectedEntity && (
             <section className="flex min-h-0 flex-col">
@@ -237,9 +250,6 @@ export function PlaygroundPanel({
                 onSeedCurrent={() => seedRecords('current')}
                 onClear={() => clearType(selectedEntity.typeName)}
               />
-              {seedNotice && (
-                <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />
-              )}
               <div className="relative min-h-0 flex-1">
                 <RecordTable
                   entity={selectedEntity}
@@ -290,7 +300,7 @@ export function ScopedPlaygroundWorkbench({
 }): React.JSX.Element | null {
   const [panelRef, isCompact] = useCompactPanel(680);
   const [formOpen, setFormOpen] = useState(false);
-  const [seedNotice, setSeedNotice] = useState<string | null>(null);
+  const [seedNotice, setSeedNotice] = useState<SeedNoticeState | null>(null);
   const contract = useMemo(
     () => buildPlaygroundContract(schema, { externalTypes: STDLIB_TYPE_DEFINITIONS }),
     [schema],
@@ -342,11 +352,7 @@ export function ScopedPlaygroundWorkbench({
       (sum, list) => sum + list.length,
       0,
     );
-    setSeedNotice(
-      result.warnings.length > 0
-        ? `Seeded ${generatedCount} records with ${result.warnings.length} warnings.`
-        : `Seeded ${generatedCount} records.`,
-    );
+    setSeedNotice({ generatedCount, warnings: result.warnings });
   };
 
   return (
@@ -363,7 +369,7 @@ export function ScopedPlaygroundWorkbench({
         onClear={() => clearType(entity.typeName)}
         scoped
       />
-      {seedNotice && <SeedNotice message={seedNotice} onDismiss={() => setSeedNotice(null)} />}
+      {seedNotice && <SeedNotice notice={seedNotice} onDismiss={() => setSeedNotice(null)} />}
       <div
         className={cn(
           'relative grid min-h-0 flex-1 bg-muted/10',
@@ -483,7 +489,7 @@ function EntityNav({
         key={entity.typeName}
         onClick={() => onSelect(entity.typeName)}
         className={cn(
-          'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition-colors',
+          'flex w-full flex-col items-start gap-1 rounded-md px-2 py-2 text-left text-sm transition-colors',
           selectedTypeName === entity.typeName
             ? 'bg-primary/10 text-primary'
             : highlighted
@@ -491,17 +497,15 @@ function EntityNav({
               : 'text-foreground hover:bg-muted',
         )}
       >
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate">{entity.typeName}</span>
-          {highlighted && (
-            <span className="shrink-0 rounded-full bg-reference/15 px-1.5 py-0 text-[9px] font-medium text-reference-text">
-              current
-            </span>
-          )}
-        </span>
-        <Badge variant="secondary" className="ml-2 shrink-0">
+        <Badge variant="secondary" className="h-4 min-w-5 justify-center px-1 text-[9px]">
           {count}
         </Badge>
+        <span className="block w-full min-w-0 truncate leading-5">{entity.typeName}</span>
+        {highlighted && (
+          <span className="w-fit rounded-full bg-reference/15 px-1.5 py-0 text-[9px] font-medium leading-4 text-reference-text">
+            current
+          </span>
+        )}
       </button>
     );
   });
@@ -521,14 +525,18 @@ function PanelHeader({
   highlightedTypeName,
   highlightedUnavailable,
   onSeedAll,
+  seedNotice,
+  onDismissSeedNotice,
 }: {
   recordCount: number;
   highlightedTypeName?: string | null;
   highlightedUnavailable?: boolean;
   onSeedAll?: () => void;
+  seedNotice?: SeedNoticeState | null;
+  onDismissSeedNotice?: () => void;
 }): React.JSX.Element {
   return (
-    <header className="flex h-14 items-center justify-between px-3">
+    <header className="flex h-14 items-center justify-between gap-3 px-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold">Playground</h2>
@@ -545,6 +553,9 @@ function PanelHeader({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {seedNotice && onDismissSeedNotice && (
+          <SeedNotice notice={seedNotice} onDismiss={onDismissSeedNotice} />
+        )}
         <Badge variant="outline">{recordCount} records</Badge>
         {onSeedAll && (
           <Button
@@ -750,20 +761,68 @@ function InlineRecordEditor({
 }
 
 function SeedNotice({
-  message,
+  notice,
   onDismiss,
 }: {
-  message: string;
+  notice: SeedNoticeState;
   onDismiss: () => void;
 }): React.JSX.Element {
+  const message =
+    notice.warnings.length > 0
+      ? `Seeded ${notice.generatedCount} records, ${notice.warnings.length} warnings`
+      : `Seeded ${notice.generatedCount} records`;
+  const warningSummaries = seedWarningSummaries(notice.warnings);
+
   return (
-    <div className="flex items-center justify-between gap-2 border-b bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      <span className="min-w-0 truncate">{message}</span>
+    <div className="flex max-w-64 items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs text-muted-foreground">
+      {notice.warnings.length > 0 ? (
+        <HoverCard openDelay={150} closeDelay={80}>
+          <HoverCardTrigger asChild>
+            <button
+              type="button"
+              className="min-w-0 truncate text-left underline decoration-dotted"
+            >
+              {message}
+            </button>
+          </HoverCardTrigger>
+          <HoverCardContent align="end" className="w-80 p-0">
+            <div className="border-b px-3 py-2">
+              <div className="text-sm font-medium">Seed warnings</div>
+              <div className="text-xs text-muted-foreground">
+                Generated records skipped fields where fixtures could not satisfy the model.
+              </div>
+            </div>
+            <div className="max-h-64 overflow-y-auto p-2">
+              {warningSummaries.slice(0, 20).map((summary) => (
+                <div key={summary.key} className="rounded-sm px-2 py-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-2 font-medium text-foreground">
+                    <span>
+                      {summary.typeName}
+                      {summary.fieldName ? `.${summary.fieldName}` : ''}
+                    </span>
+                    {summary.count > 1 && (
+                      <span className="text-[10px] text-muted-foreground">x{summary.count}</span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground">{summary.message}</div>
+                </div>
+              ))}
+              {warningSummaries.length > 20 && (
+                <div className="px-2 py-1 text-xs text-muted-foreground">
+                  {warningSummaries.length - 20} more warning groups hidden.
+                </div>
+              )}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        <span className="min-w-0 truncate">{message}</span>
+      )}
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-6 w-6"
+        className="h-5 w-5 shrink-0"
         aria-label="Dismiss seed notice"
         onClick={onDismiss}
       >
@@ -771,6 +830,22 @@ function SeedNotice({
       </Button>
     </div>
   );
+}
+
+function seedWarningSummaries(
+  warnings: readonly PlaygroundFixtureWarning[],
+): Array<PlaygroundFixtureWarning & { key: string; count: number }> {
+  const byKey = new Map<string, PlaygroundFixtureWarning & { key: string; count: number }>();
+  for (const warning of warnings) {
+    const key = `${warning.typeName}:${warning.fieldName ?? ''}:${warning.message}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    byKey.set(key, { ...warning, key, count: 1 });
+  }
+  return [...byKey.values()];
 }
 
 function PlaygroundRecordForm({
