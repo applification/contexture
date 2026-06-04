@@ -59,4 +59,57 @@ describe('validation repairs', () => {
     expect(issue).toBeDefined();
     expect(issue ? repairForValidationError(schema, issue) : null).toBeNull();
   });
+
+  it('documents enum evolution compatibility for client-facing enum advisories', () => {
+    const schema: Schema = {
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        { kind: 'enum', name: 'DietaryProfile', values: [{ value: 'vegan' }] },
+        {
+          kind: 'object',
+          name: 'RecipeSafetyAssessment',
+          table: true,
+          fields: [
+            {
+              name: 'mergedDietaryProfiles',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'DietaryProfile' } },
+            },
+          ],
+        },
+      ],
+    };
+
+    const issue = checkSemantic(schema).find(
+      (candidate) => candidate.code === 'operational_enum_evolution',
+    );
+    const repair = issue ? repairForValidationError(schema, issue) : null;
+
+    expect(repair).toMatchObject({
+      label: 'Document contract',
+      focusTypeName: 'DietaryProfile',
+      op: {
+        kind: 'update_type',
+        name: 'DietaryProfile',
+        patch: {
+          compatibility: {
+            enumEvolution: {
+              unknownValueBehavior: 'preserve',
+              fallbackLabel: 'Unknown dietary profile',
+              clientSurfaces: ['web', 'mobile', 'api'],
+              owner: 'client',
+            },
+          },
+        },
+      },
+    });
+
+    const result = apply(schema, repair?.op ?? { kind: 'replace_schema', schema });
+    expect(result).toHaveProperty('schema');
+    if ('schema' in result) {
+      expect(checkSemantic(result.schema).map((candidate) => candidate.code)).not.toContain(
+        'operational_enum_evolution',
+      );
+    }
+  });
 });

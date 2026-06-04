@@ -100,6 +100,7 @@ export interface FieldDetailProps {
   modelingHints?: readonly ModelingHint[];
   validationErrors?: readonly ValidationError[];
   validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  onDiscussValidationIssue?: (error: ValidationError) => void;
   availableTypeNames?: readonly string[];
   tableIndexes?: readonly IndexDef[];
   onCreateRefTarget?: () => string | undefined;
@@ -114,6 +115,7 @@ export function FieldDetail({
   modelingHints = [],
   validationErrors = [],
   validationRepairForIssue,
+  onDiscussValidationIssue,
   availableTypeNames = [],
   tableIndexes,
   onCreateRefTarget,
@@ -243,7 +245,11 @@ export function FieldDetail({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="space-y-3">
-          <ValidationIssues errors={validationErrors} repairForIssue={validationRepairForIssue} />
+          <ValidationIssues
+            errors={validationErrors}
+            onDiscussIssue={onDiscussValidationIssue}
+            repairForIssue={validationRepairForIssue}
+          />
 
           <FieldGroup>
             <Field>

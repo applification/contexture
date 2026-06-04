@@ -45,6 +45,40 @@ export function repairForValidationError(
 
   if (error.code === 'enum_duplicate_value' && type.kind === 'enum') return null;
 
+  if (
+    error.code === 'operational_enum_evolution' &&
+    type.kind === 'object' &&
+    loc.fieldIndex !== undefined
+  ) {
+    const field = type.fields[loc.fieldIndex];
+    const enumName = findRefTypeName(field?.type);
+    const enumType = schema.types.find(
+      (candidate): candidate is Extract<TypeDef, { kind: 'enum' }> =>
+        candidate.kind === 'enum' && candidate.name === enumName,
+    );
+    if (!field || !enumType) return null;
+    return {
+      label: 'Document contract',
+      op: {
+        kind: 'update_type',
+        name: enumType.name,
+        patch: typePatch({
+          compatibility: {
+            ...enumType.compatibility,
+            enumEvolution: {
+              unknownValueBehavior: 'preserve',
+              fallbackLabel: `Unknown ${humanizeTypeName(enumType.name).toLowerCase()}`,
+              clientSurfaces: ['web', 'mobile', 'api'],
+              owner: 'client',
+              notes: `${type.name}.${field.name} clients must preserve unknown ${enumType.name} values, render a neutral fallback, and avoid interpreting unknown values as safe or silently ignored.`,
+            },
+          },
+        }),
+      },
+      focusTypeName: enumType.name,
+    };
+  }
+
   if (error.code === 'unresolved_ref' && type.kind === 'object' && loc.fieldIndex !== undefined) {
     const field = type.fields[loc.fieldIndex];
     const refName = findRefTypeName(field?.type);
@@ -289,4 +323,11 @@ function discriminatorLiteralValue(typeName: string): string {
     .replace(/[^A-Za-z0-9]+/gu, '-')
     .replace(/^-+|-+$/gu, '')
     .toLowerCase();
+}
+
+function humanizeTypeName(typeName: string): string {
+  return typeName
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .replace(/[_-]+/gu, ' ')
+    .trim();
 }

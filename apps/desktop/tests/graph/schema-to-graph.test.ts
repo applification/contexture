@@ -250,7 +250,43 @@ describe('buildGraph', () => {
 
     expect(graph.nodes[0].data).toMatchObject({
       validationIssueCount: 1,
+      validationIssueTone: 'error',
       fields: [expect.objectContaining({ name: 'author', validationIssueCount: 1 })],
+    });
+  });
+
+  it('preserves warning severity for validation highlights', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        {
+          kind: 'object',
+          name: 'RecipeSafetyAssessment',
+          fields: [
+            {
+              name: 'unknownDietaryProfiles',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'DietaryProfile' } },
+            },
+          ],
+        },
+        { kind: 'enum', name: 'DietaryProfile', values: [{ value: 'vegan' }] },
+      ],
+    };
+
+    const graph = applyValidationHighlights(buildGraph({ schema }), [
+      { path: 'types.0.fields.0.type', severity: 'warning' },
+    ]);
+
+    expect(graph.nodes[0].data).toMatchObject({
+      validationIssueCount: 1,
+      validationIssueTone: 'warning',
+      fields: [
+        expect.objectContaining({
+          name: 'unknownDietaryProfiles',
+          validationIssueCount: 1,
+          validationIssueTone: 'warning',
+        }),
+      ],
     });
   });
 
@@ -286,6 +322,7 @@ describe('buildGraph', () => {
       typeName: 'Post',
       schemaIndex: 1,
       validationIssueCount: 1,
+      validationIssueTone: 'error',
       fields: [expect.objectContaining({ name: 'author', validationIssueCount: 1 })],
     });
   });

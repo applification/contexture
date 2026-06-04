@@ -100,6 +100,8 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
     (data.previewDimmed === true && !isSelected && !isPreviewPrimary && !isPreviewAdjacent);
   const isSyncHighlighted = data.syncHighlighted === true && !isSelected && !isAdjacent;
   const hasValidationIssues = (data.validationIssueCount ?? 0) > 0;
+  const validationIssueColor =
+    data.validationIssueTone === 'warning' ? 'var(--warning)' : 'var(--destructive)';
   const fieldsInSelectedType =
     isSelected && selectedEdge === null && selectedField?.typeName !== data.typeName;
 
@@ -246,7 +248,7 @@ export const TypeNode = memo(function TypeNode(props: NodeProps<TypeNodeKind>) {
             insetBlock: 0,
             insetInlineEnd: 0,
             width: 3,
-            background: 'var(--destructive)',
+            background: validationIssueColor,
             zIndex: 2,
           }}
         />
@@ -528,6 +530,8 @@ function FieldRowButton({
   const showModelingAdvice = field.modelingHintTone === 'warning';
   const modelingHintColor =
     field.modelingHintTone === 'warning' ? 'var(--warning)' : 'var(--inspector-advisory)';
+  const validationIssueColor =
+    field.validationIssueTone === 'warning' ? 'var(--warning)' : 'var(--destructive)';
   const button = (
     <button
       type="button"
@@ -586,7 +590,7 @@ function FieldRowButton({
                 : searchFocused
                   ? 'var(--graph-node-selected-bg)'
                   : hasValidationIssues
-                    ? 'color-mix(in oklch, var(--destructive) 10%, transparent)'
+                    ? `color-mix(in oklch, ${validationIssueColor} 10%, transparent)`
                     : undefined,
         boxShadow: selected
           ? `inset 2px 0 0 ${selectionAccent}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
@@ -595,7 +599,7 @@ function FieldRowButton({
             : searchFocused
               ? 'inset 3px 0 0 var(--graph-node-selected), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
               : hasValidationIssues
-                ? 'inset 3px 0 0 var(--destructive), inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)'
+                ? `inset 3px 0 0 ${validationIssueColor}, inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)`
                 : 'inset 0 -1px 0 color-mix(in oklch, var(--border) 82%, transparent)',
       }}
     >
@@ -608,7 +612,7 @@ function FieldRowButton({
               : highlighted
                 ? `color-mix(in oklch, ${selectionAccent} 38%, var(--foreground))`
                 : hasValidationIssues
-                  ? 'var(--destructive)'
+                  ? validationIssueColor
                   : 'var(--muted-foreground)',
           fontWeight: 400,
         }}

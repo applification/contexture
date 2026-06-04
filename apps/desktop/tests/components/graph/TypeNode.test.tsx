@@ -458,6 +458,35 @@ describe('TypeNode', () => {
     );
   });
 
+  it('uses warning color for field rows with warning validation issues', () => {
+    const data: TypeNodeData = {
+      typeName: 'RecipeSafetyAssessment',
+      kind: 'object',
+      imported: false,
+      validationIssueCount: 1,
+      validationIssueTone: 'warning',
+      fields: [
+        {
+          name: 'unknownDietaryProfiles',
+          summary: 'DietaryProfile[] enum',
+          optional: true,
+          nullable: false,
+          validationIssueCount: 1,
+          validationIssueTone: 'warning',
+        },
+      ],
+    };
+    render(<TypeNode {...makeProps(data)} />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('type-node-validation-rail').getAttribute('style')).toContain(
+      'var(--warning)',
+    );
+    expect(screen.getByTestId('type-node-field').getAttribute('style')).toContain('var(--warning)');
+    expect(screen.getByTestId('type-node-field').getAttribute('style')).not.toContain(
+      'var(--destructive)',
+    );
+  });
+
   it('keeps low-pressure modeling advice out of canvas field rows', () => {
     const data: TypeNodeData = {
       typeName: 'Post',

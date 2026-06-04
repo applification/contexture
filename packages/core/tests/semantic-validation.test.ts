@@ -1050,6 +1050,43 @@ describe('checkSemantic — operational advice', () => {
     );
   });
 
+  it('treats documented enum evolution compatibility as a resolved advisory', () => {
+    const schema: Schema = {
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        {
+          kind: 'enum',
+          name: 'DietaryProfile',
+          compatibility: {
+            enumEvolution: {
+              unknownValueBehavior: 'preserve',
+              fallbackLabel: 'Unknown dietary profile',
+              clientSurfaces: ['web', 'mobile', 'api'],
+              owner: 'client',
+            },
+          },
+          values: [{ value: 'vegan' }],
+        },
+        {
+          kind: 'object',
+          name: 'RecipeSafetyAssessment',
+          table: true,
+          fields: [
+            {
+              name: 'mergedDietaryProfiles',
+              type: { kind: 'array', element: { kind: 'ref', typeName: 'DietaryProfile' } },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(checkSemantic(schema).map((issue) => issue.code)).not.toContain(
+      'operational_enum_evolution',
+    );
+  });
+
   it('warns when collaborative array edits have updatedAt but no conflict token', () => {
     const schema: Schema = {
       version: '1',

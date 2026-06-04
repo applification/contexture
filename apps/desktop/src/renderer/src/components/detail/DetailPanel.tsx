@@ -24,6 +24,7 @@ import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registr
 import { useMemo, useSyncExternalStore } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useChatComposerStore } from '../../store/chat-composer';
 import type { Op } from '../../store/ops';
 import { useGraphSelectionStore } from '../../store/selection';
 import { useUIChromeStore } from '../../store/ui-chrome';
@@ -112,6 +113,14 @@ export function DetailPanel({
       },
     };
   };
+  const discussIssue = (error: ValidationError): void => {
+    useChatComposerStore.getState().setPendingChatMessage({
+      message: validationChatPrompt(error),
+      context: '',
+    });
+    useUIChromeStore.getState().setSidebarTab('chat');
+    useUIChromeStore.getState().setSidebarVisible(true);
+  };
 
   if (selection.edge) {
     return (
@@ -166,6 +175,7 @@ export function DetailPanel({
         }}
         validationErrors={validationErrorsForField(validationErrors, typeIndex, fieldIndex)}
         validationRepairForIssue={repairForIssue}
+        onDiscussValidationIssue={discussIssue}
         availableTypeNames={schema.types
           .filter((candidate) => candidate.name !== type.name)
           .map((candidate) => candidate.name)}
@@ -186,6 +196,7 @@ export function DetailPanel({
       modelingHints={modelingHints.filter((hint) => hint.typeName === type.name)}
       validationErrors={typeValidationErrors}
       validationRepairForIssue={repairForIssue}
+      onDiscussValidationIssue={discussIssue}
       availableTypeNames={schema.types
         .filter((candidate) => candidate.name !== type.name)
         .map((candidate) => candidate.name)}
@@ -252,6 +263,22 @@ export function DetailPanel({
       document.dispatchEvent(new CustomEvent(FOCUS_TYPE_NAME_EVENT, { detail: { typeName } }));
     }, 0);
   }
+}
+
+function validationChatPrompt(error: ValidationError): string {
+  return [
+    'Help me resolve this Contexture validation issue.',
+    '',
+    `Code: ${error.code}`,
+    `Severity: ${error.severity}`,
+    `Path: ${error.path}`,
+    `Message: ${error.message}`,
+    error.hint ? `Hint: ${error.hint}` : null,
+    '',
+    'Please review the current IR and suggest the smallest safe model change. If the fix should be app-runtime owned instead of modeled, explain the runtime contract to document.',
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 function EmptyState({ message }: { message: string }) {

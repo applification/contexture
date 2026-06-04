@@ -11,6 +11,7 @@
 import type { Schema } from '@contexture/core/ir';
 import { DetailPanel } from '@renderer/components/detail/DetailPanel';
 import type { RefEdgeData } from '@renderer/components/graph/schema-to-graph';
+import { useChatComposerStore } from '@renderer/store/chat-composer';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUIChromeStore } from '@renderer/store/ui-chrome';
 import { useUndoStore } from '@renderer/store/undo';
@@ -81,6 +82,7 @@ describe('DetailPanel', () => {
     useGraphSelectionStore.getState().clear();
     useUIChromeStore.getState().setSidebarVisible(true);
     useUIChromeStore.getState().setSidebarTab('properties');
+    useChatComposerStore.getState().setPendingChatMessage(null);
   });
   afterEach(cleanup);
 
@@ -307,6 +309,111 @@ describe('DetailPanel', () => {
     expect(within(issues).getByText('unresolved_ref')).toBeInTheDocument();
     expect(within(issues).getByText(/Unresolved ref "Author"/i)).toBeInTheDocument();
     expect(within(issues).getByText('types.0.fields.0.type')).toBeInTheDocument();
+  });
+
+  it('renders field-level validation warnings as advisories', () => {
+    seedUnchecked({
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        { kind: 'enum', name: 'ChannelIdentityStatus', values: [{ value: 'active' }] },
+        {
+          kind: 'object',
+          name: 'ChannelIdentity',
+          table: true,
+          fields: [
+            {
+              name: 'status',
+              type: { kind: 'ref', typeName: 'ChannelIdentityStatus' },
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<DetailPanel selection={{ typeName: 'ChannelIdentity', fieldName: 'status' }} />);
+
+    const issues = screen.getByRole('region', { name: 'Validation issues' });
+    expect(within(issues).getByText('Advisory')).toBeInTheDocument();
+    expect(within(issues).getByText('operational_enum_evolution')).toBeInTheDocument();
+    expect(issues).toHaveClass('border-warning/35', 'bg-warning/10');
+    expect(issues).not.toHaveClass('border-destructive/35', 'bg-destructive/10');
+  });
+
+  it('opens field-level validation warnings in chat', () => {
+    seedUnchecked({
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        { kind: 'enum', name: 'ChannelIdentityStatus', values: [{ value: 'active' }] },
+        {
+          kind: 'object',
+          name: 'ChannelIdentity',
+          table: true,
+          fields: [
+            {
+              name: 'status',
+              type: { kind: 'ref', typeName: 'ChannelIdentityStatus' },
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<DetailPanel selection={{ typeName: 'ChannelIdentity', fieldName: 'status' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Discuss in chat' }));
+
+    expect(useUIChromeStore.getState().sidebarTab).toBe('chat');
+    expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain(
+      'operational_enum_evolution',
+    );
+    expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain(
+      'Severity: warning',
+    );
+    expect(useChatComposerStore.getState().pendingChatMessage?.message).toContain(
+      'types.1.fields.0.type',
+    );
+  });
+
+  it('documents compatibility contracts from field-level enum evolution advisories', () => {
+    seedUnchecked({
+      version: '1',
+      metadata: { description: 'Mobile and web meal planning app.' },
+      types: [
+        { kind: 'enum', name: 'ChannelIdentityStatus', values: [{ value: 'active' }] },
+        {
+          kind: 'object',
+          name: 'ChannelIdentity',
+          table: true,
+          fields: [
+            {
+              name: 'status',
+              type: { kind: 'ref', typeName: 'ChannelIdentityStatus' },
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<DetailPanel selection={{ typeName: 'ChannelIdentity', fieldName: 'status' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Document contract' }));
+
+    expect(useUndoStore.getState().schema.types[0]).toMatchObject({
+      kind: 'enum',
+      name: 'ChannelIdentityStatus',
+      compatibility: {
+        enumEvolution: {
+          unknownValueBehavior: 'preserve',
+          fallbackLabel: 'Unknown channel identity status',
+          clientSurfaces: ['web', 'mobile', 'api'],
+          owner: 'client',
+        },
+      },
+    });
+
+    cleanup();
+    render(<DetailPanel selection={{ typeName: 'ChannelIdentity', fieldName: 'status' }} />);
+    expect(screen.queryByRole('region', { name: 'Validation issues' })).not.toBeInTheDocument();
   });
 
   it('offers deterministic validation repair from the selected field details', () => {

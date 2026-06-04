@@ -1,4 +1,11 @@
-import type { FieldDef, FieldType, ObjectInvariant, Schema, TypeDef } from './ir';
+import type {
+  EnumEvolutionCompatibility,
+  FieldDef,
+  FieldType,
+  ObjectInvariant,
+  Schema,
+  TypeDef,
+} from './ir';
 import { analyzeModelingHints, type ModelingHint } from './modeling-hints';
 import { checkSemantic, type SemanticIssue, type StdlibCatalog } from './semantic-validation';
 
@@ -13,6 +20,7 @@ export interface DomainBrief {
     tableCount: number;
     invariantCount: number;
     derivationCount: number;
+    compatibilityContractCount: number;
     relationshipCount: number;
     queryContractCount: number;
     unresolvedDecisionCount: number;
@@ -23,7 +31,12 @@ export interface DomainBrief {
   semanticWarnings: SemanticIssue[];
 }
 
-export type DomainDecisionKind = 'invariant' | 'derivation' | 'relationship' | 'query';
+export type DomainDecisionKind =
+  | 'invariant'
+  | 'derivation'
+  | 'compatibility'
+  | 'relationship'
+  | 'query';
 
 export interface DomainDecision {
   id: string;
@@ -77,6 +90,7 @@ export function buildDomainBrief(
         .length,
       invariantCount: countInvariants(schema),
       derivationCount: countDerivations(schema),
+      compatibilityContractCount: collectCompatibilityDecisions(schema).length,
       relationshipCount: collectRelationshipDecisions(schema).length,
       queryContractCount: collectQueryDecisions(schema).length,
       unresolvedDecisionCount: unresolvedDecisions.length,
@@ -92,6 +106,7 @@ function collectDeclaredDecisions(schema: Schema): DomainDecision[] {
   return [
     ...collectInvariantDecisions(schema),
     ...collectDerivationDecisions(schema),
+    ...collectCompatibilityDecisions(schema),
     ...collectRelationshipDecisions(schema),
     ...collectQueryDecisions(schema),
   ].sort((a, b) => a.id.localeCompare(b.id));
@@ -159,6 +174,45 @@ function collectDerivationDecisions(schema: Schema): DomainDecision[] {
     });
   });
   return decisions;
+}
+
+function collectCompatibilityDecisions(schema: Schema): DomainDecision[] {
+  const decisions: DomainDecision[] = [];
+  schema.types.forEach((type, typeIndex) => {
+    if (type.kind !== 'enum' || !type.compatibility?.enumEvolution) return;
+    const contract = type.compatibility.enumEvolution;
+    const parts = [
+      `${type.name} unknown enum values: ${enumEvolutionBehaviorLabel(contract.unknownValueBehavior)}`,
+      contract.fallbackLabel ? `fallback label "${contract.fallbackLabel}"` : null,
+      (contract.clientSurfaces?.length ?? 0) > 0
+        ? `surfaces: ${contract.clientSurfaces?.join(', ')}`
+        : null,
+      contract.owner ? `owner: ${contract.owner}` : null,
+      contract.notes ?? null,
+    ].filter((part): part is string => Boolean(part));
+    decisions.push({
+      id: `compatibility:enumEvolution:${type.name}`,
+      kind: 'compatibility',
+      title: `${type.name} enum evolution`,
+      scope: type.name,
+      path: `types.${typeIndex}.compatibility.enumEvolution`,
+      statement: `${parts.join('; ')}.`,
+    });
+  });
+  return decisions;
+}
+
+function enumEvolutionBehaviorLabel(
+  behavior: EnumEvolutionCompatibility['unknownValueBehavior'],
+): string {
+  switch (behavior) {
+    case 'preserve':
+      return 'preserve raw values and render a neutral fallback';
+    case 'fallbackOnly':
+      return 'render a neutral fallback without interpreting the value';
+    case 'rejectAtBoundary':
+      return 'reject unknown values at an explicit compatibility boundary';
+  }
 }
 
 function collectRelationshipDecisions(schema: Schema): DomainDecision[] {

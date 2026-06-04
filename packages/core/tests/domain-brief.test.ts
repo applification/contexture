@@ -10,6 +10,19 @@ describe('domain brief', () => {
       types: [
         { kind: 'object', name: 'Tenant', table: true, fields: [] },
         {
+          kind: 'enum',
+          name: 'ProjectStatus',
+          compatibility: {
+            enumEvolution: {
+              unknownValueBehavior: 'preserve',
+              fallbackLabel: 'Unknown status',
+              clientSurfaces: ['web', 'api'],
+              owner: 'client',
+            },
+          },
+          values: [{ value: 'active' }],
+        },
+        {
           kind: 'object',
           name: 'Project',
           table: true,
@@ -67,10 +80,11 @@ describe('domain brief', () => {
     const brief = buildDomainBrief(schema);
 
     expect(brief.summary).toMatchObject({
-      typeCount: 3,
+      typeCount: 4,
       tableCount: 3,
       invariantCount: 1,
       derivationCount: 1,
+      compatibilityContractCount: 1,
       relationshipCount: 1,
       queryContractCount: 2,
     });
@@ -81,6 +95,11 @@ describe('domain brief', () => {
           id: 'invariant:Project:search-text-required',
         }),
         expect.objectContaining({ kind: 'derivation', id: 'derivation:Project:summary' }),
+        expect.objectContaining({
+          kind: 'compatibility',
+          id: 'compatibility:enumEvolution:ProjectStatus',
+          statement: expect.stringContaining('Unknown status'),
+        }),
         expect.objectContaining({ kind: 'relationship', id: 'relationship:Task:projectId' }),
         expect.objectContaining({ kind: 'query', id: 'query:index:Project:by_tenant' }),
         expect.objectContaining({ kind: 'query', id: 'query:search:Project:search_projects' }),

@@ -15,7 +15,14 @@
 
 import { derivationKindLabel } from '@contexture/core/derivation';
 import { listFixtureModules } from '@contexture/core/fixture-generators';
-import type { FieldDef, FieldType, IndexDef, Schema, TypeDef } from '@contexture/core/ir';
+import type {
+  EnumEvolutionCompatibility,
+  FieldDef,
+  FieldType,
+  IndexDef,
+  Schema,
+  TypeDef,
+} from '@contexture/core/ir';
 import type { ModelingHint } from '@contexture/core/modeling-hints';
 import type { TypeUpdatePatch } from '@contexture/core/ops';
 import type { ValidationError } from '@renderer/services/validation';
@@ -91,6 +98,7 @@ export interface TypeDetailProps {
   modelingHints?: readonly ModelingHint[];
   validationErrors?: readonly ValidationError[];
   validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  onDiscussValidationIssue?: (error: ValidationError) => void;
   availableTypeNames?: readonly string[];
   availableObjectTypeNames?: readonly string[];
 }
@@ -103,6 +111,7 @@ export function TypeDetail({
   modelingHints = [],
   validationErrors = [],
   validationRepairForIssue,
+  onDiscussValidationIssue,
   availableTypeNames = [],
   availableObjectTypeNames = [],
 }: TypeDetailProps) {
@@ -122,6 +131,7 @@ export function TypeDetail({
         modelingHints={modelingHints}
         validationErrors={validationErrors}
         validationRepairForIssue={validationRepairForIssue}
+        onDiscussValidationIssue={onDiscussValidationIssue}
         recordsCount={tableRecords.length}
         reserved={nameReserved}
       />
@@ -166,6 +176,7 @@ export function TypeDetail({
 
       <ValidationIssues
         errors={validationErrors}
+        onDiscussIssue={onDiscussValidationIssue}
         onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
         repairForIssue={validationRepairForIssue}
       />
@@ -200,6 +211,7 @@ function TableTypeDetail({
   modelingHints,
   validationErrors,
   validationRepairForIssue,
+  onDiscussValidationIssue,
   recordsCount,
   reserved,
 }: {
@@ -209,6 +221,7 @@ function TableTypeDetail({
   modelingHints: readonly ModelingHint[];
   validationErrors: readonly ValidationError[];
   validationRepairForIssue?: (error: ValidationError) => ValidationIssueRepair | null;
+  onDiscussValidationIssue?: (error: ValidationError) => void;
   recordsCount: number;
   reserved: boolean;
 }) {
@@ -279,6 +292,7 @@ function TableTypeDetail({
         <div className="space-y-4">
           <ValidationIssues
             errors={validationErrors}
+            onDiscussIssue={onDiscussValidationIssue}
             onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
             repairForIssue={validationRepairForIssue}
           />
@@ -332,6 +346,7 @@ function TableTypeDetail({
         <div className="flex h-full min-h-0 flex-col">
           <ValidationIssues
             errors={validationErrors}
+            onDiscussIssue={onDiscussValidationIssue}
             onIssueClick={(error) => selectFieldFromValidationIssue(type, error)}
             repairForIssue={validationRepairForIssue}
           />
@@ -1768,6 +1783,7 @@ function EnumBody({
 
   return (
     <div className="space-y-2">
+      <EnumCompatibilitySection type={type} />
       <div className="flex items-center justify-between">
         <Label>Values</Label>
         <Button type="button" variant="ghost" size="sm" onClick={addValue} className="h-7 text-xs">
@@ -1870,6 +1886,60 @@ function EnumBody({
       )}
     </div>
   );
+}
+
+function EnumCompatibilitySection({ type }: { type: Extract<TypeDef, { kind: 'enum' }> }) {
+  const contract = type.compatibility?.enumEvolution;
+  if (!contract) return null;
+
+  return (
+    <section className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-xs font-medium text-foreground">Compatibility contract</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Unknown values: {enumEvolutionBehaviorSummary(contract.unknownValueBehavior)}
+          </p>
+        </div>
+        <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+          documented
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {contract.fallbackLabel && (
+          <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[11px]">
+            fallback: {contract.fallbackLabel}
+          </Badge>
+        )}
+        {contract.owner && (
+          <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+            owner: {contract.owner}
+          </Badge>
+        )}
+        {(contract.clientSurfaces ?? []).map((surface) => (
+          <Badge key={surface} variant="outline" className="h-5 rounded-md px-1.5 text-[11px]">
+            {surface}
+          </Badge>
+        ))}
+      </div>
+      {contract.notes && (
+        <p className="text-xs leading-relaxed text-foreground/85">{contract.notes}</p>
+      )}
+    </section>
+  );
+}
+
+function enumEvolutionBehaviorSummary(
+  behavior: EnumEvolutionCompatibility['unknownValueBehavior'],
+): string {
+  switch (behavior) {
+    case 'preserve':
+      return 'preserve raw value and render fallback';
+    case 'fallbackOnly':
+      return 'render fallback without interpreting';
+    case 'rejectAtBoundary':
+      return 'reject at explicit boundary';
+  }
 }
 
 function enumDeleteDisabledReason(valueCount: number, isDuplicate: boolean): string | undefined {

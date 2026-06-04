@@ -55,6 +55,7 @@ export interface TypeNodeData extends Record<string, unknown> {
   stdlib?: boolean;
   /** Local object nodes can create fields directly from the canvas. */
   canAddFields?: boolean;
+  validationIssueTone?: 'error' | 'warning';
 }
 
 export interface EnumValueRow {
@@ -78,6 +79,7 @@ export interface FieldRow {
   /** Bundled stdlib metadata when this field references `namespace.Type`. */
   stdlibTarget?: StdlibTargetRow;
   validationIssueCount?: number;
+  validationIssueTone?: 'error' | 'warning';
   modelingHintCount?: number;
   modelingHintTone?: 'advisory' | 'warning';
 }
