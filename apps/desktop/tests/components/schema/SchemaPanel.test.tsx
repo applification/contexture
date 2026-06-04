@@ -70,7 +70,9 @@ describe('SchemaPanel', () => {
 
     expect(screen.getByTestId('agent-setup')).toHaveTextContent('Agent setup');
     fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex package');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Agent readiness');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('0/2 checks ready.');
+    expect(screen.getByTestId('agent-setup-content')).not.toHaveTextContent('Convex package');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
     expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
     fireEvent.click(screen.getByText('Copy install'));
@@ -78,7 +80,9 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('agent-setup-install-value')).toHaveTextContent(
       'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
     );
-    expect(screen.getByText('Advanced')).toBeInTheDocument();
+    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prompt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Smoke test')).not.toBeInTheDocument();
   });
 
   it('copies the Agent setup install command with announced feedback', () => {
@@ -136,53 +140,13 @@ describe('SchemaPanel', () => {
     );
   });
 
-  it('uses the saved document path in the Agent setup prompt and smoke test', () => {
-    const onCopy = vi.fn();
-    render(
-      <SchemaPanel
-        {...DEFAULT_PROPS}
-        zodSource="zod"
-        documentFilePath="/repo/garden.contexture.json"
-        onCopy={onCopy}
-      />,
-    );
+  it('keeps Agent setup focused on install checks before the document has a path', () => {
+    render(<SchemaPanel {...DEFAULT_PROPS} zodSource="zod" documentFilePath={null} />);
 
     fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use Convex AI files for Convex implementation choices. Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing. Do not edit @contexture-generated files directly.',
-    );
-    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask your agent: "List the contexture MCP tools, then inspect /repo/garden.contexture.json, read the domain brief, check Convex AI files with \'bunx convex ai-files status\', and summarize the Convex tables plus unresolved decisions."',
-    );
-
-    fireEvent.click(screen.getByTestId('agent-setup-prompt-copy'));
-    expect(onCopy).toHaveBeenCalledWith(
-      'Use Convex AI files for Convex implementation choices. Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing. Do not edit @contexture-generated files directly.',
-    );
-  });
-
-  it('shows a save-first Agent setup state before the document has a path', () => {
-    const onRequestSave = vi.fn();
-    render(
-      <SchemaPanel
-        {...DEFAULT_PROPS}
-        zodSource="zod"
-        documentFilePath={null}
-        onRequestSave={onRequestSave}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-unsaved')).toHaveTextContent(
-      'Save this document to create a stable .contexture.json path before handing it to an agent.',
-    );
-    expect(screen.queryByLabelText('Saved-document prompt')).not.toBeInTheDocument();
-    expect(screen.getByTestId('agent-setup-smoke-value')).toHaveTextContent(
-      'Ask your agent: "List the contexture MCP tools."',
-    );
-
-    fireEvent.click(screen.getByText('Save first'));
-    expect(onRequestSave).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
+    expect(screen.queryByText('Save first')).not.toBeInTheDocument();
   });
 
   it('renders an error message when `error` is non-null and hides the code/copy controls', () => {
@@ -209,9 +173,8 @@ describe('SchemaPanel', () => {
     expect(screen.getByTestId('schema-error')).toBeInTheDocument();
     expect(screen.getByTestId('agent-setup')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('agent-setup'));
-    expect(screen.getByTestId('agent-setup-prompt-value')).toHaveTextContent(
-      'Use Convex AI files for Convex implementation choices. Use the Contexture MCP server to inspect /repo/garden.contexture.json, inspect the domain brief for unresolved decisions, propose reviewable Convex model changes, emit convex/schema.ts and convex/validators.ts, then check drift before finishing. Do not edit @contexture-generated files directly.',
-    );
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Convex AI files');
+    expect(screen.getByTestId('agent-setup-content')).toHaveTextContent('Contexture MCP');
   });
 
   it('prefers the empty state over the error state when the schema is empty', () => {

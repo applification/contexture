@@ -39,7 +39,6 @@ import {
   FolderOpen,
   GitCompareArrows,
   MousePointer2,
-  Save,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -62,7 +61,7 @@ import { ModelSyncBanner } from './components/hud/ModelSyncBanner';
 import { PlaygroundPanel } from './components/playground/PlaygroundPanel';
 import { ReviewPanel } from './components/review/ReviewPanel';
 import {
-  AgentSetupPopover,
+  AgentSetupContent,
   type SchemaOutputType,
   SchemaPanel,
   type SchemaPanelProps,
@@ -113,9 +112,9 @@ export default function App(): React.JSX.Element {
     [setLayout],
   );
   const [showGraphControls, setShowGraphControls] = useState(false);
-  const [agentSetupCopied, setAgentSetupCopied] = useState<
-    'install' | 'convex-ai-files' | 'prompt' | 'smoke' | null
-  >(null);
+  const [agentSetupCopied, setAgentSetupCopied] = useState<'install' | 'convex-ai-files' | null>(
+    null,
+  );
   const agentSetupCopyTimeoutRef = useRef<number | null>(null);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const selectedNodeId = useGraphSelectionStore((s) => s.state.primaryNodeId);
@@ -341,20 +340,17 @@ export default function App(): React.JSX.Element {
     [],
   );
 
-  const copyAgentSetupText = useCallback(
-    (key: 'install' | 'convex-ai-files' | 'prompt' | 'smoke', text: string) => {
-      copyToClipboard(text);
-      setAgentSetupCopied(key);
-      if (agentSetupCopyTimeoutRef.current !== null) {
-        window.clearTimeout(agentSetupCopyTimeoutRef.current);
-      }
-      agentSetupCopyTimeoutRef.current = window.setTimeout(() => {
-        setAgentSetupCopied(null);
-        agentSetupCopyTimeoutRef.current = null;
-      }, 2000);
-    },
-    [],
-  );
+  const copyAgentSetupText = useCallback((key: 'install' | 'convex-ai-files', text: string) => {
+    copyToClipboard(text);
+    setAgentSetupCopied(key);
+    if (agentSetupCopyTimeoutRef.current !== null) {
+      window.clearTimeout(agentSetupCopyTimeoutRef.current);
+    }
+    agentSetupCopyTimeoutRef.current = window.setTimeout(() => {
+      setAgentSetupCopied(null);
+      agentSetupCopyTimeoutRef.current = null;
+    }, 2000);
+  }, []);
 
   useProjectAutoSave({
     getChat: chat.toHistory,
@@ -647,12 +643,8 @@ export default function App(): React.JSX.Element {
                 {hasSchema && (
                   <OnboardingLoopPanel
                     state={onboardingState}
-                    isDirty={isDirty}
-                    documentFilePath={filePath}
                     convexVersion={convexVersion}
                     agentSetupCopied={agentSetupCopied}
-                    onSave={() => void fileMenu.handleSave()}
-                    onRequestSave={() => void fileMenu.handleSave()}
                     onCopyAgentSetup={copyAgentSetupText}
                   />
                 )}
@@ -665,7 +657,6 @@ export default function App(): React.JSX.Element {
                   onOutputDirChange={updateSchemaOutputDir}
                   documentFilePath={filePath}
                   onOpenGeneratedFile={openGeneratedFile}
-                  onRequestSave={() => void fileMenu.handleSave()}
                   schemaFileName={schemaFileName}
                   schema={schema}
                   convexVersion={convexVersion}
@@ -896,22 +887,14 @@ function buildOnboardingState(
 
 function OnboardingLoopPanel({
   state,
-  isDirty,
-  documentFilePath,
   convexVersion,
   agentSetupCopied,
-  onSave,
-  onRequestSave,
   onCopyAgentSetup,
 }: {
   state: OnboardingState;
-  isDirty: boolean;
-  documentFilePath: string | null;
   convexVersion: SchemaPanelProps['convexVersion'];
-  agentSetupCopied: 'install' | 'convex-ai-files' | 'prompt' | 'smoke' | null;
-  onSave: () => void;
-  onRequestSave: () => void;
-  onCopyAgentSetup: (key: 'install' | 'convex-ai-files' | 'prompt' | 'smoke', text: string) => void;
+  agentSetupCopied: 'install' | 'convex-ai-files' | null;
+  onCopyAgentSetup: (key: 'install' | 'convex-ai-files', text: string) => void;
 }): React.JSX.Element {
   interface ReadinessDetail {
     label: string;
@@ -1054,87 +1037,70 @@ function OnboardingLoopPanel({
                     </span>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-2" align="start">
-                  <div className="px-1 pb-1">
-                    <h3 className="text-xs font-semibold text-foreground">
-                      {group.label} readiness
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      {completeCount}/{group.detail.length} checks ready.
-                    </p>
-                  </div>
-                  <ul className="space-y-1">
-                    {group.detail.map((detail) => (
-                      <li
-                        key={detail.label}
-                        className="rounded border border-border/60 bg-background/70 px-2 py-1.5"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          {detail.done ? (
-                            <CheckCircle2
-                              className="size-3.5 shrink-0 text-success"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <span
-                              className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
-                              aria-hidden="true"
-                            />
-                          )}
-                          <span className="text-[11px] font-medium text-foreground">
-                            {detail.label}
-                          </span>
-                          <span className="ml-auto text-[10px] text-muted-foreground">
-                            {detail.done ? 'Ready' : 'Needs action'}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-                          {detail.help}
+                <PopoverContent
+                  className={group.label === 'Agent' ? 'w-[430px] p-2' : 'w-80 p-2'}
+                  align="start"
+                >
+                  {group.label === 'Agent' ? (
+                    <AgentSetupContent
+                      convexVersion={convexVersion}
+                      copied={agentSetupCopied}
+                      onCopy={onCopyAgentSetup}
+                    />
+                  ) : (
+                    <>
+                      <div className="px-1 pb-1">
+                        <h3 className="text-xs font-semibold text-foreground">
+                          {group.label} readiness
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground">
+                          {completeCount}/{group.detail.length} checks ready.
                         </p>
-                      </li>
-                    ))}
-                  </ul>
-                  {group.note ? (
-                    <p className="mt-2 rounded border border-warning/30 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
-                      {group.note}
-                    </p>
-                  ) : null}
+                      </div>
+                      <ul className="space-y-1">
+                        {group.detail.map((detail) => (
+                          <li
+                            key={detail.label}
+                            className="rounded border border-border/60 bg-background/70 px-2 py-1.5"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              {detail.done ? (
+                                <CheckCircle2
+                                  className="size-3.5 shrink-0 text-success"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <span
+                                  className="size-3.5 shrink-0 rounded-full border border-warning/70 bg-warning/10"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span className="text-[11px] font-medium text-foreground">
+                                {detail.label}
+                              </span>
+                              <span className="ml-auto text-[10px] text-muted-foreground">
+                                {detail.done ? 'Ready' : 'Needs action'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                              {detail.help}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                      {group.note ? (
+                        <p className="mt-2 rounded border border-warning/30 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+                          {group.note}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </PopoverContent>
               </Popover>
             </li>
           );
         })}
       </ul>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="h-8 gap-1.5 px-2 text-xs"
-          onClick={onSave}
-          disabled={state.hasSavedOutputs && state.driftClean && !isDirty}
-          title={
-            state.hasSavedOutputs && state.driftClean && !isDirty
-              ? 'Generated files are already saved and drift clean.'
-              : 'Save this model and emit generated files.'
-          }
-        >
-          <Save className="size-3.5" />
-          {state.hasSavedOutputs && state.driftClean && !isDirty
-            ? 'Saved and emitted'
-            : 'Save and emit'}
-        </Button>
-        <AgentSetupPopover
-          documentFilePath={documentFilePath}
-          convexVersion={convexVersion}
-          copied={agentSetupCopied}
-          onCopy={onCopyAgentSetup}
-          onRequestSave={onRequestSave}
-          className="h-8 w-auto px-2 py-0"
-          compact
-        />
-      </div>
     </aside>
   );
 }

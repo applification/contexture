@@ -140,9 +140,10 @@ describe('App Codex-first copy', () => {
     await user.click(screen.getByLabelText(/Agent: Convex AI files: ready/));
 
     expect(screen.getByText('Agent readiness')).toBeInTheDocument();
-    expect(
-      screen.getByText('Run bunx convex ai-files install in the target repo.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('2/2 checks ready.')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-setup-install-value')).toHaveTextContent(
+      'codex mcp add contexture -- /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp',
+    );
     expect(screen.getAllByText('Ready').length).toBeGreaterThanOrEqual(2);
   });
 
