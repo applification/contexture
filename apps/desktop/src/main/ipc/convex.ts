@@ -188,10 +188,14 @@ async function probeContextureMcp(
       message: output || 'Codex MCP list did not return output.',
     };
   } catch (err) {
+    const output = outputFromThrownExecError(err);
     return {
       command,
       status: 'probe_failed',
-      message: outputFromThrownExecError(err) || (err instanceof Error ? err.message : String(err)),
+      message:
+        mcpProbeFailureMessage(output) ||
+        output ||
+        (err instanceof Error ? err.message : String(err)),
     };
   }
 }
@@ -202,6 +206,11 @@ function convexAiFilesOutputReady(output: string): boolean {
 
 function contextureMcpOutputReady(output: string): boolean {
   return /^contexture\s+.+\s+enabled\b/imu.test(output);
+}
+
+function mcpProbeFailureMessage(output: string): string | null {
+  if (!/failed to load configuration/iu.test(output)) return null;
+  return `Codex could not load its configuration. Fix the Codex config error, then run "codex mcp list" again.\n${output}`;
 }
 
 function compactOutput(stdout?: string | Buffer, stderr?: string | Buffer): string {

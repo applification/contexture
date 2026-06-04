@@ -1213,7 +1213,7 @@ function setupAgentReadinessStatus(
     };
   }
   return {
-    status: 'unknown',
+    status: 'needs_action',
     description: check.message || 'Setup status could not be checked.',
   };
 }

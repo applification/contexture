@@ -123,4 +123,39 @@ describe('Convex version IPC helpers', () => {
     expect(result.convexAiFiles.status).toBe('not_ready');
     expect(result.contextureMcp.status).toBe('not_ready');
   });
+
+  it('reports Codex configuration failures when probing Contexture MCP', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
+    const appDir = join(dir, 'apps/todo');
+    await mkdir(appDir, { recursive: true });
+    await writeFile(join(appDir, 'package.json'), JSON.stringify({}), 'utf8');
+    const execFile = vi.fn<ExecFileLike>(async (file) => {
+      if (file === 'bunx') {
+        return {
+          stdout: `Convex AI files: enabled
+  ✔ Agent skills: installed, up to date
+`,
+        };
+      }
+      const err = new Error('Command failed: codex mcp list') as Error & { stderr: string };
+      err.stderr = `Error: failed to load configuration
+
+Caused by:
+    0: /Users/rufus/.codex/config.toml:7:16: unknown variant \`priority\`, expected \`fast\` or \`flex\`
+    1: unknown variant \`priority\`, expected \`fast\` or \`flex\`
+       in \`service_tier\`
+`;
+      throw err;
+    });
+
+    const result = await getConvexAgentReadinessInfo(
+      { irPath: join(appDir, 'todo.contexture.json') },
+      { execFile },
+    );
+
+    expect(result.contextureMcp.status).toBe('probe_failed');
+    expect(result.contextureMcp.message).toContain('Codex could not load its configuration');
+    expect(result.contextureMcp.message).toContain('/Users/rufus/.codex/config.toml:7:16');
+    expect(result.contextureMcp.message).toContain('service_tier');
+  });
 });
