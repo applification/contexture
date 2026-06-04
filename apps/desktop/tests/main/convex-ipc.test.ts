@@ -55,6 +55,37 @@ describe('Convex version IPC helpers', () => {
     });
   });
 
+  it('reports Convex versions from the configured monorepo Convex package', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
+    const convexPackageDir = join(dir, 'packages/convex');
+    await mkdir(convexPackageDir, { recursive: true });
+    await writeFile(join(dir, 'package.json'), JSON.stringify({}), 'utf8');
+    await writeFile(
+      join(convexPackageDir, 'package.json'),
+      JSON.stringify({ dependencies: { convex: '^1.39.1' } }),
+      'utf8',
+    );
+    await writeFile(
+      join(dir, 'app.contexture.json'),
+      JSON.stringify({
+        version: '1',
+        types: [],
+        outputs: { convex: { dir: 'packages/convex' } },
+      }),
+      'utf8',
+    );
+
+    const result = await getConvexVersionInfo({
+      irPath: join(dir, 'app.contexture.json'),
+    });
+
+    expect(result).toMatchObject({
+      targetVersion: '^1.39.1',
+      targetPackagePath: join(convexPackageDir, 'package.json'),
+      status: 'ok',
+    });
+  });
+
   it('detects enabled Convex AI files and Contexture MCP from CLI output', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
     const appDir = join(dir, 'apps/todo');
@@ -97,6 +128,47 @@ describe('Convex version IPC helpers', () => {
       'codex',
       ['mcp', 'list'],
       expect.objectContaining({ env: process.env }),
+    );
+  });
+
+  it('probes Convex AI files from the model project root', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'contexture-convex-'));
+    const convexPackageDir = join(dir, 'packages/convex');
+    await mkdir(convexPackageDir, { recursive: true });
+    await writeFile(
+      join(convexPackageDir, 'package.json'),
+      JSON.stringify({ devDependencies: { convex: '1.40.0' } }),
+      'utf8',
+    );
+    await writeFile(
+      join(dir, 'app.contexture.json'),
+      JSON.stringify({
+        version: '1',
+        types: [],
+        outputs: { convex: { dir: 'packages/convex' } },
+      }),
+      'utf8',
+    );
+    const execFile = vi.fn<ExecFileLike>(async (file) => {
+      if (file === 'bunx') {
+        return {
+          stdout: `Convex AI files: enabled
+  ✔ Agent skills: installed, up to date
+`,
+        };
+      }
+      return {
+        stdout:
+          'Name        Command                                                             Args  Env  Cwd  Status   Auth\ncontexture  /Applications/Contexture.app/Contents/Resources/bin/contexture-mcp  -     -    -    enabled  Unsupported\n',
+      };
+    });
+
+    await getConvexAgentReadinessInfo({ irPath: join(dir, 'app.contexture.json') }, { execFile });
+
+    expect(execFile).toHaveBeenCalledWith(
+      'bunx',
+      ['convex', 'ai-files', 'status'],
+      expect.objectContaining({ cwd: dir }),
     );
   });
 
