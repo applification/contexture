@@ -179,6 +179,7 @@ describe('App Codex-first copy', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Properties inspector')).toHaveTextContent('plot');
     });
+    expect(screen.getByTestId('inspector-selection-badge')).toHaveTextContent('field');
     expect(screen.queryByTestId('field-detail-header')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back to Sowing fields' })).toBeInTheDocument();
 
@@ -196,7 +197,9 @@ describe('App Codex-first copy', () => {
     useGraphSelectionStore.getState().click('Sowing', 'replace');
     useGraphSelectionStore.getState().selectField({ typeName: 'Sowing', fieldName: 'plot' });
 
-    await user.click(await screen.findByRole('button', { name: 'Delete field plot' }));
+    await user.click(await screen.findByLabelText('Open selection actions'));
+    await user.click(await screen.findByText('Delete...'));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
 
     const sowing = useUndoStore.getState().schema.types.find((type) => type.name === 'Sowing');
     expect(sowing).toMatchObject({

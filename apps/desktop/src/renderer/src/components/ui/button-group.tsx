@@ -2,6 +2,15 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+const segmentedControlSelectedClass =
+  'bg-primary/20 text-primary hover:bg-primary/25 hover:text-primary';
+
+const segmentedControlActiveStateClass =
+  'data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:hover:bg-primary/25 data-[state=active]:hover:text-primary';
+
+const segmentedControlItemClass =
+  'text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary';
+
 const ButtonGroup = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & {
@@ -50,4 +59,11 @@ const ButtonGroupText = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
 );
 ButtonGroupText.displayName = 'ButtonGroupText';
 
-export { ButtonGroup, ButtonGroupSeparator, ButtonGroupText };
+export {
+  ButtonGroup,
+  ButtonGroupSeparator,
+  ButtonGroupText,
+  segmentedControlActiveStateClass,
+  segmentedControlItemClass,
+  segmentedControlSelectedClass,
+};

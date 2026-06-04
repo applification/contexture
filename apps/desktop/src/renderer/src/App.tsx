@@ -25,10 +25,12 @@ import {
 import type { Schema, TypeDef } from '@contexture/core/ir';
 import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
+  AlertCircle,
   Bot,
   Boxes,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   Clock,
   FileCode2,
   FilePlus2,
@@ -37,6 +39,7 @@ import {
   Maximize2,
   MessageSquare,
   Minimize2,
+  MoreHorizontal,
   MousePointer2,
   Play,
   SlidersHorizontal,
@@ -55,6 +58,7 @@ import { ReconcileModal } from './components/dialogs/ReconcileModal';
 import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
+import { GraphLegend } from './components/graph/GraphLegend';
 import { type CreateTypeKind, createFieldOp, createTypeOp } from './components/graph/interactions';
 import { TYPE_NODE_EVENT } from './components/graph/nodes/TypeNode';
 import { DriftBanner } from './components/hud/DriftBanner';
@@ -74,7 +78,25 @@ import { GraphControlsPanel } from './components/toolbar/GraphControlsPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { TypeKindBadge, type TypeKindLabel } from './components/toolbar/type-kind-badge';
 import { UpdateBanner } from './components/UpdateBanner';
+import { Alert, AlertDescription, AlertTitle } from './components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from './components/ui/alert-dialog';
 import { Button } from './components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './components/ui/dropdown-menu';
 import {
   Empty,
   EmptyDescription,
@@ -97,6 +119,7 @@ import { useDocumentStore } from './store/document';
 import { useDriftStore } from './store/drift';
 import { useGraphLayoutStore } from './store/layout-config';
 import { useModelSyncStore } from './store/model-sync';
+import { usePlaygroundStore } from './store/playground';
 import { type EdgeSelection, type FieldSelection, useGraphSelectionStore } from './store/selection';
 import { useUIChromeStore } from './store/ui-chrome';
 import { useUndoStore } from './store/undo';
@@ -116,6 +139,9 @@ export default function App(): React.JSX.Element {
   );
   const [showGraphControls, setShowGraphControls] = useState(false);
   const [inspectorCompact, setInspectorCompact] = useState(false);
+  const [inspectorActionsOpen, setInspectorActionsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteInspectorError, setDeleteInspectorError] = useState<string | null>(null);
   const [agentSetupCopied, setAgentSetupCopied] = useState<'install' | 'convex-ai-files' | null>(
     null,
   );
@@ -136,6 +162,7 @@ export default function App(): React.JSX.Element {
   const filePath = useDocumentStore((s) => s.filePath);
   const convexVersion = useConvexVersionStore();
   const driftedPaths = useDriftStore((s) => s.driftedPaths);
+  const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
 
   // Drive the collapse/expand imperative API from the UI-store flag so
   // the Toolbar's sidebar button toggles the same thing as a user drag
@@ -176,6 +203,13 @@ export default function App(): React.JSX.Element {
     document.addEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
     return () => document.removeEventListener(TYPE_EDGE_SELECT_EVENT, onEdgeSelect);
   }, []);
+
+  useEffect(() => {
+    if (!sidebarVisible || activeTab !== 'playground' || !selectedNodeId) return;
+    const selectedType = schema.types.find((type) => type.name === selectedNodeId);
+    if (selectedType?.kind !== 'object' || selectedType.table !== true) return;
+    usePlaygroundStore.getState().selectType(selectedType.name);
+  }, [activeTab, schema, selectedNodeId, sidebarVisible]);
 
   const createType = useCallback((kind: CreateTypeKind): void => {
     const op = createTypeOp(useUndoStore.getState().schema, kind);
@@ -396,27 +430,40 @@ export default function App(): React.JSX.Element {
       : selectedEdge
         ? edgeSelectionLabel(selectedEdge)
         : detailTypeName;
+  const inspectorSelectionKind =
+    selectedField && selectedField.typeName === detailTypeName
+      ? 'field'
+      : selectedEdge
+        ? 'edge'
+        : inspectorKind;
+  const inspectorDeleteLabel = selectedField
+    ? `field ${selectedField.fieldName}`
+    : detailTypeName
+      ? `type ${detailTypeName}`
+      : 'selection';
+  const canDeleteInspectorSelection = detailType !== undefined && selectedEdge === null;
   const inspectorLinkedToChat = activeTab === 'chat' && pendingChatMessage !== null;
   const backToSelectedType = useCallback((): void => {
     if (!selectedField) return;
     useGraphSelectionStore.getState().selectField(null);
     useGraphSelectionStore.getState().focus(selectedField.typeName);
   }, [selectedField]);
-  const deleteInspectorSelection = useCallback((): void => {
+  const deleteInspectorSelection = useCallback((): string | null => {
     if (selectedField) {
       const result = useUndoStore.getState().apply({
         kind: 'remove_field',
         typeName: selectedField.typeName,
         fieldName: selectedField.fieldName,
       });
-      if ('error' in result) return;
+      if ('error' in result) return result.error;
       useGraphSelectionStore.getState().selectField(null);
-      return;
+      return null;
     }
-    if (!detailTypeName || !detailType) return;
+    if (!detailTypeName || !detailType) return 'Nothing is selected to delete.';
     const result = useUndoStore.getState().apply({ kind: 'delete_type', name: detailTypeName });
-    if ('error' in result) return;
+    if ('error' in result) return result.error;
     useGraphSelectionStore.getState().clear();
+    return null;
   }, [detailType, detailTypeName, selectedField]);
   const openSelectedTypeInPlayground = useCallback((): void => {
     if (!detailTypeName) return;
@@ -424,6 +471,10 @@ export default function App(): React.JSX.Element {
     useUIChromeStore.getState().setSidebarVisible(true);
     setActiveTab('playground');
   }, [detailTypeName, setActiveTab, setPlaygroundScope]);
+  const selectPlaygroundEntity = useCallback((typeName: string): void => {
+    useGraphSelectionStore.getState().click(typeName, 'replace');
+    useGraphSelectionStore.getState().focus(typeName);
+  }, []);
   const selectActivityTab = useCallback(
     (tab: typeof activeTab): void => {
       if (tab === 'playground') setPlaygroundScope({ mode: 'all' });
@@ -435,6 +486,10 @@ export default function App(): React.JSX.Element {
     typeof selectedNodeId === 'string' && STDLIB_TYPE_DEFINITIONS.has(selectedNodeId)
       ? selectedNodeId
       : undefined;
+  const playgroundHighlightedTypeName =
+    playgroundScope.mode === 'selected' && detailTypeName === playgroundScope.typeName
+      ? playgroundScope.typeName
+      : null;
   const hasSelection = detailTypeName !== null && detailTypeName !== undefined;
   const onboardingState = useMemo(
     () =>
@@ -576,23 +631,41 @@ export default function App(): React.JSX.Element {
             <ModelSyncBanner />
             <div className="relative flex-1 min-h-0">
               {hasSchema && (
-                <div className="absolute top-2 left-2 z-20">
-                  <Popover open={showGraphControls} onOpenChange={setShowGraphControls}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        className="h-8 px-2 gap-1.5 shadow-sm"
-                        aria-label="Graph controls"
-                        title="Graph controls"
-                      >
-                        <SlidersHorizontal className="size-4" />
-                        <ChevronDown className="size-3" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="p-0 w-72" align="start">
-                      <GraphControlsPanel onClose={() => setShowGraphControls(false)} />
-                    </PopoverContent>
-                  </Popover>
+                <div className="absolute top-2 left-2 z-20 flex items-start gap-2">
+                  <GraphLegend
+                    showEnumNodes={graphLayout.showEnums}
+                    showStdlibNodes={graphLayout.showStdlib}
+                  />
+                  <section
+                    aria-label="Graph controls"
+                    className="overflow-hidden rounded-xl border border-border/80 bg-card/95 text-xs text-card-foreground shadow-sm backdrop-blur"
+                  >
+                    <button
+                      type="button"
+                      className="flex h-[38px] w-full min-w-40 items-center justify-between gap-3 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      aria-expanded={showGraphControls}
+                      aria-label={
+                        showGraphControls ? 'Collapse graph controls' : 'Expand graph controls'
+                      }
+                      title="Graph controls"
+                      onClick={() => setShowGraphControls((open) => !open)}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <SlidersHorizontal className="size-4" aria-hidden="true" />
+                        <span>Graph Controls</span>
+                      </span>
+                      {showGraphControls ? (
+                        <ChevronUp className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="size-3.5" aria-hidden="true" />
+                      )}
+                    </button>
+                    {showGraphControls && (
+                      <div className="w-72 border-t border-border/70">
+                        <GraphControlsPanel />
+                      </div>
+                    )}
+                  </section>
                 </div>
               )}
               {hasSchema ? (
@@ -610,108 +683,202 @@ export default function App(): React.JSX.Element {
                         : 'w-[min(24rem,calc(100%-1.5rem))]'
                     }`}
                   >
-                    <div className="grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-2">
-                      <div className="min-w-0">
-                        <div className="mb-0.5 flex h-5 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          {selectedField && selectedField.typeName === detailTypeName ? (
-                            <>
-                              <span className="truncate">Canvas</span>
-                              <span aria-hidden="true" className="text-border">
-                                /
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="-ml-1 h-5 max-w-32 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={backToSelectedType}
-                                aria-label={`Back to ${selectedField.typeName} fields`}
-                              >
-                                <span className="truncate">{selectedField.typeName}</span>
-                              </Button>
-                              <span aria-hidden="true" className="text-border">
-                                /
-                              </span>
-                              <span className="truncate">{selectedField.fieldName}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="truncate">Canvas</span>
-                              {detailTypeName && (
+                    <div className="px-3 py-2.5">
+                      {inspectorCompact ? (
+                        <div className="grid min-h-8 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                          <div className="min-w-0 truncate text-sm font-semibold text-foreground">
+                            {inspectorTitle ?? 'Inspector'}
+                          </div>
+                          <button
+                            type="button"
+                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            aria-label="Expand inspector"
+                            title="Expand inspector"
+                            onClick={() => setInspectorCompact(false)}
+                          >
+                            <Maximize2 className="size-3.5" aria-hidden="true" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid min-h-[4.25rem] grid-rows-[auto_auto] gap-1.5">
+                          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                              {selectedField && selectedField.typeName === detailTypeName ? (
                                 <>
+                                  <span className="truncate">Canvas</span>
                                   <span aria-hidden="true" className="text-border">
                                     /
                                   </span>
-                                  <span className="truncate">{detailTypeName}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="-ml-1 h-5 max-w-32 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={backToSelectedType}
+                                    aria-label={`Back to ${selectedField.typeName} fields`}
+                                  >
+                                    <span className="truncate">{selectedField.typeName}</span>
+                                  </Button>
+                                  <span aria-hidden="true" className="text-border">
+                                    /
+                                  </span>
+                                  <span className="truncate">{selectedField.fieldName}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="truncate">Canvas</span>
+                                  {detailTypeName && (
+                                    <>
+                                      <span aria-hidden="true" className="text-border">
+                                        /
+                                      </span>
+                                      <span className="truncate">{detailTypeName}</span>
+                                    </>
+                                  )}
                                 </>
                               )}
-                            </>
-                          )}
-                        </div>
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="truncate text-sm font-semibold text-foreground">
-                            {inspectorTitle ?? 'Inspector'}
+                            </div>
+                            <button
+                              type="button"
+                              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              aria-label="Collapse inspector"
+                              title="Collapse inspector"
+                              onClick={() => setInspectorCompact(true)}
+                            >
+                              <Minimize2 className="size-3.5" aria-hidden="true" />
+                            </button>
                           </div>
-                          {inspectorKind && inspectorKind !== 'ref' && (
-                            <TypeKindBadge kind={inspectorKind} />
-                          )}
-                          {inspectorKind === 'ref' && (
-                            <span className="shrink-0 rounded border border-reference/35 bg-reference/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-reference-text">
-                              edge
-                            </span>
-                          )}
+                          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <div className="min-w-0 truncate text-sm font-semibold text-foreground">
+                                {inspectorTitle ?? 'Inspector'}
+                              </div>
+                              <div className="shrink-0">
+                                {inspectorSelectionKind === 'field' && (
+                                  <span
+                                    className="w-fit rounded border border-border bg-muted/40 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+                                    data-testid="inspector-selection-badge"
+                                  >
+                                    field
+                                  </span>
+                                )}
+                                {inspectorSelectionKind &&
+                                  inspectorSelectionKind !== 'field' &&
+                                  inspectorSelectionKind !== 'edge' &&
+                                  inspectorSelectionKind !== 'ref' && (
+                                    <TypeKindBadge kind={inspectorSelectionKind} />
+                                  )}
+                                {(inspectorSelectionKind === 'edge' ||
+                                  inspectorSelectionKind === 'ref') && (
+                                  <span className="w-fit rounded border border-reference/35 bg-reference/10 px-1.5 py-0 text-[9px] font-medium uppercase tracking-wide text-reference-text">
+                                    edge
+                                  </span>
+                                )}
+                              </div>
+                              {inspectorLinkedToChat && (
+                                <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-reference/25 bg-reference/10 px-2 text-[10px] font-medium text-reference-text">
+                                  <MessageSquare className="size-3" aria-hidden="true" />
+                                  Linked
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {detailTypeName && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={openSelectedTypeInPlayground}
+                                >
+                                  <Play aria-hidden="true" className="size-3.5" />
+                                  Try
+                                </Button>
+                              )}
+                              {canDeleteInspectorSelection && (
+                                <DropdownMenu
+                                  open={inspectorActionsOpen}
+                                  onOpenChange={setInspectorActionsOpen}
+                                >
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-muted-foreground"
+                                      aria-label="Open selection actions"
+                                      onClick={() => setInspectorActionsOpen(true)}
+                                    >
+                                      <MoreHorizontal aria-hidden="true" className="size-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onSelect={(event) => {
+                                        event.preventDefault();
+                                        setInspectorActionsOpen(false);
+                                        setDeleteInspectorError(null);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 aria-hidden="true" className="size-4" />
+                                      Delete...
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {inspectorLinkedToChat && (
-                          <span className="inline-flex h-6 items-center gap-1 rounded-full border border-reference/25 bg-reference/10 px-2 text-[10px] font-medium text-reference-text">
-                            <MessageSquare className="size-3" aria-hidden="true" />
-                            Linked
-                          </span>
-                        )}
-                        {hasSelection && detailTypeName && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={openSelectedTypeInPlayground}
-                          >
-                            <Play aria-hidden="true" className="size-3.5" />
-                            Try
-                          </Button>
-                        )}
-                        {detailType && !selectedEdge && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            aria-label={
-                              selectedField
-                                ? `Delete field ${selectedField.fieldName}`
-                                : `Delete type ${detailTypeName}`
-                            }
-                            onClick={deleteInspectorSelection}
-                          >
-                            <Trash2 aria-hidden="true" className="size-3.5" />
-                          </Button>
-                        )}
-                        <button
-                          type="button"
-                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          aria-label={inspectorCompact ? 'Expand inspector' : 'Collapse inspector'}
-                          title={inspectorCompact ? 'Expand inspector' : 'Collapse inspector'}
-                          onClick={() => setInspectorCompact((compact) => !compact)}
-                        >
-                          {inspectorCompact ? (
-                            <Maximize2 className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            <Minimize2 className="size-3.5" aria-hidden="true" />
-                          )}
-                        </button>
-                      </div>
+                      )}
                     </div>
+                    <AlertDialog
+                      open={deleteDialogOpen}
+                      onOpenChange={(open) => {
+                        setDeleteDialogOpen(open);
+                        if (!open) setDeleteInspectorError(null);
+                      }}
+                    >
+                      <AlertDialogContent size="sm">
+                        <AlertDialogHeader>
+                          <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
+                            <Trash2 aria-hidden="true" />
+                          </AlertDialogMedia>
+                          <AlertDialogTitle>Delete {inspectorDeleteLabel}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove the selected {selectedField ? 'field' : 'type'} from
+                            the model. You can undo this action afterwards.
+                          </AlertDialogDescription>
+                          {deleteInspectorError && (
+                            <Alert variant="destructive" className="mt-1 text-left">
+                              <AlertCircle aria-hidden="true" />
+                              <AlertTitle>Delete blocked</AlertTitle>
+                              <AlertDescription>{deleteInspectorError}</AlertDescription>
+                            </Alert>
+                          )}
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setDeleteInspectorError(null)}>
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            variant="destructive"
+                            onClick={(event) => {
+                              const error = deleteInspectorSelection();
+                              if (error) {
+                                event.preventDefault();
+                                setDeleteInspectorError(error);
+                              } else {
+                                setDeleteInspectorError(null);
+                              }
+                            }}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     {!inspectorCompact && (
                       <div className="min-h-0 flex-1 overflow-y-auto">
                         {hasSelection ? (
@@ -819,9 +986,8 @@ export default function App(): React.JSX.Element {
                 >
                   <PlaygroundPanel
                     schema={schema}
-                    highlightedTypeName={
-                      playgroundScope.mode === 'selected' ? playgroundScope.typeName : null
-                    }
+                    highlightedTypeName={playgroundHighlightedTypeName}
+                    onSelectEntity={selectPlaygroundEntity}
                   />
                 </div>
                 <div className={activeTab !== 'stdlib' ? 'hidden' : 'flex-1 min-h-0 flex flex-col'}>

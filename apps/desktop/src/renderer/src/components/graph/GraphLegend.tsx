@@ -1,218 +1,250 @@
 /**
- * Canvas legend — Zod/Contexture edition.
+ * Canvas legend.
  *
- * Pins to the bottom-right of the graph. Collapsed by default so it
- * stays out of the way; expanded view names every visual affordance
- * the canvas uses so new users can decode the diagram at a glance.
- *
- * Matches the `TypeDef` kinds, inline enum marker, table subtype marker,
- * and the edge modes (field ref, inferred table id, union variant,
- * cross-boundary import). Colours are pulled from `globals.css` so theme
- * changes flow through without edits here.
+ * Mirrors the current graph vocabulary: compact type badges, relationship
+ * strokes from `RefEdge`, and the few field cues that are otherwise easy
+ * to miss on first use.
  */
-import { ChevronDown, ChevronUp, Table2 } from 'lucide-react';
+import {
+  Box,
+  ChevronDown,
+  ChevronUp,
+  GitBranch,
+  ListChecks,
+  Map as MapIcon,
+  Table2,
+} from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
 import { memo, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { TypeKindBadge, type TypeKindLabel } from '../toolbar/type-kind-badge';
 
 interface EdgeItem {
   label: string;
+  description: string;
   color: string;
   dash?: string;
 }
 
 const EDGE_ITEMS: readonly EdgeItem[] = [
   {
-    label: 'Modeled ref',
+    label: 'Field ref',
+    description: 'A ref field points at another type.',
     color: 'var(--graph-edge-fk)',
   },
   {
-    label: 'Inferred table id',
+    label: 'Inferred id',
+    description: 'A table id field was recognized from the model.',
     color: 'var(--graph-edge-import)',
-    dash: '6,4',
+    dash: '6 4',
   },
   {
     label: 'Union variant',
+    description: 'A discriminated union includes this variant.',
     color: 'var(--graph-edge-union)',
-    dash: '2,4',
+    dash: '2 4',
   },
   {
-    label: 'Import (cross-boundary)',
-    color: 'var(--graph-edge-import)',
-    dash: '6,4',
-  },
-  {
-    label: 'Active selection',
+    label: 'Active path',
+    description: 'Selection, adjacency, or preview focus.',
     color: 'var(--graph-edge-active)',
   },
 ];
 
-interface NodeItem {
+interface TypeItem {
+  kind: TypeKindLabel;
   label: string;
-  /** Header swatch colour — matches `headerColorFor` in `TypeNode`. */
-  header: string;
-  table?: boolean;
-  /** Border style. Imported refs render dashed; everything else solid. */
-  style?: 'solid' | 'dashed';
+  icon: React.JSX.Element | null;
 }
 
-const NODE_ITEMS: readonly NodeItem[] = [
-  { label: 'Object', header: 'var(--graph-node-header-bg)' },
-  { label: 'Table', header: 'var(--graph-node-table-header-bg)', table: true },
-  {
-    label: 'Discriminated union',
-    header: 'color-mix(in oklch, var(--chart-4) 85%, transparent)',
-  },
-  {
-    label: 'Raw (escape hatch)',
-    header: 'color-mix(in oklch, var(--muted-foreground) 55%, transparent)',
-  },
-  {
-    label: 'Imported',
-    header: 'var(--graph-node-header-bg)',
-    style: 'dashed',
-  },
-  {
-    label: 'Stdlib',
-    header: 'color-mix(in oklch, var(--chart-2) 72%, var(--graph-node-header-bg))',
-    style: 'dashed',
-  },
-  {
-    label: 'Selected',
-    header: 'var(--graph-node-selected)',
-  },
+const BASE_TYPE_ITEMS: readonly TypeItem[] = [
+  { kind: 'object', label: 'Object', icon: <Box className="size-3.5" aria-hidden="true" /> },
+  { kind: 'table', label: 'Table', icon: <Table2 className="size-3.5" aria-hidden="true" /> },
+  { kind: 'union', label: 'Union', icon: <GitBranch className="size-3.5" aria-hidden="true" /> },
+  { kind: 'raw', label: 'Raw', icon: null },
 ];
 
+const ENUM_TYPE_ITEM: TypeItem = {
+  kind: 'enum',
+  label: 'Enum',
+  icon: <ListChecks className="size-3.5" aria-hidden="true" />,
+};
+
 export const GraphLegend = memo(function GraphLegend({
-  showEnumNodes = false,
   showStdlibNodes = false,
+  className,
 }: {
   showEnumNodes?: boolean;
   showStdlibNodes?: boolean;
+  className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const visibleNodeItems = showStdlibNodes
-    ? NODE_ITEMS
-    : NODE_ITEMS.filter((item) => item.label !== 'Stdlib');
-  const nodeItems = showEnumNodes
-    ? [
-        ...visibleNodeItems.slice(0, 2),
-        {
-          label: 'Enum',
-          header: 'color-mix(in oklch, var(--chart-3) 85%, transparent)',
-        },
-        ...visibleNodeItems.slice(2),
-      ]
-    : visibleNodeItems;
+  const typeItems = [
+    BASE_TYPE_ITEMS[0],
+    BASE_TYPE_ITEMS[1],
+    ENUM_TYPE_ITEM,
+    ...BASE_TYPE_ITEMS.slice(2),
+  ];
 
   return (
-    <div
-      className="absolute bottom-3 right-3 z-10 rounded-lg border border-border bg-background/80 backdrop-blur-md shadow-md text-xs select-none"
-      style={{ minWidth: 150 }}
+    <section
+      aria-label="Graph legend"
+      className={cn(
+        'overflow-hidden rounded-xl border border-border/80 bg-card/95 text-xs text-card-foreground shadow-sm backdrop-blur',
+        className,
+      )}
     >
       <button
         type="button"
-        className="flex items-center justify-between w-full px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+        className="flex h-[38px] w-full min-w-32 items-center justify-between gap-3 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={expanded ? 'Collapse legend' : 'Expand legend'}
       >
-        Legend
-        {expanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+        <span className="flex min-w-0 items-center gap-2">
+          <MapIcon className="size-4" aria-hidden="true" />
+          <span>Legend</span>
+        </span>
+        {expanded ? (
+          <ChevronUp className="size-3.5" aria-hidden="true" />
+        ) : (
+          <ChevronDown className="size-3.5" aria-hidden="true" />
+        )}
       </button>
 
       {expanded && (
-        <div className="px-2.5 pb-2 space-y-2">
-          <div className="space-y-1">
-            <span className="text-[9px] text-muted-foreground font-medium uppercase">Edges</span>
-            {EDGE_ITEMS.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <svg width="24" height="8" className="shrink-0" aria-hidden="true">
-                  <title>{`${item.label} edge swatch`}</title>
-                  <line
-                    x1="0"
-                    y1="4"
-                    x2="24"
-                    y2="4"
-                    stroke={item.color}
-                    strokeWidth="2"
-                    strokeDasharray={item.dash}
+        <div className="w-72 border-t border-border/70">
+          <LegendSection title="Types">
+            <div className="grid grid-cols-2 gap-1.5">
+              {typeItems.map((item) => (
+                <TypeLegendItem key={item.kind} item={item} />
+              ))}
+              {showStdlibNodes && (
+                <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-background/55 px-2 py-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 rounded-full"
+                    style={{
+                      background:
+                        'color-mix(in oklch, var(--chart-2) 72%, var(--graph-node-header-bg))',
+                    }}
                   />
-                </svg>
-                <span className="text-foreground">{item.label}</span>
+                  <span className="truncate text-foreground">Stdlib</span>
+                </div>
+              )}
+              <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-background/55 px-2 py-1.5">
+                <span
+                  aria-hidden="true"
+                  className="h-3 w-4 rounded-sm border border-dashed border-muted-foreground/80"
+                />
+                <span className="truncate text-foreground">Imported</span>
               </div>
-            ))}
-          </div>
+            </div>
+          </LegendSection>
 
-          <div className="space-y-1">
-            <span className="text-[9px] text-muted-foreground font-medium uppercase">Fields</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px]" style={{ color: 'var(--graph-edge-property)' }}>
-                → Reference
-              </span>
-              <span className="text-foreground">Object ref</span>
+          <LegendSection title="Relationships">
+            <div className="space-y-1">
+              {EDGE_ITEMS.map((item) => (
+                <EdgeLegendItem key={item.label} item={item} />
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-flex min-w-0 items-baseline gap-0.5 text-[9px]"
+          </LegendSection>
+
+          <LegendSection title="Fields" last>
+            <div className="grid gap-1.5">
+              <FieldCue
+                sample="-> Customer"
+                label="Object ref"
                 style={{ color: 'var(--graph-edge-property)' }}
-              >
-                <span>→ Source</span>
-                <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>· union</span>
-              </span>
-              <span className="text-foreground">Union ref</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="text-[9px]"
+              />
+              <FieldCue
+                sample="-> Event · union"
+                label="Union ref"
+                style={{ color: 'var(--graph-edge-property)' }}
+              />
+              <FieldCue
+                sample="Status enum"
+                label="Inline enum"
                 style={{
                   color: 'var(--muted-foreground)',
                   fontFamily: 'var(--font-mono)',
                 }}
-              >
-                Status enum
-              </span>
-              <span className="text-foreground">Inline enum</span>
+              />
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-[9px] text-muted-foreground font-medium uppercase">Nodes</span>
-            {nodeItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <div
-                  aria-hidden="true"
-                  className="relative shrink-0 overflow-hidden rounded"
-                  style={{
-                    width: 18,
-                    height: 12,
-                    background: 'var(--graph-node-body-bg)',
-                    border: `1px ${item.style ?? 'solid'} var(--graph-node-border)`,
-                    boxShadow: `inset 0 3px 0 ${item.header}`,
-                  }}
-                >
-                  {item.table ? (
-                    <>
-                      <span
-                        className="absolute inset-y-0 left-0"
-                        style={{
-                          width: 3,
-                          background: 'var(--graph-node-table-accent)',
-                        }}
-                      />
-                      <Table2
-                        size={8}
-                        strokeWidth={2.2}
-                        className="absolute right-0.5 top-0.5 text-white"
-                      />
-                    </>
-                  ) : null}
-                </div>
-                <span className="text-foreground">{item.label}</span>
-              </div>
-            ))}
-          </div>
+          </LegendSection>
         </div>
       )}
-    </div>
+    </section>
   );
 });
+
+function LegendSection({
+  title,
+  children,
+  last = false,
+}: {
+  title: string;
+  children: ReactNode;
+  last?: boolean;
+}): React.JSX.Element {
+  return (
+    <div className={last ? 'px-3 py-2.5' : 'border-b border-border/70 px-3 py-2.5'}>
+      <div className="mb-2 text-[10px] font-semibold text-muted-foreground">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function TypeLegendItem({ item }: { item: TypeItem }): React.JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-background/55 px-2 py-1.5">
+      <span className="flex min-w-0 items-center gap-1.5 text-foreground">
+        {item.icon}
+        <span className="truncate">{item.label}</span>
+      </span>
+      <TypeKindBadge kind={item.kind} />
+    </div>
+  );
+}
+
+function EdgeLegendItem({ item }: { item: EdgeItem }): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-2 rounded-md px-1 py-1">
+      <svg width="36" height="10" className="shrink-0" aria-hidden="true">
+        <line
+          x1="1"
+          y1="5"
+          x2="35"
+          y2="5"
+          stroke={item.color}
+          strokeWidth="2"
+          strokeDasharray={item.dash}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="min-w-0">
+        <div className="truncate text-foreground">{item.label}</div>
+        <div className="truncate text-[10px] text-muted-foreground">{item.description}</div>
+      </div>
+    </div>
+  );
+}
+
+function FieldCue({
+  sample,
+  label,
+  style,
+}: {
+  sample: string;
+  label: string;
+  style: CSSProperties;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md bg-background/55 px-2 py-1.5">
+      <span className="min-w-0 truncate text-[10px]" style={style}>
+        {sample}
+      </span>
+      <span className="shrink-0 text-foreground">{label}</span>
+    </div>
+  );
+}

@@ -711,6 +711,11 @@ describe('TypeDetail', () => {
       expect(screen.getByDisplayValue('Planting time.')).toBeInTheDocument();
     });
 
+    it('does not show type-level sample data controls for enums', () => {
+      setup({ ...type, sampleData: { category: 'food' } });
+      expect(screen.queryByText('Sample data')).not.toBeInTheDocument();
+    });
+
     it('renders documented enum compatibility contracts', () => {
       setup({
         ...type,

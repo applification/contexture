@@ -15,6 +15,7 @@ import { useGraphLayoutStore } from '@renderer/store/layout-config';
 import { useGraphSelectionStore } from '@renderer/store/selection';
 import { useUndoStore } from '@renderer/store/undo';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const unsub = () => undefined;
@@ -96,6 +97,63 @@ describe('App global keyboard', () => {
     fireEvent.keyDown(document, { key: 'Delete' });
     expect(useUndoStore.getState().schema.types).toEqual([]);
     expect(useGraphSelectionStore.getState().state.primaryNodeId).toBeNull();
+  });
+
+  it('deletes the inspector selection after menu confirmation', async () => {
+    const user = userEvent.setup();
+    useUndoStore.getState().apply({
+      kind: 'add_type',
+      type: { kind: 'object', name: 'Plot', fields: [] },
+    });
+    useGraphSelectionStore.getState().click('Plot', 'replace');
+    render(<App />);
+
+    await user.click(screen.getByLabelText('Open selection actions'));
+    await user.click(await screen.findByText('Delete...'));
+
+    expect(await screen.findByText('Delete type Plot?')).toBeInTheDocument();
+    expect(useUndoStore.getState().schema.types).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(useUndoStore.getState().schema.types).toEqual([]));
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBeNull();
+  });
+
+  it('surfaces an inspector delete error when a type is still referenced', async () => {
+    const user = userEvent.setup();
+    useUndoStore.getState().apply({
+      kind: 'replace_schema',
+      schema: {
+        version: '1',
+        types: [
+          {
+            kind: 'object',
+            name: 'Recipe',
+            fields: [{ name: 'status', type: { kind: 'ref', typeName: 'RecipeStatus' } }],
+          },
+          {
+            kind: 'enum',
+            name: 'RecipeStatus',
+            values: [{ value: 'draft' }, { value: 'published' }],
+          },
+        ],
+      },
+    });
+    useGraphSelectionStore.getState().click('RecipeStatus', 'replace');
+    render(<App />);
+
+    await user.click(screen.getByLabelText('Open selection actions'));
+    await user.click(await screen.findByText('Delete...'));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unresolved ref "RecipeStatus"');
+    expect(screen.getByText('Delete type RecipeStatus?')).toBeInTheDocument();
+    expect(useUndoStore.getState().schema.types.map((type) => type.name)).toEqual([
+      'Recipe',
+      'RecipeStatus',
+    ]);
+    expect(useGraphSelectionStore.getState().state.primaryNodeId).toBe('RecipeStatus');
   });
 
   it('F2 opens properties and focuses the selected type name', async () => {

@@ -13,25 +13,21 @@ describe('GraphLegend', () => {
     expect(screen.getByText('Table')).toBeInTheDocument();
   });
 
-  it('documents quiet modeled refs and active selection separately', () => {
+  it('documents quiet field refs and active paths separately', () => {
     render(<GraphLegend />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
 
-    expect(screen.getByText('Modeled ref')).toBeInTheDocument();
-    expect(screen.getByText('Active selection')).toBeInTheDocument();
+    expect(screen.getByText('Field ref')).toBeInTheDocument();
+    expect(screen.getByText('Active path')).toBeInTheDocument();
   });
 
-  it('documents inline enums by default and only shows enum nodes when expanded in controls', () => {
-    const { rerender } = render(<GraphLegend />);
+  it('documents enum nodes and inline enums by default', () => {
+    render(<GraphLegend />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
 
     expect(screen.getByText('Inline enum')).toBeInTheDocument();
-    expect(screen.queryByText('Enum')).not.toBeInTheDocument();
-
-    rerender(<GraphLegend showEnumNodes />);
-
     expect(screen.getByText('Enum')).toBeInTheDocument();
   });
 });

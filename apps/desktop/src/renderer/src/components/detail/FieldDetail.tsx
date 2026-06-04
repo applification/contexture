@@ -1207,9 +1207,9 @@ function RefTargetPicker({
           variant="outline"
           aria-label="target"
           aria-expanded={open}
-          className="h-8 w-full justify-between px-2 text-left text-xs font-normal"
+          className="h-8 min-w-0 w-full justify-between px-2 text-left text-xs font-normal"
         >
-          <span className="truncate">{currentLabel}</span>
+          <span className="min-w-0 truncate">{currentLabel}</span>
           <ChevronsUpDown aria-hidden="true" className="ml-2 h-3.5 w-3.5 opacity-60" />
         </Button>
       </PopoverTrigger>
@@ -1413,9 +1413,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   // Wrap the label around its control so `getByLabelText` in tests and
   // click-to-focus for users both work without juggling `htmlFor` ids.
   return (
-    <Label className="grid grid-cols-[80px_1fr] items-center gap-2 text-[11px] text-muted-foreground">
+    <Label className="grid min-w-0 grid-cols-[80px_minmax(0,1fr)] items-center gap-2 text-[11px] text-muted-foreground">
       <span>{label}</span>
-      {children}
+      <span className="min-w-0">{children}</span>
     </Label>
   );
 }

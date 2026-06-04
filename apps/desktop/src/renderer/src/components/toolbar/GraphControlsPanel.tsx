@@ -15,17 +15,17 @@
  * canvas is mounted.
  */
 import { useGraphLayoutStore } from '@renderer/store/layout-config';
-import { Maximize2, RefreshCw, X } from 'lucide-react';
+import { Maximize2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  segmentedControlItemClass,
+  segmentedControlSelectedClass,
+} from '@/components/ui/button-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
-interface Props {
-  onClose: () => void;
-}
-
-export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
+export function GraphControlsPanel(): React.JSX.Element {
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
   const setGraphLayout = useGraphLayoutStore((s) => s.setGraphLayout);
   const resetGraphControls = useGraphLayoutStore((s) => s.resetToDefaults);
@@ -52,13 +52,6 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
 
   return (
     <div>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold text-foreground">Graph Controls</span>
-        <Button variant="ghost" size="icon" className="size-6" onClick={onClose}>
-          <X className="size-3.5" />
-        </Button>
-      </div>
-
       <div className="px-3 py-2 space-y-1.5 border-b border-border">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
           Layout
@@ -74,10 +67,11 @@ export function GraphControlsPanel({ onClose }: Props): React.JSX.Element {
                 key={layoutMode}
                 htmlFor={`graph-layout-mode-${layoutMode}`}
                 className={cn(
-                  'flex cursor-pointer items-center justify-center px-2 text-xs font-medium text-muted-foreground transition-colors',
-                  'border-l border-border first:border-l-0 hover:bg-accent hover:text-foreground',
+                  'flex cursor-pointer items-center justify-center px-2 text-xs font-medium',
+                  'border-l border-border first:border-l-0',
+                  segmentedControlItemClass,
                   'focus-within:z-10 focus-within:ring-1 focus-within:ring-ring',
-                  graphLayout.layoutMode === layoutMode && 'bg-muted text-foreground',
+                  graphLayout.layoutMode === layoutMode && segmentedControlSelectedClass,
                 )}
               >
                 <input
