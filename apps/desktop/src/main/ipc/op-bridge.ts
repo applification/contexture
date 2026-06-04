@@ -67,6 +67,19 @@ export function makeIpcForwardOp(
     });
 }
 
+export function syncTurnContextAfterForwardOp(
+  forwardOp: ForwardOpFn,
+  turnContext: TurnContext,
+): ForwardOpFn {
+  return async (op) => {
+    const result = await forwardOp(op);
+    if ('schema' in result) {
+      turnContext.pushIR(result.schema);
+    }
+    return result;
+  };
+}
+
 /**
  * Holds the IR snapshot the renderer pushes at turn-start so the
  * system-prompt builder can read it cheaply. Simple, single-slot
