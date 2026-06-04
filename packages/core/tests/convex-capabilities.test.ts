@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { buildConvexCapabilityManifest, parseConvexCliCommands } from '../src';
+import rootPackageJson from '../../../package.json' with { type: 'json' };
+import {
+  buildConvexCapabilityManifest,
+  CONTEXTURE_SUPPORTED_CONVEX_VERSION,
+  parseConvexCliCommands,
+} from '../src';
 
 describe('convex capabilities', () => {
+  it('derives the supported Convex version from the root package dependency', () => {
+    expect(CONTEXTURE_SUPPORTED_CONVEX_VERSION).toBe(
+      rootPackageJson.devDependencies.convex.replace(/^[~^=<> ]+/u, ''),
+    );
+  });
+
   it('parses Convex CLI commands from help output', () => {
     expect(
       parseConvexCliCommands(`

@@ -19,7 +19,7 @@ describe('Convex version IPC helpers', () => {
     await mkdir(appDir, { recursive: true });
     await writeFile(
       join(appDir, 'package.json'),
-      JSON.stringify({ dependencies: { convex: '^1.40.0' } }),
+      JSON.stringify({ dependencies: { convex: '^1.39.1' } }),
       'utf8',
     );
 
@@ -28,8 +28,8 @@ describe('Convex version IPC helpers', () => {
     });
 
     expect(result).toMatchObject({
-      emitterVersion: '1.40.0',
-      targetVersion: '^1.40.0',
+      emitterVersion: '1.39.1',
+      targetVersion: '^1.39.1',
       status: 'ok',
     });
   });
@@ -49,7 +49,7 @@ describe('Convex version IPC helpers', () => {
     });
 
     expect(result).toMatchObject({
-      emitterVersion: '1.40.0',
+      emitterVersion: '1.39.1',
       targetVersion: '1.37.0',
       status: 'mismatch',
     });
