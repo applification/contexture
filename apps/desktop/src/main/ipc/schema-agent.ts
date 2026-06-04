@@ -30,7 +30,12 @@ import {
 import { createSchemaReadTools } from '../providers/schema-read-tools';
 import { generateReconcileProposal, type ReconcileProposalInput } from '../reconcile/proposals';
 import { ChatTurnController } from './chat-turn';
-import { type BridgeTransport, makeIpcForwardOp, TurnContext } from './op-bridge';
+import {
+  type BridgeTransport,
+  makeIpcForwardOp,
+  syncTurnContextAfterForwardOp,
+  TurnContext,
+} from './op-bridge';
 import { IpcString, parseIpcPayload } from './validation';
 
 export interface SchemaAgentIpc {
@@ -158,7 +163,8 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     }
   });
 
-  const forwardOp = makeIpcForwardOp(toolTransport);
+  const turnContext = new TurnContext();
+  const forwardOp = syncTurnContextAfterForwardOp(makeIpcForwardOp(toolTransport), turnContext);
   const opToolDescriptors = [
     ...createSchemaReadTools(() => turnContext.current()),
     ...createOpTools(forwardOp),
@@ -173,7 +179,6 @@ export function registerSchemaAgentIpc(mainWindow: BrowserWindow): SchemaAgentIp
     if (provider !== 'codex' && provider !== 'claude') return null;
     return runtimes[provider];
   };
-  const turnContext = new TurnContext();
   const currentThreads: Partial<Record<ProviderKind, ProviderThreadRef>> = {};
   const currentModelOptions: Partial<
     Record<ProviderKind, { model?: string; effort?: string; options?: ModelOptions }>
