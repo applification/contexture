@@ -161,6 +161,7 @@ function emitJsonSchemaInvariants(type: Extract<TypeDef, { kind: 'object' }>): o
         }
         break;
       case 'fieldPredicate':
+      case 'fieldComparison':
       case 'uniqueInArray':
         break;
     }
