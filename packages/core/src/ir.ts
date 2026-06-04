@@ -61,6 +61,22 @@ const SampleDataHintSchema = z.object({
 
 export type SampleDataHint = z.infer<typeof SampleDataHintSchema>;
 
+const EnumEvolutionCompatibilitySchema = z.object({
+  unknownValueBehavior: z.enum(['preserve', 'fallbackOnly', 'rejectAtBoundary']),
+  fallbackLabel: z.string().min(1).optional(),
+  clientSurfaces: z.array(z.string().min(1)).optional(),
+  owner: z.enum(['backend', 'client', 'api', 'external']).optional(),
+  notes: z.string().min(1).optional(),
+});
+
+export type EnumEvolutionCompatibility = z.infer<typeof EnumEvolutionCompatibilitySchema>;
+
+const TypeCompatibilitySchema = z.object({
+  enumEvolution: EnumEvolutionCompatibilitySchema.optional(),
+});
+
+export type TypeCompatibility = z.infer<typeof TypeCompatibilitySchema>;
+
 const DerivationPolicySchema = z.object({
   kind: z.enum(['computed', 'cachedHandle', 'snapshot', 'rollup', 'estimate']),
   sources: z.array(z.string().min(1)).optional(),
@@ -225,6 +241,7 @@ const EnumTypeDefSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   sampleData: SampleDataHintSchema.optional(),
+  compatibility: TypeCompatibilitySchema.optional(),
   values: z.array(
     z.object({
       value: z.string().min(1),

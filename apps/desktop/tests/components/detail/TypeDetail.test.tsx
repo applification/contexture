@@ -707,6 +707,28 @@ describe('TypeDetail', () => {
       expect(screen.getByDisplayValue('Planting time.')).toBeInTheDocument();
     });
 
+    it('renders documented enum compatibility contracts', () => {
+      setup({
+        ...type,
+        compatibility: {
+          enumEvolution: {
+            unknownValueBehavior: 'preserve',
+            fallbackLabel: 'Unknown season',
+            clientSurfaces: ['web', 'api'],
+            owner: 'client',
+            notes: 'Clients must preserve unknown values at the compatibility boundary.',
+          },
+        },
+      });
+
+      expect(screen.getByText('Compatibility contract')).toBeInTheDocument();
+      expect(screen.getByText(/preserve raw value/i)).toBeInTheDocument();
+      expect(screen.getByText('fallback: Unknown season')).toBeInTheDocument();
+      expect(screen.getByText('owner: client')).toBeInTheDocument();
+      expect(screen.getByText('web')).toBeInTheDocument();
+      expect(screen.getByText('api')).toBeInTheDocument();
+    });
+
     it('dispatches add_value when Add value is clicked', () => {
       const { dispatch } = setup(type);
       fireEvent.click(screen.getByRole('button', { name: 'Add value' }));

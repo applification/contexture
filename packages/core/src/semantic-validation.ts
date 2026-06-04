@@ -1098,16 +1098,21 @@ function checkInboundIdempotencyAdvice(schema: Schema): SemanticIssueDraft[] {
 
 function checkEnumEvolutionAdvice(schema: Schema): SemanticIssueDraft[] {
   const issues: SemanticIssueDraft[] = [];
-  const enumNames = new Set(
-    schema.types.filter((type) => type.kind === 'enum').map((type) => type.name),
+  const enums = new Map(
+    schema.types
+      .filter((type): type is Extract<TypeDef, { kind: 'enum' }> => type.kind === 'enum')
+      .map((type) => [type.name, type]),
   );
-  if (enumNames.size === 0) return issues;
+  if (enums.size === 0) return issues;
 
   schema.types.forEach((type, typeIndex) => {
     if (type.kind !== 'object') return;
     type.fields.forEach((field, fieldIndex) => {
       const enumName = unwrapRefTarget(field.type);
-      if (!enumName || !enumNames.has(enumName)) return;
+      if (!enumName) return;
+      const enumType = enums.get(enumName);
+      if (!enumType) return;
+      if (enumType.compatibility?.enumEvolution) return;
       if (!isLikelyClientSurfaceEnum(enumName, field, type, schema)) return;
       issues.push({
         code: 'operational_enum_evolution',

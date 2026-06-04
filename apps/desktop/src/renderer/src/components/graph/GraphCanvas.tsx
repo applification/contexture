@@ -101,23 +101,23 @@ export function focusedFieldFromTarget(target: GraphFocusTarget): FocusedField |
 
 export function applyValidationHighlights(
   graph: BuildGraphResult,
-  errors: readonly { path: string }[],
+  errors: readonly { path: string; severity?: 'error' | 'warning' }[],
 ): BuildGraphResult {
   if (errors.length === 0) return graph;
 
-  const typeIssueCounts = new Map<number, number>();
-  const fieldIssueCounts = new Map<string, number>();
+  const typeIssues = new Map<number, { count: number; tone: 'error' | 'warning' }>();
+  const fieldIssues = new Map<string, { count: number; tone: 'error' | 'warning' }>();
 
   for (const error of errors) {
     const typeMatch = error.path.match(/^types\.(\d+)/u);
     if (!typeMatch) continue;
     const typeIndex = Number(typeMatch[1]);
-    typeIssueCounts.set(typeIndex, (typeIssueCounts.get(typeIndex) ?? 0) + 1);
+    incrementIssue(typeIssues, typeIndex, error.severity);
 
     const fieldMatch = error.path.match(/^types\.\d+\.fields\.(\d+)/u);
     if (fieldMatch) {
       const key = `${typeIndex}:${Number(fieldMatch[1])}`;
-      fieldIssueCounts.set(key, (fieldIssueCounts.get(key) ?? 0) + 1);
+      incrementIssue(fieldIssues, key, error.severity);
     }
   }
 
@@ -127,21 +127,33 @@ export function applyValidationHighlights(
       if (node.type !== 'type') return node;
       const typeIndex = node.data.schemaIndex;
       if (typeIndex === undefined) return node;
-      const validationIssueCount = typeIssueCounts.get(typeIndex) ?? 0;
-      if (validationIssueCount === 0) return node;
+      const typeIssue = typeIssues.get(typeIndex);
+      if (!typeIssue) return node;
       return {
         ...node,
         data: {
           ...node.data,
-          validationIssueCount,
+          validationIssueCount: typeIssue.count,
+          validationIssueTone: typeIssue.tone,
           fields: node.data.fields.map((field: FieldRow, fieldIndex: number) => ({
             ...field,
-            validationIssueCount: fieldIssueCounts.get(`${typeIndex}:${fieldIndex}`) ?? undefined,
+            validationIssueCount: fieldIssues.get(`${typeIndex}:${fieldIndex}`)?.count,
+            validationIssueTone: fieldIssues.get(`${typeIndex}:${fieldIndex}`)?.tone,
           })),
         } satisfies TypeNodeData,
       };
     }),
   };
+}
+
+function incrementIssue<K>(
+  issues: Map<K, { count: number; tone: 'error' | 'warning' }>,
+  key: K,
+  severity: 'error' | 'warning' = 'error',
+): void {
+  const existing = issues.get(key);
+  const tone = severity === 'error' || existing?.tone === 'error' ? 'error' : 'warning';
+  issues.set(key, { count: (existing?.count ?? 0) + 1, tone });
 }
 
 export function GraphCanvas(props: GraphCanvasProps): React.JSX.Element {
