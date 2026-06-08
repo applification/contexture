@@ -1,4 +1,5 @@
 import { buildDomainBrief } from '@contexture/core/domain-brief';
+import { describeEvolutionPolicy } from '@contexture/core/evolution-policy';
 import type { Schema, TypeDef } from '@contexture/core/ir';
 import { analyzeModelingHints } from '@contexture/core/modeling-hints';
 import { z } from 'zod';
@@ -66,7 +67,10 @@ export function createSchemaReadTools(getCurrentSchema: GetCurrentSchema): OpToo
       inputSchema: {},
       handler: async () => {
         const schema = readSchema(getCurrentSchema);
-        return buildDomainBrief(schema);
+        return {
+          evolutionPolicy: describeEvolutionPolicy(schema),
+          brief: buildDomainBrief(schema),
+        };
       },
     },
   ];
@@ -80,6 +84,7 @@ function schemaSummary(schema: Schema): Record<string, unknown> {
   return {
     version: schema.version,
     name: schema.metadata?.name,
+    evolutionPolicy: describeEvolutionPolicy(schema),
     typeCount: schema.types.length,
     types: schema.types.map(typeListItem),
     imports: schema.imports ?? [],

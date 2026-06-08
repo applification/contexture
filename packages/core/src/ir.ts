@@ -12,6 +12,9 @@
  * ops applier to gate any input before it reaches the live store.
  */
 import { z } from 'zod';
+import { EVOLUTION_POLICIES, type EvolutionPolicy } from './evolution-policy';
+
+export const EvolutionPolicySchema = z.enum(EVOLUTION_POLICIES);
 
 const StringFieldTypeSchema = z.object({
   kind: z.literal('string'),
@@ -317,6 +320,7 @@ export type ImportDecl =
 const MetadataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
+  evolutionPolicy: EvolutionPolicySchema.optional(),
 });
 
 const OutputTargetConfigSchema = z.object({
@@ -363,7 +367,7 @@ export type Schema = {
   version: '1';
   types: TypeDef[];
   imports?: ImportDecl[];
-  metadata?: { name?: string; description?: string };
+  metadata?: { name?: string; description?: string; evolutionPolicy?: EvolutionPolicy };
   outputs?: OutputsConfig;
 };
 

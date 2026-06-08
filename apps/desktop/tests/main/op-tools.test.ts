@@ -15,7 +15,7 @@ function toolNamed(tools: OpToolDescriptor[], name: string): OpToolDescriptor {
 }
 
 describe('createOpTools', () => {
-  it('registers one SDK tool per op (28 total)', () => {
+  it('registers one SDK tool per op (29 total)', () => {
     const { tools } = makeTools();
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
@@ -41,6 +41,7 @@ describe('createOpTools', () => {
         'reorder_fields',
         'replace_schema',
         'set_discriminator',
+        'set_evolution_policy',
         'set_table_flag',
         'update_field',
         'update_index',

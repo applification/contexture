@@ -56,6 +56,8 @@ export interface AgentTurnSchemaDiff {
 export function describeAgentTurnOp(op: Pick<AgentTurnOpResult, 'name' | 'op'>): string {
   if (!op.op) return op.name;
   switch (op.op.kind) {
+    case 'set_evolution_policy':
+      return `Set evolution policy to ${op.op.policy}`;
     case 'add_type':
       return `Added ${op.op.type.name}`;
     case 'update_type':

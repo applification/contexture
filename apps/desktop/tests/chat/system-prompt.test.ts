@@ -41,6 +41,7 @@ describe('buildSystemPromptAppend', () => {
     const prompt = buildSystemPromptAppend({ stdlibRegistry: EMPTY_STDLIB });
     for (const op of [
       'add_type',
+      'set_evolution_policy',
       'update_type',
       'rename_type',
       'delete_type',
@@ -104,6 +105,15 @@ describe('buildSystemPromptAppend', () => {
     expect(prompt).toContain('stable child ids');
     expect(prompt).toContain('shopping list items');
     expect(prompt).toContain('meal plan meals');
+  });
+
+  it('instructs agents to inspect and follow evolutionPolicy', () => {
+    const prompt = buildSystemPromptAppend({ stdlibRegistry: EMPTY_STDLIB });
+    expect(prompt).toContain('## Evolution policy');
+    expect(prompt).toContain('inspect the current `evolutionPolicy`');
+    expect(prompt).toContain('`preserveData`');
+    expect(prompt).toContain('`resettable`');
+    expect(prompt).toContain('`scratch`');
   });
 
   it('is deterministic across stdlib-entry orderings', () => {

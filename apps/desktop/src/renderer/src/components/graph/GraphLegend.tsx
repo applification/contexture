@@ -9,6 +9,7 @@ import {
   Box,
   ChevronDown,
   ChevronUp,
+  Code2,
   GitBranch,
   ListChecks,
   Map as MapIcon,
@@ -61,7 +62,7 @@ const BASE_TYPE_ITEMS: readonly TypeItem[] = [
   { kind: 'object', label: 'Object', icon: <Box className="size-3.5" aria-hidden="true" /> },
   { kind: 'table', label: 'Table', icon: <Table2 className="size-3.5" aria-hidden="true" /> },
   { kind: 'union', label: 'Union', icon: <GitBranch className="size-3.5" aria-hidden="true" /> },
-  { kind: 'raw', label: 'Raw', icon: null },
+  { kind: 'raw', label: 'Raw', icon: <Code2 className="size-3.5" aria-hidden="true" /> },
 ];
 
 const ENUM_TYPE_ITEM: TypeItem = {
@@ -72,19 +73,19 @@ const ENUM_TYPE_ITEM: TypeItem = {
 
 export const GraphLegend = memo(function GraphLegend({
   showStdlibNodes = false,
+  showRawTypes = false,
+  showImportedNodes = false,
   className,
 }: {
   showEnumNodes?: boolean;
   showStdlibNodes?: boolean;
+  showRawTypes?: boolean;
+  showImportedNodes?: boolean;
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const typeItems = [
-    BASE_TYPE_ITEMS[0],
-    BASE_TYPE_ITEMS[1],
-    ENUM_TYPE_ITEM,
-    ...BASE_TYPE_ITEMS.slice(2),
-  ];
+  const typeItems = [BASE_TYPE_ITEMS[0], BASE_TYPE_ITEMS[1], ENUM_TYPE_ITEM, BASE_TYPE_ITEMS[2]];
+  if (showRawTypes) typeItems.push(BASE_TYPE_ITEMS[3]);
 
   return (
     <section
@@ -132,13 +133,15 @@ export const GraphLegend = memo(function GraphLegend({
                   <span className="truncate text-foreground">Stdlib</span>
                 </div>
               )}
-              <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-background/55 px-2 py-1.5">
-                <span
-                  aria-hidden="true"
-                  className="h-3 w-4 rounded-sm border border-dashed border-muted-foreground/80"
-                />
-                <span className="truncate text-foreground">Imported</span>
-              </div>
+              {showImportedNodes && (
+                <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-background/55 px-2 py-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-4 shrink-0 rounded-sm border border-dashed border-muted-foreground/80"
+                  />
+                  <span className="truncate text-foreground">Imported</span>
+                </div>
+              )}
             </div>
           </LegendSection>
 
@@ -197,10 +200,9 @@ function LegendSection({
 
 function TypeLegendItem({ item }: { item: TypeItem }): React.JSX.Element {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-background/55 px-2 py-1.5">
-      <span className="flex min-w-0 items-center gap-1.5 text-foreground">
+    <div className="flex min-w-0 items-center gap-2 rounded-md bg-background/55 px-2 py-1.5">
+      <span className="flex shrink-0 items-center text-foreground" title={item.label}>
         {item.icon}
-        <span className="truncate">{item.label}</span>
       </span>
       <TypeKindBadge kind={item.kind} />
     </div>

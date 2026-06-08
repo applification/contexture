@@ -15,6 +15,7 @@ export { emitMcpDefinitions } from './emit-mcp-definitions';
 export { emit as emitSchemaIndex } from './emit-schema-index';
 export { emitStructuredOutputSchemas } from './emit-structured-output-schemas';
 export { emit as emitZod } from './emit-zod';
+export * from './evolution-policy';
 export * from './file-forward';
 export * from './fixture-generators';
 export * from './generated-bundle-writer';
