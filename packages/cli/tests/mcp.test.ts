@@ -92,6 +92,14 @@ describe('Contexture MCP server', () => {
             }),
           }),
           expect.objectContaining({
+            name: 'set_evolution_policy',
+            description: expect.stringContaining('preserveData'),
+            annotations: expect.objectContaining({
+              readOnlyHint: false,
+              destructiveHint: true,
+            }),
+          }),
+          expect.objectContaining({
             name: 'add_invariant',
             description: expect.stringContaining('object-level invariant'),
             annotations: expect.objectContaining({
@@ -138,7 +146,7 @@ describe('Contexture MCP server', () => {
   it('inspects a .contexture.json file through @contexture/core', async () => {
     const irPath = await fixtureIr({
       version: '1',
-      metadata: { name: 'Garden' },
+      metadata: { name: 'Garden', evolutionPolicy: 'scratch' },
       types: [
         {
           kind: 'object',
@@ -159,6 +167,10 @@ describe('Contexture MCP server', () => {
         path: irPath,
         version: '1',
         name: 'Garden',
+        evolutionPolicy: expect.objectContaining({
+          value: 'scratch',
+          guidance: expect.stringContaining('No meaningful data'),
+        }),
         typeCount: 1,
         types: [
           {
@@ -207,7 +219,7 @@ describe('Contexture MCP server', () => {
   it('returns an agent-readable domain brief', async () => {
     const irPath = await fixtureIr({
       version: '1',
-      metadata: { name: 'Garden' },
+      metadata: { name: 'Garden', evolutionPolicy: 'resettable' },
       outputs: { aiPipeline: { domainBrief: { enabled: true } } },
       types: [
         {
@@ -231,6 +243,10 @@ describe('Contexture MCP server', () => {
       expect(result.structuredContent).toMatchObject({
         path: irPath,
         generatedPath: expect.stringContaining('.contexture/domain-brief.json'),
+        evolutionPolicy: expect.objectContaining({
+          value: 'resettable',
+          agentInstruction: expect.stringContaining('discarded or regenerated'),
+        }),
         brief: {
           version: 1,
           model: { name: 'Garden' },
@@ -695,6 +711,7 @@ describe('Contexture MCP server', () => {
   it('provides repo integration guidance for MCP-capable agents', async () => {
     const irPath = await fixtureIr({
       version: '1',
+      metadata: { evolutionPolicy: 'scratch' },
       types: [{ kind: 'object', name: 'Plot', table: true, fields: [] }],
     });
 
@@ -714,7 +731,9 @@ describe('Contexture MCP server', () => {
           'check_contexture_drift',
         ],
         prompt: expect.stringContaining('Use the Contexture MCP server'),
+        evolutionPolicy: expect.objectContaining({ value: 'scratch' }),
         rules: expect.arrayContaining([
+          expect.stringContaining('Read evolutionPolicy'),
           expect.stringContaining('Do not hand-edit generated files'),
           expect.stringContaining('Prefer typed op tools'),
         ]),

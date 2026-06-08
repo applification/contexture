@@ -23,6 +23,7 @@
  */
 
 import { type ZodError, z } from 'zod';
+import type { EvolutionPolicy } from './evolution-policy';
 import type {
   FieldDef,
   FieldType,
@@ -34,6 +35,7 @@ import type {
   TypeDef,
 } from './ir';
 import {
+  EvolutionPolicySchema,
   FieldDefSchema,
   IndexDefSchema,
   IRSchema,
@@ -56,6 +58,7 @@ export type TypeUpdatePatch = TypeDef extends infer T
   : never;
 
 export type Op =
+  | { kind: 'set_evolution_policy'; policy: EvolutionPolicy }
   | { kind: 'add_type'; type: TypeDef }
   | { kind: 'update_type'; name: string; patch: TypeUpdatePatch }
   | { kind: 'rename_type'; from: string; to: string }
@@ -121,6 +124,7 @@ const TypeUpdatePatchSchema = z.record(z.string(), z.unknown()).superRefine((pat
 });
 
 export const OpSchema: z.ZodType<Op> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('set_evolution_policy'), policy: EvolutionPolicySchema }),
   z.object({ kind: z.literal('add_type'), type: TypeDefSchema }),
   z.object({
     kind: z.literal('update_type'),
@@ -318,6 +322,8 @@ function formatSemanticErrors(opKind: string, issues: SemanticIssue[]): string {
 
 function applyStructural(schema: Schema, op: Op): ApplyResult {
   switch (op.kind) {
+    case 'set_evolution_policy':
+      return setEvolutionPolicy(schema, op.policy);
     case 'add_type':
       return addType(schema, op.type);
     case 'update_type':
@@ -377,6 +383,10 @@ function applyStructural(schema: Schema, op: Op): ApplyResult {
     default:
       return { error: `unknown op: ${(op as { kind: string }).kind}` };
   }
+}
+
+function setEvolutionPolicy(schema: Schema, policy: EvolutionPolicy): ApplyResult {
+  return { schema: { ...schema, metadata: { ...schema.metadata, evolutionPolicy: policy } } };
 }
 
 // ── types ────────────────────────────────────────────────────────────────

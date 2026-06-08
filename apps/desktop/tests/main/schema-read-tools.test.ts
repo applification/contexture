@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const schema: Schema = {
   version: '1',
+  metadata: { evolutionPolicy: 'scratch' },
   types: [
     {
       kind: 'object',
@@ -32,6 +33,10 @@ describe('schema read tools', () => {
 
     expect(result).toMatchObject({
       version: '1',
+      evolutionPolicy: expect.objectContaining({
+        value: 'scratch',
+        guidance: expect.stringContaining('No meaningful data'),
+      }),
       typeCount: 2,
       types: [
         expect.objectContaining({
@@ -78,8 +83,11 @@ describe('schema read tools', () => {
     );
 
     await expect(brief?.handler({})).resolves.toMatchObject({
-      unresolvedDecisions: expect.any(Array),
-      declaredDecisions: expect.any(Array),
+      evolutionPolicy: expect.objectContaining({ value: 'scratch' }),
+      brief: {
+        unresolvedDecisions: expect.any(Array),
+        declaredDecisions: expect.any(Array),
+      },
     });
   });
 });

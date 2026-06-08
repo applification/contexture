@@ -48,6 +48,10 @@ export function buildSystemPromptAppend(input: BuildSystemPromptAppendInput): st
     '',
     renderOpCatalogue(),
     '',
+    '## Evolution policy',
+    '',
+    EVOLUTION_POLICY_RULES.trim(),
+    '',
     '## Convex collection modeling',
     '',
     COLLECTION_MODELING_RULES.trim(),
@@ -135,6 +139,9 @@ paste the IR. Prefer targeted reads over requesting the full schema. If the
 exact full IR is truly necessary, call \`inspect_current_schema\` with
 \`includeSchema: true\`.
 
+Before planning model changes, inspect the current \`evolutionPolicy\` and
+follow it. Do not rely on prior chat memory for data-preservation posture.
+
 Prefer surgical ops over \`replace_schema\`; the bulk rewrite is an escape
 hatch, not a default. When the user explicitly attaches files, their contents
 appear in an \`<attached_files>\` block before the message; use them as context,
@@ -147,6 +154,21 @@ Skills are available and auto-load on topic match:
   (Email, URL, UUID, ISODate, Money, CountryCode, PhoneNumber, …).
 - \`generate-sample\` — use when the user asks for sample / fixture /
   example data for a type.
+`;
+
+const EVOLUTION_POLICY_RULES = `
+Contexture models carry an \`evolutionPolicy\` in metadata. Read it before
+proposing changes:
+
+- \`preserveData\`: real data may exist. Prefer additive, migration-aware
+  model changes and call out destructive data risk before deletes, renames, or
+  incompatible reshapes.
+- \`resettable\`: data may exist, but it can be discarded or regenerated. You
+  may propose breaking remodels when they simplify the model; mention reset
+  impact briefly instead of designing full migrations.
+- \`scratch\`: this is exploratory and no meaningful data is expected. You may
+  freely propose renames, deletes, restructures, and replacement models without
+  repeated migration warnings.
 `;
 
 const COLLECTION_MODELING_RULES = `
@@ -192,6 +214,7 @@ interface OpSpec {
 }
 
 const OP_CATALOGUE: OpSpec[] = [
+  { name: 'set_evolution_policy', shape: '{ policy: "preserveData"|"resettable"|"scratch" }' },
   { name: 'add_type', shape: '{ payload: TypeDef }' },
   { name: 'update_type', shape: "{ name: string; patch: Partial<Omit<TypeDef, 'kind'|'name'>> }" },
   { name: 'rename_type', shape: '{ from: string; to: string }' },

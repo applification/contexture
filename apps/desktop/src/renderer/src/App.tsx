@@ -15,6 +15,7 @@
  * sidebar button).
  */
 
+import { type EvolutionPolicy, getEvolutionPolicy } from '@contexture/core/evolution-policy';
 import {
   emitGeneratedTarget,
   enableGeneratedTarget,
@@ -22,7 +23,7 @@ import {
   previewableGeneratedTargets,
   setGeneratedTargetOutputDir,
 } from '@contexture/core/generated-targets';
-import type { Schema, TypeDef } from '@contexture/core/ir';
+import type { FieldType, Schema, TypeDef } from '@contexture/core/ir';
 import { STDLIB_REGISTRY, STDLIB_TYPE_DEFINITIONS } from '@shared/stdlib-registry';
 import {
   AlertCircle,
@@ -55,6 +56,7 @@ import { DetailPanel } from './components/detail/DetailPanel';
 import { FOCUS_TYPE_NAME_EVENT } from './components/detail/TypeDetail';
 import { DocumentDialogs } from './components/dialogs/DocumentDialogs';
 import { ReconcileModal } from './components/dialogs/ReconcileModal';
+import { EvolutionPolicyPanel } from './components/graph/EvolutionPolicyPanel';
 import { TYPE_EDGE_SELECT_EVENT } from './components/graph/edge-select-event';
 import { GraphBackground } from './components/graph/GraphBackground';
 import { type CanvasPosition, GraphCanvas } from './components/graph/GraphCanvas';
@@ -126,6 +128,7 @@ import { useUndoStore } from './store/undo';
 
 export default function App(): React.JSX.Element {
   const schema = useSyncExternalStore(useUndoStore.subscribe, () => useUndoStore.getState().schema);
+  const evolutionPolicy = getEvolutionPolicy(schema);
   const hasSchema = schema.types.length > 0;
 
   const layout = useDocumentStore((s) => s.layout);
@@ -163,6 +166,13 @@ export default function App(): React.JSX.Element {
   const convexVersion = useConvexVersionStore();
   const driftedPaths = useDriftStore((s) => s.driftedPaths);
   const graphLayout = useGraphLayoutStore((s) => s.graphLayout);
+  const legendVisibility = useMemo(
+    () => ({
+      showRawTypes: schema.types.some((type) => type.kind === 'raw'),
+      showImportedNodes: hasVisibleImportedNodes(schema, graphLayout.showStdlib),
+    }),
+    [graphLayout.showStdlib, schema],
+  );
 
   // Drive the collapse/expand imperative API from the UI-store flag so
   // the Toolbar's sidebar button toggles the same thing as a user drag
@@ -233,6 +243,10 @@ export default function App(): React.JSX.Element {
     if ('error' in result) return;
     useGraphSelectionStore.getState().selectField({ typeName, fieldName: op.field.name });
     useGraphSelectionStore.getState().focus({ nodeId: typeName, fieldName: op.field.name });
+  }, []);
+
+  const updateEvolutionPolicy = useCallback((policy: EvolutionPolicy): void => {
+    useUndoStore.getState().apply({ kind: 'set_evolution_policy', policy });
   }, []);
 
   const focusSelectedTypeName = useCallback((): void => {
@@ -631,10 +645,13 @@ export default function App(): React.JSX.Element {
             <ModelSyncBanner />
             <div className="relative flex-1 min-h-0">
               {hasSchema && (
-                <div className="absolute top-2 left-2 z-20 flex items-start gap-2">
+                <div className="absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-start gap-2">
+                  <EvolutionPolicyPanel policy={evolutionPolicy} onChange={updateEvolutionPolicy} />
                   <GraphLegend
                     showEnumNodes={graphLayout.showEnums}
                     showStdlibNodes={graphLayout.showStdlib}
+                    showRawTypes={legendVisibility.showRawTypes}
+                    showImportedNodes={legendVisibility.showImportedNodes}
                   />
                   <section
                     aria-label="Graph controls"
@@ -1017,6 +1034,48 @@ function typeKindLabel(type: TypeDef): TypeKindLabel {
   if (type.kind === 'enum') return 'enum';
   if (type.kind === 'discriminatedUnion') return 'union';
   return 'raw';
+}
+
+function hasVisibleImportedNodes(schema: Schema, showStdlibNodes: boolean): boolean {
+  const localNames = new Set(schema.types.map((type) => type.name));
+  return schema.types.some((type) => {
+    if (type.kind === 'discriminatedUnion') {
+      return type.variants.some((variant) =>
+        isVisibleImportedTarget(variant, localNames, showStdlibNodes),
+      );
+    }
+    if (type.kind !== 'object') return false;
+    return type.fields.some((field) => {
+      const target = unwrapRefTarget(field.type);
+      return target ? isVisibleImportedTarget(target, localNames, showStdlibNodes) : false;
+    });
+  });
+}
+
+function isVisibleImportedTarget(
+  typeName: string,
+  localNames: ReadonlySet<string>,
+  showStdlibNodes: boolean,
+): boolean {
+  const crossBoundary = typeName.includes('.') || !localNames.has(typeName);
+  if (!crossBoundary) return false;
+  return showStdlibNodes || !isStdlibRef(typeName);
+}
+
+function unwrapRefTarget(type: FieldType): string | undefined {
+  let current = type;
+  while (current.kind === 'array') current = current.element;
+  return current.kind === 'ref' ? current.typeName : undefined;
+}
+
+function isStdlibRef(typeName: string): boolean {
+  const [namespace, name, ...rest] = typeName.split('.');
+  return (
+    rest.length === 0 &&
+    namespace !== undefined &&
+    name !== undefined &&
+    STDLIB_REGISTRY.hasType(namespace, name)
+  );
 }
 
 function edgeSelectionLabel(edge: EdgeSelection): string {

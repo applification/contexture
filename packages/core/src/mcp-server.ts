@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ZodError, z } from 'zod';
 import { buildDomainBrief } from './domain-brief';
+import { describeEvolutionPolicy } from './evolution-policy';
 import { createFileBackedForward, nodeFileBackedFs } from './file-forward';
 import { checkGeneratedBundle, writeGeneratedBundle } from './generated-bundle-writer';
 import { GENERATED_TARGETS } from './generated-targets';
@@ -77,6 +78,13 @@ const GeneratedTargetInspectSchema = z.object({
   enabled: z.boolean(),
 });
 
+const EvolutionPolicyInspectSchema = z.object({
+  value: z.enum(['preserveData', 'resettable', 'scratch']),
+  label: z.string(),
+  guidance: z.string(),
+  agentInstruction: z.string(),
+});
+
 const ModelingHintInspectSchema = z.object({
   id: z.string(),
   kind: z.enum([
@@ -132,6 +140,7 @@ const InspectOutput = {
     }),
   ),
   outputConfig: z.unknown().optional(),
+  evolutionPolicy: EvolutionPolicyInspectSchema,
   generatedTargets: z.array(GeneratedTargetInspectSchema),
   modelingHints: z.array(ModelingHintInspectSchema),
   domainBrief: z.object({
@@ -155,6 +164,7 @@ const InspectOutput = {
 const InspectDomainBriefOutput = {
   path: z.string(),
   generatedPath: z.string(),
+  evolutionPolicy: EvolutionPolicyInspectSchema,
   brief: z.unknown(),
 };
 
@@ -223,6 +233,7 @@ const IntegrationGuidanceOutput = {
   sourceOfTruth: z.literal('.contexture.json'),
   safeLoop: z.array(z.string()),
   preferredMutationTools: z.array(z.string()),
+  evolutionPolicy: EvolutionPolicyInspectSchema,
   rules: z.array(z.string()),
   prompt: z.string(),
 };
@@ -291,6 +302,7 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
       return jsonToolResult({
         path: irPath,
         generatedPath: paths.domainBrief,
+        evolutionPolicy: describeEvolutionPolicy(schema),
         brief: buildDomainBrief(schema, { stdlib: options.stdlib }),
       });
     },
@@ -377,7 +389,8 @@ export function createContextureMcpServer(options: ContextureMcpServerOptions = 
     },
     async ({ irPath }) => {
       const path = assertContextureIrPath(irPath);
-      const structuredContent = buildIntegrationGuidance(path);
+      const { schema } = await readContextureFile(path);
+      const structuredContent = buildIntegrationGuidance(path, schema);
       return jsonToolResult(structuredContent);
     },
   );
@@ -580,6 +593,7 @@ function buildInspectSummary(
       path: imp.path,
     })),
     ...(schema.outputs ? { outputConfig: schema.outputs } : {}),
+    evolutionPolicy: describeEvolutionPolicy(schema),
     generatedTargets: GENERATED_TARGETS.map((target) => ({
       kind: target.kind,
       group: target.group,
@@ -750,6 +764,7 @@ function isSchemaLike(value: unknown): value is Schema {
 
 function buildIntegrationGuidance(
   irPath: string,
+  schema: Schema,
 ): z.infer<z.ZodObject<typeof IntegrationGuidanceOutput>> {
   const preferredMutationTools = createOpTools(async () => ({ error: 'guidance only' })).map(
     (tool) => tool.name,
@@ -765,8 +780,10 @@ function buildIntegrationGuidance(
     sourceOfTruth: '.contexture.json',
     safeLoop,
     preferredMutationTools,
+    evolutionPolicy: describeEvolutionPolicy(schema),
     rules: [
       'Treat the .contexture.json IR as the source of truth for domain-model changes.',
+      'Read evolutionPolicy before planning changes: preserveData means migration-aware and additive by default; resettable allows breaking remodels with a brief reset note; scratch allows exploratory deletes, renames, and restructures without repeated migration caveats.',
       'Do not hand-edit generated files with a @contexture-generated marker; change the IR and emit instead.',
       'Prefer typed op tools such as add_type, add_field, rename_type, set_table_flag, add_index, and add_search_index over apply_contexture_op when possible.',
       'Typed op tools take irPath plus their direct arguments. The generic apply_contexture_op takes { irPath, op } where op is the closed-world operation with a kind.',
@@ -774,7 +791,7 @@ function buildIntegrationGuidance(
       'After any model mutation, validate, emit generated targets, and check drift before finishing.',
       'Wire generated outputs into the existing app architecture; Contexture does not own arbitrary application code.',
     ],
-    prompt: `Use the Contexture MCP server to inspect ${irPath}, make domain-model changes with typed op tools, validate the IR, emit generated Convex and supporting targets, and check drift before finishing.`,
+    prompt: `Use the Contexture MCP server to inspect ${irPath}, read its evolutionPolicy before planning changes, make domain-model changes with typed op tools, validate the IR, emit generated Convex and supporting targets, and check drift before finishing.`,
   };
 }
 

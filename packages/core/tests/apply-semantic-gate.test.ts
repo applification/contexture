@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { getEvolutionPolicy } from '../src/evolution-policy';
 import type { Schema } from '../src/ir';
+import { IRSchema } from '../src/ir';
 import { apply, type Op, OpSchema } from '../src/ops';
 import type { StdlibCatalog } from '../src/semantic-validation';
 
@@ -21,6 +23,31 @@ const baseSchema: Schema = {
 };
 
 describe('apply() — delta semantic gate', () => {
+  it('defaults evolutionPolicy to preserveData and applies set_evolution_policy', () => {
+    expect(getEvolutionPolicy(baseSchema)).toBe('preserveData');
+    expect(
+      IRSchema.safeParse({ version: '1', metadata: { evolutionPolicy: 'scratch' }, types: [] }),
+    ).toMatchObject({ success: true });
+
+    const result = apply(baseSchema, { kind: 'set_evolution_policy', policy: 'scratch' });
+
+    expect(result).toMatchObject({
+      schema: { metadata: { evolutionPolicy: 'scratch' } },
+    });
+  });
+
+  it('rejects invalid evolutionPolicy values', () => {
+    const parsed = OpSchema.safeParse({
+      kind: 'set_evolution_policy',
+      policy: 'reckless',
+    });
+
+    expect(parsed.success).toBe(false);
+    expect(
+      IRSchema.safeParse({ version: '1', metadata: { evolutionPolicy: 'reckless' }, types: [] }),
+    ).toMatchObject({ success: false });
+  });
+
   it('rejects update_type patches that try to change identity through the wrong op', () => {
     const parsed = OpSchema.safeParse({
       kind: 'update_type',

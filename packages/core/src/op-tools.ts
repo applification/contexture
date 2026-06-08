@@ -24,7 +24,7 @@
  */
 
 import { type ZodTypeAny, z } from 'zod';
-import { IRSchema, IRSchemaObject, ObjectInvariantSchema } from './ir';
+import { EvolutionPolicySchema, IRSchema, IRSchemaObject, ObjectInvariantSchema } from './ir';
 import { type ApplyResult, type Op, OpSchema } from './ops';
 
 /**
@@ -308,6 +308,13 @@ function assertOp(value: Op, opName: string): void {
 export function createOpTools(forward: ForwardOp): OpToolDescriptor[] {
   return [
     // --- Field-level (strict) ---
+    strictTool(
+      'set_evolution_policy',
+      'Set how conservatively Contexture and agents should evolve this model: preserveData assumes real data, resettable allows breaking changes with reset impact, scratch allows exploratory remodels without migration caveats.',
+      { policy: EvolutionPolicySchema },
+      ({ policy }) => ({ kind: 'set_evolution_policy', policy }),
+      forward,
+    ),
     strictTool(
       'add_field',
       'Add a field to an object type.',

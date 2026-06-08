@@ -10,7 +10,7 @@ describe('GraphLegend', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
 
-    expect(screen.getByText('Table')).toBeInTheDocument();
+    expect(screen.getAllByText('table')[0]).toBeInTheDocument();
   });
 
   it('documents quiet field refs and active paths separately', () => {
@@ -28,6 +28,24 @@ describe('GraphLegend', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
 
     expect(screen.getByText('Inline enum')).toBeInTheDocument();
-    expect(screen.getByText('Enum')).toBeInTheDocument();
+    expect(screen.getAllByText('enum')[0]).toBeInTheDocument();
+  });
+
+  it('omits raw and imported cues when the visible graph does not use them', () => {
+    render(<GraphLegend />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
+
+    expect(screen.queryByText('raw')).not.toBeInTheDocument();
+    expect(screen.queryByText('Imported')).not.toBeInTheDocument();
+  });
+
+  it('documents raw and imported cues when the visible graph uses them', () => {
+    render(<GraphLegend showRawTypes showImportedNodes />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand legend' }));
+
+    expect(screen.getByText('raw')).toBeInTheDocument();
+    expect(screen.getByText('Imported')).toBeInTheDocument();
   });
 });
