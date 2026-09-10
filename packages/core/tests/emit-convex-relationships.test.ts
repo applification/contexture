@@ -46,6 +46,7 @@ describe('emitConvexRelationships', () => {
         module: ts.ModuleKind.ESNext,
         moduleResolution: ts.ModuleResolutionKind.Bundler,
         strict: true,
+        noUncheckedIndexedAccess: true,
         skipLibCheck: true,
         noEmit: true,
       });
