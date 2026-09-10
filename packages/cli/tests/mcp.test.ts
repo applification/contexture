@@ -143,7 +143,7 @@ describe('Contexture MCP server', () => {
     });
   });
 
-  it('inspects a .contexture.json file through @contexture/core', async () => {
+  it('inspects a .contexture.json file after discovering its output schema', async () => {
     const irPath = await fixtureIr({
       version: '1',
       metadata: { name: 'Garden', evolutionPolicy: 'scratch' },
@@ -158,6 +158,7 @@ describe('Contexture MCP server', () => {
     });
 
     await withClient(async (client) => {
+      await client.listTools();
       const result = await client.callTool({
         name: 'inspect_contexture',
         arguments: { irPath },

@@ -149,6 +149,7 @@ const InspectOutput = {
       tableCount: z.number(),
       invariantCount: z.number(),
       derivationCount: z.number(),
+      compatibilityContractCount: z.number(),
       relationshipCount: z.number(),
       queryContractCount: z.number(),
       unresolvedDecisionCount: z.number(),

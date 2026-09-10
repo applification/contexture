@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { emitConvexRelationships, type Schema } from '../src';
@@ -21,6 +23,42 @@ function emittedRelationships(source: string): Array<{
 }
 
 describe('emitConvexRelationships', () => {
+  it.each([false, true])('typechecks generated helpers with table refs: %s', (withRef) => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Target', table: true, fields: [] },
+        {
+          kind: 'object',
+          name: 'Source',
+          table: true,
+          fields: withRef ? [{ name: 'targetId', type: { kind: 'ref', typeName: 'Target' } }] : [],
+        },
+      ],
+    };
+    // Keep the temporary source under the package so it resolves the installed Convex.
+    const directory = mkdtempSync(join(process.cwd(), '.relationship-typecheck-'));
+    try {
+      const file = join(directory, 'relationships.ts');
+      writeFileSync(file, emitConvexRelationships(schema));
+      const program = ts.createProgram([file], {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        strict: true,
+        noUncheckedIndexedAccess: true,
+        skipLibCheck: true,
+        noEmit: true,
+      });
+      const errors = ts
+        .getPreEmitDiagnostics(program)
+        .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+      expect(errors).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('emits relationship metadata and generic app-layer helpers for table refs', () => {
     const schema: Schema = {
       version: '1',

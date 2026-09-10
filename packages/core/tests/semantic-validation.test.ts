@@ -824,6 +824,36 @@ describe('checkSemantic — duplicates', () => {
     );
   });
 
+  it('accepts indexes on inherited fields while still rejecting absent fields', () => {
+    const schema: Schema = {
+      version: '1',
+      types: [
+        { kind: 'object', name: 'Fields', fields: [{ name: 'key', type: { kind: 'string' } }] },
+        { kind: 'object', name: 'Base', extends: ['Fields'], fields: [] },
+        {
+          kind: 'object',
+          name: 'Fixture',
+          table: true,
+          extends: ['Base'],
+          fields: [],
+          indexes: [
+            { name: 'by_key', fields: ['key'] },
+            { name: 'by_missing', fields: ['missing'] },
+          ],
+          searchIndexes: [{ name: 'search_key', searchField: 'key' }],
+        },
+      ],
+    };
+    expect(
+      checkSemantic(schema, STDLIB).filter((issue) => issue.code.startsWith('convex_')),
+    ).toEqual([
+      expect.objectContaining({
+        code: 'convex_index_unknown_field',
+        path: 'types.2.indexes.1.fields.0',
+      }),
+    ]);
+  });
+
   it('rejects Convex indexes that reference missing fields', () => {
     const schema: Schema = {
       version: '1',
