@@ -145,6 +145,7 @@ function convexTableName(type: ObjectType): string {
 
 function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
   const issues: SemanticIssueDraft[] = [];
+  const byName = new Map(schema.types.map((type) => [type.name, type]));
   schema.types.forEach((type, typeIndex) => {
     if (type.kind !== 'object') return;
     if (type.table !== true) {
@@ -168,8 +169,8 @@ function checkConvexTableShapes(schema: Schema): SemanticIssueDraft[] {
       });
     }
 
-    const fieldNames = new Set(type.fields.map((field) => field.name));
-    const fieldsByName = new Map(type.fields.map((field) => [field.name, field]));
+    const fieldsByName = effectiveFields(type, byName);
+    const fieldNames = new Set(fieldsByName.keys());
     type.fields.forEach((field, fieldIndex) => {
       if (!field.name.startsWith('_')) return;
       issues.push({

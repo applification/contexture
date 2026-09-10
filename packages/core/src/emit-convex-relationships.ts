@@ -40,6 +40,9 @@ export function emitConvexRelationships(schema: Schema, sourcePath?: string): st
     '',
     `export const relationships = ${JSON.stringify(relationships, null, 2)} as const satisfies readonly ContextureRelationship[];`,
     '',
+    '// Generic helpers handle every relationship policy, including an empty model.',
+    'const relationshipRules: readonly ContextureRelationship[] = relationships;',
+    '',
     ...assertionHelpers(relationships),
     '',
     ...deleteHelpers(relationships),
@@ -176,7 +179,7 @@ function assertionHelpers(relationships: Relationship[]): string[] {
     `  table: string,`,
     `  input: ContextureSource,`,
     `): Promise<void> {`,
-    `  for (const relationship of relationships) {`,
+    `  for (const relationship of relationshipRules) {`,
     `    if (relationship.fromTable !== table) continue;`,
     `    await assertRelationshipRef(db, relationship, input);`,
     `  }`,
@@ -235,7 +238,7 @@ function deleteHelpers(relationships: Relationship[]): string[] {
     `  table: string,`,
     `  id: GenericId<string>,`,
     `): Promise<void> {`,
-    `  for (const relationship of relationships) {`,
+    `  for (const relationship of relationshipRules) {`,
     `    if (relationship.toTable !== table) continue;`,
     `    if (relationship.onDelete === 'restrict') {`,
     `      throw new Error(\`Delete is restricted while \${relationship.fromTable} may reference this \${table} document.\`);`,
@@ -251,7 +254,7 @@ function deleteHelpers(relationships: Relationship[]): string[] {
   if (relationships.some((relationship) => relationship.onDelete !== 'none')) {
     lines.push(
       '',
-      `export const contextureDeletePlans = relationships.filter((relationship) => relationship.onDelete !== 'none');`,
+      `export const contextureDeletePlans = relationshipRules.filter((relationship) => relationship.onDelete !== 'none');`,
     );
   }
   return lines;
