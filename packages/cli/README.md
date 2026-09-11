@@ -180,6 +180,12 @@ configure its **Trusted Publisher** on npmjs.com:
 - Environment: leave empty (the workflow does not name an environment)
 - Allow direct `npm publish` (stage-only permission cannot run this workflow)
 
+With npm 11.15+ and an authenticated owner account, the equivalent command is:
+
+```sh
+npm trust github @applification/contexture --repo=applification/contexture --file=release.yml --allow-publish --yes
+```
+
 Rerun the failed release jobs. Future tagged releases use GitHub OIDC and automatic
 provenance; no npm publishing token is stored in GitHub. The workflow pins npm
 11.16.0 and Node 24 and grants `id-token: write` only to the publishing job.

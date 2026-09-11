@@ -182,7 +182,10 @@ async function verifyMcp(cwd: string, irPath: string) {
     assert.equal(stderr, '');
   } finally {
     lines.close();
-    if (child.exitCode === null) child.kill();
+    if (child.exitCode === null) {
+      child.kill();
+      await closed;
+    }
   }
 }
 
@@ -424,8 +427,12 @@ try {
   console.log(
     `Verified ${filename} on ${process.platform}/${process.arch}, Node ${process.versions.node}: scripts-disabled ${source} install, CLI, bundled stdlib, drift failures, MCP, consumer Convex ${consumerConvexVersion}, committed frozen lockfile and production build install.`,
   );
+} catch (error) {
+  // Report the behavior failure even if a Windows file lock also prevents cleanup.
+  process.exitCode = 1;
+  console.error(error);
 } finally {
   server.closeAllConnections();
   server.close();
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 }
