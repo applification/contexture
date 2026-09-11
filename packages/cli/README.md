@@ -21,9 +21,8 @@ or registry credentials are needed by consumers. To select a particular release:
 pnpm add -D -E @applification/contexture@0.15.52 --ignore-scripts
 ```
 
-Version `0.15.52` is the first planned npm release; it becomes installable after
-publication. CI and production builds must use the committed lockfile rather than
-resolving `latest` independently on every build.
+Version `0.15.52` is the first npm release. CI and production builds must use the
+committed lockfile rather than resolving `latest` independently on every build.
 
 ## Use the project tooling
 
@@ -150,6 +149,14 @@ bytes against the tested artifact, runs the real npm install tests on all three 
 and only then publishes the GitHub draft as latest. The workspace manifest remains
 private to prevent accidental publication of TypeScript sources; publish the built
 tarball, not the workspace directory. Its generated manifest is public.
+
+New publications can be visible on npm's website and version endpoints before they
+are installable. npm's [publish-time scanning](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/)
+typically delays availability by about five minutes and can take longer. The publish
+job checks the package-manager install index every 30 seconds for up to 20 minutes
+before starting consumer tests. It logs pending availability, never republishes the
+version, and leaves GitHub as a draft if the wait expires. Once npm makes the version
+available, rerun failed jobs on the same tag.
 
 npm and GitHub cannot be published atomically. If npm succeeds and a later step fails,
 the npm version remains published and GitHub remains a draft. Rerun failed jobs on

@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { inspectNpmLatest, inspectNpmRelease } from './npm-registry';
+import { inspectNpmInstallability, inspectNpmLatest, inspectNpmRelease } from './npm-registry';
 
 const [command, directoryArgument] = process.argv.slice(2);
 assert.ok(
@@ -51,18 +51,28 @@ if (command === 'publish' && status === 'missing') {
   assert.equal(code, 0, 'npm publish failed; retry only with this same verified artifact');
 }
 
-for (let attempt = 0; attempt < 6; attempt += 1) {
+// npm scans new publications before exposing them to package managers. Allow
+// twenty minutes for index visibility; never republish while waiting for it.
+const deadline = Date.now() + (command === 'publish' ? 20 * 60_000 : 0);
+for (let attempt = 1; ; attempt += 1) {
   if (
     (await inspectNpmRelease(artifact, fetch)) === 'published' &&
-    (await inspectNpmLatest(artifact, fetch)) === version
+    (await inspectNpmLatest(artifact, fetch)) === version &&
+    (await inspectNpmInstallability(artifact, fetch)) === 'available'
   ) {
     console.log(
-      `Verified npm ${artifact.name}@${version}: metadata and downloaded bytes match the tested tarball.`,
+      `Verified npm ${artifact.name}@${version}: install index, metadata and downloaded bytes match the tested tarball.`,
     );
     process.exit(0);
   }
-  await setTimeout(2_000);
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) break;
+  console.log(
+    `Waiting for npm ${artifact.name}@${version} to become installable (check ${attempt}); npm may still be scanning this publication.`,
+  );
+  await setTimeout(Math.min(30_000, remaining));
+  if (Date.now() >= deadline) break;
 }
 throw new Error(
-  `npm ${artifact.name}@${version} is not visible yet; the GitHub release must remain a draft`,
+  `npm ${artifact.name}@${version} is not installable yet; keep the GitHub release as a draft and rerun failed jobs after npm makes it available`,
 );

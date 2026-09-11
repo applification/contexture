@@ -7,7 +7,40 @@ export interface NpmArtifact {
   integrity: string;
 }
 
-export type NpmRequest = (url: string | URL, init: { signal: AbortSignal }) => Promise<Response>;
+export type NpmRequest = (
+  url: string | URL,
+  init: { signal: AbortSignal; headers?: Record<string, string> },
+) => Promise<Response>;
+
+export async function inspectNpmInstallability(artifact: NpmArtifact, request: NpmRequest) {
+  // Version endpoints and tarballs can be visible while npm's publish-time scan
+  // still withholds the package index used by package managers.
+  const response = await request(
+    `https://registry.npmjs.org/${encodeURIComponent(artifact.name)}`,
+    {
+      signal: AbortSignal.timeout(30_000),
+      headers: { accept: 'application/vnd.npm.install-v1+json' },
+    },
+  );
+  if (response.status === 404) return 'pending';
+  if (!response.ok) throw new Error(`npm install index lookup failed: HTTP ${response.status}`);
+  const metadata = await response.json();
+  assert.equal(metadata.name, artifact.name, 'npm install index package name differs');
+  assert.ok(
+    metadata.versions && typeof metadata.versions === 'object',
+    'npm install index is missing versions',
+  );
+  const version = metadata.versions[artifact.version];
+  if (version === undefined) return 'pending';
+  assert.equal(version.name, artifact.name, 'npm install index version package name differs');
+  assert.equal(version.version, artifact.version, 'npm install index version differs');
+  assert.equal(
+    version.dist?.integrity,
+    artifact.integrity,
+    'npm install index differs from the tested artifact',
+  );
+  return 'available';
+}
 
 export async function inspectNpmLatest(
   artifact: NpmArtifact,
