@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
+import cliPackage from '../package.json';
 import { createContextureMcpServer } from '../src/mcp-server';
 
 async function fixtureIr(schema: unknown): Promise<string> {
@@ -569,7 +570,7 @@ describe('Contexture MCP server', () => {
       expect(result.structuredContent).toMatchObject({
         path: irPath,
         valid: true,
-        mcp: { version: '0.0.0' },
+        mcp: { version: cliPackage.version },
         errors: [],
         warnings: [
           expect.objectContaining({

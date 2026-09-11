@@ -1,6 +1,12 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createContextureMcpServer } from './mcp-server';
+import { CONTEXTURE_VERSION } from './version';
+
+if (process.argv.includes('--version') || process.argv.includes('-v')) {
+  process.stdout.write(`${CONTEXTURE_VERSION}\n`);
+  process.exit(0);
+}
 
 const server = createContextureMcpServer();
 const transport = new StdioServerTransport();

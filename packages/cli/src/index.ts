@@ -1,10 +1,9 @@
-#!/usr/bin/env bun
-import { readdir, stat } from 'node:fs/promises';
+#!/usr/bin/env node
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   analyzeModelingHints,
   assertContextureIrPath,
-  buildConvexCapabilityManifest,
   checkGeneratedBundle,
   checkSemantic,
   createFileBackedForward,
@@ -20,7 +19,9 @@ import {
   type TypeDef,
   writeGeneratedBundle,
 } from '@contexture/core';
+import { collectConvexCapabilities } from './convex-capabilities';
 import { STDLIB_REGISTRY, STDLIB_RUNTIME_MODULES } from './stdlib-runtime';
+import { CONTEXTURE_VERSION } from './version';
 
 const STDLIB_EMIT_DEPS = { stdlibRuntime: STDLIB_RUNTIME_MODULES } as const;
 
@@ -80,6 +81,7 @@ Schema mutations:
   replace-schema <schemaJson>
 
 Options:
+  --version, -v       Report the Contexture release version
   --ir <path>          Path to a .contexture.json file
   --json               Emit machine-readable JSON
   --op-json <json>     Inline op for \`apply\`
@@ -163,12 +165,12 @@ async function findIrPath(cwd: string): Promise<string> {
 }
 
 async function readSchema(irPath: string): Promise<Schema> {
-  const raw = await Bun.file(irPath).text();
+  const raw = await readFile(irPath, 'utf8');
   return load(raw).schema;
 }
 
 async function readJson(irPath: string): Promise<unknown> {
-  const raw = await Bun.file(irPath).text();
+  const raw = await readFile(irPath, 'utf8');
   try {
     return JSON.parse(raw);
   } catch (err) {
@@ -539,45 +541,6 @@ function writeResult(value: unknown, json: boolean): void {
   writeJson(value);
 }
 
-async function collectConvexCapabilities() {
-  const [{ v }, server, convexPackage, cliVersion, cliHelp] = await Promise.all([
-    import('convex/values'),
-    import('convex/server'),
-    import('convex/package.json'),
-    runCommand(['bunx', 'convex', '--version']),
-    runCommand(['bunx', 'convex', '--help']),
-  ]);
-
-  return buildConvexCapabilityManifest({
-    packageVersion: packageVersionFromModule(convexPackage),
-    cliVersion: cliVersion.trim() || null,
-    validators: Object.keys(v),
-    serverExports: Object.keys(server),
-    cliHelp,
-  });
-}
-
-function packageVersionFromModule(module: unknown): string | null {
-  const candidate =
-    module && typeof module === 'object' && 'default' in module ? module.default : module;
-  if (!candidate || typeof candidate !== 'object' || !('version' in candidate)) return null;
-  return typeof candidate.version === 'string' ? candidate.version : null;
-}
-
-async function runCommand(cmd: string[]): Promise<string> {
-  const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (exitCode !== 0) {
-    const detail = stderr.trim() || stdout.trim() || `exit code ${exitCode}`;
-    throw new Error(`${cmd.join(' ')} failed: ${detail}`);
-  }
-  return stdout;
-}
-
 function renderConvexCapabilitiesText(
   manifest: Awaited<ReturnType<typeof collectConvexCapabilities>>,
 ) {
@@ -594,13 +557,18 @@ function renderConvexCapabilitiesText(
 
 async function run(argv: string[]): Promise<void> {
   const { command, args, options } = parseArgv(argv);
+  if (command === '--version' || command === '-v' || command === 'version') {
+    if (options.json) writeJson({ ok: true, version: CONTEXTURE_VERSION });
+    else process.stdout.write(`${CONTEXTURE_VERSION}\n`);
+    return;
+  }
   if (command === 'help' || command === '--help' || command === '-h') {
     process.stdout.write(HELP);
     return;
   }
 
   if (command === 'convex-capabilities') {
-    const manifest = await collectConvexCapabilities();
+    const manifest = await collectConvexCapabilities(options.cwd);
     if (options.json) writeJson({ ok: true, manifest });
     else process.stdout.write(renderConvexCapabilitiesText(manifest));
     return;
@@ -731,7 +699,7 @@ async function run(argv: string[]): Promise<void> {
     const writableIrPath = assertContextureIrPath(irPath);
     let opJson = options.opJson;
     if (!opJson && options.opFile) {
-      opJson = await Bun.file(options.opFile).text();
+      opJson = await readFile(options.opFile, 'utf8');
     }
     if (!opJson) {
       throw new Error('apply requires --op-json <json> or --op-file <path>');

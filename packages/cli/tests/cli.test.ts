@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import cliPackage from '../package.json';
 
 const cliPath = new URL('../src/index.ts', import.meta.url).pathname;
 
@@ -48,7 +49,25 @@ async function runCli(cwd: string, args: string[]) {
   });
 }
 
-describe('@contexture/cli', () => {
+describe('@applification/contexture', () => {
+  it('fails capability inspection when the consumer has no installed Convex', async () => {
+    const { dir } = await fixtureProject();
+    const result = await runCli(dir, ['convex-capabilities', '--json']);
+    expect({ exitCode: result.exitCode, output: JSON.parse(result.stdout) }).toMatchObject({
+      exitCode: 1,
+      output: { ok: false, error: { message: expect.stringContaining('Install convex') } },
+    });
+  });
+
+  it('reports its package version without requiring a model', async () => {
+    const { dir } = await fixtureProject();
+    const result = await runCli(dir, ['--version', '--json']);
+    expect({ exitCode: result.exitCode, output: JSON.parse(result.stdout) }).toEqual({
+      exitCode: 0,
+      output: { ok: true, version: cliPackage.version },
+    });
+  });
+
   it('inspects schema as structured JSON', async () => {
     const { dir, irPath } = await fixtureProject();
     await writeFile(
