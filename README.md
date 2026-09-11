@@ -22,6 +22,10 @@ This is a Turborepo monorepo:
 | **Web** | [`apps/web/`](apps/web/) | Marketing website (Next.js) | Vercel (auto-deploy on merge to main) |
 | **stdlib** | [`packages/stdlib/`](packages/stdlib/) | Curated types library | — |
 | **runtime** | [`packages/runtime/`](packages/runtime/) | Published as `@contexture/runtime` | npm |
+| **CLI / MCP** | [`packages/cli/`](packages/cli/README.md) | Project-local Node 24 tooling (`@applification/contexture`) | npm + GitHub Releases |
+
+For consuming projects, follow the [CLI installation, MCP and upgrade guide](packages/cli/README.md).
+Install with `pnpm add -D -E @applification/contexture`; Bun is only required when developing Contexture itself.
 
 ## Prerequisites
 

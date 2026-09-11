@@ -8,6 +8,9 @@ permissions:
   contents: read
 
 jobs:
+  cli-package:
+    uses: ./.github/workflows/cli-package.yml
+
   quality:
     name: Quality checks
     runs-on: ubuntu-24.04
