@@ -161,7 +161,9 @@ async function verifyMcp(cwd: string, irPath: string) {
       );
       const result = await request('tools/call', { name, arguments: { irPath } });
       assert.notEqual(result.isError, true);
-      assert.equal(result.structuredContent?.path, irPath.replaceAll('\\', '/'));
+      const returnedPath = result.structuredContent?.path;
+      assert.ok(typeof returnedPath === 'string');
+      assert.equal(resolve(returnedPath), irPath);
       if (name === 'inspect_contexture') assert.equal(result.structuredContent?.typeCount, 1);
       if (name === 'validate_contexture') {
         assert.equal(result.structuredContent?.valid, true);
@@ -313,7 +315,7 @@ try {
   assert.ok(
     drift.drift.some(
       (file: { path: string; status: string }) =>
-        file.path === convexSchema.replaceAll('\\', '/') && file.status === 'drifted',
+        resolve(file.path) === convexSchema && file.status === 'drifted',
     ),
   );
   await cli(consumer, ['emit', '--json']);
